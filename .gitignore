@@ -40,6 +40,10 @@ id_rsa*
 # Mounted SUTs live in their own repo/workspace, not in the core repo
 /sut/
 
+# Onboarding workbench is an output dir; only its README belongs in core
+/.shared/skills/bugate/integration/workbench/*
+!/.shared/skills/bugate/integration/workbench/README.md
+
 # Logs / artifacts / temp
 *.log
 /artifacts/

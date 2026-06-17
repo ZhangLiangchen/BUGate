@@ -444,3 +444,63 @@ things that break the loop are equally important to guard: **nothing promotes**
 *Protocol authority: ADR-BUGATE-001 (Promotion Rule + Consequences). Mechanism:
 `scripts/memory_bus.py` (`note`/`search`/`handoff`/`session-start`) and
 `bin/promote-memory`. The generalization gate is policy, not a script.*
+
+---
+
+## Write-quality lint
+
+The `lint` subcommand (`bin/memory-service-lint`, which drives
+`scripts/memory_bus.py lint`) is the one *structural* check the toolchain does
+provide. It is SUT-neutral by construction: every rule is grounded in the
+driver's own constants and tag vocabulary, never in any product's tag families.
+It does **not** check content neutrality — that remains the §4 human/agent gate.
+
+It walks every memory under the resolved `project_tag()` namespace and applies
+`lint_findings()` to each record, plus a corpus-level `cardinality_warnings()`
+pass. Findings carry a `severity` of `error` or `warning`.
+
+### Per-record errors (hard violations)
+
+- **Missing required structural tags.** The namespace tag itself, plus a
+  `agent:*`, a `type:*`, and a `status:*` tag, are all required. Any missing one
+  is an error (`missing_namespace` / `missing_tag`).
+- **Invalid enum values.** `agent:`, `type:`, and `status:` are validated
+  against the driver's own constants — `VALID_AGENTS`, `VALID_TYPES`,
+  `VALID_STATUS` (the same vocabulary §2.2 lists). An out-of-enum value is an
+  error (`invalid_agent` / `invalid_type` / `invalid_status`).
+
+### Per-record warnings
+
+- **Unknown tag prefix.** Any tag whose prefix falls outside the driver's
+  governed vocabulary — `GOVERNED_TAG_PREFIXES` = `project`, `agent`, `type`,
+  `status`, `scope`, `task`, `msg` — is flagged `unknown_tag_prefix`. It is only
+  a warning, because the service or other callers may legitimately attach other
+  structured prefixes.
+- **Confirmed finding/decision without evidence.** A `status:confirmed` record
+  of `type:finding` or `type:decision` should carry an evidence/artifact
+  reference in metadata — one of `EVIDENCE_KEYS` (`artifact_paths`, `refs`,
+  `evidence`, `source_url`, `source`, `incident_path`). If none is present, it is
+  flagged `confirmed_without_evidence`. This is the lint complement to §4.6: a
+  promoted Core rule that records no evidence is incomplete.
+- **Handoff without a target.** A `type:handoff` record that declares no
+  `msg:to-<agent>` and is not `msg:broadcast` is flagged
+  `handoff_without_target`.
+
+### High-cardinality tag rule (corpus-level)
+
+`cardinality_warnings()` aggregates, across all checked memories, the distinct
+values seen for each tag key. If any single key carries **more than 8 distinct
+values** (`HIGH_CARDINALITY_THRESHOLD`), it is flagged `high_cardinality_tag`:
+such high-cardinality data belongs in *metadata*, not in tags. The `msg:` key is
+exempt — `msg:to-<agent>` / `msg:broadcast` legitimately fan out by agent.
+
+### How and when to run it
+
+Run `bin/memory-service-lint --include-warnings` to see warnings alongside the
+hard violations; without that flag, only errors are reported. The command
+**exits non-zero only on hard errors** (missing required tag or invalid enum) —
+warnings never affect the exit code. Treat it as the pre-promotion sanity check
+on a namespace's write quality: a clean error count means every record carries
+the required structural tags with valid enums, while the warning stream
+surfaces the softer governance gaps (missing evidence, untargeted handoffs,
+off-vocabulary or high-cardinality tags) for an author to reconcile by hand.

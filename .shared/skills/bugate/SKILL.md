@@ -32,6 +32,41 @@ framework. It separates reusable method from SUT-specific facts.
 | 5 | `04_execution_report.md` | Execution result, failures, and classification. |
 | 6 | `05_knowledge_update.md` | Reusable learnings and promotion candidates. |
 
+### Optional Full-SDTD modeling stages
+
+For complex use cases you may opt into three extra pre-Layer-3 modeling artifacts.
+They are not part of the required pre-code set; skip them for simple flows.
+
+| Stage | Artifact | Purpose |
+|---|---|---|
+| 1A | `01a_domain_model.md` | Business objects, attributes, relationships, and invariants. |
+| 1B | `01b_state_flow.md` | State catalog, flow steps, and transition table. |
+| 2A | `02a_test_dimension_matrix.yaml` | Explicit test-dimension selection before inventory. |
+
+Create them with `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init --full-sdtd`.
+`check_bugate_v13_semantics.py` validates them only when present, chaining
+`OBJ-`/`STATE-`/`TR-` ids across stages.
+
+For a filled, passing reference of the whole stack (a neutral demo SUT), see
+`examples/demo-sut/`.
+
+## Gate Enforcement
+
+The pre-code gates are not advisory. A PreToolUse hook runs
+`scripts/check_bugate.py` before a file write: when the write targets a
+profile-guarded implementation path and the configured pre-code artifacts are
+not present and accepted, the hook returns a non-zero decision and the write is
+blocked. Claude triggers it through the matched `file_path`; Codex triggers it
+through the `apply_patch` header. With no SUT profile mounted
+(`guarded_path_regex: []`) nothing is guarded, so the core stays usable.
+
+**Code-first requests.** If the user asks to skip straight to test
+implementation (Stage 4 / Layer 4), do not produce code. First build or confirm
+the configured pre-code artifacts (business brief, testability, inventory, and
+any profile-required readable/adversarial cases) and explain that implementation
+follows once those gates are accepted. Because the hook physically blocks
+guarded writes until then, jumping to code is rejected rather than helpful.
+
 ## References
 
 - Read `references/sdtd-constitution.md` for invariants.

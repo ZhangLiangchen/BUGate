@@ -25,6 +25,15 @@ PRECODE_ARTIFACTS = [
 POSTRUN_ARTIFACTS = ["04_execution_report.md", "05_knowledge_update.md"]
 ALL_ARTIFACTS = PRECODE_ARTIFACTS + POSTRUN_ARTIFACTS
 
+# Optional Full-SDTD modeling artifacts. They are NOT part of the required
+# pre-code set: a profile or use case opts into them "when needed" for complex
+# flows. The v1.3 semantic checker validates them only when present.
+OPTIONAL_PRECODE_ARTIFACTS = [
+    "01a_domain_model.md",
+    "01b_state_flow.md",
+    "02a_test_dimension_matrix.yaml",
+]
+
 
 def find_root(start: Path | None = None) -> Path:
     start = (start or Path.cwd()).resolve()
@@ -110,6 +119,97 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
     return data
 
 
+def strip_inline_comment(line: str) -> str:
+    """Drop a trailing ``  # ...`` comment, ignoring ``#`` inside quotes."""
+
+    quote: str | None = None
+    out: list[str] = []
+    for idx, char in enumerate(line):
+        if quote:
+            out.append(char)
+            if char == quote:
+                quote = None
+            continue
+        if char in {'"', "'"}:
+            quote = char
+            out.append(char)
+            continue
+        if char == "#" and (idx == 0 or line[idx - 1] in {" ", "\t"}):
+            break
+        out.append(char)
+    return "".join(out).rstrip()
+
+
+def parse_nested_yaml(text: str) -> Any:
+    """Parse the indented YAML subset used by nested BUGate artifacts.
+
+    Supports nested mappings, lists of scalars, lists of mappings (including a
+    first key on the dash line), inline ``[a, b]`` lists, and scalars. It is not
+    a general YAML parser, by design; BUGate core stays standard-library only.
+    """
+
+    rows: list[tuple[int, str]] = []
+    for raw in text.splitlines():
+        content = strip_inline_comment(raw)
+        if not content.strip():
+            continue
+        indent = len(content) - len(content.lstrip(" "))
+        rows.append((indent, content.strip()))
+    idx = [0]
+
+    def parse_map(indent: int) -> dict[str, Any]:
+        node: dict[str, Any] = {}
+        while idx[0] < len(rows):
+            cur_indent, line = rows[idx[0]]
+            if cur_indent != indent or line.startswith("- "):
+                break
+            if ":" not in line:
+                idx[0] += 1
+                continue
+            key, _, value = line.partition(":")
+            key = key.strip()
+            value = value.strip()
+            idx[0] += 1
+            node[key] = parse_scalar(value) if value else parse_child(indent)
+        return node
+
+    def parse_child(parent_indent: int) -> Any:
+        if idx[0] >= len(rows):
+            return None
+        cur_indent, line = rows[idx[0]]
+        if cur_indent <= parent_indent:
+            return None
+        return parse_list(cur_indent) if line.startswith("- ") else parse_map(cur_indent)
+
+    def parse_list(indent: int) -> list[Any]:
+        items: list[Any] = []
+        while idx[0] < len(rows):
+            cur_indent, line = rows[idx[0]]
+            if cur_indent != indent or not line.startswith("- "):
+                break
+            rest = line[2:].strip()
+            idx[0] += 1
+            if not rest:
+                items.append(parse_child(indent))
+            elif ":" in rest and rest[0] not in {"[", '"', "'"}:
+                key, _, value = rest.partition(":")
+                item: dict[str, Any] = {key.strip(): parse_scalar(value.strip()) if value.strip() else None}
+                while idx[0] < len(rows):
+                    sub_indent, sub_line = rows[idx[0]]
+                    if sub_indent <= indent or sub_line.startswith("- "):
+                        break
+                    item.update(parse_map(sub_indent))
+                    break
+                items.append(item)
+            else:
+                items.append(parse_scalar(rest))
+        return items
+
+    if idx[0] < len(rows) and rows[0][1].startswith("- "):
+        return parse_list(rows[0][0])
+    return parse_map(0)
+
+
 def split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     if not text.startswith("---\n"):
         return {}, text
@@ -190,6 +290,39 @@ def markdown_table_rows(text: str) -> list[list[str]]:
         if cells and not all(set(cell) <= {"-", ":"} for cell in cells):
             rows.append(cells)
     return rows
+
+
+def section_between(text: str, heading: str, level: str = "## ") -> str:
+    """Return the body of a ``## heading`` section up to the next same-level heading."""
+
+    marker = f"{level}{heading}"
+    start = text.find(marker)
+    if start < 0:
+        return ""
+    nxt = text.find(f"\n{level}", start + len(marker))
+    return text[start:] if nxt < 0 else text[start:nxt]
+
+
+def normalize_header(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+
+
+def table_dicts(text: str, heading: str) -> list[dict[str, str]]:
+    """Parse the markdown table under ``## heading`` into a list of row dicts.
+
+    Keys are the normalized header cells; empty rows are dropped.
+    """
+
+    rows = markdown_table_rows(section_between(text, heading))
+    if len(rows) < 2:
+        return []
+    headers = [normalize_header(cell) for cell in rows[0]]
+    result: list[dict[str, str]] = []
+    for row in rows[1:]:
+        if not any(cell.strip() for cell in row):
+            continue
+        result.append({headers[i]: (row[i] if i < len(row) else "") for i in range(len(headers))})
+    return result
 
 
 def parse_inventory_cases(text: str) -> list[dict[str, Any]]:

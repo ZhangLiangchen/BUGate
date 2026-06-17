@@ -10,17 +10,28 @@ sut_profile: TBD
 
 ## Canonical Business Flows
 
+## Clarification Gate
+
+| dimension | status | open question |
+|---|---|---|
+| objective | clear / discoverable / unknown | TBD |
+| done criteria | clear / discoverable / unknown | TBD |
+| scope | clear / discoverable / unknown | TBD |
+| constraints | clear / discoverable / unknown | TBD |
+| environment | clear / discoverable / unknown | TBD |
+| safety | clear / discoverable / unknown | TBD |
+
 ## Propositions
 
-| id | proposition | priority | verifiability |
-|---|---|---|---|
-| P-001 | TBD | TBD | TBD |
+| id | proposition | priority | verifiability | evidence_label |
+|---|---|---|---|---|
+| P-001 | TBD | TBD | TBD | fact / inferred / unknown |
 
 ## Business Oracles
 
-| id | oracle | observable evidence |
-|---|---|---|
-| O-001 | TBD | TBD |
+| id | oracle | observable evidence | evidence_label |
+|---|---|---|---|
+| O-001 | TBD | TBD | fact / inferred / unknown |
 
 ## Boundaries
 

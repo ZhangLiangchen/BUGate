@@ -23,7 +23,7 @@ changelog:
 # 零领域知识 QA 的 AI 辅助自动化测试方法论
 
 > *业务理解审计与缺陷发现的双层流程 · v1.1*
-> *配套文件：SOP.md（新人执行手册）、templates/（可复制工具模板）*
+> *配套文件：SOP.md（新人执行手册）、`.shared/skills/bugate/templates/`（01–05 gate 产物模板，复制即填）*
 
 ---
 
@@ -568,6 +568,14 @@ Wave 8   变异测试质量门                      → mutation-test-reports/
 
 度量是诊断信号，不是绩效指标。**禁止将上述指标作为个人 KPI**，否则会激励数字游戏（如人为放宽 unresolved 标准以提高收敛率）。
 
+### 8.4 事故驱动回归（让 §8.2 元指标有机制可依）
+
+§8.2 的「线上逃逸缺陷回溯命中率」只是一个**待测量的数字**，需要一个机制让它闭环：
+
+- **每个确认缺陷都要生成一条具名回归用例**——无论它来自 Wave 6 对抗审查、Wave 8 变异分数缺口，还是 §8.2 统计到的线上逃逸 bug——在缺陷关闭前，必须产出一条挂到该事故的命题/用例（在 `04_execution_report.md` 与 `05_knowledge_update.md` 的「Regression Cases」表中登记）。
+- **测试设计优先投向「曾经出过 bug 的区域」**：历史缺陷密度高的地方，下一轮用例覆盖优先级更高。
+- SUT 特有的事故库路径、断言规则号、环境名留在 **SUT profile**，不进 BUGate 核心。
+
 ---
 
 ## 9. 需求变更后的再生成机制
@@ -615,97 +623,79 @@ CI 定期跑 `detect_stale.py`：
 
 ## 10. 落地实施模板
 
-### 10.1 项目无关的目录结构
+> **方法论与已发布引擎的关系。** 本章讲「如何在一个项目里落地 BUGate」。先区分两类东西：
+>
+> - **方法论工作产物**（§1–§9 描述的 `.ai/` 下 Wave 产物、命题库、访谈记录等）：它们是你在分析过程中**逐步产出**的中间件，不是仓库预置文件，也不是安装前提。把它们放在一个工作目录（例如 `.ai/`）即可。
+> - **已发布的 BUGate 引擎**（本仓库 clone 即得）：pre-code 治理被实现为 **01–05 gate 产物栈** + `scripts/` 门与编排 + `.shared/skills/bugate/` 技能与 adapters。**这才是安装契约。** 下面的目录结构、hook 与初始化清单都以已发布引擎为准。
+>
+> 9-Wave 方法论的产物会**收敛**到 gate 产物栈：命题/oracle 落到 `01_business_brief.md`，层级决策落到 `02_testability.md`，用例清单落到 `03_inventory.yaml`，以此类推。
+
+### 10.1 已发布引擎的目录结构（项目无关）
 
 ```
 project-root/
-├── .ai/
-│   ├── wave-0/                       # Wave 0 产物
-│   │   ├── prd-health-report.yaml
-│   │   ├── prd-gap-report.yaml
-│   │   └── prd-routing-decision.md
-│   ├── raw-propositions/             # Wave 1 产物
-│   │   ├── ai-a.yaml
-│   │   ├── ai-b.yaml
-│   │   └── ai-c.yaml
-│   ├── audit/                        # Wave 2 产物
-│   │   ├── audit-report.md
-│   │   ├── consensus.yaml
-│   │   └── unresolved.yaml
-│   ├── interviews/                   # Wave 3 产物
-│   │   ├── Q-001-questionnaire.yaml
-│   │   └── Q-001-record.yaml
-│   ├── validated-model/              # 审计层最终产物
-│   │   ├── propositions.yaml
-│   │   ├── state-machines/
-│   │   ├── traceability-matrix.yaml
-│   │   └── unresolved.yaml
-│   ├── test-design/                  # 缺陷发现层产物
-│   │   ├── boundary-catalog.yaml
-│   │   ├── adversarial-scenarios/
-│   │   └── risk-weighted-priorities.yaml
-│   ├── metrics/                      # 过程与结果指标
-│   ├── schemas/                      # 所有 YAML schema
-│   └── scripts/                      # 确定性合并、漂移检测
-├── .claude/
-│   ├── agents/
-│   │   ├── prd-health-checker.md     # Wave 0
-│   │   ├── prd-reader-a.md           # Wave 1
-│   │   ├── prd-reader-b.md
-│   │   ├── prd-reader-c.md
-│   │   ├── business-model-builder.md # Wave 1-3 综合
-│   │   ├── test-case-designer.md     # Wave 5-6
-│   │   ├── adversarial-red-team.md   # Wave 6
-│   │   └── test-code-implementer.md  # Wave 7（三层隔离最后一层）
-│   ├── rules/
-│   └── hooks/
-└── .githooks/
+├── AGENTS.md                          # sentinel：脚本靠 AGENTS.md + .shared/ 定位根
+├── CLAUDE.md                          # 指向 AGENTS.md 的符号链接
+├── bugate.config.yaml                 # 核心默认配置；SUT profile 覆盖它
+├── scripts/                           # 纯标准库的门 + 编排引擎（clone 即用）
+├── .shared/skills/bugate/
+│   ├── SKILL.md
+│   ├── references/                    # 各层 gate 判据 + profile-schema
+│   ├── templates/                     # 01–05 gate 产物模板（+ 可选 01a/01b/02a）
+│   └── adapters/{claude,codex}/       # 各 runtime 的 agent / 命令路由卡
+├── docs/qa-methodology/               # 本方法论文档集（METHOD/SOP/...）
+├── examples/sample-sut.profile.yaml   # 可拷贝的样例 profile
+│
+├── <artifact_dir>/                    # profile 指定，例如 docs/usecases/UC-<PREFIX>-<NN>-<slug>/
+│   ├── 01_business_brief.md           #   每个用例一套 gate 产物
+│   ├── 02_testability.md
+│   ├── 03_inventory.yaml
+│   ├── 03a_test_cases.md
+│   ├── 03b_adversarial_cases.yaml
+│   ├── 04_execution_report.md
+│   └── 05_knowledge_update.md
+│
+└── .ai/                               # （可选）§1–§9 方法论工作产物，分析中间件，非安装前提
+    ├── wave-0/  raw-propositions/  audit/  interviews/  validated-model/  ...
+    └── scripts/                       # 方法论示意工具（如确定性合并）；核心未发布同名脚本
 ```
 
-### 10.2 三层 agent 隔离的 hook 模板
+### 10.2 agent 角色路径隔离的 hook（已发布机制）
 
-`hooks/pretooluse-three-layer-isolation.sh`：
+已发布的隔离机制是 `scripts/check_agent_role_paths.py`，**默认关闭**：
 
-```bash
-#!/usr/bin/env bash
-# 三层 agent 隔离：根据 CLAUDE_AGENT_ROLE 限制可读路径
+- 当前角色来自环境变量 `BUGATE_AGENT_ROLE`（未设置即放行一切）。
+- 角色与其禁读/禁写路径模式由**活动 SUT profile** 通过 `agent_roles:` 映射提供；核心不内置任何角色名或路径。
+- 接线：Claude Code 的 `PreToolUse`（matcher `Read|Edit|Write`）与 Codex 的 `apply_patch` 都调用本脚本。
 
-case "$CLAUDE_AGENT_ROLE" in
-  business-model-builder)
-    FORBIDDEN_PATTERNS=(src/ internal/ lib/ tests/)
-    ;;
-  test-case-designer)
-    FORBIDDEN_PATTERNS=(src/ internal/ lib/ api-spec/)
-    ;;
-  test-code-implementer)
-    FORBIDDEN_PATTERNS=(src/ internal/ lib/ api-spec/ docs/business/)
-    # 注意：可以读 tests/helpers/, tests/fixtures/
-    ;;
-esac
+profile 里配置三层隔离（builder / designer / implementer）示例：
 
-if [[ "$CLAUDE_TOOL_NAME" == "Read" ]]; then
-  for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
-    if [[ "$CLAUDE_TOOL_TARGET" == ${pattern}* ]]; then
-      echo "BLOCKED: $CLAUDE_AGENT_ROLE 禁止读取 ${pattern}"
-      exit 1
-    fi
-  done
-fi
-exit 0
+```yaml
+# bugate.config.yaml 或被引用的 profile
+agent_roles:
+  builder:                      # 业务模型构建者：不读实现/测试码
+    - "^src/.*"
+    - "^tests/.*"
+  designer:                     # 用例设计者：不读实现与 API spec
+    - "^src/.*"
+    - "^api-spec/.*"
+  implementer:                  # 测试实现者：不读业务实现，避免照搬实现当预期
+    read:
+      - "^src/.*"
+    write:
+      - "^docs/business/.*"
 ```
 
-### 10.3 项目初始化清单
+### 10.3 项目初始化清单（已发布引擎）
 
-1. 克隆模板目录结构
-2. 配置 PRD 路径至 `prd-health-checker.md` 与 `prd-reader-*.md`
-3. 配置源码路径至 hook 脚本（FORBIDDEN_PATTERNS）
-4. 配置测试框架至 `test-code-implementer.md`
-5. **跑一次 Wave 0**，确认 PRD 健康度达标
-6. 试跑 Wave 1-2，验证产物 schema 合规
-7. 校准 confidence 阈值与聚类相似度阈值
-8. 配置 pre-commit hooks
-9. 配置 CI 跑 detect_stale.py
-10. 写项目级 README，说明 PRD 段落对应的子系统映射
+1. clone BUGate（或作为子模块挂载）；确认 sentinel（`AGENTS.md` + `.shared/`）可被脚本定位。
+2. 写一个 SUT profile（见 `references/profile-schema.md`，可拷贝 `examples/sample-sut.profile.yaml`），设置 `artifact_dir`、`guarded_path_regex`、`agent_roles`、命令等。
+3. `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init`（复杂用例加 `--full-sdtd` 一并生成 01a/01b/02a）。
+4. 逐层跑门：`check_bugate_brief_semantics.py` / `check_bugate_layer2_semantics.py` / `check_bugate_inventory_semantics.py`，再 `check_bugate_v13_semantics.py <artifact_dir> --scope pre-code`。
+5. 需要双 agent 互审时跑 `sdtd_multiview_cli_bridge.py` / `sdtd_adversarial_cli_bridge.py`（检测到 CLI runtime 才真派发，否则确定性回退）。
+6. 执行后跑 `self_healing_mvp.py` + `generate_sdtd_reports.py` 产出 04/05。
+7. 把物理写门接到 runtime 的 `PreToolUse`（`scripts/check_bugate.py`）；需要角色隔离时再启用 `check_agent_role_paths.py`（`BUGATE_AGENT_ROLE` + profile `agent_roles`）。
+8. （可选）把 §1–§9 的 9-Wave 方法论工作产物放在 `.ai/` 下作为分析中间件，最终收敛到 01–05 gate 产物栈。
 
 ---
 
@@ -779,7 +769,7 @@ exit 0
 
 本方法论不是银弹。它无法解决组织文化层面的问题、完全未文档化的隐性知识、棕地系统的存量测试迁移、或方法论疲劳风险。但它给出一条**结构化、可落地、不依赖个人英雄主义**的工程路径——让"AI 辅助测试"从依赖资深 QA 经验的不稳定实践，变成任何 QA 都能可靠执行的标准化流程。
 
-具体的"明天如何执行"，由配套文件 **SOP.md** 提供。本方法论文档（METHOD.md）回答"为什么"；SOP.md 回答"怎么做"；`templates/` 提供"复制即可填写"的工具包。
+具体的"明天如何执行"，由配套文件 **SOP.md** 提供。本方法论文档（METHOD.md）回答"为什么"；SOP.md 回答"怎么做"；`.shared/skills/bugate/templates/` 提供"复制即可填写"的 01–05 gate 产物模板（用 `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init` 落地，没有单独的初始化脚本）。
 
 ---
 
@@ -801,4 +791,4 @@ exit 0
 
 ---
 
-*文档版本：v1.1 | 性质：通用方法论 | 配套：SOP.md, templates/ | v2 路线：棕地系统适配*
+*文档版本：v1.1 | 性质：通用方法论 | 配套：SOP.md, .shared/skills/bugate/templates/ | v2 路线：棕地系统适配*

@@ -2,3 +2,12 @@ adapters:
   brief_gate: brief-gate.md
   testability_gate: testability-gate.md
   inventory_gate: inventory-gate.md
+  sdtd_multiview: sdtd-multiview.md
+  sdtd_adversarial: sdtd-adversarial.md
+
+sdtd_workflow:
+  orchestrator: python3 scripts/sdtd_orchestrator.py <artifact_dir> --init
+  self_healing: python3 scripts/self_healing_mvp.py <artifact_dir>
+  reports: python3 scripts/generate_sdtd_reports.py <artifact_dir> --write
+  assertion_coverage: python3 scripts/generate_assertion_coverage_matrix.py <artifact_dir>
+  semantics_check: python3 scripts/check_bugate_v13_semantics.py <artifact_dir> --scope pre-code

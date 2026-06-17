@@ -55,17 +55,23 @@ No install is needed for this — the hooks invoke the same stdlib-only scripts 
 
 The core does nothing on its own; you mount a system under test via a **profile**.
 
-1. Create a profile, e.g. `sut/<name>.profile.yaml`, declaring your SUT's surfaces:
+1. Create a profile by copying the sample, then declare your SUT's surfaces:
+
+   ```bash
+   cp examples/sample-sut.profile.yaml sut/<name>.profile.yaml
+   ```
 
    ```yaml
    artifact_dir: docs/usecases                 # where UC artifacts (01–03…) live
    guarded_path_regex:                          # which test files the write-guard protects
-     - "tests/.*/test_uc_.*\\.py$"
+     - "tests/.*/test_.*\\.py$"
    required_precode_artifacts:                  # override the default 01–05 set if you want
      - 01_business_brief.md
      - 02_testability.md
      - 03_inventory.yaml
    ```
+
+   A filled, passing example gate stack lives in [`examples/demo-sut/`](examples/demo-sut/).
 
 2. Point the core at it in `bugate.config.yaml`:
 

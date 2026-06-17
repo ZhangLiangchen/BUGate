@@ -40,7 +40,9 @@ This is the minimum viable BUGate flow.
 The workflow expands from a simple three-layer gate into a fuller governed test
 development lifecycle:
 
-- domain model and state flow when needed,
+- domain model and state flow when needed (the optional `01a_domain_model.md`,
+  `01b_state_flow.md`, and `02a_test_dimension_matrix.yaml` modeling stack,
+  validated by `check_bugate_v13_semantics.py` only when present),
 - human-readable test-case review,
 - adversarial case review,
 - execution report,

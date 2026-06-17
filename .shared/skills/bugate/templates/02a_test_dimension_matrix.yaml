@@ -1,0 +1,44 @@
+gate: layer2a_test_dimension_matrix
+gate_status: pending
+sut_profile: TBD
+
+# Optional Full-SDTD stage 2A. Use this matrix to make test dimension selection
+# explicit before Layer 3 inventory cases are accepted. Build it after
+# 01b_state_flow.md and 02_testability.md. Skip for simple flows; it is not part
+# of the required pre-code set.
+
+dimension_matrix:
+  - id: DIM-001
+    category: flow  # flow | state | boundary | permission | error_handling | async | data_integrity | safety | contract | regression
+    intent: TBD
+    proposition_refs: [P-001]
+    oracle_refs: [O-001]
+    object_refs: [OBJ-001]
+    transition_refs: [TR-001]
+    risk_refs: [RISK-01]
+    selected_layer: e2e  # api | contract | integration | e2e | manual | deferred
+    priority: P0         # P0 | P1 | P2 | P3
+    evidence:
+      source: TBD
+      probe: null
+    coverage_decision:
+      include_in_layer3: yes  # yes | no | deferred
+      reason: TBD
+      deferred_to: null
+    candidate_cases:
+      - id_hint: CASE-001
+        case_intent: TBD
+        side_effect: read_only  # read_only | creates_resources | irreversible
+        data_strategy: fixed    # fixed | query_first | generated | create | unavailable
+
+coverage_rules:
+  p0_p1_must_have_oracle: true
+  high_risk_requires_case: true
+  every_strict_oracle_has_dimension: true
+  every_included_dimension_maps_to_inventory_case: false
+
+open_questions:
+  - id: Q-001
+    blocks_dimension: DIM-001
+    question: TBD
+    resolution_needed_before: not_blocking  # layer3 | code | execution | not_blocking

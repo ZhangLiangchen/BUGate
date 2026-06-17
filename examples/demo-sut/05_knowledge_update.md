@@ -1,12 +1,15 @@
 ---
 gate: knowledge_update
-gate_status: draft
-sut_profile: TBD
+gate_status: passed
+sut_profile: demo-sut (Linkly URL shortener)
 ---
 
 # Knowledge Update
 
 ## Reusable Findings
+
+Asserting the redirect status and Location header directly (without following
+redirects) is the reusable pattern for any redirect-based SUT.
 
 ## Regression Cases
 
@@ -20,6 +23,12 @@ sut_profile: TBD
 
 ## SUT Profile Updates
 
+Keep the expired-link fixture in the profile so O-003 stays cheap to exercise.
+
 ## BUGate Core Updates
 
+None; this slice used the core engine unchanged.
+
 ## Follow-ups
+
+Resolve Q-001 (confirm 410 vs 404) with the service owner, then tighten O-003.

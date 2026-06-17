@@ -28,18 +28,23 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
 
 ## Quickstart — mount a SUT
 
-1. Point `bugate.config.yaml` at your SUT profile (or keep `mode: core` for the unmounted engine):
+1. Copy the sample profile and point `bugate.config.yaml` at it (or keep `mode: core` for the unmounted engine):
 
-   ```yaml
-   profile: path/to/my-sut.profile.yaml
+   ```bash
+   cp examples/sample-sut.profile.yaml sut/my-sut.profile.yaml
    ```
 
-2. In the profile, declare the SUT's surfaces:
+   ```yaml
+   # bugate.config.yaml
+   profile: sut/my-sut.profile.yaml
+   ```
+
+2. In the profile, declare the SUT's surfaces (see [`examples/sample-sut.profile.yaml`](examples/sample-sut.profile.yaml) for the full, commented version):
 
    ```yaml
    artifact_dir: docs/usecases             # where UC artifacts live
    guarded_path_regex:                     # which test files the write-guard protects
-     - "tests/.*/test_uc_.*\\.py$"
+     - "tests/.*/test_.*\\.py$"
    required_precode_artifacts:             # override the default 01–05 set if needed
      - 01_business_brief.md
      - 02_testability.md
@@ -55,6 +60,12 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
 
 The core ships with `guarded_path_regex: []` (write-guard **disabled**) and an empty `artifact_dir`; a SUT profile turns these on.
 
+**Worked example.** [`examples/demo-sut/`](examples/demo-sut/) is a filled, passing 01–05 gate stack for a neutral fictional SUT (a URL shortener), including the optional `01a`/`01b`/`02a` modeling artifacts. It doubles as a smoke fixture — the repo's own gates run against it green:
+
+```bash
+python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+```
+
 ## Agent runtimes
 
 BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/`. The gate engine is **stdlib-only** (no third-party deps) and resolves the repo root git-free via a sentinel (`AGENTS.md` + `.shared/`). Note: adding or changing a Codex hook requires re-trusting its hash.
@@ -65,8 +76,10 @@ BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills
 bugate.config.yaml          # core config; a SUT profile overrides its values
 AGENTS.md                   # agent behavior protocol (SUT-neutral)
 scripts/                    # gate engine + SDTD orchestration (stdlib-only)
-.shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/
+.shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
 docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records
+examples/                   # sample SUT profile + a filled, passing demo gate stack
+.github/workflows/          # CI: py_compile, semantics gates, de-SUT guard
 ```
 
 ## License

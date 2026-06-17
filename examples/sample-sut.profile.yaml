@@ -1,0 +1,42 @@
+# Sample BUGate SUT profile — copy this to sut/<name>.profile.yaml and edit.
+#
+# A profile is merged on top of bugate.config.yaml by bugate_core.load_config.
+# Point BUGate at it via `profile:` in bugate.config.yaml or the BUGATE_PROFILE
+# env var. Replace every placeholder path/regex below with the real ones for
+# your system under test. See .shared/skills/bugate/references/profile-schema.md
+# for the full field reference, and examples/demo-sut/ for a filled gate stack.
+
+# Where this requirement's pre-code BUGate artifacts live (one dir per use case).
+artifact_dir: sut/example/bugate/REQ-001
+
+# Implementation paths physically blocked by scripts/check_bugate.py until the
+# pre-code artifacts below reach gate_status: passed. Empty list = nothing guarded.
+guarded_path_regex:
+  - "^sut/example/tests/.*\\.py$"
+
+# Artifact filenames that must reach gate_status: passed before guarded writes.
+# Add 01a_domain_model.md / 01b_state_flow.md / 02a_test_dimension_matrix.yaml
+# here only if you want the optional Full-SDTD modeling stack to be required.
+required_precode_artifacts:
+  - 01_business_brief.md
+  - 02_testability.md
+  - 03_inventory.yaml
+  - 03a_test_cases.md
+  - 03b_adversarial_cases.yaml
+
+# Agent-role path isolation (consulted by scripts/check_agent_role_paths.py when
+# BUGATE_AGENT_ROLE is set). Core ships no roles; the profile supplies them.
+agent_roles:
+  # Bare list: forbidden for both read and write under this role.
+  implementer:
+    - "^sut/example/docs/source_mirror/.*$"
+  # Split form: scope read and write independently.
+  designer:
+    read:
+      - "^sut/example/internal/.*$"
+    write:
+      - "^sut/example/tests/.*\\.py$"
+
+# Memory-bus project namespace/tag for all reads/writes (override per project).
+memory:
+  namespace: project:example-sut

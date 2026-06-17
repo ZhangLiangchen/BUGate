@@ -8,11 +8,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from bugate_core import ALL_ARTIFACTS, find_root, read_text, write_text
+from bugate_core import ALL_ARTIFACTS, OPTIONAL_PRECODE_ARTIFACTS, find_root, read_text, write_text
 
 
 ROOT = find_root()
 TEMPLATE_DIR = ROOT / ".shared" / "skills" / "bugate" / "templates"
+
+
+def _artifacts(full_sdtd: bool) -> list[str]:
+    return [*ALL_ARTIFACTS, *OPTIONAL_PRECODE_ARTIFACTS] if full_sdtd else list(ALL_ARTIFACTS)
 
 
 def copy_template(artifact_dir: Path, name: str) -> bool:
@@ -26,9 +30,9 @@ def copy_template(artifact_dir: Path, name: str) -> bool:
     return False
 
 
-def init(artifact_dir: Path) -> int:
+def init(artifact_dir: Path, full_sdtd: bool = False) -> int:
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    created = [name for name in ALL_ARTIFACTS if copy_template(artifact_dir, name)]
+    created = [name for name in _artifacts(full_sdtd) if copy_template(artifact_dir, name)]
     for name in created:
         print(f"created {name}")
     if not created:
@@ -36,8 +40,8 @@ def init(artifact_dir: Path) -> int:
     return 0
 
 
-def status(artifact_dir: Path) -> int:
-    for name in ALL_ARTIFACTS:
+def status(artifact_dir: Path, full_sdtd: bool = False) -> int:
+    for name in _artifacts(full_sdtd):
         print(f"{name}: {'present' if (artifact_dir / name).exists() else 'missing'}")
     return 0
 
@@ -102,6 +106,11 @@ def main() -> int:
     parser.add_argument("--init", action="store_true")
     parser.add_argument("--auto", action="store_true")
     parser.add_argument("--scope", choices=["pre-code", "post-run"], default="pre-code")
+    parser.add_argument(
+        "--full-sdtd",
+        action="store_true",
+        help="Also create/list the optional modeling artifacts (01a/01b/02a).",
+    )
     parser.add_argument("--run-cli-workers", action="store_true")
     parser.add_argument("--pytest-log", default="")
     parser.add_argument("--command", default="")
@@ -109,7 +118,7 @@ def main() -> int:
     parser.add_argument("--exit-code", type=int, default=0)
     args = parser.parse_args()
     if args.init:
-        return init(args.artifact_dir)
+        return init(args.artifact_dir, args.full_sdtd)
     if args.auto:
         if args.scope == "pre-code":
             return auto_precode(args.artifact_dir, args.run_cli_workers)
@@ -117,7 +126,7 @@ def main() -> int:
             print("--scope post-run requires --pytest-log and --command")
             return 2
         return auto_postrun(args.artifact_dir, args)
-    return status(args.artifact_dir)
+    return status(args.artifact_dir, args.full_sdtd)
 
 
 if __name__ == "__main__":

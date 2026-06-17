@@ -1,18 +1,26 @@
 ---
 gate: execution_report
-gate_status: draft
-sut_profile: TBD
+gate_status: passed
+sut_profile: demo-sut (Linkly URL shortener)
 ---
 
 # Execution Report
 
 ## Command
 
+profile-owned test runner over the three Linkly cases.
+
 ## Environment
+
+A local Linkly instance with an expired-link fixture.
 
 ## Result
 
+CASE-001 pass, CASE-002 pass, CASE-003 pass. All oracles held.
+
 ## Failure Classification
+
+No failures in this run.
 
 ## Regression Cases
 
@@ -24,4 +32,8 @@ sut_profile: TBD
 
 ## Rerun Or Repair Decision
 
+No rerun needed; the slice is green.
+
 ## Evidence Links
+
+Captured HTTP responses for each case are attached to the run record.

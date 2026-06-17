@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile all gate scripts
+        run: python3 -m py_compile scripts/*.py
+
+      - name: Brief semantics gate
+        run: python3 scripts/check_bugate_brief_semantics.py .shared/skills/bugate/templates
+
+      - name: Layer-2 semantics gate
+        run: python3 scripts/check_bugate_layer2_semantics.py .shared/skills/bugate/templates
+
+      - name: Inventory semantics gate
+        run: python3 scripts/check_bugate_inventory_semantics.py .shared/skills/bugate/templates
+
+      - name: V13 pre-code semantics gate
+        run: python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
+
+      - name: De-SUT forbidden-term guard
+        run: python3 scripts/check_no_sut_terms.py
