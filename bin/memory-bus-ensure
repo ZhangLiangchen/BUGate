@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Ensure the local memory service is up; start it in the background if not.
+# Git-free root via sentinel walk-up (AGENTS.md + .shared), pwd fallback.
+set -euo pipefail
+
+find_root() {
+  local dir
+  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || echo "$PWD")"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/AGENTS.md" ] && [ -d "$dir/.shared" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  echo "$PWD"
+}
+ROOT="$(find_root)"
+
+LOG_FILE="${TMPDIR:-/tmp}/bugate-memory-bus.log"
+PORT="${MCP_HTTP_PORT:-8000}"
+MAX_WAIT_SECONDS="${MEMORY_BUS_ENSURE_WAIT_SECONDS:-8}"
+
+health_ok() {
+  python3 "$ROOT/scripts/memory_bus.py" status --json >/dev/null 2>&1
+}
+
+if health_ok; then
+  exit 0
+fi
+
+mkdir -p "$(dirname "$LOG_FILE")"
+
+# Avoid starting duplicate launchers when multiple hooks fire close together.
+if ! pgrep -f "memory.*launch.*--port ${PORT}" >/dev/null 2>&1; then
+  {
+    printf '[%s] starting BUGate memory bus on 127.0.0.1:%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$PORT"
+    nohup "$ROOT/bin/memory-bus-start" >>"$LOG_FILE" 2>&1 &
+  } >/dev/null 2>&1
+fi
+
+for _ in $(seq 1 "$MAX_WAIT_SECONDS"); do
+  if health_ok; then
+    printf 'Memory bus was not running; started successfully.\n'
+    exit 0
+  fi
+  sleep 1
+done
+
+printf 'Memory bus unavailable after ensure attempt; continuing without it. See %s\n' "$LOG_FILE" >&2
+exit 0

@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Wave 8 periodic quality-evidence run (BUGate core, SUT-neutral).
+#
+# Re-runs oracle falsification on the current real evidence pool, then
+# regenerates the assertion coverage matrix + Wave 8 audit from that result:
+#   <REPORTS_DIR>/oracle_falsification_result.{json,md}
+#   <REPORTS_DIR>/assertion_coverage_matrix.md
+#
+# The Wave 8 evidence glob is SUT-specific and is NOT hardcoded here. Supply it
+# via the WAVE8_EVIDENCE_GLOB env var, or via the active BUGate profile/config
+# key `wave8_evidence_glob` (the simple BUGate YAML parser flattens nested keys,
+# so an indented `wave8:\n  evidence_glob: ...` block is read as `evidence_glob`
+# or `wave8_evidence_glob`). If neither is set, this script prints a hint and
+# exits non-zero rather than guessing a SUT path.
+#
+# Optional overrides:
+#   WAVE8_REPORTS_DIR     Output directory (default: <ROOT>/reports).
+#   WAVE8_ARTIFACT_ROOT   Root scanned for 03_inventory.yaml (default: <ROOT>).
+#   BUGATE_PROFILE        Profile path passed through to the falsifier.
+#
+# Enable weekly automation with EITHER:
+#   crontab:  0 9 * * 1  cd /path/to/bugate && WAVE8_EVIDENCE_GLOB='...' bin/wave8-weekly >> reports/wave8_weekly.log 2>&1
+#   launchd:  a LaunchAgent invoking this script with StartCalendarInterval (Weekday=1, Hour=9),
+#             with WAVE8_EVIDENCE_GLOB set in the LaunchAgent's EnvironmentVariables.
+#
+# The run is offline (no live API calls, no test edits); git history dates
+# successive reports.
+set -euo pipefail
+
+# Git-free root via sentinel walk-up (AGENTS.md + .shared), pwd fallback.
+find_root() {
+  local dir
+  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || echo "$PWD")"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/AGENTS.md" ] && [ -d "$dir/.shared" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  echo "$PWD"
+}
+ROOT="$(find_root)"
+cd "$ROOT"
+
+# Resolve the evidence glob: env var wins, else fall back to the active profile.
+EVIDENCE_GLOB="${WAVE8_EVIDENCE_GLOB:-}"
+if [ -z "$EVIDENCE_GLOB" ]; then
+  EVIDENCE_GLOB="$(
+    python3 - "$ROOT" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1] + "/scripts")
+try:
+    from bugate_core import load_config
+    cfg = load_config()
+except Exception:
+    cfg = {}
+print(cfg.get("wave8_evidence_glob") or cfg.get("evidence_glob") or "")
+PY
+  )"
+fi
+
+if [ -z "$EVIDENCE_GLOB" ]; then
+  cat >&2 <<'HINT'
+[wave8-weekly] No Wave 8 evidence glob configured.
+
+Set one of:
+  * env var:  WAVE8_EVIDENCE_GLOB='<path/glob to real captured evidence JSON>'
+  * config:   add `wave8_evidence_glob: '<glob>'` to bugate.config.yaml or your
+              active SUT profile (the BUGate YAML parser also accepts a
+              `wave8:` block with an indented `evidence_glob:` line).
+
+The Wave 8 evidence glob is SUT-specific and is intentionally not hardcoded.
+HINT
+  exit 1
+fi
+
+REPORTS_DIR="${WAVE8_REPORTS_DIR:-$ROOT/reports}"
+ARTIFACT_ROOT="${WAVE8_ARTIFACT_ROOT:-$ROOT}"
+mkdir -p "$REPORTS_DIR"
+
+ORACLE_JSON="$REPORTS_DIR/oracle_falsification_result.json"
+ORACLE_MD="$REPORTS_DIR/oracle_falsification_result.md"
+MATRIX_MD="$REPORTS_DIR/assertion_coverage_matrix.md"
+
+echo "[wave8-weekly] $(date -u +%FT%TZ) evidence glob: $EVIDENCE_GLOB"
+
+oracle_args=(--evidence "$EVIDENCE_GLOB" --json-output "$ORACLE_JSON" --md-output "$ORACLE_MD")
+if [ -n "${BUGATE_PROFILE:-}" ]; then
+  oracle_args+=(--profile "$BUGATE_PROFILE")
+fi
+python3 "$ROOT/scripts/oracle_falsification.py" "${oracle_args[@]}"
+
+python3 "$ROOT/scripts/generate_assertion_coverage_matrix.py" \
+  --mutation-result "$ORACLE_JSON" \
+  --artifact-root "$ARTIFACT_ROOT" \
+  --output "$MATRIX_MD"
+
+echo "[wave8-weekly] done. Review survived falsifications and bare/missing assertions:"
+echo "  $ORACLE_MD"
+echo "  $MATRIX_MD"

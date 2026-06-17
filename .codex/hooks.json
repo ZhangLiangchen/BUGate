@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_bugate.py\""
+          },
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_plan_lock.py\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/bugate_prompt_reminder.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

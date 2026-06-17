@@ -1,0 +1,4 @@
+adapters:
+  brief_gate: brief-gate.md
+  testability_gate: testability-gate.md
+  inventory_gate: inventory-gate.md

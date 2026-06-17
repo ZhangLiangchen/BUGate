@@ -1,0 +1,19 @@
+gate: layer3_inventory
+gate_status: pending
+sut_profile: TBD
+cases:
+  - id: CASE-001
+    intent: TBD
+    priority: TBD
+    proposition_refs:
+      - P-001
+    oracle_refs:
+      - O-001
+    layer_decision: TBD
+    preconditions: []
+    data_source:
+      source: TBD
+      status: pending
+    expected_observations: []
+    implementation_target: TBD
+coverage_deferred: []

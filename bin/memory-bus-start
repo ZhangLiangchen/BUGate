@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Launch the local mcp-memory-service for BUGate.
+#
+# The memory service binary + its ONNX model are installed by the USER. This
+# wrapper only configures the storage dir / API keys and launches it. It is
+# git-free: the project root is found via a sentinel walk-up (AGENTS.md + .shared)
+# with a pwd fallback, so it works in plain (non-git) checkouts too.
+set -euo pipefail
+
+# --- git-free root: walk up for the AGENTS.md + .shared sentinel -------------
+find_root() {
+  local dir="${PWD}"
+  # Prefer the directory containing this script's parent, then walk up.
+  local start
+  start="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || echo "$PWD")"
+  dir="$start"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/AGENTS.md" ] && [ -d "$dir/.shared" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  echo "$PWD"
+}
+ROOT="$(find_root)"
+
+export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-$ROOT/.memory_bus}"
+export MCP_MEMORY_STORAGE_BACKEND="${MCP_MEMORY_STORAGE_BACKEND:-sqlite_vec}"
+# PyTorch-free embeddings via ONNX. The model must already exist under
+# ~/.cache/mcp_memory/onnx_models (pre-download once; the in-service downloader
+# cannot traverse a socks all_proxy). Set MCP_MEMORY_USE_ONNX=0 to fall back.
+export MCP_MEMORY_USE_ONNX="${MCP_MEMORY_USE_ONNX:-1}"
+mkdir -p "$MCP_MEMORY_BASE_DIR"
+
+# --- generate client API keys once (git-ignored) ----------------------------
+if [ ! -f "$MCP_MEMORY_BASE_DIR/client.env" ]; then
+  TOKEN="$(python3 - <<'PY'
+import secrets
+print(secrets.token_urlsafe(32))
+PY
+)"
+  umask 077
+  {
+    printf 'MCP_API_KEY=%s\n' "$TOKEN"
+    printf 'MCP_API_KEY_AGENT=%s\n' "$TOKEN"
+    printf 'MCP_API_KEY_HUMAN=%s\n' "$TOKEN"
+  } > "$MCP_MEMORY_BASE_DIR/client.env"
+fi
+set -a
+. "$MCP_MEMORY_BASE_DIR/client.env"
+set +a
+
+# --- resolve the `memory` binary: project venv OR PATH ----------------------
+MEMORY_BIN=""
+if [ -x "$ROOT/.venv/bin/memory" ]; then
+  MEMORY_BIN="$ROOT/.venv/bin/memory"
+elif command -v memory >/dev/null 2>&1; then
+  MEMORY_BIN="$(command -v memory)"
+fi
+
+if [ -z "$MEMORY_BIN" ]; then
+  cat >&2 <<'HINT'
+memory-bus-start: the `memory` binary (mcp-memory-service) was not found.
+
+Install it (the service + model are user-provided; BUGate only ships the driver):
+
+  pip install mcp-memory-service
+
+Then pre-download the ONNX embedding model once so the service can run offline /
+behind a proxy:
+
+  mkdir -p ~/.cache/mcp_memory/onnx_models
+  # fetch the all-MiniLM-L6-v2 ONNX model into that directory
+
+It must be importable as `memory` on PATH or installed into <root>/.venv/bin/memory.
+HINT
+  exit 1
+fi
+
+exec "$MEMORY_BIN" launch --host 127.0.0.1 --port "${MCP_HTTP_PORT:-8000}" "$@"

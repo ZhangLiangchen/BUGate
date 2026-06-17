@@ -1,0 +1,10 @@
+gate: adversarial_cases
+gate_status: pending
+sut_profile: TBD
+adversarial_cases:
+  - id: ADV-001
+    risk: TBD
+    scenario: TBD
+    expected_oracle_pressure: TBD
+    disposition: pending
+residual_risks: []

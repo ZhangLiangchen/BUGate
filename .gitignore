@@ -1,0 +1,48 @@
+# ── BUGate core .gitignore (SUT-neutral) ──
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local agent + memory state — SUT-mounted, never part of core
+.memory_bus/
+.shared/memory/
+.shared/progress/
+.shared/memory-service-archive/
+.codex/memories/
+.claude/memory/
+
+# Secrets / environments — never commit
+.env
+.env.*
+!.env.example
+**/secrets.*
+**/*.secret
+*.pem
+*.key
+id_rsa*
+*_keypair*
+*mnemonic*
+
+# Mounted SUTs live in their own repo/workspace, not in the core repo
+/sut/
+
+# Logs / artifacts / temp
+*.log
+/artifacts/
+/tmp/
+*.tmp
+*.bak

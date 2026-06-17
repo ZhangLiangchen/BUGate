@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Stop the local memory service. Git-free root via sentinel walk-up.
+set -euo pipefail
+
+find_root() {
+  local dir
+  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || echo "$PWD")"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/AGENTS.md" ] && [ -d "$dir/.shared" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  echo "$PWD"
+}
+ROOT="$(find_root)"
+
+export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-$ROOT/.memory_bus}"
+if [ -f "$MCP_MEMORY_BASE_DIR/client.env" ]; then
+  set -a
+  . "$MCP_MEMORY_BASE_DIR/client.env"
+  set +a
+fi
+
+MEMORY_BIN=""
+if [ -x "$ROOT/.venv/bin/memory" ]; then
+  MEMORY_BIN="$ROOT/.venv/bin/memory"
+elif command -v memory >/dev/null 2>&1; then
+  MEMORY_BIN="$(command -v memory)"
+fi
+
+if [ -z "$MEMORY_BIN" ]; then
+  echo "memory-bus-stop: \`memory\` binary not found; nothing to stop." >&2
+  exit 0
+fi
+
+exec "$MEMORY_BIN" stop "$@"

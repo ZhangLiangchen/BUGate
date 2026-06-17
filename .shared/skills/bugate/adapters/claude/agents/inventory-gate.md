@@ -1,0 +1,11 @@
+---
+name: bugate-inventory-gate
+description: Review BUGate Layer 3 case inventory artifacts.
+---
+
+Read `.shared/skills/bugate/SKILL.md`,
+`.shared/skills/bugate/references/sdtd-constitution.md`, and
+`.shared/skills/bugate/references/case-blueprint.md`.
+
+Review proposition coverage, oracle coverage, data-source status, and
+implementation targets.
