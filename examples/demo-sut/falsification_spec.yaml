@@ -1,0 +1,79 @@
+# Declarative Wave 8 oracle-falsification spec for the demo SUT (Linkly).
+# The engine (scripts/oracle_falsification.py) is SUT-neutral; this spec supplies
+# the oracles (declarative field assertions), the field-level mutations, and the
+# evidence glob. No SUT code is imported. Evidence paths are relative to this file.
+
+evidence_glob: evidence/*.json
+
+oracles:
+  - id: O-001
+    name: created_link_mapping
+    assert:
+      - path: code
+        op: equals
+        value: 200
+      - path: data
+        op: present
+      - path: data.original_url
+        op: nonempty
+      - path: data.short_code
+        op: nonempty
+  - id: O-002
+    name: active_link_redirects
+    assert:
+      - path: data.status
+        op: equals
+        value: active
+      - path: data.redirect_status
+        op: equals
+        value: 302
+
+mutations:
+  - id: envelope_500
+    category: envelope_error
+    path: code
+    op: set
+    value: 500
+    expected_fail_reason: the mapping oracle must reject a non-200 envelope code
+    action_if_survived: add an envelope-code assertion to O-001
+  - id: data_null
+    category: missing_key_field
+    path: data
+    op: set
+    value: null
+    expected_fail_reason: the mapping oracle must reject a null data payload
+    action_if_survived: add a data-present assertion to O-001
+  - id: drop_original_url
+    category: missing_key_field
+    path: data.original_url
+    op: delete
+    expected_fail_reason: the mapping oracle must reject a missing original_url
+    action_if_survived: add an original_url assertion to O-001
+  - id: empty_short_code
+    category: missing_key_field
+    path: data.short_code
+    op: set
+    value: ""
+    expected_fail_reason: the mapping oracle must reject an empty short_code
+    action_if_survived: add a short_code nonempty assertion to O-001
+  - id: status_regression
+    category: status_regression
+    path: data.status
+    op: set
+    value: expired
+    expected_fail_reason: the redirect oracle must reject a non-active status
+    action_if_survived: assert the exact active status in O-002
+  - id: redirect_regression
+    category: status_regression
+    path: data.redirect_status
+    op: set
+    value: 200
+    expected_fail_reason: the redirect oracle must reject a non-302 redirect status
+    action_if_survived: assert the exact 302 redirect status in O-002
+  - id: expiry_drift
+    category: boundary
+    path: data.expires_at
+    op: set
+    value: "2000-01-01T00:00:00Z"
+    expected_fail_reason: an expiry oracle should reject a past expiry on an active link
+    action_if_survived: no oracle covers expires_at — add an expiry-consistency assertion or accept this boundary

@@ -16,6 +16,26 @@ python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope pre-code
 python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
 ```
 
+## Wave 8 quality (oracle falsification + coverage matrix)
+
+`falsification_spec.yaml` + `evidence/` drive the SUT-neutral falsification
+engine: it mutates the captured evidence field by field and scores how many wrong
+states the declarative oracles catch.
+
+```bash
+# from the repo root
+python3 scripts/oracle_falsification.py --spec examples/demo-sut/falsification_spec.yaml \
+  --json-output /tmp/of.json --md-output /tmp/of.md --gate          # ~85.7% (>= 0.70 gate)
+python3 scripts/generate_assertion_coverage_matrix.py --artifact-root examples/demo-sut \
+  --spec examples/demo-sut/falsification_spec.yaml --mutation-result /tmp/of.json --output /tmp/matrix.md
+```
+
+Expected: 6 mutations killed, 1 survived (`expiry_drift` — no oracle covers
+`expires_at`, so the engine flags the gap). The coverage matrix marks O-001/O-002
+`covered` and **O-003 `missing_implementation`** on purpose: CASE-003 references the
+expiry oracle but the active-link spec does not define it — exactly the bug-catch
+the matrix exists for. Extend the spec with an expired-link oracle to close it.
+
 ## What is here
 
 | File | Stage |

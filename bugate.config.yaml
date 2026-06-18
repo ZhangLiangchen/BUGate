@@ -11,6 +11,13 @@ memory:
 # SUT profiles should override these values outside the BUGate core.
 artifact_dir:
 guarded_path_regex: []
+
+# Wave 8 oracle falsification (default unmounted → oracle_falsification.py reports
+# profile_required). A SUT profile points at a declarative oracle/mutation spec and
+# an optional score threshold (0-1). See references/profile-schema.md and the worked
+# spec at examples/demo-sut/falsification_spec.yaml.
+#   falsification_spec: sut/example/falsification_spec.yaml
+#   falsification_threshold: 0.7
 required_precode_artifacts:
   - 01_business_brief.md
   - 02_testability.md

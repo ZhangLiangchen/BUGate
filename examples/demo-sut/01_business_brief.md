@@ -31,11 +31,11 @@ Out of scope: authentication, rate limiting, and analytics.
 
 ## Propositions
 
-| id | proposition | priority | verifiability | evidence_label |
-|---|---|---|---|---|
-| P-001 | Creating a short link for a valid URL returns a unique short code that maps to that URL. | P0 | api | fact |
-| P-002 | Visiting an active short code redirects the client to the original URL. | P0 | e2e | fact |
-| P-003 | Visiting an expired short code returns HTTP 410 and does not redirect. | P1 | api | fact |
+| id | proposition | priority | verifiability | evidence_label | source |
+|---|---|---|---|---|---|
+| P-001 | Creating a short link for a valid URL returns a unique short code that maps to that URL. | P0 | api | fact | Linkly API spec, Create Link |
+| P-002 | Visiting an active short code redirects the client to the original URL. | P0 | e2e | fact | Linkly API spec, Redirect |
+| P-003 | Visiting an expired short code returns HTTP 410 and does not redirect. | P1 | api | fact | Linkly API spec, Expiry |
 
 ## Business Oracles
 

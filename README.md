@@ -19,7 +19,7 @@ One core can mount **one** SUT or **many** (N=1 is just the degenerate case). Th
 Test development is gated through layered artifacts; code is blocked until the pre-code artifacts reach `gate_status: passed`:
 
 1. **Layer 1 — Business Brief** (`01_business_brief.md`) — SUT boundary, propositions (`P-xxx`), business oracles (`O-xxx`), boundaries, states, open questions.
-2. **Layer 2 — Testability** (`02_testability.md`) — the cheapest valid test layer per proposition, resource strategy, side-effect classification, skip/xfail rules.
+2. **Layer 2 — Testability** (`02_testability.md`) — the cheapest valid test layer per proposition, resource strategy, side-effect classification, and deferral decisions.
 3. **Layer 3 — Inventory** (`03_inventory.yaml`) — concrete cases bound to propositions + oracles.
 4. **Layer 3A / 3B** (`03a_test_cases.md`, `03b_adversarial_cases.yaml`) — human-readable review cases + adversarial/red-team cases.
 5. **Layer 4 — Code** — written only after the above pass.

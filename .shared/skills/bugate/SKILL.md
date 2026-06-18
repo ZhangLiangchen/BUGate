@@ -85,6 +85,7 @@ guarded writes until then, jumping to code is rejected rather than helpful.
 - Multi-view core bridge: `python3 scripts/sdtd_multiview_cli_bridge.py run-all <artifact_dir>`
 - Adversarial core bridge: `python3 scripts/sdtd_adversarial_cli_bridge.py run-all <artifact_dir>`
 - Post-run reports: `python3 scripts/self_healing_mvp.py ...` then `python3 scripts/generate_sdtd_reports.py <artifact_dir> ... --write`
+- Wave 8 quality: `python3 scripts/oracle_falsification.py --spec <spec.yaml> --gate` then `python3 scripts/generate_assertion_coverage_matrix.py --artifact-root <dir> --spec <spec.yaml> --mutation-result <result.json>` — declarative oracle falsification scoring + 5-state coverage matrix; reports `profile_required` without a spec.
 
 SUT profiles may wrap these commands with product-specific paths, peer runtime
 dispatch, evidence fetchers, and assertion runners. Core commands must remain

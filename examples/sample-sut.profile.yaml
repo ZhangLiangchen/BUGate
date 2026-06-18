@@ -37,6 +37,12 @@ agent_roles:
     write:
       - "^sut/example/tests/.*[.]py$"
 
+# Wave 8 oracle falsification: a declarative oracle/mutation spec + score gate.
+# The engine (scripts/oracle_falsification.py) is SUT-neutral; the spec supplies
+# the oracles, mutations, and evidence. See examples/demo-sut/falsification_spec.yaml.
+falsification_spec: examples/demo-sut/falsification_spec.yaml
+falsification_threshold: 0.7
+
 # Memory-bus project namespace/tag for all reads/writes (override per project).
 memory:
   namespace: project:example-sut

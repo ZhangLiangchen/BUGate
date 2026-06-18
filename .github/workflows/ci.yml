@@ -37,6 +37,13 @@ jobs:
       - name: Worked demo passes the strict gate
         run: python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
 
+      - name: Wave 8 falsification gate + coverage matrix (demo)
+        run: |
+          python3 scripts/oracle_falsification.py --spec examples/demo-sut/falsification_spec.yaml \
+            --json-output /tmp/of.json --md-output /tmp/of.md --gate
+          python3 scripts/generate_assertion_coverage_matrix.py --artifact-root examples/demo-sut \
+            --spec examples/demo-sut/falsification_spec.yaml --mutation-result /tmp/of.json --output /tmp/matrix.md
+
       - name: Orchestrator init smoke (full SDTD)
         run: |
           tmp="$(mktemp -d)"

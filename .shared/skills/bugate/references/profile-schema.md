@@ -125,7 +125,18 @@ agent_roles:
     write:
       - "^sut/example/tests/.*[.]py$"
 
+# Wave 8 oracle falsification: declarative oracle/mutation spec + score gate (0-1).
+falsification_spec: sut/example/falsification_spec.yaml
+falsification_threshold: 0.7
+
 # Memory Service project namespace/tag for all reads/writes.
 memory:
   namespace: project:example-sut
 ```
+
+`falsification_spec` points `scripts/oracle_falsification.py` at a declarative
+spec (`oracles:` as field assertions, `mutations:` as field-path ops, plus an
+`evidence`/`evidence_glob`). The engine is SUT-neutral and imports no SUT code;
+without a spec it reports `profile_required`. `falsification_threshold` is the
+kill-rate gate (`--gate` exits non-zero below it). See the worked example at
+`examples/demo-sut/falsification_spec.yaml`.

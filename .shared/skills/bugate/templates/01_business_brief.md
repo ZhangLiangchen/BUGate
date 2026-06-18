@@ -23,9 +23,9 @@ sut_profile: TBD
 
 ## Propositions
 
-| id | proposition | priority | verifiability | evidence_label |
-|---|---|---|---|---|
-| P-001 | TBD | TBD | TBD | fact / inferred / unknown |
+| id | proposition | priority | verifiability | evidence_label | source |
+|---|---|---|---|---|---|
+| P-001 | TBD | TBD | TBD | fact / inferred / unknown | TBD |
 
 ## Business Oracles
 
