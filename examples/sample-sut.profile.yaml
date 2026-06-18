@@ -43,6 +43,10 @@ agent_roles:
 falsification_spec: examples/demo-sut/falsification_spec.yaml
 falsification_threshold: 0.7
 
+# Wave 0 PRD health self-assessment (scripts/check_prd_health.py, METHOD §3).
+prd_health_spec: examples/demo-sut/prd_health.yaml
+prd_health_min: 60
+
 # Memory-bus project namespace/tag for all reads/writes (override per project).
 memory:
   namespace: project:example-sut

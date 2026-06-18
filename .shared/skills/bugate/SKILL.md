@@ -78,6 +78,7 @@ guarded writes until then, jumping to code is rejected rather than helpful.
 
 ## Core Commands
 
+- Wave 0 PRD health: `python3 scripts/check_prd_health.py --input <prd_health.yaml> --gate` — 8-dimension PRD score (0-100) + grade A–D + routing; `profile_required` without a spec.
 - Initialize/status artifacts: `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init`
 - Layer gates: `python3 scripts/check_bugate_brief_semantics.py <artifact_dir>`, `check_bugate_layer2_semantics.py`, `check_bugate_inventory_semantics.py`
 - Full pre-code check: `python3 scripts/check_bugate_v13_semantics.py <artifact_dir> --scope pre-code`

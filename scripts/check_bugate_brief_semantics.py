@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from pathlib import Path
 
 from bugate_core import (
@@ -19,6 +20,36 @@ from bugate_core import (
 )
 
 _NOT_VERIFIABLE = ("unverif", "deferred", "unknown", "tbd", "not yet", "no ")
+_EVIDENCE_LABELS = {"fact", "inferred", "unknown"}
+
+
+def _check_evidence_label(report: GateReport, section: str, idx: int, row: dict) -> None:
+    if "evidence_label" not in row:
+        return
+    value = (row.get("evidence_label") or "").strip().lower()
+    if not value:
+        report.fail(f"01_business_brief.md: {section}[{idx}] evidence_label must be set")
+    elif value not in _EVIDENCE_LABELS:
+        report.fail(
+            f"01_business_brief.md: {section}[{idx}] evidence_label must be one of fact/inferred/unknown, "
+            f"got {row.get('evidence_label')!r}"
+        )
+
+
+def _check_brief_fields(report: GateReport, body: str) -> None:
+    """Accepted-brief field gates: source non-empty, evidence_label enum, unknown→Q."""
+    for idx, row in enumerate(table_dicts(body, "Propositions"), start=1):
+        if "source" in row and not (row.get("source") or "").strip():
+            report.fail(f"01_business_brief.md: Propositions[{idx}] source must be non-empty when accepted")
+        _check_evidence_label(report, "Propositions", idx, row)
+    for idx, row in enumerate(table_dicts(body, "Business Oracles"), start=1):
+        _check_evidence_label(report, "Business Oracles", idx, row)
+    for idx, row in enumerate(table_dicts(body, "Clarification Gate"), start=1):
+        status = (row.get("status") or "").strip().lower()
+        if "unknown" in status and not re.search(r"\bQ-\d", row.get("open_question") or ""):
+            report.fail(
+                f"01_business_brief.md: Clarification Gate[{idx}] is 'unknown' but has no bound Q-xxx open question"
+            )
 
 
 def _verifiability_ratio(body: str) -> tuple[int, int]:
@@ -67,6 +98,8 @@ def check(artifact_dir: Path, *, require_passed: bool = False) -> GateReport:
                 report.fail(f"01_business_brief.md: verifiability ratio {ratio:.2f} < required {vmin:.2f} ({verifiable}/{total} verifiable)")
             elif ratio < 0.80:
                 report.warn(f"01_business_brief.md: verifiability ratio {ratio:.2f} below the 0.80 advisory bar ({verifiable}/{total})")
+    if require_passed:
+        _check_brief_fields(report, body)
     ensure_no_tbd(report, path, body, enabled=require_passed)
     return report
 

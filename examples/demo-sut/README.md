@@ -16,6 +16,15 @@ python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope pre-code
 python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
 ```
 
+## Wave 0 PRD health
+
+`prd_health.yaml` is a declarative 8-dimension PRD self-assessment scored by the
+SUT-neutral engine (METHOD §3):
+
+```bash
+python3 scripts/check_prd_health.py --input examples/demo-sut/prd_health.yaml --gate   # 87.5/100, grade A
+```
+
 ## Wave 8 quality (oracle falsification + coverage matrix)
 
 `falsification_spec.yaml` + `evidence/` drive the SUT-neutral falsification

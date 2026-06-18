@@ -150,6 +150,12 @@ kill-rate gate (`--gate` exits non-zero below it). See the worked example at
   one requirement's passed artifacts can never unlock another's tests. A guarded
   path that matches a pattern with no `uc` capture is blocked (fail-closed). When
   unset, the single `artifact_dir` is used (default).
+- `prd_health_spec` / `prd_health_min` — enable the **Wave 0 PRD health check**
+  (`scripts/check_prd_health.py`, METHOD §3). Point at a declarative 8-dimension
+  self-assessment (scores 1-5); the engine computes a 0-100 composite + grade
+  A–D + routing and passes through a structured gap report. `--gate` exits
+  non-zero below `prd_health_min` (default 60). Without a spec it reports
+  `profile_required`. See `examples/demo-sut/prd_health.yaml`.
 - `verifiability_min` — enables the Layer 1 **verifiability-ratio gate** in
   `check_bugate_brief_semantics.py`. A proposition counts as verifiable unless its
   `verifiability` cell reads unverifiable / deferred / unknown / tbd. The gate

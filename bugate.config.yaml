@@ -18,6 +18,16 @@ guarded_path_regex: []
 # spec at examples/demo-sut/falsification_spec.yaml.
 #   falsification_spec: sut/example/falsification_spec.yaml
 #   falsification_threshold: 0.7
+
+# Wave 0 PRD health check (default unmounted → check_prd_health.py reports
+# profile_required). Point at a declarative 8-dimension self-assessment; the
+# engine scores 0-100 + grade A-D. See examples/demo-sut/prd_health.yaml.
+#   prd_health_spec: sut/example/prd_health.yaml
+#   prd_health_min: 60
+
+# Optional Layer-1/Layer-4 hardening gates (off by default):
+#   verifiability_min: 0.8                 # Layer 1 verifiability-ratio floor
+#   artifact_dir_template: docs/usecases/{uc}/   # per-UC fail-closed write binding
 required_precode_artifacts:
   - 01_business_brief.md
   - 02_testability.md
