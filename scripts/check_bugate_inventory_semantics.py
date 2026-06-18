@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from bugate_core import (
     GateReport,
+    as_bool,
     ensure_no_tbd,
+    load_config,
     oracle_ids,
     parse_inventory_cases,
     proposition_ids,
@@ -22,6 +25,14 @@ def _as_list(value) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
+
+
+def _is_adversarial_absorbed(case: dict) -> bool:
+    """A case absorbed from Stage 3B: origin marks it, or it cites an ADV-xxx id."""
+    origin = str(case.get("origin") or case.get("source") or "").lower()
+    if "adversarial" in origin or "3b" in origin or "adv-" in origin:
+        return True
+    return any("ADV-" in value for value in (str(v) for v in case.values()))
 
 
 def check(artifact_dir: Path, *, require_passed: bool = False) -> GateReport:
@@ -71,6 +82,14 @@ def check(artifact_dir: Path, *, require_passed: bool = False) -> GateReport:
             report.fail(f"03_inventory.yaml: missing oracle coverage for {', '.join(missing_o)}")
     else:
         report.warn("01_business_brief.md not found; reverse coverage was not checked")
+    # Adversarial-absorption back-link (profile-gated via require_adversarial_absorption):
+    # every UC must absorb >= 1 Stage 3B finding as a named inventory case.
+    if as_bool(load_config(profile=os.environ.get("BUGATE_PROFILE")).get("require_adversarial_absorption")):
+        if not any(_is_adversarial_absorbed(case) for case in cases):
+            report.fail(
+                "03_inventory.yaml: require_adversarial_absorption is set but no case is marked "
+                "adversarial-absorbed (set origin: adversarial or reference an ADV-xxx id)"
+            )
     ensure_no_tbd(report, path, body, enabled=require_passed)
     return report
 

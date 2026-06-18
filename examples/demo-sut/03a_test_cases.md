@@ -32,3 +32,13 @@ sut_profile: demo-sut (Linkly URL shortener)
 - Expected result: 410 with no Location header.
 - Proposition refs: P-003
 - Oracle refs: O-003
+
+## CASE-004
+
+- Intent: Expired link returns exactly 410, never 404 — absorbed from adversarial finding ADV-002.
+- Origin: adversarial (Stage 3B absorption).
+- Preconditions: An expired short link seeded via fixture.
+- Steps: GET /{short_code} without following redirects; assert the exact status code.
+- Expected result: status is exactly 410 (not 404, not any other non-2xx).
+- Proposition refs: P-003
+- Oracle refs: O-003

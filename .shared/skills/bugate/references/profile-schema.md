@@ -161,3 +161,11 @@ kill-rate gate (`--gate` exits non-zero below it). See the worked example at
   `verifiability` cell reads unverifiable / deferred / unknown / tbd. The gate
   fails below this floor (e.g. `0.8`) and warns below the `0.80` advisory bar.
   When unset, the gate is off (default).
+- `require_multiview` — when true, `check_bugate_v13_semantics.py` requires a
+  Wave 1 `00_multiview/divergence_report.md` per UC (and, under `--require-passed`,
+  `gate_status: passed`). Makes "every new UC runs Wave 1 + divergence archived" an
+  enforced gate. Also available as the `--require-multiview` flag. Off by default.
+- `require_adversarial_absorption` — when true, `check_bugate_inventory_semantics.py`
+  requires the inventory to contain at least one case absorbed from Stage 3B
+  (marked `origin: adversarial` or referencing an `ADV-xxx` id). Makes "every new
+  UC absorbs >= 1 adversarial finding" an enforced gate. Off by default.

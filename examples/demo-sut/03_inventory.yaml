@@ -51,4 +51,21 @@ cases:
     expected_observations:
       - GET /{short_code} responds 410 with no Location header.
     implementation_target: profile-owned test for the expiry behavior
+  - id: CASE-004
+    intent: Expired link returns exactly 410, never 404 — absorbed from adversarial finding ADV-002.
+    priority: P1
+    origin: adversarial
+    proposition_refs:
+      - P-003
+    oracle_refs:
+      - O-003
+    layer_decision: api
+    preconditions:
+      - An expired short link seeded via fixture.
+    data_source:
+      source: a fixture that seeds an already-expired link
+      status: ready
+    expected_observations:
+      - GET /{short_code} responds with the exact 410 status, never 404.
+    implementation_target: profile-owned regression test for the exact expired status
 coverage_deferred: []

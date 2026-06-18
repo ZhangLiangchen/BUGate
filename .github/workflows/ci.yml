@@ -37,6 +37,9 @@ jobs:
       - name: Worked demo passes the strict gate
         run: python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
 
+      - name: Per-UC hardening gates ON (multiview + adversarial absorption, demo)
+        run: BUGATE_PROFILE=examples/sample-sut.profile.yaml python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+
       - name: Wave 0 PRD health gate (demo)
         run: python3 scripts/check_prd_health.py --input examples/demo-sut/prd_health.yaml --json-output /tmp/h.json --md-output /tmp/h.md --gate
 

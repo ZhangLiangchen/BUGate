@@ -25,9 +25,11 @@ guarded_path_regex: []
 #   prd_health_spec: sut/example/prd_health.yaml
 #   prd_health_min: 60
 
-# Optional Layer-1/Layer-4 hardening gates (off by default):
+# Optional hardening gates (off by default):
 #   verifiability_min: 0.8                 # Layer 1 verifiability-ratio floor
 #   artifact_dir_template: docs/usecases/{uc}/   # per-UC fail-closed write binding
+#   require_multiview: true                # require Wave 1 00_multiview/divergence_report.md per UC
+#   require_adversarial_absorption: true   # require >=1 Stage 3B-absorbed inventory case per UC
 required_precode_artifacts:
   - 01_business_brief.md
   - 02_testability.md

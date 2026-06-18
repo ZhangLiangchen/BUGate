@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from pathlib import Path
 
 from bugate_core import (
     ALL_ARTIFACTS,
     GateReport,
+    as_bool,
     ensure_no_tbd,
     load_config,
     parse_inventory_cases,
@@ -310,8 +312,24 @@ def _check_dimension_matrix(
         ensure_no_tbd(report, path, text, enabled=True)
 
 
-def check(artifact_dir: Path, *, scope: str, require_passed: bool, profile: str | None = None) -> GateReport:
-    config = load_config(profile=profile)
+def _check_multiview(report: GateReport, artifact_dir: Path, require_passed: bool) -> None:
+    """Wave 1 multiview is a required per-UC gate (profile-gated via require_multiview)."""
+    path = artifact_dir / "00_multiview" / "divergence_report.md"
+    if not report.require_file(path):
+        return
+    if require_passed:
+        report.require_status(path)
+
+
+def check(
+    artifact_dir: Path,
+    *,
+    scope: str,
+    require_passed: bool,
+    profile: str | None = None,
+    require_multiview: bool = False,
+) -> GateReport:
+    config = load_config(profile=profile or os.environ.get("BUGATE_PROFILE"))
     report = GateReport("bugate_v13", artifact_dir)
     needed = required_precode_artifacts(config) if scope == "pre-code" else ALL_ARTIFACTS
     for name in needed:
@@ -327,6 +345,9 @@ def check(artifact_dir: Path, *, scope: str, require_passed: bool, profile: str 
         _check_readable_cases(report, artifact_dir, require_passed)
     if "03b_adversarial_cases.yaml" in needed:
         _check_adversarial(report, artifact_dir, require_passed)
+    # Wave 1 multiview as a per-UC gate, when the profile opts in.
+    if require_multiview or as_bool(config.get("require_multiview")):
+        _check_multiview(report, artifact_dir, require_passed)
     if scope == "all":
         _check_report(report, artifact_dir, "04_execution_report.md", require_passed)
         _check_report(report, artifact_dir, "05_knowledge_update.md", require_passed)
@@ -338,9 +359,16 @@ def main() -> int:
     parser.add_argument("artifact_dir", type=Path)
     parser.add_argument("--scope", choices=["pre-code", "all"], default="pre-code")
     parser.add_argument("--require-passed", action="store_true")
+    parser.add_argument("--require-multiview", action="store_true", help="Require a Wave 1 00_multiview/divergence_report.md per UC")
     parser.add_argument("--profile", help="Optional SUT profile config path")
     args = parser.parse_args()
-    return check(args.artifact_dir, scope=args.scope, require_passed=args.require_passed, profile=args.profile).exit()
+    return check(
+        args.artifact_dir,
+        scope=args.scope,
+        require_passed=args.require_passed,
+        profile=args.profile,
+        require_multiview=args.require_multiview,
+    ).exit()
 
 
 if __name__ == "__main__":

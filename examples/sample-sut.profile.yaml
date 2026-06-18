@@ -47,6 +47,10 @@ falsification_threshold: 0.7
 prd_health_spec: examples/demo-sut/prd_health.yaml
 prd_health_min: 60
 
+# Per-UC hardening gates (opt-in; off in the lean core default).
+require_multiview: true              # every UC must ship 00_multiview/divergence_report.md
+require_adversarial_absorption: true # every UC inventory must absorb >= 1 Stage 3B finding
+
 # Memory-bus project namespace/tag for all reads/writes (override per project).
 memory:
   namespace: project:example-sut

@@ -98,6 +98,7 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
     data: dict[str, Any] = {}
     active_list: str | None = None
     for raw in text.splitlines():
+        raw = strip_inline_comment(raw)  # drop trailing ' # ...' (quote-safe); keeps indent
         if not raw.strip() or raw.lstrip().startswith("#"):
             continue
         indent = len(raw) - len(raw.lstrip(" "))
@@ -255,6 +256,13 @@ def load_config(root: Path | None = None, profile: str | None = None) -> dict[st
         if path.exists():
             data.update(parse_simple_yaml(read_text(path)))
     return data
+
+
+def as_bool(value: Any) -> bool:
+    """Interpret a config flag (which may arrive as a string) as a boolean."""
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"true", "yes", "on", "1"}
 
 
 def required_precode_artifacts(config: dict[str, Any] | None = None) -> list[str]:

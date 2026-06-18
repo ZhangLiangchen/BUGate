@@ -45,6 +45,20 @@ Expected: 6 mutations killed, 1 survived (`expiry_drift` — no oracle covers
 expiry oracle but the active-link spec does not define it — exactly the bug-catch
 the matrix exists for. Extend the spec with an expired-link oracle to close it.
 
+## Per-UC hardening gates (opt-in)
+
+With a profile that sets `require_multiview` + `require_adversarial_absorption`
+(see `examples/sample-sut.profile.yaml`), two extra per-UC gates turn on:
+
+```bash
+BUGATE_PROFILE=examples/sample-sut.profile.yaml \
+  python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+```
+
+This demo satisfies them: `00_multiview/divergence_report.md` (Wave 1 ran) is
+present, and `CASE-004` is an inventory case absorbed from Stage 3B
+(`origin: adversarial`). Both gates are off in the lean core default.
+
 ## What is here
 
 | File | Stage |
