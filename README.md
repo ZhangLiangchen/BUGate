@@ -4,6 +4,21 @@
 
 This repository is the reusable **core**. It contains no product's tests or business data; a **SUT profile** mounts a specific system onto the core.
 
+## First 5 minutes (start here)
+
+Zero install (Python 3.11+, standard library only). From the repo root:
+
+```bash
+python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+```
+
+That runs every pre-code gate against a filled, **passing** demo stack (a neutral URL-shortener use case) and prints `PASS`. To watch the physical write-guard **block, then allow** an edit, walk through [`examples/mounted-demo/WALKTHROUGH.md`](examples/mounted-demo/WALKTHROUGH.md).
+
+- **Bootstrapping with an AI agent?** [`INIT.md`](INIT.md) is a runnable init prompt (Python check → zero-install smoke → config load → optional capabilities).
+- **What can it do / every command?** [`CAPABILITIES.md`](CAPABILITIES.md).
+- **Turn on optional runtimes** (AI CLIs, MCP memory service + ONNX, role isolation): [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
+- **The methodology** (why): [`docs/qa-methodology/`](docs/qa-methodology/) — start with its [README](docs/qa-methodology/README.md) (English summary + glossary) then `METHOD.md` / `SOP.md`.
+
 ## The three-layer model
 
 | Layer | What it is | Where it lives |
@@ -31,7 +46,7 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
 1. Copy the sample profile and point `bugate.config.yaml` at it (or keep `mode: core` for the unmounted engine):
 
    ```bash
-   cp examples/sample-sut.profile.yaml sut/my-sut.profile.yaml
+   mkdir -p sut && cp examples/sample-sut.profile.yaml sut/my-sut.profile.yaml
    ```
 
    ```yaml

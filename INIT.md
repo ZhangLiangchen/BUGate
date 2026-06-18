@@ -58,7 +58,7 @@ The core does nothing on its own; you mount a system under test via a **profile*
 1. Create a profile by copying the sample, then declare your SUT's surfaces:
 
    ```bash
-   cp examples/sample-sut.profile.yaml sut/<name>.profile.yaml
+   mkdir -p sut && cp examples/sample-sut.profile.yaml sut/<name>.profile.yaml
    ```
 
    ```yaml

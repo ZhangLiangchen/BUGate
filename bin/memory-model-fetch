@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Pre-download the ONNX embedding model the OPTIONAL MCP memory service uses, so
+# it can run offline / behind a proxy. The in-service downloader cannot traverse
+# a socks all_proxy, so fetch once with this driver. BUGate ships ONLY this
+# driver; the memory service + model are user-provided. SUT-neutral, no secrets.
+#
+# Usage:   bin/memory-model-fetch
+# Override: BUGATE_ONNX_MODEL=<hf repo id>   MCP_MEMORY_ONNX_DIR=<dest dir>
+set -euo pipefail
+
+MODEL="${BUGATE_ONNX_MODEL:-sentence-transformers/all-MiniLM-L6-v2}"
+DEST="${MCP_MEMORY_ONNX_DIR:-$HOME/.cache/mcp_memory/onnx_models}"
+mkdir -p "$DEST"
+echo "[memory-model-fetch] model: $MODEL"
+echo "[memory-model-fetch] dest:  $DEST"
+
+# The pre-download must NOT go through a socks all_proxy; clear it for this fetch.
+unset all_proxy ALL_PROXY >/dev/null 2>&1 || true
+
+if command -v hf >/dev/null 2>&1; then
+  hf download "$MODEL" --include "onnx/*" "*.json" "*.txt" --local-dir "$DEST"
+elif command -v huggingface-cli >/dev/null 2>&1; then
+  huggingface-cli download "$MODEL" --include "onnx/*" "*.json" "*.txt" --local-dir "$DEST"
+else
+  cat >&2 <<EOF
+[memory-model-fetch] No Hugging Face CLI found. Install one, then re-run:
+    pipx install huggingface_hub        # or: pip install -U huggingface_hub
+    hf download "$MODEL" --include "onnx/*" "*.json" "*.txt" --local-dir "$DEST"
+
+  Or download the files manually from:
+    https://huggingface.co/$MODEL/tree/main/onnx
+  into: $DEST
+
+Then confirm the on-disk layout matches your mcp-memory-service version's
+expectations (this driver is a convenience, not a contract with that service).
+EOF
+  exit 1
+fi
+
+echo "[memory-model-fetch] done. Keep MCP_MEMORY_USE_ONNX=1 (default) and start the"
+echo "service with bin/memory-bus-start; set MCP_MEMORY_USE_ONNX=0 to fall back."

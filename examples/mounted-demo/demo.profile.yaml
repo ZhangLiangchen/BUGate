@@ -1,0 +1,19 @@
+# Worked "mounted SUT" profile for the write-guard walkthrough (see WALKTHROUGH.md).
+# It binds a tiny fake test tree (tests/<uc>/...) to per-UC artifact dirs
+# (usecases/<uc>/) via a {uc} template + a (?P<uc>...) capture, so scripts/check_bugate.py
+# physically blocks edits to a UC's tests until that UC's pre-code artifacts pass.
+
+# Per-UC fail-closed binding: each guarded test path resolves to its OWN artifact dir.
+artifact_dir_template: examples/mounted-demo/usecases/{uc}/
+guarded_path_regex:
+  - "examples/mounted-demo/tests/(?P<uc>[^/]+)/.*[.]py$"
+
+required_precode_artifacts:
+  - 01_business_brief.md
+  - 02_testability.md
+  - 03_inventory.yaml
+  - 03a_test_cases.md
+  - 03b_adversarial_cases.yaml
+
+memory:
+  namespace: project:mounted-demo

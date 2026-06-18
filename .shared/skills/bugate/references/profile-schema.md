@@ -183,3 +183,7 @@ kill-rate gate (`--gate` exits non-zero below it). See the worked example at
 - `reject_on_bridge_failures` — when true, `sdtd_multiview.check` /
   `sdtd_adversarial.check` fail if any schema-rejected peer view sits in
   `00_*/cli_bridge_failures/`.
+- `wave8_evidence_glob` — the captured-evidence glob `bin/wave8-weekly` feeds to
+  the falsifier (SUT-specific, so not hardcoded). Also settable via the
+  `WAVE8_EVIDENCE_GLOB` env var; `WAVE8_REPORTS_DIR` / `WAVE8_ARTIFACT_ROOT`
+  override the weekly run's output dir and the inventory-scan root.

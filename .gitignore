@@ -50,3 +50,15 @@ id_rsa*
 /tmp/
 *.tmp
 *.bak
+
+# Default report outputs from the scorers when run without explicit --*-output
+# (oracle_falsification.py / check_prd_health.py / generate_assertion_coverage_matrix.py).
+# The committed examples/demo-sut artifacts are NOT matched by these names.
+/oracle_falsification_result.json
+/oracle_falsification_result.md
+/prd_health_result.json
+/prd_health_report.md
+/assertion_coverage_matrix.md
+/self_healing.json
+/self_healing.md
+/self_healing_repair_plan.md

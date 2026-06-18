@@ -1,0 +1,203 @@
+# BUGate — Setting up the OPTIONAL external runtimes
+
+The BUGate **core** (the 4-layer gate engine) is zero-dependency stdlib Python —
+see [`INIT.md`](../INIT.md). This document covers the **three OPTIONAL
+mechanisms** that call out to runtimes *you* install. BUGate ships only the
+driver scripts; each capability **degrades gracefully** when its runtime is
+absent, so a clean checkout stays green without any of them.
+
+Each section follows the same shape: **Install → Wire → Verify → Fallback**.
+
+| Capability | You install | Default if absent |
+|---|---|---|
+| 1. Dual-agent CLIs (multi-view + adversarial) | `codex` + `claude` CLIs | deterministic placeholder views, gate stays green |
+| 2. MCP memory service + ONNX | `mcp-memory-service` + ONNX model | note/search/lint exit 0 non-fatally |
+| 3. Agent role isolation | nothing (env + profile) | default OFF (no-op when role unset) |
+
+---
+
+## 1. Dual-agent CLIs — multi-view cross-audit & adversarial review
+
+Two independent AI agents work as *peer* reviewers. The Wave 1 bridge
+(`scripts/sdtd_multiview_cli_bridge.py`) extracts the business model from two
+sides and reports divergence before Layer 1 is accepted; the Stage 3B bridge
+(`scripts/sdtd_adversarial_cli_bridge.py`) runs two independent red-team
+reviewers and synthesizes `03b_adversarial_cases.yaml`. Both bridges share the
+exact same dispatch shape and `SDTD_*` env contract.
+
+### Install
+
+Put both CLIs on `PATH`:
+
+- the `codex` CLI (must support the non-interactive `codex exec` subcommand with
+  `--ask-for-approval`, `--sandbox`, and stdin via a trailing `-`);
+- the `claude` CLI (must support `claude -p` with `--permission-mode` and
+  `--output-format`).
+
+Minimum-version note: install a build recent enough that `codex exec
+--ask-for-approval never --sandbox read-only -` and `claude -p --permission-mode
+dontAsk --output-format text` are both accepted. If your build does not support
+a model/effort flag, leave the corresponding env var unset (see below) to fall
+back to the CLI's own defaults, or override the binary name.
+
+### Wire
+
+The bridges invoke these **exact** commands (read from `build_command()` in both
+scripts), piping the prompt on **stdin**:
+
+- **claude:** `claude -p [--model M] [--effort E] --permission-mode dontAsk --output-format text`
+- **codex:** `codex exec --ask-for-approval never --sandbox read-only [--model M] [-c model_reasoning_effort="E"] -`
+
+The `--model` / `--effort` (claude) and `--model` / `-c model_reasoning_effort`
+(codex) flags are appended **only when** the corresponding env var is set —
+nothing vendor-specific is hardcoded. Tune via these `SDTD_*` env knobs (neutral
+defaults, all overridable):
+
+| Env var | Effect | Default |
+|---|---|---|
+| `SDTD_CODEX_BIN` / `SDTD_CLAUDE_BIN` | CLI binary name | `codex` / `claude` |
+| `SDTD_CODEX_MODEL` / `SDTD_CLAUDE_MODEL` | model override (empty → CLI default) | unset |
+| `SDTD_CODEX_REASONING_EFFORT` / `SDTD_CLAUDE_EFFORT` | reasoning effort | unset |
+| `SDTD_CLI_TIMEOUT_SECONDS` | per-peer subprocess timeout | `1800` |
+| `SDTD_CLI_HTTPS_PROXY` / `SDTD_CLI_HTTP_PROXY` / `SDTD_CLI_ALL_PROXY` | optional proxy values (injected into the child env only if set) | unset |
+| `SDTD_CLI_PROXY=0` | force-disable proxy injection even when proxy vars are set | injection on |
+
+Proxy injection is **OFF unless** one of the proxy vars above is explicitly set;
+no host:port is ever hardcoded. Run the bridges per use-case artifact dir:
+
+```bash
+python3 scripts/sdtd_multiview_cli_bridge.py    run-all <uc-dir>   # Wave 1 multi-view
+python3 scripts/sdtd_adversarial_cli_bridge.py  run-all <uc-dir>   # Stage 3B adversarial
+```
+
+### Verify
+
+```bash
+python3 scripts/sdtd_multiview_cli_bridge.py    check-env
+python3 scripts/sdtd_adversarial_cli_bridge.py  check-env
+```
+
+`check-env` prints each CLI's resolved path (or `not_found`), the resulting
+`dispatch_mode` (`real_peer_dispatch` when both are present, otherwise
+`fallback (missing: <name>)`), the model/effort defaults, the proxy-env summary,
+and the timeout. When both CLIs resolve you are ready for real peer dispatch.
+
+### Fallback
+
+If **either** CLI is missing on `PATH`, the bridge writes **deterministic
+placeholder views** (tagged `dispatch_mode: fallback_placeholder`) plus a note
+that real dispatch was skipped, and still emits a divergence report /
+`03b_adversarial_cases.yaml`. Per-peer failures during real dispatch (timeout,
+non-zero exit, empty or schema-invalid output) also degrade that one peer to a
+placeholder rather than failing. The artifact flow and the gate stay green.
+
+---
+
+## 2. MCP memory service + ONNX — cross-session memory
+
+A locally running `mcp-memory-service` HTTP API gives BUGate cross-session
+memory and an experience-promotion loop. The service + its ONNX embedding model
+are **user-provided**; `scripts/memory_bus.py` is a thin stdlib-only driver that
+only talks to the running service.
+
+### Install
+
+```bash
+pip install mcp-memory-service
+```
+
+Then **pre-download the ONNX embedding model once** so the service can run
+offline / behind a proxy:
+
+```bash
+bin/memory-model-fetch
+```
+
+This fetches the embedding model (default `sentence-transformers/all-MiniLM-L6-v2`;
+override via `BUGATE_ONNX_MODEL`) into `~/.cache/mcp_memory/onnx_models`
+(override via `MCP_MEMORY_ONNX_DIR`). **SOCKS-proxy caveat:** the in-service
+downloader **cannot traverse a SOCKS `all_proxy`**, which is exactly why you
+pre-fetch with this driver — it unsets `all_proxy`/`ALL_PROXY` for the fetch.
+`bin/memory-model-fetch` needs a Hugging Face CLI (`hf` or `huggingface-cli`) on
+`PATH`; if neither is present it prints install hints and exits non-zero.
+**Fallback:** set `MCP_MEMORY_USE_ONNX=0` to skip ONNX embeddings entirely.
+
+### Wire
+
+```bash
+bin/memory-bus-start
+```
+
+The wrapper resolves the `memory` binary from `<root>/.venv/bin/memory` or
+`PATH`, configures `MCP_MEMORY_BASE_DIR` (default `<root>/.memory_bus`, git-ignored),
+`MCP_MEMORY_STORAGE_BACKEND` (`sqlite_vec`), and `MCP_MEMORY_USE_ONNX` (`1`),
+generates client API keys once into `.memory_bus/client.env`, then launches the
+service on `127.0.0.1:${MCP_HTTP_PORT:-8000}`. If the `memory` binary is not
+found it prints the `pip install` + `bin/memory-model-fetch` hint and exits 1.
+The driver's project namespace comes from the SUT profile (`memory.namespace`)
+or `MEMORY_BUS_PROJECT_TAG`, defaulting to `project:bugate`. Once running, use
+the `bin/memory-service-*` and `bin/promote-memory` wrappers (e.g.
+`bin/memory-service-note`, `bin/memory-service-search`, `bin/memory-service-lint`,
+`bin/promote-memory`).
+
+### Verify
+
+```bash
+bin/memory-bus-start    # launch
+bin/memory-bus-status   # confirm reachable
+```
+
+### Fallback
+
+When the service is unreachable, `memory_bus.py` prints a clear hint ("Start it
+with `bin/memory-bus-start`") and **exits non-fatally (0)** — its note, search,
+and lint subcommands all return 0 when `service_available()` is false, so hooks
+and the gate are never blocked by a down memory service.
+
+---
+
+## 3. Agent role isolation — three-layer path guard (Wave 7)
+
+`scripts/check_agent_role_paths.py` is a PreToolUse path guard that stops one
+agent role from touching files that belong to another (e.g. keeping a test
+implementer from re-deriving expectations out of SUT source). It ships with **no
+hardcoded paths or role names** — everything comes from the env and the active
+SUT profile, and it is **default OFF**.
+
+### Install
+
+Nothing to install — it is a stdlib-only core script.
+
+### Wire
+
+Enable **per session** by exporting the role and supplying forbidden patterns in
+the profile:
+
+```bash
+export BUGATE_AGENT_ROLE=builder      # or designer | implementer | <your role>
+```
+
+Declare the role's forbidden path patterns under an `agent_roles:` map in the
+active profile (a bare list applies to both reads and writes; or use `read:` /
+`write:` sub-lists to scope). See the canonical
+[`profile-schema.md`](../.shared/skills/bugate/references/profile-schema.md) for
+the full shape. Patterns are Python regexes; deny wins, everything else is
+allowed.
+
+The PreToolUse wiring is **already shipped** in `.codex/hooks.json` and
+`.claude/settings.json` (matcher `Edit|Write`), which resolve the repo root via
+the `AGENTS.md` + `.shared` sentinel walk-up and call the guard. (Codex Desktop
+requires re-trusting the hook hash after any hook change.)
+
+### Verify
+
+With a role exported and a matching forbidden pattern in the profile, attempt an
+edit/write to a forbidden path: the guard exits non-zero and prints
+`BUGate agent-role path isolation (role=<role>) blocked:` with the offending
+path. An allowed path returns 0.
+
+### Fallback
+
+Default **OFF**: if `BUGATE_AGENT_ROLE` is unset/empty, or the active profile
+defines no `agent_roles` rules for the role/action, the guard is a **no-op**
+(exit 0, allow everything).

@@ -1,0 +1,6 @@
+gate: adversarial_cases
+gate_status: passed
+sut_profile: mounted-demo
+# Minimal stub for the write-guard walkthrough (gate_status: passed).
+adversarial_cases: []
+residual_risks: []

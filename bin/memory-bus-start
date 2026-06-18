@@ -70,8 +70,9 @@ Install it (the service + model are user-provided; BUGate only ships the driver)
 Then pre-download the ONNX embedding model once so the service can run offline /
 behind a proxy:
 
-  mkdir -p ~/.cache/mcp_memory/onnx_models
-  # fetch the all-MiniLM-L6-v2 ONNX model into that directory
+  bin/memory-model-fetch
+  # fetches all-MiniLM-L6-v2 into ~/.cache/mcp_memory/onnx_models
+  # (override BUGATE_ONNX_MODEL / MCP_MEMORY_ONNX_DIR; MCP_MEMORY_USE_ONNX=0 skips ONNX)
 
 It must be importable as `memory` on PATH or installed into <root>/.venv/bin/memory.
 HINT
