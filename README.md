@@ -44,7 +44,7 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
    ```yaml
    artifact_dir: docs/usecases             # where UC artifacts live
    guarded_path_regex:                     # which test files the write-guard protects
-     - "tests/.*/test_.*\\.py$"
+     - "tests/.*/test_.*[.]py$"
    required_precode_artifacts:             # override the default 01–05 set if needed
      - 01_business_brief.md
      - 02_testability.md

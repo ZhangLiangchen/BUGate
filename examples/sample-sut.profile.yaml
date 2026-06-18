@@ -12,7 +12,7 @@ artifact_dir: sut/example/bugate/REQ-001
 # Implementation paths physically blocked by scripts/check_bugate.py until the
 # pre-code artifacts below reach gate_status: passed. Empty list = nothing guarded.
 guarded_path_regex:
-  - "^sut/example/tests/.*\\.py$"
+  - "^sut/example/tests/.*[.]py$"
 
 # Artifact filenames that must reach gate_status: passed before guarded writes.
 # Add 01a_domain_model.md / 01b_state_flow.md / 02a_test_dimension_matrix.yaml
@@ -35,7 +35,7 @@ agent_roles:
     read:
       - "^sut/example/internal/.*$"
     write:
-      - "^sut/example/tests/.*\\.py$"
+      - "^sut/example/tests/.*[.]py$"
 
 # Memory-bus project namespace/tag for all reads/writes (override per project).
 memory:

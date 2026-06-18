@@ -16,6 +16,11 @@ python3 scripts/sdtd_adversarial_cli_bridge.py run-all <artifact_dir>
 python3 scripts/sdtd_adversarial.py check <artifact_dir>
 ```
 
+> Note: `run-all` writes `03b_adversarial_cases.yaml` with `gate_status: pending`,
+> so the final `check` will **fail** until you review the synthesized additions
+> and set `gate_status: passed`. That failure is the gate working as intended —
+> review and accept first, then re-run `check`.
+
 Runtime knobs (env, all optional; empty/off by default):
 `SDTD_CODEX_MODEL`, `SDTD_CLAUDE_MODEL`, `SDTD_CODEX_REASONING_EFFORT`,
 `SDTD_CLAUDE_EFFORT`, `SDTD_CODEX_BIN`, `SDTD_CLAUDE_BIN`,

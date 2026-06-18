@@ -103,7 +103,7 @@ artifact_dir: sut/example/bugate/REQ-001
 
 # Implementation paths physically blocked until the pre-code artifacts pass.
 guarded_path_regex:
-  - "^sut/example/tests/.*\\.py$"
+  - "^sut/example/tests/.*[.]py$"
 
 # Artifact filenames that must reach gate_status: passed before guarded writes.
 required_precode_artifacts:
@@ -123,7 +123,7 @@ agent_roles:
     read:
       - "^sut/example/internal/.*$"
     write:
-      - "^sut/example/tests/.*\\.py$"
+      - "^sut/example/tests/.*[.]py$"
 
 # Memory Service project namespace/tag for all reads/writes.
 memory:

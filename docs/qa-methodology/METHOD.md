@@ -666,7 +666,7 @@ project-root/
 
 - 当前角色来自环境变量 `BUGATE_AGENT_ROLE`（未设置即放行一切）。
 - 角色与其禁读/禁写路径模式由**活动 SUT profile** 通过 `agent_roles:` 映射提供；核心不内置任何角色名或路径。
-- 接线：Claude Code 的 `PreToolUse`（matcher `Read|Edit|Write`）与 Codex 的 `apply_patch` 都调用本脚本。
+- 接线：**写动作**的角色隔离已默认接到 Claude 的 `PreToolUse`（matcher `Edit|Write`）与 Codex 的 `apply_patch`——`BUGATE_AGENT_ROLE` 未设时是 no-op，设了即按 profile 的 `agent_roles` 生效。要**同时**启用**读隔离**，把 Claude 的 matcher 扩到 `Read|Edit|Write`（核心默认不接 `Read`，以免每次读文件都触发守卫）。
 
 profile 里配置三层隔离（builder / designer / implementer）示例：
 

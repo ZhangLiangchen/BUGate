@@ -7,6 +7,7 @@ guard by adding regexes under `guarded_path_regex` in `bugate.config.yaml`.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -84,15 +85,26 @@ def collect_paths(stdin_text: str) -> set[str]:
     return {p for p in paths if p}
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        help="File paths to check (manual use). When omitted, paths are read "
+        "from the runtime's PreToolUse hook payload on stdin.",
+    )
+    args = parser.parse_args(argv)
+
     root = find_root(Path.cwd().resolve())
     config = load_config(root, os.environ.get("BUGATE_PROFILE"))
     patterns = guarded_patterns(config)
     if not patterns:
         return 0
 
-    stdin_text = sys.stdin.read()
-    paths = collect_paths(stdin_text)
+    paths = {p.strip() for p in args.paths if p.strip()}
+    # Read the hook payload from stdin only when it is piped (never block a TTY).
+    if not sys.stdin.isatty():
+        paths |= collect_paths(sys.stdin.read())
     if not paths:
         return 0
 

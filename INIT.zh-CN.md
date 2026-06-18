@@ -41,7 +41,7 @@ python3 scripts/check_bugate_brief_semantics.py     .shared/skills/bugate/templa
    ```yaml
    artifact_dir: docs/usecases                 # 用例工件（01–03…）所在目录
    guarded_path_regex:                         # 物理写守卫保护哪些测试文件
-     - "tests/.*/test_uc_.*\\.py$"
+     - "tests/.*/test_.*[.]py$"
    required_precode_artifacts:                 # 可覆盖默认的 01–05 工件集
      - 01_business_brief.md
      - 02_testability.md

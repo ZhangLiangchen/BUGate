@@ -64,7 +64,7 @@ The core does nothing on its own; you mount a system under test via a **profile*
    ```yaml
    artifact_dir: docs/usecases                 # where UC artifacts (01–03…) live
    guarded_path_regex:                          # which test files the write-guard protects
-     - "tests/.*/test_.*\\.py$"
+     - "tests/.*/test_.*[.]py$"
    required_precode_artifacts:                  # override the default 01–05 set if you want
      - 01_business_brief.md
      - 02_testability.md

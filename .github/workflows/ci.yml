@@ -33,3 +33,38 @@ jobs:
 
       - name: De-SUT forbidden-term guard
         run: python3 scripts/check_no_sut_terms.py
+
+      - name: Worked demo passes the strict gate
+        run: python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+
+      - name: Orchestrator init smoke (full SDTD)
+        run: |
+          tmp="$(mktemp -d)"
+          python3 scripts/sdtd_orchestrator.py "$tmp" --init --full-sdtd
+          python3 scripts/check_bugate_v13_semantics.py "$tmp" --scope pre-code
+          rm -rf "$tmp"
+
+      - name: Core stays stdlib-only
+        run: |
+          python3 - <<'PY'
+          import ast, sys, pathlib
+          repo_mods = {p.stem for p in pathlib.Path("scripts").glob("*.py")}
+          allowed = set(sys.stdlib_module_names) | repo_mods
+          bad = []
+          for p in sorted(pathlib.Path("scripts").glob("*.py")):
+              tree = ast.parse(p.read_text(encoding="utf-8"))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for a in node.names:
+                          if a.name.split(".")[0] not in allowed:
+                              bad.append(f"{p.name}: import {a.name}")
+                  elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                      if node.module.split(".")[0] not in allowed:
+                          bad.append(f"{p.name}: from {node.module}")
+          if bad:
+              print("Third-party imports found in core:")
+              for b in bad:
+                  print(" ", b)
+              sys.exit(1)
+          print("Core is stdlib-only: OK")
+          PY

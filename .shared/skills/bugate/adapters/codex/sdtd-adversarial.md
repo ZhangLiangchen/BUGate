@@ -59,6 +59,11 @@ proxy injection stays off unless its env vars are set.
 python3 scripts/sdtd_adversarial.py check <artifact_dir>
 ```
 
+The bridge writes `03b_adversarial_cases.yaml` as `gate_status: pending`, so this
+`check` **fails until a human reviews the synthesized additions and sets
+`gate_status: passed`**. That failure is the gate working — accept first, then
+re-run `check`.
+
 ## Boundaries
 
 - Do not pass one peer's chat analysis, interim conclusion, or saved view into
