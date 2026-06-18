@@ -47,8 +47,10 @@ the matrix exists for. Extend the spec with an expired-link oracle to close it.
 
 ## Per-UC hardening gates (opt-in)
 
-With a profile that sets `require_multiview` + `require_adversarial_absorption`
-(see `examples/sample-sut.profile.yaml`), two extra per-UC gates turn on:
+With a profile that sets the opt-in hardening flags (`require_multiview`,
+`require_adversarial_absorption`, `require_regression_traceability`,
+`layer2_strict`, `reject_on_bridge_failures` — see
+`examples/sample-sut.profile.yaml`), extra per-UC gates turn on:
 
 ```bash
 BUGATE_PROFILE=examples/sample-sut.profile.yaml \

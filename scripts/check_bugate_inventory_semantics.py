@@ -71,6 +71,15 @@ def check(artifact_dir: Path, *, require_passed: bool = False) -> GateReport:
             report.fail(f"{loc}: missing layer_decision")
         if not str(case.get("implementation_target") or "").strip():
             report.warn(f"{loc}: implementation_target is empty; SUT profile must provide it before code generation")
+        if require_passed:
+            if not _as_list(case.get("expected_observations")):
+                report.fail(f"{loc}: missing expected_observations (no observable assertion plan)")
+            if not _as_list(case.get("preconditions")):
+                report.fail(f"{loc}: missing preconditions")
+            # data_source.status is flattened to the case-level `status` key by the parser.
+            ds_status = str(case.get("status") or "").strip().lower()
+            if ds_status in {"", "pending", "tbd"}:
+                report.fail(f"{loc}: data source status must be resolved (not pending) when accepted")
     brief = artifact_dir / "01_business_brief.md"
     if brief.exists():
         brief_body = read_text(brief)

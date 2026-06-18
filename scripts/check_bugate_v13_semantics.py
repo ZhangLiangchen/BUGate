@@ -85,17 +85,67 @@ def _check_readable_cases(report: GateReport, artifact_dir: Path, require_passed
         report.fail("03a_test_cases.md: accepted artifact must not contain placeholders")
 
 
-def _check_adversarial(report: GateReport, artifact_dir: Path, require_passed: bool) -> None:
+def _check_adversarial(report: GateReport, artifact_dir: Path, require_passed: bool, require_real_dispatch: bool = False) -> None:
     path = artifact_dir / "03b_adversarial_cases.yaml"
     if not report.require_file(path):
         return
     if require_passed:
         report.require_status(path)
     body = read_text(path)
-    if "adversarial_cases:" not in body:
-        report.fail("03b_adversarial_cases.yaml: missing adversarial_cases")
+    data = parse_nested_yaml(body)
+    if not isinstance(data, dict):
+        report.fail("03b_adversarial_cases.yaml: must parse to a YAML mapping")
+        return
+    if data.get("gate") not in {None, "adversarial_cases"}:
+        report.fail("03b_adversarial_cases.yaml: gate must be adversarial_cases")
+    cases = data.get("adversarial_cases")
+    if not isinstance(cases, list) or not cases:
+        report.fail("03b_adversarial_cases.yaml: adversarial_cases must be a non-empty list")
+    else:
+        for idx, case in enumerate(cases, start=1):
+            loc = f"03b_adversarial_cases.yaml: adversarial_cases[{idx}]"
+            if not isinstance(case, dict):
+                report.fail(f"{loc} must be a mapping")
+                continue
+            if not str(case.get("id") or "").strip():
+                report.fail(f"{loc}.id must be set")
+            if require_passed:
+                for fld in ("risk", "scenario", "expected_oracle_pressure"):
+                    if not str(case.get(fld) or "").strip():
+                        report.fail(f"{loc}.{fld} must be non-empty when accepted")
+                if str(case.get("disposition") or "").strip().lower() in {"", "pending"}:
+                    report.fail(f"{loc}.disposition must be decided (not pending) when accepted")
+    if require_passed and "residual_risks" not in data:
+        report.fail("03b_adversarial_cases.yaml: residual_risks must be present (use [] if none)")
+    if require_real_dispatch and "real_peer_dispatch" not in body:
+        report.fail("03b_adversarial_cases.yaml: require_real_adversarial_dispatch is set but the bridge dispatch was not real_peer_dispatch")
     if require_passed and re.search(r"\bTBD\b|待定|TODO", body, re.I):
         report.fail("03b_adversarial_cases.yaml: accepted artifact must not contain placeholders")
+
+
+_NONE_TOKENS = {"", "none", "n/a", "na", "-", "tbd"}
+
+
+def _check_regression_cases(report: GateReport, artifact_dir: Path, name: str, require_passed: bool, require_section: bool) -> None:
+    """Validate the 04/05 Regression Cases table: non-baseline rows must name a case + ref."""
+    path = artifact_dir / name
+    if not path.exists():
+        return
+    body = read_text(path)
+    if "## Regression Cases" not in body:
+        if require_section:
+            report.fail(f"{name}: require_regression_traceability is set but there is no ## Regression Cases section")
+        return
+    for idx, row in enumerate(table_dicts(body, "Regression Cases"), start=1):
+        defect = str(row.get("defect_incident_id") or "").strip().lower()
+        if defect in _NONE_TOKENS:
+            continue  # explicit no-defect baseline row
+        if not (require_passed or require_section):
+            continue
+        if str(row.get("named_regression_case") or "").strip().lower() in _NONE_TOKENS:
+            report.fail(f"{name}: Regression Cases[{idx}] defect {defect!r} has no named regression case")
+        if not re.search(r"\b[PO]-\d", str(row.get("proposition_oracle") or "")):
+            report.fail(f"{name}: Regression Cases[{idx}] must reference a P-xxx/O-xxx")
 
 
 def _check_report(report: GateReport, artifact_dir: Path, name: str, require_passed: bool) -> None:
@@ -344,13 +394,18 @@ def check(
     if "03a_test_cases.md" in needed:
         _check_readable_cases(report, artifact_dir, require_passed)
     if "03b_adversarial_cases.yaml" in needed:
-        _check_adversarial(report, artifact_dir, require_passed)
+        _check_adversarial(
+            report, artifact_dir, require_passed,
+            require_real_dispatch=as_bool(config.get("require_real_adversarial_dispatch")),
+        )
     # Wave 1 multiview as a per-UC gate, when the profile opts in.
     if require_multiview or as_bool(config.get("require_multiview")):
         _check_multiview(report, artifact_dir, require_passed)
     if scope == "all":
-        _check_report(report, artifact_dir, "04_execution_report.md", require_passed)
-        _check_report(report, artifact_dir, "05_knowledge_update.md", require_passed)
+        require_regression = as_bool(config.get("require_regression_traceability"))
+        for name in ("04_execution_report.md", "05_knowledge_update.md"):
+            _check_report(report, artifact_dir, name, require_passed)
+            _check_regression_cases(report, artifact_dir, name, require_passed, require_regression)
     return report
 
 

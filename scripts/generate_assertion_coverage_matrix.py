@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
-from bugate_core import parse_inventory_cases, parse_nested_yaml, read_text, write_text
+from bugate_core import as_bool, load_config, parse_inventory_cases, parse_nested_yaml, read_text, write_text
 
 
 def _as_list(value) -> list[str]:
@@ -36,6 +37,9 @@ def main() -> int:
     parser.add_argument("--spec", help="Declarative oracle spec (defines oracle ids/names)")
     parser.add_argument("--artifact-root", default=".")
     parser.add_argument("--output", default="assertion_coverage_matrix.md")
+    parser.add_argument("--gate", action="store_true", help="Exit non-zero if missing_implementation > --max-missing")
+    parser.add_argument("--max-missing", type=int, default=0)
+    parser.add_argument("--profile", help="Optional SUT profile config path")
     args = parser.parse_args()
     root = Path(args.artifact_root)
 
@@ -122,6 +126,10 @@ def main() -> int:
     print(f"written {args.output} "
           f"(covered={counts['covered']} missing_implementation={counts['missing_implementation']} "
           f"defined_unused={counts['defined_unused']})")
+    gate_on = args.gate or as_bool(load_config(profile=args.profile or os.environ.get("BUGATE_PROFILE")).get("require_assertion_coverage"))
+    if gate_on and counts["missing_implementation"] > args.max_missing:
+        print(f"FAIL: {counts['missing_implementation']} missing_implementation oracle(s) > max {args.max_missing}")
+        return 1
     return 0
 
 

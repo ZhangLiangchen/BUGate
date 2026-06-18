@@ -48,7 +48,8 @@ jobs:
           python3 scripts/oracle_falsification.py --spec examples/demo-sut/falsification_spec.yaml \
             --json-output /tmp/of.json --md-output /tmp/of.md --gate
           python3 scripts/generate_assertion_coverage_matrix.py --artifact-root examples/demo-sut \
-            --spec examples/demo-sut/falsification_spec.yaml --mutation-result /tmp/of.json --output /tmp/matrix.md
+            --spec examples/demo-sut/falsification_spec.yaml --mutation-result /tmp/of.json --output /tmp/matrix.md \
+            --gate --max-missing 1
 
       - name: Orchestrator init smoke (full SDTD)
         run: |

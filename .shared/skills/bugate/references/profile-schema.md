@@ -169,3 +169,17 @@ kill-rate gate (`--gate` exits non-zero below it). See the worked example at
   requires the inventory to contain at least one case absorbed from Stage 3B
   (marked `origin: adversarial` or referencing an `ADV-xxx` id). Makes "every new
   UC absorbs >= 1 adversarial finding" an enforced gate. Off by default.
+- `require_regression_traceability` — when true, `check_bugate_v13_semantics.py`
+  (scope `all`) requires a `## Regression Cases` section in 04/05, and every
+  non-baseline row must name a regression case + reference a `P-`/`O-` id.
+- `layer2_strict` — when true, `check_bugate_layer2_semantics.py` additionally
+  requires resolved Evidence Plan `status` (not pending), non-empty Layer Decision
+  `reason`, and `## Dependencies` + `## Deferred Claims` sections.
+- `require_assertion_coverage` — when true (or `generate_assertion_coverage_matrix.py
+  --gate`), the matrix exits non-zero if `missing_implementation > --max-missing`
+  (a case references an oracle the falsification spec never defines).
+- `require_real_adversarial_dispatch` — when true, the 03b gate fails unless the
+  artifact came from real peer dispatch (not a deterministic placeholder).
+- `reject_on_bridge_failures` — when true, `sdtd_multiview.check` /
+  `sdtd_adversarial.check` fail if any schema-rejected peer view sits in
+  `00_*/cli_bridge_failures/`.

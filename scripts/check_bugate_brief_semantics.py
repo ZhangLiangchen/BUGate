@@ -39,10 +39,14 @@ def _check_evidence_label(report: GateReport, section: str, idx: int, row: dict)
 def _check_brief_fields(report: GateReport, body: str) -> None:
     """Accepted-brief field gates: source non-empty, evidence_label enum, unknown→Q."""
     for idx, row in enumerate(table_dicts(body, "Propositions"), start=1):
-        if "source" in row and not (row.get("source") or "").strip():
-            report.fail(f"01_business_brief.md: Propositions[{idx}] source must be non-empty when accepted")
+        for col in ("proposition", "priority", "source"):
+            if col in row and not (row.get(col) or "").strip():
+                report.fail(f"01_business_brief.md: Propositions[{idx}] {col} must be non-empty when accepted")
         _check_evidence_label(report, "Propositions", idx, row)
     for idx, row in enumerate(table_dicts(body, "Business Oracles"), start=1):
+        for col in ("oracle", "observable_evidence"):
+            if col in row and not (row.get(col) or "").strip():
+                report.fail(f"01_business_brief.md: Business Oracles[{idx}] {col} must be non-empty when accepted")
         _check_evidence_label(report, "Business Oracles", idx, row)
     for idx, row in enumerate(table_dicts(body, "Clarification Gate"), start=1):
         status = (row.get("status") or "").strip().lower()
@@ -80,7 +84,7 @@ def check(artifact_dir: Path, *, require_passed: bool = False) -> GateReport:
         report.fail("01_business_brief.md: must define at least one P-xxx proposition")
     if not o_ids:
         report.fail("01_business_brief.md: must define at least one O-xxx business oracle")
-    for heading in ("Scope", "Propositions", "Business Oracles"):
+    for heading in ("Scope", "Canonical Business Flows", "Propositions", "Business Oracles", "Boundaries", "Assumptions", "Open Questions"):
         if f"## {heading}" not in body:
             report.fail(f"01_business_brief.md: missing section ## {heading}")
     # Optional verifiability-ratio gate (opt-in via profile config verifiability_min).

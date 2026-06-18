@@ -48,8 +48,14 @@ prd_health_spec: examples/demo-sut/prd_health.yaml
 prd_health_min: 60
 
 # Per-UC hardening gates (opt-in; off in the lean core default).
-require_multiview: true              # every UC must ship 00_multiview/divergence_report.md
-require_adversarial_absorption: true # every UC inventory must absorb >= 1 Stage 3B finding
+require_multiview: true               # every UC must ship 00_multiview/divergence_report.md
+require_adversarial_absorption: true  # every UC inventory must absorb >= 1 Stage 3B finding
+require_regression_traceability: true # 04/05 must carry a Regression Cases section
+layer2_strict: true                   # Layer 2 evidence status + dependency/deferred sections
+reject_on_bridge_failures: true       # archived schema-rejected peer views block the gate
+# Heavier gates available but not enabled here (the demo intentionally violates them):
+#   require_assertion_coverage: true       # 0 missing_implementation oracles (demo keeps O-003 as a teaching gap)
+#   require_real_adversarial_dispatch: true # 03b must come from real peer dispatch, not a placeholder
 
 # Memory-bus project namespace/tag for all reads/writes (override per project).
 memory:

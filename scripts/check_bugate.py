@@ -55,7 +55,7 @@ def precode_passed(artifact_dir: Path, config: dict[str, Any]) -> tuple[bool, li
 
 
 def artifact_dir_template(config: dict[str, Any]) -> str | None:
-    return config.get("artifact_dir_template") or config.get("uc_artifact_dir_template")
+    return config.get("artifact_dir_template")
 
 
 def uc_dir_for(path: str, compiled: list[re.Pattern[str]], template: str, root: Path) -> Path | None:

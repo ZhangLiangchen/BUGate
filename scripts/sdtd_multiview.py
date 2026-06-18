@@ -4,13 +4,25 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
-from bugate_core import read_text, write_text
+from bugate_core import as_bool, load_config, read_text, write_text
 
 
 def multiview_dir(artifact_dir: Path) -> Path:
     return artifact_dir / "00_multiview"
+
+
+def bridge_failures(out: Path, label: str) -> int:
+    """When the profile opts in, archived schema-rejected peer views block the gate."""
+    if not as_bool(load_config(profile=os.environ.get("BUGATE_PROFILE")).get("reject_on_bridge_failures")):
+        return 0
+    fdir = out / "cli_bridge_failures"
+    failures = sorted(fdir.glob("*")) if fdir.exists() else []
+    for f in failures:
+        print(f"FAIL: archived bridge failure {label}/cli_bridge_failures/{f.name}")
+    return 1 if failures else 0
 
 
 def init(artifact_dir: Path, focus: str) -> None:
@@ -73,6 +85,8 @@ def check(artifact_dir: Path) -> int:
     report = read_text(out / "divergence_report.md")
     if "gate_status: passed" not in report:
         print("FAIL: divergence_report.md gate_status must be passed")
+        return 1
+    if bridge_failures(out, "00_multiview"):
         return 1
     print("PASS")
     return 0
