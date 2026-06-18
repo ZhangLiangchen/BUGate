@@ -54,6 +54,29 @@ def precode_passed(artifact_dir: Path, config: dict[str, Any]) -> tuple[bool, li
     return not missing_or_pending, missing_or_pending
 
 
+def artifact_dir_template(config: dict[str, Any]) -> str | None:
+    return config.get("artifact_dir_template") or config.get("uc_artifact_dir_template")
+
+
+def uc_dir_for(path: str, compiled: list[re.Pattern[str]], template: str, root: Path) -> Path | None:
+    """Bind a guarded path to its per-UC artifact dir via a ``(?P<uc>...)`` capture.
+
+    Returns None (fail-closed) when the path matches a guarded pattern that
+    carries no ``uc`` capture, so one UC's passed artifacts can never unlock a
+    different UC's implementation files.
+    """
+    for regex in compiled:
+        match = regex.search(path)
+        if not match:
+            continue
+        uc = (match.groupdict() or {}).get("uc")
+        if not uc:
+            return None
+        resolved = Path(template.replace("{uc}", uc))
+        return resolved if resolved.is_absolute() else root / resolved
+    return None
+
+
 def collect_strings(value: Any) -> list[str]:
     found: list[str] = []
     if isinstance(value, dict):
@@ -113,13 +136,29 @@ def main(argv: list[str] | None = None) -> int:
     if not blocked:
         return 0
 
-    artifact_dir = resolve_artifact_dir(root, config)
-    if artifact_dir:
-        passed, reasons = precode_passed(artifact_dir, config)
-        if passed:
+    template = artifact_dir_template(config)
+    if template:
+        # Per-UC fail-closed binding: each blocked path must map to its own UC
+        # artifact dir (via the pattern's `uc` capture) and that dir must pass.
+        reasons = []
+        for path in blocked:
+            uc_dir = uc_dir_for(path, compiled, template, root)
+            if uc_dir is None:
+                reasons.append(f"{path}: cannot bind to a UC artifact dir (pattern has no 'uc' capture) — fail-closed")
+                continue
+            passed, why = precode_passed(uc_dir, config)
+            if not passed:
+                reasons.append(f"{path}: {uc_dir} not ready: " + "; ".join(why))
+        if not reasons:
             return 0
     else:
-        reasons = ["artifact_dir/artifact_root is not configured in the active BUGate profile"]
+        artifact_dir = resolve_artifact_dir(root, config)
+        if artifact_dir:
+            passed, reasons = precode_passed(artifact_dir, config)
+            if passed:
+                return 0
+        else:
+            reasons = ["artifact_dir/artifact_root is not configured in the active BUGate profile"]
 
     sys.stderr.write("BUGate guard blocked edits to configured implementation paths:\n")
     for path in blocked:

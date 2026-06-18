@@ -140,3 +140,18 @@ spec (`oracles:` as field assertions, `mutations:` as field-path ops, plus an
 without a spec it reports `profile_required`. `falsification_threshold` is the
 kill-rate gate (`--gate` exits non-zero below it). See the worked example at
 `examples/demo-sut/falsification_spec.yaml`.
+
+### Optional hardening keys
+
+- `artifact_dir_template` — enables **per-UC fail-closed** write-guarding in
+  `scripts/check_bugate.py`. Set a template with a `{uc}` placeholder (e.g.
+  `docs/usecases/{uc}/`) and give each `guarded_path_regex` a named `(?P<uc>...)`
+  capture. A blocked path is then checked against *its own* UC artifact dir, so
+  one requirement's passed artifacts can never unlock another's tests. A guarded
+  path that matches a pattern with no `uc` capture is blocked (fail-closed). When
+  unset, the single `artifact_dir` is used (default).
+- `verifiability_min` — enables the Layer 1 **verifiability-ratio gate** in
+  `check_bugate_brief_semantics.py`. A proposition counts as verifiable unless its
+  `verifiability` cell reads unverifiable / deferred / unknown / tbd. The gate
+  fails below this floor (e.g. `0.8`) and warns below the `0.80` advisory bar.
+  When unset, the gate is off (default).

@@ -270,6 +270,38 @@ def write_real_view(out: Path, peer: str, body: str, cleaned: bool) -> None:
     print(f"{peer}: wrote real peer view ({len(body)} chars)")
 
 
+MIN_VIEW_CHARS = 40
+
+
+def view_schema_errors(body: str) -> list[str]:
+    """Schema check for a returned Wave 1 peer view: it must carry propositions."""
+    text = (body or "").strip()
+    errors: list[str] = []
+    if len(text) < MIN_VIEW_CHARS:
+        errors.append(f"view too short ({len(text)} < {MIN_VIEW_CHARS} chars)")
+    if not proposition_ids(text):
+        errors.append("no P-xxx proposition ids found in returned view")
+    return errors
+
+
+def archive_failed_view(out: Path, peer: str, raw: str, errors: list[str]) -> Path:
+    """Archive a schema-invalid returned view instead of persisting it as real."""
+    path = out / "cli_bridge_failures" / f"{peer}_rejected_view.md"
+    write_text(
+        path,
+        "---\n"
+        f"gate: multiview_{peer}_rejected\n"
+        "dispatch_mode: schema_rejected\n"
+        "---\n\n"
+        f"# Rejected {peer} peer view (schema validation failed)\n\n"
+        + "".join(f"- {e}\n" for e in errors)
+        + "\n## Raw returned output (truncated)\n\n```\n"
+        + (raw or "")[:5000]
+        + "\n```\n",
+    )
+    return path
+
+
 def synthesize_divergence(
     out: Path,
     codex_view: str,
@@ -422,6 +454,13 @@ def run_all(artifact_dir: Path) -> int:
         if not cleaned_body.strip():
             print(f"{peer}: empty output; using placeholder for this peer")
             write_placeholder_view(out, peer, propositions, f"{peer} CLI returned empty output")
+            views[peer] = read_text(out / f"{peer}_view.md")
+            continue
+        errors = view_schema_errors(cleaned_body)
+        if errors:
+            archived = archive_failed_view(out, peer, stdout, errors)
+            print(f"{peer}: returned view failed schema ({'; '.join(errors)}); archived {archived.name}, using placeholder")
+            write_placeholder_view(out, peer, propositions, f"{peer} returned a schema-invalid view: {errors[0]}")
             views[peer] = read_text(out / f"{peer}_view.md")
             continue
         write_real_view(out, peer, cleaned_body, was_cleaned)
