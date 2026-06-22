@@ -22,6 +22,7 @@ are explicitly set.
 from __future__ import annotations
 
 import argparse
+from functools import lru_cache
 import os
 import shutil
 import subprocess
@@ -88,13 +89,31 @@ def proxy_summary() -> str:
 # Flags mirror the conservative shape used by the reference dispatcher:
 #   * Claude: `claude -p [--model M] [--effort E] --permission-mode dontAsk
 #             --output-format text` — prompt is piped on stdin.
-#   * Codex:  `codex exec --ask-for-approval never --sandbox read-only [--model M]
-#             [-c model_reasoning_effort="E"] -` — prompt is piped on stdin via `-`.
+#   * Codex:  `codex exec [--ask-for-approval never] --sandbox read-only
+#             [--model M] [-c model_reasoning_effort="E"] -` — prompt is piped
+#             on stdin via `-`. The approval flag is used only when supported;
+#             current standalone Codex CLIs run non-interactively without it.
 # Model/effort flags are appended only when the corresponding env var is set, so
 # nothing vendor-specific is hardcoded. If you are unsure about flag support for
 # your CLI build, override the binary or unset the model/effort env vars to fall
 # back to the CLI's own defaults.
 # ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def codex_supports_ask_for_approval() -> bool:
+    try:
+        result = subprocess.run(
+            [CODEX_BIN, "exec", "--help"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=10,
+            env=cli_env(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "--ask-for-approval" in result.stdout
 
 
 def build_command(peer: str) -> list[str]:
@@ -108,7 +127,10 @@ def build_command(peer: str) -> list[str]:
         cmd += ["--permission-mode", "dontAsk", "--output-format", "text"]
         return cmd
     if peer == "codex":
-        cmd = [CODEX_BIN, "exec", "--ask-for-approval", "never", "--sandbox", "read-only"]
+        cmd = [CODEX_BIN, "exec"]
+        if codex_supports_ask_for_approval():
+            cmd += ["--ask-for-approval", "never"]
+        cmd += ["--sandbox", "read-only"]
         if CODEX_MODEL:
             cmd += ["--model", CODEX_MODEL]
         if CODEX_REASONING_EFFORT:

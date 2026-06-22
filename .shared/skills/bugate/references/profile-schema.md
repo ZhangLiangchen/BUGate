@@ -2,9 +2,11 @@
 
 BUGate core reads a deliberately small profile surface. A profile is a YAML file
 whose keys are merged on top of `bugate.config.yaml` by `load_config`. Profiles
-can live in a mounted SUT workspace and be selected through
-`BUGATE_PROFILE=/path/profile.yaml`, the core `bugate.config.yaml` `profile` field,
-or its `active_profile` alias.
+can live in or beside a mounted SUT automation test workspace and be selected
+through `BUGATE_PROFILE=/path/profile.yaml`, the core `bugate.config.yaml`
+`profile` field, or its `active_profile` alias. The profile binds BUGate to a
+test automation surface; it does not copy product source, API dumps, secrets, or
+environment facts into BUGate core.
 
 This document is the full key contract. Keys are grouped into core
 `bugate.config.yaml` fields, SUT-profile fields, and environment variables. Core
@@ -30,7 +32,8 @@ These keys are read from the core config and may be overridden by a profile.
 ## SUT-profile keys
 
 These keys are normally supplied by the SUT profile and bind BUGate's gate to a
-specific requirement and implementation tree.
+specific requirement and guarded implementation tree inside the mounted test
+automation workspace.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
@@ -93,15 +96,15 @@ These drive the Codex/Claude peer CLI dispatch in `sdtd_multiview_cli_bridge.py`
 ## Example profile
 
 A complete, copy-paste SUT profile. Replace the placeholder paths and regexes
-with the real ones for your system under test.
+with the real ones for your SUT automation test workspace.
 
 ```yaml
 # SUT profile merged on top of bugate.config.yaml by load_config.
 
-# Where this requirement's pre-code BUGate artifacts live.
+# Where this requirement's pre-code BUGate artifacts live in the test workspace.
 artifact_dir: sut/example/bugate/REQ-001
 
-# Implementation paths physically blocked until the pre-code artifacts pass.
+# Test implementation paths physically blocked until the pre-code artifacts pass.
 guarded_path_regex:
   - "^sut/example/tests/.*[.]py$"
 

@@ -8,6 +8,8 @@ test analysis and test-case governance framework.
 - Keep shared runtime instructions in `.shared/skills/bugate/`.
 - Keep SUT-specific source, API dumps, secrets, environments, fixtures, live
   evidence, and project memories outside BUGate core.
+- Treat a mounted SUT as the SUT automation test framework / test workspace
+  unless a profile explicitly defines a narrower evidence boundary.
 - `CLAUDE.md` must remain a symlink to this file.
 
 ## Roles
@@ -27,14 +29,14 @@ test analysis and test-case governance framework.
 1. Do not add SUT source code, product API snapshots, environment secrets,
    credentials, generated caches, or project-specific fixtures to BUGate core.
 2. Put SUT paths, resource policies, environment names, auth rules, and tool
-   commands in a SUT profile or mounted workspace.
+   commands in a SUT profile or mounted test workspace.
 3. Treat BUGate artifacts as pre-code governance: business brief, testability
    decision, inventory/oracle mapping, readable test cases, adversarial review,
    execution report, and knowledge update.
 4. A test implementation must not be generated before the configured pre-code
    artifacts are present and accepted for that SUT profile.
 5. If a rule requires SUT-specific facts, stop at the profile boundary and ask
-   for a profile or mounted SUT workspace instead of inventing details.
+   for a profile or mounted SUT test workspace instead of inventing details.
 
 ## Startup
 
@@ -44,7 +46,7 @@ For non-trivial BUGate work:
 2. Read `docs/qa-methodology/METHOD.md` when method rationale is needed.
 3. Read `docs/qa-methodology/SOP.md` when execution procedure is needed.
 4. Inspect the active SUT profile only if the task explicitly involves a
-   mounted SUT.
+   mounted SUT test workspace.
 
 ## Hook Policy
 

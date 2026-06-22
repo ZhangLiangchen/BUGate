@@ -19,30 +19,53 @@ The coupling boundary is clean enough to separate:
 
 - reusable method and gates,
 - SUT profile contracts,
-- product-owned implementation and evidence.
+- mounted automation test workspaces,
+- product runtime/source/evidence that remains outside BUGate core.
 
 ## Decision
 
-BUGate is split into three layers:
+BUGate is split into four conceptual parts:
 
-| Layer | Ownership | Content |
+```mermaid
+flowchart LR
+  Core["BUGate Core\nSUT-neutral method and gates"]
+  Profile["SUT Profile\nbridge contract"]
+  Workspace["Mounted Workspace\nSUT automation test framework"]
+  Runtime["SUT / Product Runtime\nblack-box target and evidence sources"]
+
+  Core --> Profile
+  Profile --> Workspace
+  Workspace --> Runtime
+  Runtime -. "observed behavior / evidence" .-> Workspace
+```
+
+| Part | Ownership | Content |
 |---|---|---|
 | BUGate Core | This repository | Method, artifact templates, structural gate criteria, hook mechanism, adapter layout. |
-| SUT Profile | Mounted SUT workspace or profile package | Paths, commands, evidence sources, guarded implementation patterns, resource policy, runtime kind. |
-| SUT | Product repository | Source code, API docs, fixtures, tests, secrets, live evidence, incidents, and local agent rules. |
+| SUT Profile | Profile package or mounted test workspace | Paths, commands, evidence sources, guarded test patterns, resource policy, runtime kind, role policy, namespace. |
+| Mounted Workspace | Usually the SUT automation test repository/workspace | Test code, BUGate artifacts, fixtures, runners, generated cases, captured evidence, local test rules. |
+| SUT / Product Runtime | Product-owned systems and repositories | Black-box API/UI/runtime behavior, product docs/contracts/environments, optional source/API dumps/secrets, live incidents, and operational evidence. |
 
 Core must not depend on any single SUT kind, path, business entity, environment,
 or resource naming scheme.
+
+"Mounting a SUT" therefore means mounting the SUT's test automation surface, not
+copying or vendoring the product repository into BUGate core. Product source can
+be used as an evidence source when a profile allows it, but it is never the
+default truth for black-box behavior.
 
 ## Consequences
 
 - Core becomes portable across different systems under test.
 - SUT profiles provide the concrete "teeth" for physical write guards and
-  evidence checks.
+  evidence checks inside the mounted test workspace.
 - Core can still define strict invariants, but it must express them in
   SUT-neutral terms.
 - SUT-specific learning can be promoted into Core only after it is rewritten as
   a product-neutral rule.
+- Product source, API dumps, secrets, and live environment details remain
+  outside Core. They belong to the product side, the test workspace, or a
+  profile-controlled evidence/config boundary.
 
 ## Promotion Rule
 

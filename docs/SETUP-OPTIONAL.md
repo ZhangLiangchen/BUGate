@@ -27,18 +27,23 @@ exact same dispatch shape and `SDTD_*` env contract.
 
 ### Install
 
-Put both CLIs on `PATH`:
+Install both CLIs with the vendor native installers and put them on `PATH`:
 
-- the `codex` CLI (must support the non-interactive `codex exec` subcommand with
-  `--ask-for-approval`, `--sandbox`, and stdin via a trailing `-`);
+- Codex CLI, using the standalone macOS/Linux installer:
+  `curl -fsSL https://chatgpt.com/codex/install.sh | sh`
+- Claude Code, using Native Install (Recommended):
+  `curl -fsSL https://claude.ai/install.sh | bash`
+- the `codex` CLI must support the non-interactive `codex exec` subcommand with
+  `--sandbox` and stdin via a trailing `-`;
 - the `claude` CLI (must support `claude -p` with `--permission-mode` and
   `--output-format`).
 
-Minimum-version note: install a build recent enough that `codex exec
---ask-for-approval never --sandbox read-only -` and `claude -p --permission-mode
-dontAsk --output-format text` are both accepted. If your build does not support
-a model/effort flag, leave the corresponding env var unset (see below) to fall
-back to the CLI's own defaults, or override the binary name.
+Minimum-version note: install a build recent enough that `codex exec --sandbox
+read-only -` and `claude -p --permission-mode dontAsk --output-format text` are
+both accepted. Older Codex builds that still accept `--ask-for-approval never`
+are handled automatically by the bridge. If your build does not support a
+model/effort flag, leave the corresponding env var unset (see below) to fall back
+to the CLI's own defaults, or override the binary name.
 
 ### Wire
 
@@ -46,7 +51,7 @@ The bridges invoke these **exact** commands (read from `build_command()` in both
 scripts), piping the prompt on **stdin**:
 
 - **claude:** `claude -p [--model M] [--effort E] --permission-mode dontAsk --output-format text`
-- **codex:** `codex exec --ask-for-approval never --sandbox read-only [--model M] [-c model_reasoning_effort="E"] -`
+- **codex:** `codex exec [--ask-for-approval never] --sandbox read-only [--model M] [-c model_reasoning_effort="E"] -`
 
 The `--model` / `--effort` (claude) and `--model` / `-c model_reasoning_effort`
 (codex) flags are appended **only when** the corresponding env var is set —
@@ -81,6 +86,10 @@ python3 scripts/sdtd_adversarial_cli_bridge.py  check-env
 `dispatch_mode` (`real_peer_dispatch` when both are present, otherwise
 `fallback (missing: <name>)`), the model/effort defaults, the proxy-env summary,
 and the timeout. When both CLIs resolve you are ready for real peer dispatch.
+This is a binary-resolution check only: a CLI can still fail at dispatch time if
+it is not logged in or lacks an API key. In that case, the failed peer is
+degraded to `fallback_placeholder` while the other peer can still produce a real
+view.
 
 ### Fallback
 
@@ -103,7 +112,9 @@ only talks to the running service.
 ### Install
 
 ```bash
-pip install mcp-memory-service
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -U pip
+.venv/bin/python -m pip install mcp-memory-service huggingface_hub numpy onnxruntime tokenizers
 ```
 
 Then **pre-download the ONNX embedding model once** so the service can run
@@ -119,7 +130,8 @@ override via `BUGATE_ONNX_MODEL`) into `~/.cache/mcp_memory/onnx_models`
 downloader **cannot traverse a SOCKS `all_proxy`**, which is exactly why you
 pre-fetch with this driver — it unsets `all_proxy`/`ALL_PROXY` for the fetch.
 `bin/memory-model-fetch` needs a Hugging Face CLI (`hf` or `huggingface-cli`) on
-`PATH`; if neither is present it prints install hints and exits non-zero.
+`PATH`; installing `huggingface_hub` into `.venv` provides `hf`. If neither is
+present it prints install hints and exits non-zero.
 **Fallback:** set `MCP_MEMORY_USE_ONNX=0` to skip ONNX embeddings entirely.
 
 ### Wire
@@ -146,6 +158,16 @@ the `bin/memory-service-*` and `bin/promote-memory` wrappers (e.g.
 bin/memory-bus-start    # launch
 bin/memory-bus-status   # confirm reachable
 ```
+
+For a full smoke test, record and search one project-scoped note:
+
+```bash
+bin/memory-service-note --agent agent --type finding --msg "memory smoke"
+bin/memory-service-search --query "memory smoke" --limit 1
+```
+
+Use the BUGate wrappers for verification; a raw `memory status` command may use
+the service's default environment instead of this repo's `.memory_bus/` database.
 
 ### Fallback
 

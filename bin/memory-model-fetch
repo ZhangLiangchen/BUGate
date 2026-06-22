@@ -18,14 +18,14 @@ echo "[memory-model-fetch] dest:  $DEST"
 unset all_proxy ALL_PROXY >/dev/null 2>&1 || true
 
 if command -v hf >/dev/null 2>&1; then
-  hf download "$MODEL" --include "onnx/*" "*.json" "*.txt" --local-dir "$DEST"
+  hf download "$MODEL" --include "onnx/*" --include "*.json" --include "*.txt" --local-dir "$DEST"
 elif command -v huggingface-cli >/dev/null 2>&1; then
-  huggingface-cli download "$MODEL" --include "onnx/*" "*.json" "*.txt" --local-dir "$DEST"
+  huggingface-cli download "$MODEL" --include "onnx/*" --include "*.json" --include "*.txt" --local-dir "$DEST"
 else
   cat >&2 <<EOF
 [memory-model-fetch] No Hugging Face CLI found. Install one, then re-run:
     pipx install huggingface_hub        # or: pip install -U huggingface_hub
-    hf download "$MODEL" --include "onnx/*" "*.json" "*.txt" --local-dir "$DEST"
+    hf download "$MODEL" --include "onnx/*" --include "*.json" --include "*.txt" --local-dir "$DEST"
 
   Or download the files manually from:
     https://huggingface.co/$MODEL/tree/main/onnx

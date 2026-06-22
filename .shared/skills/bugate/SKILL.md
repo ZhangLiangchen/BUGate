@@ -1,6 +1,6 @@
 ---
 name: bugate
-description: Use for SUT-neutral BUGate work: AI black-box requirement analysis, pre-code test governance, testability decisions, oracle mapping, adversarial review, and profile-based test-case framework setup. Do not use it to assume product-specific APIs, resources, or environments.
+description: "Use for SUT-neutral BUGate work: AI black-box requirement analysis, pre-code test governance, testability decisions, oracle mapping, adversarial review, and profile-based test-case framework setup. Do not use it to assume product-specific APIs, resources, or environments."
 ---
 
 # BUGate
@@ -10,14 +10,15 @@ framework. It separates reusable method from SUT-specific facts.
 
 ## Required Workflow
 
-1. Identify the active SUT profile. If none exists, stay in core mode and do not
-   invent product facts.
+1. Identify the active SUT profile and mounted automation test workspace. If
+   none exists, stay in core mode and do not invent product facts.
 2. Build or review the business brief before test design.
 3. Decide testability and the cheapest sufficient test layer.
 4. Map inventory, propositions, oracles, evidence, and implementation targets.
 5. Generate human-readable test cases when the workflow requires review.
 6. Run adversarial or exploratory review for high-risk changes.
-7. Only then implement or review concrete tests in the mounted SUT workspace.
+7. Only then implement or review concrete tests in the mounted SUT automation
+   test workspace.
 
 ## Artifact Stack
 
@@ -96,6 +97,11 @@ valid without any product repository mounted.
 
 - No SUT API paths, credentials, product resource IDs, service URLs, or
   environment names belong in this skill.
+- A mounted SUT workspace means the SUT's automation test framework / test
+  workspace: tests, BUGate artifacts, fixtures, runners, captured evidence, and
+  local test rules. Product source, API dumps, secrets, and live environment
+  details stay outside BUGate core and enter only through profile-controlled
+  evidence/config boundaries.
 - SUT profiles may add stricter artifact names, guarded paths, commands, and
   evidence rules, but they must not weaken the core invariants.
 - If source code is available, treat it as one possible evidence source, not as
