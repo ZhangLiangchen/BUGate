@@ -42,19 +42,21 @@ dragging any one product's specifics in with it.
 
 ## 1. The Two-Tier Layout — why a promotion loop exists at all
 
-The ADR splits BUGate into three layers with distinct ownership. The promotion
-loop runs **between** them:
+The ADR splits BUGate into four parts with distinct ownership. The promotion
+loop runs **between** BUGate Core and the SUT-side parts:
 
-| Layer | Ownership | Content (ADR Decision table) |
+| Part | Ownership | Content (ADR Decision table) |
 |---|---|---|
-| **BUGate Core** | This repository | Method, artifact templates, structural gate criteria, hook mechanism, adapter layout. |
-| **SUT Profile** | Mounted SUT workspace or profile package | Paths, commands, evidence sources, guarded implementation patterns, resource policy, runtime kind. |
-| **SUT** | Product repository | Source, API docs, fixtures, tests, secrets, live evidence, incidents, local agent rules. |
+| **BUGate Core** | This repository | SUT-neutral method, gates, templates, hook mechanism, adapter. |
+| **SUT Profile** | Bridge contract | Paths, commands, evidence sources, guarded test patterns, resource policy, runtime kind, role policy, namespace. |
+| **Mounted Workspace** | Usually the SUT automation test framework / test workspace | Test code, BUGate artifacts, fixtures, runners, generated cases, captured evidence, local test rules. |
+| **SUT / Product Runtime** | Product-owned | Black-box API/UI/runtime behavior, product docs/contracts/environments, optional source/API dump/secrets only as evidence, live behavior. |
 
 Promotion is **strictly upward and inward**: a lesson recorded against a SUT (or
-its profile) may only move *into* Core, never sideways into another SUT and never
-back out of Core as a product detail. The ADR Promotion Rule's tie-breaker is the
-default posture: **"When in doubt, keep it in the SUT profile."**
+its profile, mounted workspace, or runtime evidence) may only move *into* Core,
+never sideways into another SUT and never back out of Core as a product detail.
+The ADR Promotion Rule's tie-breaker is the default posture: **"When in doubt,
+keep it in the SUT profile."**
 
 The loop is not decoration — it is the mechanism that defeats three failure modes
 the ADR explicitly rejected (Rejected Alternatives):

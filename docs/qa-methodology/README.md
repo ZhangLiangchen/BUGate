@@ -12,7 +12,7 @@ profile or mounted workspace. On any conflict,
 | [METHOD.md](METHOD.md) | The "why": full AI-assisted black-box test methodology, the nine-Wave flow, theory mapping, and rationale. |
 | [SOP.md](SOP.md) | The "what to do next": step-by-step execution handbook for the Wave 0–3 minimum viable loop. |
 | [EXPERIENCE_PROMOTION_PROTOCOL.md](EXPERIENCE_PROMOTION_PROTOCOL.md) | How a SUT-local lesson is decided to either stay local or be promoted into SUT-neutral BUGate Core. |
-| [BUGATE_PLATFORM_DECOUPLING_ADR.md](BUGATE_PLATFORM_DECOUPLING_ADR.md) | ADR-BUGATE-001: the accepted Core / Profile / SUT three-layer architecture and its promotion rule. |
+| [BUGATE_PLATFORM_DECOUPLING_ADR.md](BUGATE_PLATFORM_DECOUPLING_ADR.md) | ADR-BUGATE-001: the accepted BUGate Core / SUT Profile / Mounted Workspace / SUT / Product Runtime four-part architecture and its promotion rule. |
 | [BUGATE_EVOLUTION_TIMELINE.md](BUGATE_EVOLUTION_TIMELINE.md) | SUT-neutral summary of how BUGate evolved from a method into a profile-driven pre-code governance framework. |
 
 ## Recommended reading order
@@ -54,23 +54,30 @@ the case inventory in `03_inventory.yaml`, and so on through
 structural gates in `scripts/`, and the skill in `.shared/skills/bugate/` — is
 the actual install contract; the Waves are how you fill it.
 
-Architecturally, BUGate is a **three-layer model** (per
-`BUGATE_PLATFORM_DECOUPLING_ADR.md`): **Core** owns SUT-neutral method, artifact
-templates, structural gate criteria, and the hook mechanism; the **SUT Profile**
-supplies paths, commands, guarded patterns, evidence sources, and runtime kind;
-the **SUT** owns product source, fixtures, secrets, and live evidence. Core must
-never depend on any single SUT's entities or paths; a lesson is promoted into
-Core only after it is restated in product-neutral terms.
+Architecturally, BUGate is a **four-part model** (per
+`BUGATE_PLATFORM_DECOUPLING_ADR.md`): **BUGate Core** owns SUT-neutral method,
+artifact templates, structural gate criteria, hook mechanism, and adapter
+layout; the **SUT Profile** is the bridge contract for paths, commands, evidence
+sources, guarded test patterns, resource policy, runtime kind, role policy, and
+namespace; the **Mounted Workspace** is usually the SUT automation test
+framework / test workspace, owning test code, BUGate artifacts, fixtures,
+runners, generated cases, captured evidence, and local test rules; the
+**SUT / Product Runtime** is product-owned, covering black-box API/UI/runtime
+behavior, product docs/contracts/environments, and optional source/API
+dump/secrets only as evidence sources. Core must never depend on any single
+SUT's entities or paths; a lesson is promoted into Core only after it is
+restated in product-neutral terms.
 
 ## Glossary (English)
 
 **Two meanings of "layer" — disambiguated.** The word is overloaded; keep them
 separate:
 
-- **Architecture layers (three-layer model):** **Core / Profile / SUT** — the
-  ownership/decoupling split from the ADR (see above). About *who owns what*.
+- **Architecture parts (four-part model):** **BUGate Core / SUT Profile /
+  Mounted Workspace / SUT / Product Runtime** — the ownership/decoupling split
+  from the ADR (see above). About *who owns what*.
 - **Gate "Layers 1–4":** the pre-code artifact stages enforced by the gates.
-  About *what artifact you produce next*. These are unrelated to the three-layer
+  About *what artifact you produce next*. These are unrelated to the four-part
   model — a Layer-1 gate lives entirely inside Core.
 
 **Gate Layers ↔ artifact numbering** (from `.shared/skills/bugate/SKILL.md`):
