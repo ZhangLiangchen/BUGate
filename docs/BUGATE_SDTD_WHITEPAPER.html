@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+ BUGate SDTD 白皮书 · 开源指导文档
+ BUGate 已从 Hypervise 独立拆分为 SUT 无关框架;正文为中立的架构、方法论与用法,
+ Hypervise 起源与真实战果集中在「第 10 章 起源实证」。
+ 独立核心 / demo 数字可在 BUGate 仓库复查;起源历史数字见原 Hypervise 产物;无臆造。
+ 可翻页文档引擎:章节翻页 + 章内滚动 + TOC 侧栏 + 明暗自适应 + 打印导出。
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BUGate SDTD 白皮书 · Spec-Driven Test Development</title>
+<style>
+  :root{
+    --bg:#fbfaf7; --panel:#ffffff; --ink:#1c1c1a; --ink2:#3a3a37; --muted:#6a6a64; --line:#e2e0d6; --line2:#d3d1c7;
+    --brand:#1d6f56; --brand2:#0f5d6e; --accent:#b3541e; --violet:#5b4aa8;
+    --ok:#1d9e75; --warn:#b9851a; --bad:#c0392b; --na:#6a7686;
+    --code-bg:#f1efe8; --teal-fill:#e1f5ee; --teal-ink:#0f6e56;
+    --amber-fill:#faeeda; --amber-ink:#854f0b; --coral-fill:#faece7; --coral-ink:#993c1d;
+    --gray-fill:#f1efe8; --gray-ink:#5f5e5a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a; --panel:#1b1d22; --ink:#e9e9e6; --ink2:#c9c9c4; --muted:#9a9a92; --line:#2c2e34; --line2:#3a3d44;
+      --brand:#5dcaa5; --brand2:#46b3c8; --accent:#e8915a; --violet:#a78bfa;
+      --ok:#34d399; --warn:#e8b84a; --bad:#f0997b; --na:#8a96a8;
+      --code-bg:#22252c; --teal-fill:#0c3b30; --teal-ink:#7fd8b8;
+      --amber-fill:#3a2a0a; --amber-ink:#e8b84a; --coral-fill:#3a1810; --coral-ink:#f0997b;
+      --gray-fill:#24262c; --gray-ink:#b4b2a9;
+    }
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{background:var(--bg); color:var(--ink); overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.75; font-size:16px}
+  code{font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace; background:var(--code-bg);
+    border:1px solid var(--line); border-radius:5px; padding:.05em .4em; font-size:.86em; color:var(--ink2)}
+
+  /* layout */
+  #app{display:flex; height:100vh}
+  #toc{width:280px; flex:0 0 280px; border-right:1px solid var(--line); background:var(--panel);
+    overflow-y:auto; padding:24px 0}
+  #toc .brand{padding:0 24px 16px; border-bottom:1px solid var(--line); margin-bottom:10px}
+  #toc .brand .t{font-size:17px; font-weight:700; letter-spacing:-.2px}
+  #toc .brand .s{font-size:12.5px; color:var(--muted); margin-top:3px}
+  #toc a{display:block; padding:7px 24px 7px 22px; color:var(--ink2); text-decoration:none; font-size:13.5px;
+    border-left:3px solid transparent; line-height:1.4}
+  #toc a:hover{background:var(--code-bg)}
+  #toc a.active{border-left-color:var(--brand); color:var(--ink); background:var(--code-bg); font-weight:600}
+  #toc a .n{color:var(--muted); font-size:12px; margin-right:7px}
+
+  #main{flex:1; display:flex; flex-direction:column; min-width:0}
+  #bar{height:3px; background:var(--brand); width:0; transition:width .3s}
+  #reader{flex:1; overflow-y:auto; scroll-behavior:smooth}
+  .chapter{display:none; max-width:880px; margin:0 auto; padding:48px 40px 120px}
+  .chapter.active{display:block; animation:fade .3s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+  /* typography */
+  .kick{font-size:12.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--brand); font-weight:700}
+  h1{font-size:30px; font-weight:700; letter-spacing:-.4px; line-height:1.25; margin:6px 0 18px}
+  h2{font-size:21px; font-weight:700; margin:34px 0 12px; padding-top:8px; letter-spacing:-.2px}
+  h3{font-size:17px; font-weight:600; margin:24px 0 8px; color:var(--ink)}
+  p{margin:12px 0; color:var(--ink2)}
+  ul,ol{margin:12px 0 12px 22px; color:var(--ink2)} li{margin:5px 0}
+  strong{color:var(--ink); font-weight:600}
+  .lead{font-size:18px; color:var(--ink2); line-height:1.7; margin:14px 0 22px}
+  .muted{color:var(--muted)} .small{font-size:13.5px}
+  a.ref{color:var(--brand2); text-decoration:none; border-bottom:1px dotted var(--brand2)}
+
+  /* callouts */
+  .note{border-radius:10px; padding:14px 18px; margin:18px 0; font-size:14.5px; line-height:1.65; border:1px solid var(--line2)}
+  .note.ok{background:rgba(29,158,117,.08); border-color:rgba(29,158,117,.3)}
+  .note.warn{background:rgba(185,133,26,.09); border-color:rgba(185,133,26,.3)}
+  .note.brand{background:rgba(29,111,86,.08); border-color:rgba(29,111,86,.3)}
+  .note b{color:var(--ink)}
+  .figcap{font-size:13px; color:var(--muted); margin:8px 0 20px; text-align:center; font-style:italic}
+
+  /* tables */
+  table{width:100%; border-collapse:collapse; font-size:14px; margin:16px 0; border:1px solid var(--line2); border-radius:10px; overflow:hidden}
+  thead th{background:var(--code-bg); text-align:left; padding:10px 13px; font-weight:700; font-size:13.5px; border-bottom:1px solid var(--line2); color:var(--ink)}
+  tbody td{padding:9px 13px; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.55; color:var(--ink2)}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:nth-child(even){background:rgba(125,125,125,.035)}
+
+  /* figure cards */
+  .fig{background:var(--panel); border:1px solid var(--line2); border-radius:12px; padding:20px 16px; margin:18px 0; overflow-x:auto}
+  svg text{font-family:inherit}
+  .b{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px}
+  .b-ok{color:#06402b; background:#9fe1cb} .b-warn{color:#3a2a05; background:#fac775}
+  .b-bad{color:#3a0d0d; background:#f0997b} .b-na{color:#0a0f1c; background:#b4b2a9}
+  @media (prefers-color-scheme: dark){
+    .b-ok{color:#04342c; background:#5dcaa5} .b-warn{color:#412402; background:#e8b84a}
+  }
+  .pill{display:inline-block; font-size:13px; color:var(--brand); border:1px solid var(--brand); border-radius:999px; padding:5px 13px; margin:4px 6px 4px 0}
+
+  /* cover */
+  .cover{max-width:880px; margin:0 auto; padding:90px 40px 60px}
+  .cover .big{font-size:52px; font-weight:800; letter-spacing:-1px; line-height:1.05}
+  .cover .big .ac{color:var(--brand)}
+  .cover .sub{font-size:22px; color:var(--ink2); margin-top:16px; font-weight:500}
+  .cover .meta{margin-top:30px; color:var(--muted); font-size:14px; line-height:1.9}
+
+  /* nav */
+  #nav{position:fixed; bottom:22px; right:30px; display:flex; gap:10px; z-index:30}
+  #nav button{width:44px; height:44px; border-radius:50%; border:1px solid var(--line2); background:var(--panel);
+    color:var(--ink); font-size:18px; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.12)}
+  #nav button:hover{border-color:var(--brand); color:var(--brand)}
+  #nav button:disabled{opacity:.35; cursor:default}
+  #tocbtn{position:fixed; top:16px; left:16px; z-index:40; display:none; width:40px; height:40px; border-radius:9px;
+    border:1px solid var(--line2); background:var(--panel); color:var(--ink); font-size:17px; cursor:pointer}
+
+  @media (max-width:860px){
+    #toc{position:fixed; left:0; top:0; bottom:0; z-index:35; transform:translateX(-100%); transition:transform .25s}
+    #toc.open{transform:none}
+    #tocbtn{display:block}
+    .chapter,.cover{padding-left:22px; padding-right:22px}
+    .cover .big{font-size:38px}
+  }
+  @media print{
+    body{overflow:visible} #app{display:block; height:auto} #toc,#nav,#tocbtn,#bar{display:none!important}
+    #reader{overflow:visible; height:auto} .chapter{display:block!important; page-break-after:always; max-width:100%}
+  }
+</style>
+</head>
+<body>
+<button id="tocbtn" aria-label="目录">☰</button>
+<div id="app">
+  <nav id="toc">
+    <div class="brand"><div class="t">BUGate SDTD 白皮书</div><div class="s">Spec-Driven Test Development · 开源指导文档 v1.0</div></div>
+    <div id="toclist"></div>
+  </nav>
+  <div id="main">
+    <div id="bar"></div>
+    <div id="reader">
+
+      <!-- 0 封面 -->
+      <section class="chapter cover" data-title="封面 / 摘要">
+        <div class="kick">BUGate · 开源白皮书 · SUT 无关 AI 测试框架</div>
+        <div class="big">BUGate <span class="ac">SDTD</span></div>
+        <div class="sub">规格驱动、双 runtime 互审、黑盒的 AI 测试用例开发流水线</div>
+        <p class="lead" style="margin-top:26px">本白皮书是 BUGate / Full SDTD 工作流的开源指导文档,系统阐述它的远景目标、方法论支撑、诞生编年史、整体与细分架构、各环节实现机制,以及能力边界。它的核心主张只有一句:<strong>当生成测试的是大语言模型时,必须用机器可校验的产物与物理门禁,强制把"业务理解"和"缺陷发现"两件事做对,而不是寄望于提醒模型"要小心"。</strong></p>
+        <div class="meta">
+          开源 · SUT 无关核心 + profile 挂载 · stdlib-only 门禁引擎 · 双 runtime(Claude Code + Codex)互审<br>
+          适用读者:测试架构师、QA 负责人、AI Agent 工作流设计者、想在自己项目挂载本框架的工程师<br>
+          诚信声明:独立核心与 demo 数字可在 BUGate 仓库 git 历史 / frontmatter 复查;起源历史数字(第 10 章)见原 Hypervise 产物;无臆造。<br>开源协议:MIT · 仓库:github.com/ZhangLiangchen/BUGate
+        </div>
+        <div class="note brand" style="margin-top:30px"><b>怎么读这份文档</b>:左侧目录点击跳转,右下角箭头或键盘 <code>←/→</code> 翻章,每章可上下滚动,浏览器「打印」即导出 PDF。建议先读第 1 章(远景)与第 11 章(能力边界),再按顺序展开;<strong>第 13 章</strong>给出纵向拓展前景(从黑盒测试前移到 PRD / 设计 / TDD / 白盒)。</div>
+      </section>
+
+      <!-- 1 远景与目标 -->
+      <section class="chapter" data-title="远景与目标">
+        <div class="kick">第 1 章</div>
+        <h1>远景与目标:把"AI 写测试"从手艺变成工程</h1>
+        <p class="lead">BUGate 想解决的不是"让 AI 写出更多测试",而是"让 AI 写出<strong>能发现缺陷</strong>的测试,并且这件事可被任何 QA 可靠复现,而不依赖资深个人英雄"。</p>
+
+        <h2>1.1 为什么需要它:AI 测试开发的四类系统性失败</h2>
+        <p>让大语言模型直接从需求文档生成端到端测试,会系统性地产生四类失败。它们成因不同、防御策略不同,任何一类不治都会让"高覆盖率、高通过率"的测试对真实缺陷的发现能力趋近于零。</p>
+        <table>
+          <thead><tr><th style="width:120px">失败模式</th><th>典型表现</th><th style="width:38%">BUGate 的对策</th></tr></thead>
+          <tbody>
+            <tr><td><strong>浅业务模型</strong></td><td>对需求的理解停留在字面,漏掉状态机、边界、副作用风险;单一模型还会"一致性地"漏掉同一类东西</td><td>Wave 1 双模型独立互审 + 分歧报告;Layer 1 命题化;1A/1B 域模型与状态流显式建模</td></tr>
+            <tr><td><strong>假绿</strong></td><td>断言写宽(<code>!=200</code>、双类型 raises)、适配后端错误行为、HTTP 200 当业务成功</td><td>宪法第 5 条;Layer 3 断言语义门;Wave 8 用真实证据改错来证明断言"能失败"</td></tr>
+            <tr><td><strong>臆造数据</strong></td><td>编造资源 ID、地址、密钥、账号等,污染共享环境</td><td>Layer 2 固定资源决策;Layer 3 数据来源必须挂 probe 证据;测试纪律硬规则</td></tr>
+            <tr><td><strong>知识蒸发</strong></td><td>踩过的坑、确认的契约、发现的缺陷只留在聊天记录,下个会话从零开始</td><td>Memory Bus 主记忆层;04 执行报告 / 05 知识回写;经验晋升闭环</td></tr>
+          </tbody>
+        </table>
+        <p>上表是整套方法论的设计起点。它给出一个关键判断:<strong>这四类失败靠"提醒模型注意"是治不住的</strong>——因为 LLM 的训练目标里,"自信猜测"被奖励得多于"承认不知","能跑通"被奖励得多于"能发现缺陷"。唯一可靠的办法,是把约束做成机器可校验的产物加物理门禁。这正是 BUGate 名字的由来:Business Understanding Gate,先过业务理解的门,再谈代码。</p>
+
+        <h2>1.2 远景:受治理的、可审计的自动化</h2>
+        <p>必须诚实地界定远景,否则会误导使用者。BUGate 的目标<strong>不是"全自动产出可直接合入的测试代码"</strong>——那恰好会踩中上面四类失败中的"假绿"和"臆造数据"。它的真实定位是:</p>
+        <div class="note ok"><b>一句话定位</b>:受治理的(human-in-the-loop)、双 runtime 互审的、黑盒的、规格驱动的测试用例开发流水线。AI 干脏活(起草、生成、跑门禁),人保留所有否决权;每一次"晋升"都由人或被人明确授权的 agent 做出。</div>
+        <p>这个定位里的每个限定词都是有意的:</p>
+        <ul>
+          <li><strong>受治理</strong>:全流程保留 6 个人工审核点(见第 11 章),编排器被明文禁止自动晋升任何审核类产物、自动写测试代码、绕过门禁。</li>
+          <li><strong>双 runtime 互审</strong>:在需求理解(Wave 1)与对抗(Stage 3B)两个最易偏读的阶段,由 Codex 与 Claude Code 两个不同厂商的模型互不沾染地独立产出,分歧本身即风险信号。</li>
+          <li><strong>黑盒</strong>:API-first,不依赖被测系统源码白盒插桩;质量证据用 oracle falsification 而非白盒变异(理由见第 9 章)。</li>
+          <li><strong>规格驱动</strong>:任何测试代码诞生前,需求必须先被转换成可被机器校验、可被人审阅的规格产物。</li>
+        </ul>
+
+        <h2>1.3 它适合谁、不适合谁</h2>
+        <p>BUGate 适合:有相对可靠需求文档(PRD/提测单)、以 API 黑盒 E2E 为主、且引入了 AI Agent(Codex/Claude Code 一类)参与测试开发的团队。它不是银弹——无法解决组织文化问题、完全未文档化的隐性知识、棕地系统存量测试迁移,这些在配套方法论里被明确划为范围之外。把预期对齐到"它让 AI 辅助测试从依赖资深经验的不稳定实践,变成任何 QA 都能可靠执行的标准化流程",是正确的使用姿态。</p>
+      </section>
+
+      <!-- 2 方法论支撑 -->
+      <section class="chapter" data-title="方法论支撑">
+        <div class="kick">第 2 章</div>
+        <h1>方法论支撑:站在 40 年测试研究的肩膀上</h1>
+        <p class="lead">BUGate 的工程实现背后,是一套 SUT 无关的零领域 QA 方法论 <code>METHOD</code>(9 个 Wave、双层架构)。这套方法论不是灵感一闪——它的 7/9 个 Wave 直接坐落在有标准、有奠基论文的经典测试方法论之上;原创之处在于"面向 LLM 失败模式的重新编排",而非重新发明各项技术。</p>
+
+        <h2>2.1 双层九 Wave 结构</h2>
+        <p>METHOD 把测试开发拆成两层防御,对应 1.1 节的两类成因不同的失败:</p>
+        <table>
+          <thead><tr><th style="width:160px">层</th><th>Wave</th><th>解决什么</th></tr></thead>
+          <tbody>
+            <tr><td><strong>业务理解审计层</strong></td><td>Wave 0 PRD 健康度体检;Wave 1 多 AI 独立提取命题;Wave 2 引用回溯审计;Wave 3 结构化访谈;Wave 4 行为 oracle 验证</td><td>防"浅业务模型":在写任何测试前,把需求转成有据、可追溯、分歧已处置的业务命题</td></tr>
+            <tr><td><strong>缺陷发现生成层</strong></td><td>Wave 5 边界/状态机/风险加权;Wave 6 对抗式红队;Wave 7 三层 agent 隔离;Wave 8 质量门(变异/oracle falsification)</td><td>防"缺陷发现弱":强制测试跳出 happy path,并用客观指标证明断言确实能失败</td></tr>
+          </tbody>
+        </table>
+        <p>两层必须同时存在——即使业务理解完全正确,LLM 生成的测试仍倾向覆盖正向场景;反之,即使技术上很会找 bug,基于错误业务模型找到的"缺陷"也是噪音。这个"双层缺一不可"是 METHOD 最核心的结构性主张。</p>
+
+        <h2>2.2 经典方法论谱系(理论基础与相关工作)</h2>
+        <p>下表把 9 个 Wave 逐条映射到它所基于的经典测试方法论与奠基文献/标准。这是开源诚信归因的核心——它让读者知道每个 Wave 背后有数十年积累,也避免"用了变异测试/oracle 的名字却不引用来源"的尴尬。</p>
+        <table>
+          <thead><tr><th style="width:120px">Wave</th><th>所基于的经典方法论</th><th style="width:34%">奠基/标准出处</th></tr></thead>
+          <tbody>
+            <tr><td>0 PRD 健康度</td><td>需求可测性 / 需求静态测试</td><td>ISO/IEC/IEEE 29148;ISTQB 静态测试</td></tr>
+            <tr><td>1 多 AI 独立提取</td><td>独立测试设计与评审多样性;规格导出测试</td><td>IEEE 1028;spec-based testing</td></tr>
+            <tr><td>2 引用回溯审计</td><td>需求可追溯性矩阵</td><td>ISO/IEC/IEEE 29148;DO-178C 双向可追溯</td></tr>
+            <tr><td>3 结构化访谈</td><td>需求获取(elicitation)结构化访谈</td><td>需求工程经典技术</td></tr>
+            <tr><td>4 行为 oracle</td><td><strong>测试预言问题</strong></td><td>Weyuker 1982《On Testing Non-testable Programs》;Barr 等 2015 oracle survey</td></tr>
+            <tr><td>5 边界/状态机/风险</td><td><strong>边界值分析、状态迁移测试、风险驱动测试</strong></td><td>Myers 1979《The Art of Software Testing》;Beizer 1990《Software Testing Techniques》;ISO 29119</td></tr>
+            <tr><td>6 对抗式红队</td><td>负向测试、模糊测试、基于性质的测试</td><td>Miller 1990(fuzzing);Claessen &amp; Hughes 2000(QuickCheck)</td></tr>
+            <tr><td>7 三层 agent 隔离</td><td><strong>独立验证与确认(IV&amp;V)</strong></td><td>IEEE 1012</td></tr>
+            <tr><td>8 质量门</td><td><strong>变异测试</strong></td><td>DeMillo, Lipton &amp; Sayward 1978</td></tr>
+          </tbody>
+        </table>
+        <p>这张表的读法:7/9 个 Wave(0、2、4、5、6、7、8)有明确的标准或奠基论文支撑;Wave 1、Wave 3 是把经典评审与需求获取实践编排进 AI 流水线的新组合。换言之,<strong>地基是公认的,楼是原创的</strong>。需要正式发表时,年份/卷期应按目标期刊格式核对补全页码与 DOI——本文只列可确证的奠基文献,不含臆造引用。</p>
+
+        <h2>2.3 真正的原创贡献</h2>
+        <p>经典方法论解决的是"如何设计有效测试";METHOD 新增解决的是"<strong>当生成测试的是 LLM 时,如何防止它在业务理解和缺陷发现两个环节系统性失败</strong>"。这部分在既有测试文献中没有现成答案,是真正的增量:</p>
+        <ul>
+          <li><strong>以 AI 两类失败模式驱动设计</strong>——双层架构不是测试领域现成的,是按"LLM 会怎么失败"重新编排经典技术的结果。</li>
+          <li><strong>"验证有据性 ≠ 验证正确性"的认知反转</strong>——QA 的工作从"判断 AI 对错"变为"审计 AI 引用是否有据",这是针对 AI 语境的认识论重构。</li>
+          <li><strong>"多 AI 分歧 = 不确定性所在"的分歧路由</strong>——把评审多样性用到 LLM 上,分歧成为风险信号而非噪音。</li>
+          <li><strong>"零领域知识 QA"定位</strong>——四个新角色(审计引用、路由分歧、采访开发、机械比对)都不要求领域知识,只要求流程纪律。</li>
+        </ul>
+        <div class="note brand"><b>给开源的归因口径</b>:对外应表述为 "original orchestration of established test methodology"(对既有测试方法论的原创编排与综合),不要用"全新发明"。这既诚实,又比"民间重新发明"可信得多。</div>
+      </section>
+
+      <!-- 3 诞生编年史 -->
+      <section class="chapter" data-title="诞生编年史">
+        <div class="kick">第 3 章</div>
+        <h1>诞生编年史:5 周、9 个阶段</h1>
+        <p class="lead">BUGate 不是一次性设计出来的,而是先有方法论,再用一次真实测试需求把它压成物理门,在实战假绿教训中淬炼,受 workflow-orchestration 与 Hermes 启发扩成 Full SDTD,最后经多轮独立审计补齐缺口。全程约 5 周(2026-05-11 → 06-15),Codex 与 Claude Code 双端协作,Memory Bus 全程留痕。</p>
+        <table>
+          <thead><tr><th style="width:64px">阶段</th><th style="width:120px">时间</th><th>主题与关键事件</th></tr></thead>
+          <tbody>
+            <tr><td>Phase 0</td><td>05-11</td><td><strong>方法论奠基</strong>:METHOD 同日三版(v0.1 HyperVision 专属 → v1.0 通用零领域 → v1.1 加 Wave 0/三层隔离/度量)。此时尚无 BUGate、无 Memory Bus、无物理门。</td></tr>
+            <tr><td>Phase 1</td><td>05-18 → 20</td><td><strong>Memory Bus 创世 + 基建入库</strong>:05-18 Memory Bus 冒烟;05-19 治理门确立(无证据 confirmed 拒写);05-20 基础设施入库。</td></tr>
+            <tr><td>Phase 2</td><td>05-21 → 24</td><td><strong>BUGate v1.2 = Minimum Viable SDTD</strong>:真实测试需求催化四层物理门;05-22 落地 5 条宪法 + 分档 Verifiability + Layer 2 语义门;发现并修复 Codex 端执行静默不完整;05-24 确立官方定调 + 差距报告 v1.0。</td></tr>
+            <tr><td>Phase 3</td><td>05-26 → 06-01</td><td><strong>实战淬炼:假绿教训</strong>:UC-AE-22 deposit API path 错位假绿三连教训;10→7 UC 方向调整(前端 UI 不在 SUT 边界)。</td></tr>
+            <tr><td>Phase 4</td><td>06-02 → 05</td><td><strong>Hermes 启发 + Full SDTD 雏形</strong>:从已开源的 Hermes(Nous Research)获取灵感,落地经验晋升闭环(agent-experience/)并补强 Memory Bus;共享 skill 树入库;BUGate v1.3 orchestration expansion 落地(七个一等 artifact + 四步 MVP)。</td></tr>
+            <tr><td>Phase 5</td><td>06-08 → 09</td><td><strong>Wave 1 多视角自动化</strong>:Codex CLI ↔ Claude CLI 自动交叉互审实现并经独立验证;首个 Golden 实例 UC-LA-09。</td></tr>
+            <tr><td>Phase 6</td><td>06-10</td><td><strong>八大机制收口 + Wave 8 路线</strong>:Wave 8 决策(oracle falsification 而非白盒 mutation);Self-healing → closure planner;orchestrator → autonomous DAG runner。</td></tr>
+            <tr><td>Phase 7</td><td>06-11</td><td><strong>独立审计 + gap 修复 + 首份质量分数</strong>:物理门加固(版本偏斜/同号双目录 fail-closed);Wave 8 首份真实 oracle falsification 86.7%;Wave 7 codify。</td></tr>
+            <tr><td>Phase 8</td><td>06-12 → 15</td><td><strong>Memory Bus 加固</strong>:ONNX 嵌入切换(footprint 2.5GB→数百 MB);435/946 过期向量重嵌;memory-recent 真·时间倒序修复。</td></tr>
+            <tr><td><strong>独立拆分</strong></td><td>2026-06</td><td><strong>从 Hypervise 抽出为独立 SUT 无关框架</strong>:确立四部分解耦模型(Core / Profile / Mounted Workspace / SUT Runtime);S1-S9 硬编码接缝收敛进 <code>bugate.config.yaml</code> + SUT profile;新增中立 <code>examples/demo-sut</code> 与 <code>bugate-full-check</code> 全自检 skill。</td></tr>
+          </tbody>
+        </table>
+        <p>这张编年史的价值不只是记录,更是一种<strong>方法论自证</strong>:每个阶段都由真实需求或真实审计驱动,而非凭空规划。特别值得注意的是 Phase 3 与 Phase 7——前者用一连串"假绿"实战教训把"测试目的是发现 bug"从口号变成带证据的纪律;后者用一次不采信前序结论的独立审计,把"机制已实现"校正为"机制已实现但当时仅 N=1 实证"(随后 UC-AE-24 由 `--auto` 驱动跑通,增至 N=2),避免了过度乐观。这种"实战淬炼 + 独立审计"的双重校正,是这套流程区别于纸面方法论的关键。</p>
+        <p class="small muted">完整 9 阶段编年史(每个里程碑带精确时间点与证据源)见 <code>docs/qa-methodology/BUGATE_EVOLUTION_TIMELINE.md</code>。</p>
+      </section>
+
+      <!-- 4 灵感血统 -->
+      <section class="chapter" data-title="灵感血统与归因">
+        <div class="kick">第 4 章</div>
+        <h1>灵感血统与归因(开源 ATTRIBUTION 用)</h1>
+        <p class="lead">开源前必须把归因说准。下表经仓库实证校正了几处常见的口头归因偏差,是 <code>ATTRIBUTION</code> 文件的事实依据。</p>
+        <table>
+          <thead><tr><th style="width:30%">组件</th><th>真实来源(仓库实证)</th></tr></thead>
+          <tbody>
+            <tr><td><strong>四层 Layer 骨架</strong></td><td>METHOD 9-Wave 方法论的工程压缩。9-Wave 本身是<strong>原创编排</strong>,基底是经典测试方法论(见第 2 章)</td></tr>
+            <tr><td>规格化纪律 / 宪法模式</td><td><strong>Spec Kit (SDD)</strong> —— specification flow + constitution 模式</td></tr>
+            <tr><td>门前纪律(过门才写代码)</td><td><strong>Superpowers</strong> —— execution discipline</td></tr>
+            <tr><td>澄清门(Minimal Clarification Gate)</td><td><strong>Trail of Bits</strong> —— underspecification 处理</td></tr>
+            <tr><td>输入≠断言</td><td><strong>PM skill</strong> patterns</td></tr>
+            <tr><td><strong>Memory Bus</strong></td><td><strong>自身的原创工程实践</strong>(我们自己想出来的,2026-05-18 工程落地);后期从 Hermes 获取灵感进行了补强。最初构想不来自 Hermes,但增强受其启发</td></tr>
+            <tr><td><strong>多 agent 互审</strong></td><td><strong>METHOD Wave 1「多 AI 独立提取」(原创编排)</strong> —— 非 Hermes</td></tr>
+            <tr><td>经验晋升学习闭环 + Memory Bus 补强</td><td><strong>Hermes</strong>(Nous Research 开源自主 AI 智能体框架,2026-02-25 发布)的灵感 —— 这才是 Hermes 对本工作流的真正贡献</td></tr>
+            <tr><td>黑盒质量证据</td><td><strong>自建路线决策(2026-06-10)</strong> —— oracle falsification 替代白盒 mutation</td></tr>
+          </tbody>
+        </table>
+        <p>两处归因需要特别澄清,以免误解。第一,关于 <strong>Memory Bus 与 Hermes 的先后关系</strong>:Hermes Agent(由 Nous Research 开发的开源自主 AI 智能体框架)于 2026-02-25 正式开源,<strong>远早于</strong> BUGate 9-Wave 方法论的产生与 Memory Bus 的工程落地——所以不能说"Memory Bus 早于 Hermes"。准确的关系是:<strong>Memory Bus 是我们自己想出来的原创工程实践</strong>(2026-05-18 落地),其最初构想不来自 Hermes;<strong>后期我们从 Hermes 获取灵感对它进行了补强</strong>,并同时吸收了 Hermes 的经验晋升学习闭环(落在 <code>agent-experience/</code>)。即:原创在前,Hermes 启发的是后续增强。第二,<strong>多 agent 互审来自 METHOD Wave 1「多 AI 独立提取」</strong>,是我们自己方法论的工程实现,非 Hermes 产生;2026-06-02 我们记录的 Hermes 启发,指向的是经验晋升闭环与 Memory Bus 补强,而非创造 Memory Bus 或 multiview 本身。</p>
+        <p>外部 skill 的引入方式也值得在开源时强调:SKILL.md 明确声明"absorbs useful ideas … without depending on their plugins at runtime"——只借鉴 idea,不在运行时依赖它们的插件,不复制分发其代码。这一措辞既清晰又安全,开源时应保留并核对各被借鉴项目的 LICENSE 与商标。</p>
+      </section>
+
+      <!-- 5 整体架构 -->
+      <section class="chapter" data-title="整体架构">
+        <div class="kick">第 5 章</div>
+        <h1>整体架构:四层结构</h1>
+        <p class="lead">BUGate 是一套四层结构,自上而下分别回答"为什么、做什么、怎么强制、怎么沉淀"。这个分层是理解整套系统的骨架。</p>
+        <div class="fig">
+          <svg width="100%" viewBox="0 0 760 300" role="img" aria-label="四层架构图">
+            <defs><marker id="wp-ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#9a9a92" stroke-width="1.4" stroke-linecap="round"/></marker></defs>
+            <g><rect x="20" y="14" width="720" height="58" rx="8" fill="var(--gray-fill)" stroke="var(--gray-ink)" stroke-width="0.6"/>
+              <text x="34" y="36" font-size="14" font-weight="700" fill="var(--ink)">① 方法论层 — 为什么</text>
+              <text x="34" y="56" font-size="12.5" fill="var(--muted)">METHOD 9-Wave(零领域通用、SUT 无关):PRD健康 / 多视角 / 引用回溯 / oracle / 边界状态风险 / 对抗 / 隔离 / 质量证伪</text></g>
+            <line x1="380" y1="72" x2="380" y2="86" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-ar)"/>
+            <g><rect x="20" y="88" width="720" height="58" rx="8" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/>
+              <text x="34" y="110" font-size="14" font-weight="700" fill="var(--teal-ink)">② 工程流程层 — 做什么</text>
+              <text x="34" y="130" font-size="12.5" fill="var(--teal-ink)">BUGate 四层 + Full SDTD 扩展 = 10 阶段流水线;每阶段产物带 frontmatter gate_status: pending|passed|failed</text></g>
+            <line x1="380" y1="146" x2="380" y2="160" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-ar)"/>
+            <g><rect x="20" y="162" width="720" height="58" rx="8" fill="var(--amber-fill)" stroke="var(--amber-ink)" stroke-width="0.6"/>
+              <text x="34" y="184" font-size="14" font-weight="700" fill="var(--amber-ink)">③ 强制执行层 — 怎么强制</text>
+              <text x="34" y="204" font-size="12.5" fill="var(--amber-ink)">4 语义门脚本 + check_bugate 物理写入门 + 2 个双端 CLI bridge + orchestrator DAG + Wave8 证伪器 + Wave7 隔离</text></g>
+            <line x1="380" y1="220" x2="380" y2="234" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-ar)"/>
+            <g><rect x="20" y="236" width="720" height="56" rx="8" fill="var(--coral-fill)" stroke="var(--coral-ink)" stroke-width="0.6"/>
+              <text x="34" y="258" font-size="14" font-weight="700" fill="var(--coral-ink)">④ 记忆与知识层 — 怎么沉淀</text>
+              <text x="34" y="278" font-size="12.5" fill="var(--coral-ink)">Memory Bus 跨 agent SSOT(带治理) ←→ docs/incidents 缺陷库 ←→ 05 知识回写 ←→ 经验晋升</text></g>
+          </svg>
+          <div class="figcap">图 5-1 BUGate 四层结构:方法论 → 工程流程 → 强制执行 → 记忆知识</div>
+        </div>
+        <p>逐层解释如下。</p>
+        <p><strong>① 方法论层</strong>是"为什么"。它是 SUT 无关的 METHOD 9-Wave,提供整套流程的理论依据。工程层每一个具体门禁,都能追溯到这一层的某个 Wave(映射见 <code>docs/qa-methodology/METHOD.md</code>)。当某条工程规则看起来武断时,读方法论层就能找到"为什么"。</p>
+        <p><strong>② 工程流程层</strong>是"做什么"。它把 9 个 Wave 压成 BUGate 四层(业务理解→可测性→用例蓝图→代码),并在 Full SDTD 扩展出10 阶段流水线。关键设计是<strong>产物即接口</strong>:阶段之间只通过带 frontmatter 的文件交接,一个 UC 一个目录、与测试文件 1:1,没有"AI 记得上一步说了什么"这种隐式状态。这让任何阶段可以换人、换模型、换会话重做。</p>
+        <p><strong>③ 强制执行层</strong>是"怎么强制",也是 BUGate 区别于纯文档方法论的关键。它把约束分成两种:<strong>语义门</strong>(脚本 exit 0/非 0)管"产物内容是否合格",可被人 review 后接受;<strong>物理门</strong>(PreToolUse hook)管"没过门就连写代码的动作都执行不了",不接受任何口头理由。绕过物理门本身被定义为违规而非变通。</p>
+        <p><strong>④ 记忆与知识层</strong>是"怎么沉淀"。Memory Bus 是跨 agent 的长期记忆 SSOT,带治理门(无证据的 confirmed 结论会被拒写);执行结果通过 04/05 回写,缺陷进 incidents 库,反复踩的坑晋升为 harness 资产。这一层让"知识蒸发"这类失败被结构性地堵住。</p>
+        <h2>5.5 解耦模型:Core / Profile / Mounted Workspace / SUT Runtime</h2>
+        <p>上面四层是 BUGate <strong>引擎内部</strong>的纵向分层(为什么→做什么→怎么强制→怎么沉淀)。它与另一个正交的问题——<strong>BUGate 与被测系统如何解耦</strong>——是两回事:二者都叫"层/部分"但含义不同,务必区分。独立拆分后,BUGate 与一个 SUT 的关系是<strong>四部分</strong>:</p>
+        <table>
+          <thead><tr><th style="width:170px">部分</th><th style="width:30%">归属</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td><strong>BUGate Core</strong></td><td>本仓库(SUT 无关)</td><td>方法论、模板、四层语义门、物理写入门、双端 adapter、Wave 0 / Wave 8 评分器</td></tr>
+            <tr><td><strong>SUT Profile</strong></td><td>桥接契约</td><td>artifact_dir、guarded_path_regex、命令、证据来源、agent_roles、falsification/prd 规格、namespace</td></tr>
+            <tr><td><strong>Mounted Workspace</strong></td><td>通常即 SUT 的自动化测试框架</td><td>测试代码、BUGate 产物、fixtures、runners、生成用例、捕获证据、本地测试规则</td></tr>
+            <tr><td><strong>SUT / Product Runtime</strong></td><td>产品方所有</td><td>黑盒 API/UI/运行时行为、产品文档/契约/环境;可选 source/API dump 仅作证据源</td></tr>
+          </tbody>
+        </table>
+        <p>关键纪律:<strong>"挂载一个 SUT"挂的是它的自动化测试框架 / 测试工作区,不是把产品源码、密钥、环境并进核心</strong>;Runtime 永远只作为黑盒证据被观测。挂载的具体机制见第 12 章。</p>
+      </section>
+
+      <!-- 6 细分架构 -->
+      <section class="chapter" data-title="细分架构">
+        <div class="kick">第 6 章</div>
+        <h1>细分架构:10 阶段流水线与双 runtime</h1>
+        <p class="lead">工程流程层展开,就是一条10 阶段流水线。每个阶段都有产物、有语义门;在写测试代码这一步前,有一道物理写入门。</p>
+        <div class="fig">
+          <svg width="100%" viewBox="0 0 760 200" role="img" aria-label="10 阶段流水线">
+            <defs><marker id="wp-ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#9a9a92" stroke-width="1.4" stroke-linecap="round"/></marker></defs>
+            <g font-size="12" font-weight="600">
+              <rect x="14" y="20" width="96" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="26" y="38" fill="var(--teal-ink)">Wave 1</text><text x="26" y="53" font-size="10.5" font-weight="400" fill="var(--teal-ink)">双模型多视角</text>
+              <line x1="110" y1="40" x2="124" y2="40" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="126" y="20" width="96" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="138" y="38" fill="var(--teal-ink)">Layer 1</text><text x="138" y="53" font-size="10.5" font-weight="400" fill="var(--teal-ink)">业务理解 Brief</text>
+              <line x1="222" y1="40" x2="236" y2="40" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="238" y="14" width="92" height="24" rx="6" fill="none" stroke="var(--teal-ink)" stroke-width="0.6" stroke-dasharray="3 2"/><text x="248" y="30" font-size="10.5" fill="var(--teal-ink)">1A 域模型</text>
+              <rect x="238" y="42" width="92" height="24" rx="6" fill="none" stroke="var(--teal-ink)" stroke-width="0.6" stroke-dasharray="3 2"/><text x="248" y="58" font-size="10.5" fill="var(--teal-ink)">1B 状态流</text>
+              <line x1="330" y1="40" x2="344" y2="40" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="346" y="20" width="96" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="358" y="38" fill="var(--teal-ink)">Layer 2</text><text x="358" y="53" font-size="10.5" font-weight="400" fill="var(--teal-ink)">可测性 +2A</text>
+              <line x1="442" y1="40" x2="456" y2="40" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="458" y="20" width="96" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="470" y="38" fill="var(--teal-ink)">Layer 3</text><text x="470" y="53" font-size="10.5" font-weight="400" fill="var(--teal-ink)">用例蓝图</text>
+              <line x1="554" y1="40" x2="568" y2="40" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="570" y="20" width="96" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="582" y="38" fill="var(--teal-ink)">3A 中文用例</text><text x="582" y="53" font-size="10.5" font-weight="400" fill="var(--teal-ink)">人工审核点</text>
+              <!-- row 2 -->
+              <rect x="14" y="118" width="96" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="26" y="136" fill="var(--teal-ink)">3B 对抗</text><text x="26" y="151" font-size="10.5" font-weight="400" fill="var(--teal-ink)">双端独立</text>
+              <line x1="110" y1="138" x2="124" y2="138" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="126" y="118" width="110" height="40" rx="7" fill="var(--coral-fill)" stroke="var(--coral-ink)" stroke-width="0.8"/><text x="138" y="136" fill="var(--coral-ink)">物理写入门</text><text x="138" y="151" font-size="10.5" font-weight="400" fill="var(--coral-ink)">check_bugate</text>
+              <line x1="236" y1="138" x2="250" y2="138" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="252" y="118" width="96" height="40" rx="7" fill="var(--amber-fill)" stroke="var(--amber-ink)" stroke-width="0.6"/><text x="264" y="136" fill="var(--amber-ink)">Layer 4</text><text x="264" y="151" font-size="10.5" font-weight="400" fill="var(--amber-ink)">pytest 代码</text>
+              <line x1="348" y1="138" x2="362" y2="138" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="364" y="118" width="96" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="376" y="136" fill="var(--teal-ink)">执行+自愈</text><text x="376" y="151" font-size="10.5" font-weight="400" fill="var(--teal-ink)">真信号</text>
+              <line x1="460" y1="138" x2="474" y2="138" stroke="#9a9a92" marker-end="url(#wp-ar2)"/>
+              <rect x="476" y="118" width="110" height="40" rx="7" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="488" y="136" fill="var(--teal-ink)">04 / 05</text><text x="488" y="151" font-size="10.5" font-weight="400" fill="var(--teal-ink)">报告+知识回写</text>
+            </g>
+          </svg>
+          <div class="figcap">图 6-1 10 阶段流水线;红色为物理写入门,绿色为带语义门的产物阶段,虚线为 Full SDTD 一等子产物</div>
+        </div>
+        <p>这条流水线的顺序不是随意的:它严格遵循"先理解、再可测、再设计、再写代码、再执行、再沉淀"。在 <strong>3B → 物理写入门 → Layer 4</strong> 这个接缝处,是整套系统最关键的一道闸——任何对 <code>test_uc_*.py</code> 的写入,在 PreToolUse 阶段就被 <code>check_bugate.py</code> 拦截,只有前序产物全部 <code>gate_status: passed</code> 才放行。这把"先过业务理解的门再谈代码"从口号变成了不可绕过的事实。</p>
+
+        <h2>6.1 双 runtime 共享入口</h2>
+        <p>整套流程同时跑在 Codex Desktop 和 Claude Code 两个 runtime 上,规则只维护一份。下表是双端共享机制及其经独立审计验证的状态。</p>
+        <table>
+          <thead><tr><th style="width:110px">层面</th><th>实现</th><th style="width:90px">验证</th></tr></thead>
+          <tbody>
+            <tr><td>行为规则</td><td><code>AGENTS.md</code> 唯一规则源;<code>CLAUDE.md</code> 是它的 symlink</td><td>✓ readlink</td></tr>
+            <tr><td>技能树</td><td><code>.shared/skills/bugate/</code> 唯一源;两端 skills 目录均 symlink 指向它</td><td>✓ 双 symlink</td></tr>
+            <tr><td>脚本</td><td><code>scripts/*.py</code> 是 stdlib-only 真实门禁引擎(22 脚本);<code>.shared/skills/bugate/</code> 提供规范/模板/参考</td><td>✓ py_compile</td></tr>
+            <tr><td>物理门 hook</td><td>Claude 拦 Edit/Write;Codex 拦 apply_patch,调同一脚本</td><td>✓ 双端配置</td></tr>
+            <tr><td>互为审计工人</td><td>Wave 1 / 3B 由当前 runtime 调对端 CLI 做独立工人,请求最强推理档(默认 CLI 自选)</td><td>✓ check-env(二进制)</td></tr>
+          </tbody>
+        </table>
+        <p>这个设计的预期效果是:规则改一处双端同时生效;更重要的是,任何一端的 AI 单独理解需求时,另一端是它的独立制衡。这正是"多 agent 互审"在工程上的落地方式——不是一个 agent 自说自话,而是两个不同厂商的模型互不沾染地各看一遍。</p>
+
+        <h2>6.2 记忆总线细分架构</h2>
+        <p>记忆层是重要的外部服务,值得单独展开。它分三层:接入层(双端 hooks + memory_bus.py 包装 + progress.py)经带鉴权的本地 HTTP 调用服务进程;服务进程(mcp-memory-service,uvicorn/FastAPI)内含 REST API、治理门、以及一个三级嵌入路径(ONNX 主路径 → torch 备路径 → hash 兜底);底层用 sqlite-vec 存储 384 维归一化向量。</p>
+        <div class="note brand"><b>三级嵌入路径的设计</b>:① ONNX 主路径(onnxruntime,已激活,PyTorch-free,footprint 由 torch 时代 2.5GB 降至数百 MB);② torch 备路径(sentence-transformers,失败自动回退);③ 纯 Python hash 兜底(前两者皆缺时,质量降级)。ONNX 与 torch 数值等价(同文本余弦 1.0),保证新旧向量同一空间。Memory Bus 是<strong>可选</strong>记忆运行时(非门禁必需),详见 <code>docs/SETUP-OPTIONAL.md</code>。</div>
+        <p>记忆总线的治理门是这套系统"知识可信"的关键:<code>confirmed</code> 状态的 finding 若不带证据(refs/evidence/artifact)会被直接拒写。这把 Memory Bus 从"杂乱文本池"约束成"可信结论库",让下游 agent 在会话启动时拿到的恢复上下文是经过质量门的。记忆总线的接入 / 服务 / 嵌入 / 存储分层详见 <code>docs/SETUP-OPTIONAL.md</code>。</p>
+      </section>
+
+      <!-- 7 各环节实现机制 -->
+      <section class="chapter" data-title="各环节实现机制">
+        <div class="kick">第 7 章</div>
+        <h1>各环节实现机制</h1>
+        <p class="lead">本章逐阶段说明实现机制。每个阶段按"回答什么问题 → 产物 → 门禁怎么验 → 预期效果"展开。</p>
+
+        <h2>7.1 Wave 1 — 双模型多视角需求理解</h2>
+        <p><strong>回答什么</strong>:单一 AI 读需求有一致性盲区,它漏掉的边界自己复查一百遍也还是漏。两个不同厂商的模型在互不沾染对方结论的前提下独立读同一份输入,分歧本身就是风险信号。<strong>产物</strong>:<code>00_multiview/</code> 下的 input pack(只含原始材料引用,不含当前 agent 分析)、双方独立 view、divergence report、带模型/推理档/耗时/prompt sha256 的全程 metadata。<strong>门禁</strong>:<code>sdtd_multiview.py check</code> 校验两份独立 view、正式分歧报告、Layer 1 吸收决议齐备;对 Full SDTD UC,这个检查被 Layer 1 语义门强制内嵌——Wave 1 没走完,Layer 1 标不了 passed。<strong>预期效果</strong>:把"需求理解偏差"从不可见变成有产物、有归档、必须处置的显式分歧。CLI bridge 在调对端 CLI 时请求最强推理档、捕获输出后做 schema 校验,校验不过不落盘、失败件归档——这保证了互审不是走过场。</p>
+
+        <h2>7.2 Layer 1 — 业务理解门 + 1A 域模型 / 1B 状态流</h2>
+        <p><strong>回答什么</strong>:这个需求在业务上到底说了什么?SUT 边界在哪?哪些是事实、哪些是推断、哪些根本没人知道?<strong>产物</strong>:<code>01_business_brief.md</code>,核心是 PRD Health 体检(8 维评分 + 可追溯性加成)、<code>P-xxx</code> 命题表(每条带原文逐字引用或行号/symbol/json-path 锚点)、<code>O-xxx</code> 业务 oracle 表、未知项清单(高危未答阻塞通过)、三档证据标注;以及 Full SDTD 的 <code>01a_domain_model</code>(业务对象/属性/关系/不变量)、<code>01b_state_flow</code>(状态/合法迁移/终态/异步/禁止迁移)。<strong>门禁</strong>:<code>check_bugate_brief_semantics.py</code>(含分档可验证性比率,≥0.80 健康 / &lt;0.40 FAIL)。<strong>预期效果</strong>:下游全部检查都建立在命题之上——Layer 1 写歪,后面每层都会"忠实地实现错误的模型",所以这里是全链路最重的人工审核点。</p>
+
+        <h2>7.3 Layer 2 + 2A — 可测性与测试层决策</h2>
+        <p><strong>回答什么</strong>:每条命题用什么层级测最便宜(API/契约/集成/E2E)?动不动真实资源?<strong>产物</strong>:<code>02_testability.md</code>(固定资源与 query-first 策略、marker 与环境、skip/xfail 边界、probe 计划)+ <code>02a_test_dimension_matrix.yaml</code>(功能/状态/边界/权限/错误/异步/副作用风险七类维度显式拆解)。<strong>门禁</strong>:<code>check_bugate_layer2_semantics.py</code>(含命题覆盖:每个 P-xxx 进决策表,与 oracle-验收映射)。<strong>预期效果</strong>:不是每条命题都值得 E2E;E2E 用例必须说清为什么更便宜的层不够。资源纪律在这里锁定——日常回归 query-first 复用固定资源,只有创建类用例才允许建资源且必须打 marker。</p>
+
+        <h2>7.4 Layer 3 — 用例蓝图</h2>
+        <p><strong>回答什么</strong>:具体测哪些 case?每条 case 绑哪些命题和 oracle?数据从哪来?断言是哪个函数?<strong>产物</strong>:<code>03_inventory.yaml</code>。每条 case 必须有 case ID、<code>proposition_refs</code>(必填)、<code>oracle_refs</code>(P0/P1 必填)、优先级、API 序列、data_source(probe 文件路径 + 五枚举 probe_status)、断言函数名(必须真实存在)、副作用分类、marker、skip/xfail 条件、incident 引用。<strong>门禁</strong>:<code>check_bugate_inventory_semantics.py</code>,机器校验 endpoint/client 路径真实存在、断言非 stub、probe 状态、marker 注册、反向命题覆盖、意图回溯。<strong>预期效果</strong>:杜绝"逻辑端点 + 占位断言 + 假装有数据"三件套。</p>
+
+        <h2>7.5 Stage 3A / 3B — 人读用例与对抗用例(均为 Layer 4 物理前置)</h2>
+        <p><strong>3A 中文可读用例</strong>:从 03_inventory 生成中文优先的 <code>03a_test_cases.md</code>(全链路唯一中文优先产物),默认 pending,必须人工确认意图/前置/预期/副作用/skip-xfail 边界后才 passed。它给不读 YAML 的业务/测试同学一个低成本否决点——代码还没写,改主意最便宜的时刻。<strong>3B 对抗用例</strong>:复用 Wave 1 的双端机制,Codex 与 Claude 各自基于 01-03A 产物独立产出对抗视角,再合成 <code>03b_adversarial_cases.yaml</code>;每条带威胁模型、攻击路径、双端候选溯源、人工裁决。它补"命题导向天然偏 happy path"的盲区。这两个产物对 Full SDTD UC 都是物理写入门的前置条件。</p>
+
+        <h2>7.6 Layer 4 — 物理写入门 + 代码实现</h2>
+        <p>对 <code>test_uc_*.py</code> 的任何写入(双端),PreToolUse hook 先调 <code>check_bugate.py</code>:① 从文件名推 UC 目录,同号多目录时按 slug 精确绑定、无匹配 fail-closed;② 校验 L1/L2/L3 全部 passed;③ 对 Full SDTD UC(brief 或 inventory 声明该产物集),03a 与 03b 也必须 passed;④ 任一不满足即阻断写入。负向对照(无 UC 目录 / 前序未 passed)实测被阻断;<code>examples/mounted-demo/</code> 走查可见 block→allow 行为。代码实现纪律要求复用既有 client/fixture/waiter/断言,完成判定必须落在业务终态 + 可观测证据上,HTTP 200 不算业务成功。</p>
+
+        <h2>7.7 执行纪律 + 失败自愈 + 04/05 知识闭环</h2>
+        <p><strong>执行纪律</strong>:PASS/FAIL/XFAIL/SKIP 四种信号谁也不许冒充谁;已知只读缺陷用 xfail(修复后变 unexpected pass 自动报警),写副作用缺陷用 skip + bug 编号 + 恢复条件;禁止为绿适配后端错误行为。<strong>自愈</strong>:<code>self_healing_mvp.py</code> 失败后做分类(基建不稳/测试侧/SUT 缺陷三族,内置"排除 fixture/数据/鉴权/环境之前不得立 SUT 缺陷"的 human gate)、重跑决策、修复边界、补丁计划——但明确不自动改测试。<strong>04/05</strong>:<code>generate_sdtd_reports.py</code> 生成执行报告与知识回写草稿,人工校正后晋升;04 留执行证据,05 留持久结论并实时写 Memory。这一层让"知识蒸发"被结构性堵住。</p>
+        <div class="note warn"><b>诚实标注(起源期 · Hypervise,详见第 10 章)</b>:orchestrator <code>--auto</code> 已在真实 UC 上端到端驱动过——UC-AE-24(2026-06-12)的 pre-code DAG(Wave1 检查→L1/L2/L3 语义门→3A 生成,在人工审核点停下)与 post-run DAG(self-healing→失败行动计划→04/05→v13 门,在晋升点停下)均由 <code>--auto</code> 执行,UC-AE-24 通过全量审计。self-healing 也已在真实 staging pytest 日志上运行并产出失败行动计划。<strong>剩余的唯一缺口</strong>是:UC-AE-24 那一轮 exit 0 无失败,所以"真实失败 → 分类 → 重跑 → 修复"这条分支尚未在一次真正失败的运行上触发。见第 11 章。</div>
+      </section>
+
+      <!-- 8 五条宪法 -->
+      <section class="chapter" data-title="五条宪法">
+        <div class="kick">第 8 章</div>
+        <h1>五条宪法:不可违反的第一性原则</h1>
+        <p class="lead">在四层语义门、物理写入门与若干 hook 之上,有 5 条不可违反的第一性原则。当任何单项检查、模板或脚本看起来允许违反时,宪法赢。它的存在是为了防止门禁被一项一项地"优化"掉,直到失去原本的作用。</p>
+        <table>
+          <thead><tr><th style="width:130px">条款</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td><strong>不变量 1<br>业务含义先于实现</strong></td><td>先确立业务上的"对/错",再谈实现细节;用户故事、验收标准、PRD 原文、开发口头答复都是输入,只有转换成带 source_quote 锚点的 P-xxx 命题、带可观测面的 O-xxx oracle 之后才能变成工件。</td></tr>
+            <tr><td><strong>不变量 2<br>命题可测 / 有界 / 显式延后</strong></td><td>每条重要命题要么可测、要么有明确边界、要么被显式标注延后;不允许悬空的模糊主张混进规格。</td></tr>
+            <tr><td><strong>不变量 3<br>用例可回溯命题与 oracle</strong></td><td>每条 Layer 3 case 回溯到 Layer 1 的 P-xxx 命题与(适用时)业务 O-xxx oracle;断言 → case → 命题 → 原文引用/probe 字段,任何一环断了就不允许进代码。HTTP 200 永远不是业务 oracle。</td></tr>
+            <tr><td><strong>不变量 4<br>证据分档不升级</strong></td><td>每个业务数据标 fact / inferred / unknown 三档;为让门禁通过而把 inferred/unknown 改标成 fact 是被禁止的。缺证据的正确动作是 probe、提问或移出范围。</td></tr>
+            <tr><td><strong>不变量 5<br>绕过预期的绿不算质量</strong></td><td>一次绿色运行如果绕过了被测的预期行为,就不是质量证据。宽松断言、适配错误行为、HTTP-only 成功、假数据都违反本条。xfail 意外变 pass、skip 被移除都是真实工作发生的信号,必须保留。</td></tr>
+          </tbody>
+        </table>
+        <p>这五条的精神可以浓缩为一句话:<strong>诚实优先于绿色</strong>。前两条保证"测的是业务真正关心的事、且可测可追溯";第三、四条保证"证据有据可查、不被升级粉饰";第五条保证"测试存在的目的是发现缺陷而非制造通过"——正好对应第 2 章的双层结构。<strong>"理解没到位连代码都写不了"不是这五条不变量本身,而是由物理写入门 hook 强制落地的工程纪律(见第 6、7 章)。</strong>这五条不变量逐字收录在 <code>references/sdtd-constitution.md</code>,Codex 与 Claude 的 gate agent 在评审任何一层前都先加载它。</p>
+      </section>
+
+      <!-- 9 质量证据 -->
+      <section class="chapter" data-title="质量证据">
+        <div class="kick">第 9 章</div>
+        <h1>质量证据:断言有效性第一次有了分数</h1>
+        <p class="lead">宪法第 5 条 说"测试为发现 bug",但这本身只是声明。Wave 8 的任务是给它一个机器化、客观、可证伪的指标——回答"现有断言在真实业务证据被故意改错时,能否稳定失败"。</p>
+
+        <h2>9.1 路线决策:为什么不做白盒变异</h2>
+        <p>Wave 8 的经典形态是白盒 SUT 变异测试(改后端源码植入缺陷,看测试能否杀死)。BUGate 明确<strong>不走这条路</strong>:面向黑盒 API-first E2E,改后端实现、重新部署、隔离环境、清理副作用、归因环境波动,成本高且归因不稳。替代方案是更适配黑盒的 <strong>oracle falsification / evidence replay</strong>:取真实捕获的业务证据快照,按字段级改错(状态倒退、金额错配、地址错配、删关键字段等),离线调用断言,验证"错误的业务状态必须被杀死"。这是一个有意的、有决策文档背书的路线选择,而非能力缺失。</p>
+
+        <h2>9.2 首份真实结果</h2>
+        <p>在中立的 <code>examples/demo-sut</code> 上,同一引擎自检得分 <strong>85.7%</strong>(killed 6 / survived 1),证明评分器 SUT 无关地可用。下面是<strong>起源期</strong>在真实业务证据上跑出的首份结果(Hypervise,详见第 10 章)。</p>
+        <div class="fig">
+          <svg width="100%" viewBox="0 0 760 130" role="img" aria-label="Wave 8 质量证据指标">
+            <g>
+              <rect x="20" y="20" width="230" height="90" rx="10" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/>
+              <text x="40" y="48" font-size="13" fill="var(--teal-ink)">首份真实分数</text>
+              <text x="40" y="84" font-size="34" font-weight="800" fill="var(--teal-ink)">86.7%</text>
+              <text x="40" y="102" font-size="11.5" fill="var(--teal-ink)">≥ 70% 验收阈值</text>
+              <rect x="265" y="20" width="230" height="90" rx="10" fill="var(--gray-fill)" stroke="var(--gray-ink)" stroke-width="0.6"/>
+              <text x="285" y="48" font-size="13" fill="var(--muted)">证伪用例</text>
+              <text x="285" y="84" font-size="30" font-weight="800" fill="var(--ink)">105</text>
+              <text x="285" y="102" font-size="11.5" fill="var(--muted)">7 真实证据 × 15 类改错</text>
+              <rect x="510" y="20" width="230" height="90" rx="10" fill="var(--amber-fill)" stroke="var(--amber-ink)" stroke-width="0.6"/>
+              <text x="530" y="48" font-size="13" fill="var(--amber-ink)">killed / survived</text>
+              <text x="530" y="84" font-size="30" font-weight="800" fill="var(--amber-ink)">91 / 14</text>
+              <text x="530" y="102" font-size="11.5" fill="var(--amber-ink)">survived 全带显式处置</text>
+            </g>
+          </svg>
+          <div class="figcap">图 9-1 Wave 8 oracle falsification 起源期首份真实结果(Hypervise · UC-LA-11,2026-06-11)</div>
+        </div>
+        <p>判定语义是:某个改错被<strong>任一</strong>绑定 oracle 杀死即算 killed,<strong>全部</strong> oracle 都放过才算 survived;每份证据先过基线(未改错时全部断言必须通过),否则该证据记为 not_run。这保证分数有意义——只针对断言本该接受的正确证据来检验它对错误证据的杀伤力。14 个 survived 不是失败,而是<strong>真实缺口的诚实暴露</strong>(起源期暴露了两类共享断言缺口,详见第 10 章),每条都带显式处置选项:补共享断言、补用例、或显式接受非严格边界。</p>
+
+        <h2>9.3 断言覆盖矩阵</h2>
+        <p>Wave 8 的另一半是断言覆盖矩阵,反查 <code>R-xx 规则 → 断言函数 → Layer 3 case → pytest 文件</code>,每个断言标 covered / defined_unused / missing_implementation。它真的能抓问题:能发现某 oracle 引用了一个并不存在的断言函数(标 missing_implementation)——中立 demo-sut 自检即抓到 1 个这类教学缺口。<code>bin/wave8-weekly</code> 把证伪执行器与矩阵重生成串成一键周期入口。</p>
+        <div class="note brand"><b>纪律</b>:质量分数只能来自真实运行——不提供结果文件时审计报告就是 <code>not_run</code>,不允许拍脑袋填数。这条纪律本身就是 第 5 条 在 Wave 8 上的体现:质量证据必须可证伪。</div>
+      </section>
+
+      <!-- 10 端到端实证 -->
+      <section class="chapter" data-title="起源实证(Hypervise)">
+        <div class="kick">第 10 章 · 起源实证(Hypervise)</div>
+        <h1>起源实证:BUGate 在 Hypervise 的端到端验证</h1>
+        <p class="lead">UC-LA-11 是首条通过 <code>--scope all --require-passed</code> 全量审计的 UC(其后 UC-AE-24 亦通过,见第 11 章),也是这套流程"不是纸面"的最强证据:它真实跑通了每个环节,门禁真实拒绝过不合格输出,并且测试找到了一个真实后端缺陷并推动修复闭环。本章以它为主线;UC-AE-24 则首次证明了 orchestrator <code>--auto</code> 能端到端驱动全链路。</p>
+        <div class="note brand"><b>关于本章</b>:BUGate 诞生于 <b>Hypervise</b>(xblock 的 USDT 跨链自动化测试框架),本章是它独立拆分<em>前</em>在真实加密钱包用例上的端到端实证——作为框架可信度的起源背书保留。数字均可在原始仓库产物中复查,与独立后的 SUT 无关核心正交;新项目用 <code>examples/demo-sut</code> 即可复现同样的门禁闭环。</div>
+        <table>
+          <thead><tr><th style="width:90px">时间</th><th>事件</th></tr></thead>
+          <tbody>
+            <tr><td>06-09</td><td>Wave 1 双模型独立理解:Claude 视角首跑被 5 项 schema 校验拒绝后重跑通过;分歧报告首跑因"要求 Layer 1 吸收但未吸收"被拒,吸收后闭环。<strong>两次拒绝是"门禁不是橡皮图章"的最硬证据。</strong></td></tr>
+            <tr><td>06-10</td><td>Stage 3B 双端对抗合成 9 条 ADV case,人工裁决;其中调度缓存/时区/teardown 提前恢复风险直接转化为 Layer 4 的 schedule-effective 守卫断言。</td></tr>
+            <tr><td>06-10</td><td><strong>13 轮真实执行战役</strong>:run-3/5 抓到两个测试侧 oracle 误区当场修正;run-6 首次全绿;<strong>run-9 活体展示真实后端缺陷 INC-2026-0610-01(归集超选,无单址足额分支未"凑够即停")</strong>;run-10/11 候选池排空时诚实 SKIP 而非自行充值。</td></tr>
+            <tr><td>06-10</td><td>开发修复合入,run-12/13 回归验证通过,xfail 未触发即消失,INC 关闭;04/05 人工校正后晋升,15 条 findings 实时入 Memory。</td></tr>
+            <tr><td>06-11</td><td>7 张真实订单证据进入 Wave 8 falsification,得分 86.7%。</td></tr>
+          </tbody>
+        </table>
+        <p>这条 UC 证明了四件事,每件都对应前面章节的某个机制:<strong>① 门禁有牙齿</strong>(Wave 1 两次真实拒绝、物理门负向对照);<strong>② 找到真 bug</strong>(INC-2026-0610-01,第 5 条 兑现);<strong>③ 诚实归类</strong>(两个测试侧 oracle 误区被诚实归为测试侧错误,没有甩给开发——这正是 self-healing 的 human gate 精神);<strong>④ 拒绝假绿</strong>(候选池空时诚实 SKIP,没有为绿造数据)。一条 UC 同时跑通这四件事,是整套方法论"能落地、不是纸面"的活体证明。</p>
+        <div class="note warn"><b>规模化的诚实边界</b>:全链路目前是 N=2——UC-LA-11(人工按阶段驱动)与 UC-AE-24(orchestrator <code>--auto</code> 驱动,2026-06-12)都已通过全量审计。两条把所有机制串通了,但"每个新 UC 都走 Wave 1 + 3B"还不是稳定的统计事实。距"Full SDTD 成熟"差的正是继续把这个规模化做厚(目标累计 3-5 条 UC),而非机制缺失。</div>
+      </section>
+
+      <!-- 11 能力边界 -->
+      <section class="chapter" data-title="能力边界与诚实声明">
+        <div class="kick">第 11 章</div>
+        <h1>能力边界与诚实声明</h1>
+        <p class="lead">开源最忌过度承诺。本章用四档分类把"做到了什么、还差什么"说清楚,并给出 Full SDTD 七项验收的当前记分。读这一章,你就知道该把这套流程用在哪、不该指望它干什么。</p>
+        <h2>11.1 四档诚实声明</h2>
+        <table>
+          <thead><tr><th style="width:140px">档位</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td><span class="b b-ok">已验证可用(独立核心)</span></td><td>四层语义门 + 物理写入门 + Wave 0 / Wave 8 评分器 + 双 runtime 真实互审;均经中立 <code>examples/demo-sut</code> 与 <code>bugate-full-check</code> 自检通过(core/demo + 可选运行时;real peer dispatch 需 <code>--mode full</code>,真实 SUT 保护需 profile)。</td></tr>
+            <tr><td><span class="b b-warn">需真实 SUT profile 激活</span></td><td>写守卫 / 角色隔离 / Wave 0 / Wave 8 门禁默认随 core 关闭(<code>guarded_path_regex: []</code>);挂载 profile 填 <code>artifact_dir</code> / <code>guarded_path_regex</code> / <code>agent_roles</code> / 规格后,才对真实 SUT 生效。</td></tr>
+            <tr><td><span class="b b-warn">需人工接受的 gate</span></td><td>L1/L2/L3 + 3A 可读用例 + 3B 对抗用例须人工评审置 <code>passed</code>;编排器在审核点停下、永不替人晋升、永不绕 hook。起源期规模化战果(N=2、真实缺陷闭环)见第 10 章。</td></tr>
+            <tr><td><span class="b b-na">有意不做</span></td><td>白盒 SUT mutation(被 oracle falsification 替代);METHOD Wave 4 行为 oracle 证伪路线(选"系统为真源,probe 先行");度量 KPI 化。</td></tr>
+          </tbody>
+        </table>
+        <p>关键区分:前两档是<strong>"引擎可用"与"在某个 SUT 上激活"的边界</strong>——core 模式不等于真实 SUT 已受保护,挂载 profile 才让门禁对该 SUT 生效;第三档是<strong>设计上的人工否决点</strong>;第四档是有决策文档背书的<strong>有意取舍</strong>。起源期(Hypervise)的规模化战果(全链路 N=2、首份 86.7%、真实缺陷闭环)见第 10 章。</p>
+        <h2>11.2 起源期 Full SDTD 七项验收记分(Hypervise)</h2>
+        <p>下表是<strong>起源期(Hypervise)</strong>Full SDTD 七项验收的当时状态(2026-06-11 复核,对比 2026-05-22 基线 2/7);独立核心的当前自检见上节与 <code>bugate-full-check</code>。</p>
+        <table>
+          <thead><tr><th style="width:46px">#</th><th>验收项</th><th style="width:60px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>6</td><td>Constitution 5 条 codify</td><td><span class="b b-ok">✓</span></td></tr>
+            <tr><td>7</td><td>Spec Kit 9 Phase codify</td><td><span class="b b-ok">✓</span></td></tr>
+            <tr><td>5</td><td>Wave 7 路径隔离已 codify(可启用机制)</td><td><span class="b b-ok">✓</span></td></tr>
+            <tr><td>2</td><td>Oracle falsification ≥ 70%(首份 86.7%)</td><td><span class="b b-ok">✓</span></td></tr>
+            <tr><td>4</td><td>Layer 1 走 Wave 1 多视角 + divergence 归档(每个新 UC)</td><td><span class="b b-warn">🟡</span></td></tr>
+            <tr><td>3</td><td>每个新 UC 含 ≥1 条 Wave 6 对抗吸纳 case</td><td><span class="b b-warn">🟡</span></td></tr>
+            <tr><td>1</td><td>Matrix 每周自动 + 无裸奔 R-xx</td><td><span class="b b-warn">🟡</span></td></tr>
+          </tbody>
+        </table>
+        <p>当前是 <strong>4 项达成 + 3 项部分达成</strong>。三个 🟡 都不是机制缺失:#4 与 #3 是"已是物理门/前置但待每个新 UC 常规化",#1 是"周期入口已建未挂 cron、矩阵仍有少量裸奔/缺实现项待清理"。换句话说,距 Full SDTD 成熟的最短路径很清楚:① 3-5 条新 UC 全链路规模化;② wave8-weekly 挂周期 + survived/裸奔项收敛;③ 一次真实失败战役验证自愈闭环。</p>
+      </section>
+
+      <!-- 12 挂载一个 SUT -->
+      <section class="chapter" data-title="挂载一个 SUT(profile)">
+        <div class="kick">第 12 章</div>
+        <h1>挂载一个 SUT:profile 机制</h1>
+        <p class="lead">早期 BUGate 与 Hypervise 耦合,开源的关键是把"随框架走的核心"与"按 SUT 重建的内容"分开。<strong>这一步现在已经完成</strong>:BUGate 是独立的 SUT 无关核心,一个 SUT 通过一份声明式 <code>profile</code> 挂载,曾经的 S1-S9 硬编码接缝已收敛进单一配置。</p>
+
+        <h2>12.1 四部分解耦(回顾)</h2>
+        <p>挂载关系是第 5.5 节的四部分:<strong>BUGate Core</strong>(本仓库,SUT 无关)→ <strong>SUT Profile</strong>(桥接契约)→ <strong>Mounted Workspace</strong>(通常即 SUT 的自动化测试框架 / 测试工作区)→ <strong>SUT / Product Runtime</strong>(黑盒目标)。核心纪律:挂载的是测试工作区,产品源码 / 密钥 / 环境事实不进入核心,Runtime 只作为黑盒证据被观测。</p>
+
+        <h2>12.2 一份 profile 声明什么</h2>
+        <p>核心默认 <code>bugate.config.yaml</code> 为 <code>mode: core</code> 且 <code>guarded_path_regex: []</code>——不守护任何路径,引擎可空跑。挂载时令 <code>bugate.config.yaml</code> 指向 <code>profile: sut/&lt;name&gt;.profile.yaml</code>(或设环境变量 <code>BUGATE_PROFILE</code>),profile 把下列 SUT 事实合并到核心之上:</p>
+        <table>
+          <thead><tr><th style="width:38%">字段</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td><code>artifact_dir</code></td><td>该 SUT 每个用例的 BUGate 产物目录(一 UC 一目录)</td></tr>
+            <tr><td><code>guarded_path_regex</code></td><td>物理写入门守护的测试实现路径;空列表 = 不守护</td></tr>
+            <tr><td><code>required_precode_artifacts</code></td><td>写守卫放行前必须 <code>passed</code> 的产物集(可加 1A/1B/2A)</td></tr>
+            <tr><td><code>agent_roles</code></td><td>Wave 7 角色路径隔离(builder / designer / implementer 读写边界)</td></tr>
+            <tr><td><code>falsification_spec</code> · <code>falsification_threshold</code></td><td>Wave 8 oracle falsification 的声明式 oracle / mutation 规格与分数门</td></tr>
+            <tr><td><code>prd_health_spec</code> · <code>prd_health_min</code></td><td>Wave 0 PRD 健康度自评规格与准入分</td></tr>
+            <tr><td>per-UC 硬化门</td><td><code>require_multiview</code> / <code>require_adversarial_absorption</code> / <code>require_regression_traceability</code> / <code>layer2_strict</code> / <code>require_assertion_coverage</code> / <code>require_real_adversarial_dispatch</code> / <code>reject_on_bridge_failures</code>(默认关,按 SUT 开启)</td></tr>
+            <tr><td><code>memory.namespace</code></td><td>该 SUT 在记忆总线里的命名空间 / 标签</td></tr>
+          </tbody>
+        </table>
+        <p>范本与字段全解见 <code>examples/sample-sut.profile.yaml</code> 与 <code>.shared/skills/bugate/references/profile-schema.md</code>。SUT profile 只能让核心不变量<strong>更严</strong>,不能更松。</p>
+
+        <h2>12.3 自带的中立证据:demo-sut + 全自检</h2>
+        <p>核心仓自带中立夹具,让任何人零配置就能看到门禁闭环:</p>
+        <ul>
+          <li><code>examples/demo-sut/</code> —— 一个中立 URL 短链 SUT 的<strong>填满且通过</strong>的 01–05 门禁栈(含可选 1A/1B/2A)。<code>python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed</code> 直接 PASS;其 Wave 0 自评 87.5 / A、Wave 8 证伪 85.7%。</li>
+          <li><code>examples/mounted-demo/</code> —— 一份挂载 profile 的走查:已 <code>passed</code> 的 UC 放行写入、<code>pending</code> 的 UC 被物理门 <code>exit 2</code> 阻断,演示"先过门再写代码"。</li>
+          <li><code>$bugate-full-check</code> skill —— 一键端到端自检(四层门、双 runtime 真实互审、记忆总线、ONNX、Wave 0/8、写守卫、角色隔离),并明确区分"核心 + 可选运行时可用"与"真实 SUT 全部门禁已激活"。</li>
+        </ul>
+        <p>另有 <code>scripts/check_no_sut_terms.py</code>(de-SUT 守卫)在 CI 中扫描核心的源码 / Markdown / YAML 等文本,确保 SUT 专属词汇不渗入引擎与方法论;它<strong>不覆盖 HTML 发布材料</strong>(如本白皮书),后者的中立性需人工把关。</p>
+
+        <h2>12.4 对外口径(三句话)</h2>
+        <ul>
+          <li>对开发:缺陷报告自带完整证据链(命题→oracle→case→断言→可观测证据),不拿测试侧推断当你的 bug。</li>
+          <li>对测试同学:AI 干脏活,你保留所有否决权;每次纠正沉淀进记忆与规范,不会下周再犯。</li>
+          <li>对采用者:SUT 无关核心 + 一份 profile 即可挂载;质量承诺可证伪——断言有效性有分数、门禁有拒绝记录、缺陷有闭环时间线。</li>
+        </ul>
+      </section>
+
+      <!-- 13 前景展望 -->
+      <section class="chapter" data-title="前景展望:演进方向">
+        <div class="kick">第 13 章</div>
+        <h1>前景展望:BUGate 的两条演进方向</h1>
+        <p class="lead">BUGate 今天的实例化形态是"黑盒测试用例开发"。但它真正可复用的不是某条测试流水线,而是一组<strong>研发阶段无关</strong>的原语:需求评分、业务理解、多视角评审、门禁产物、物理写入门、记忆总线。这些原语并不依赖"被治理的对象是测试"——它们可以沿产品研发流程<strong>纵向前移</strong>到需求、设计、开发(TDD),并向<strong>白盒</strong>延伸。<strong>本章是设计上的可拓展预期(roadmap),不是既有能力声明。</strong></p>
+
+        <div class="note brand"><b>定位升级</b>:与其说 BUGate 是"一个 AI 黑盒测试框架",不如说它是一套"<strong>AI 辅助研发的治理底座</strong>"——把"先有据、再评审、过门禁、留记忆"做成机器可校验的纪律,而这套纪律对 PRD、设计、代码、测试一样成立。</div>
+
+        <h2>13.1 为什么这些原语是阶段无关的</h2>
+        <p>回看四类系统性失败(第 1 章):浅理解、假绿、臆造、知识蒸发——它们不是测试独有的,而是<strong>任何让 LLM 直接产出工件的环节</strong>都会犯的错。让 AI 写 PRD、写设计、写实现,同样会浅理解需求、自信臆造、留不下知识。因此 BUGate 的对策(命题化、证据分档、多视角分歧、门禁、记忆治理)天然适用于这些环节,只是"被治理的工件"从测试代码换成了 PRD / 设计 / 实现。</p>
+
+        <h2>13.2 左移:需求与设计质量门</h2>
+        <p><strong>Wave 0 PRD 健康度评分</strong>本就与测试无关——它是一个声明式的需求质量打分器(8 维 + 可追溯性加成),输入 PRD 自评、输出 0–100 分 + A–D 等级 + 路由。放在研发流程最前端,PRD 一写完就评分,挡住"对烂 PRD 做精确实现/测试"。<strong>Layer 1 业务理解</strong>(命题 P-xxx、oracle O-xxx、域模型 1A、状态流 1B)是一份可被机器校验、可被人审阅的规格;<strong>多视角评审</strong>(两个不同厂商模型独立读同一输入、分歧即风险)可直接用于评审 PRD、设计文档、API 契约。三者合起来,就是一道<strong>开发开始前</strong>的需求/设计质量门——QA、PM、BA、开发都能用。</p>
+
+        <h2>13.3 左移到开发:TDD 的规格层</h2>
+        <p>TDD 的核心是"先写规格化的失败测试,再写实现"。BUGate 的 Layer 1 命题 + oracle 恰好就是<strong>开发者的可执行规格</strong>:每条命题带原文锚点与证据分档,每个 oracle 带可观测面。开发者(或开发侧 AI)据此先写失败测试、再写实现——而<strong>物理写入门</strong>这一机制是路径无关的:今天它守护测试实现路径(产物未 passed 禁写测试),同样可以配置成守护<strong>实现代码路径</strong>(规格未接受禁写实现),把"先过理解的门再写代码"直接变成 TDD 的红-绿纪律。这一步主要是<strong>一个 profile 变体 + 守护路径配置</strong>,产物与门禁机制都已存在。</p>
+
+        <h2>13.4 向白盒延伸</h2>
+        <p>BUGate 当前刻意走黑盒(第 9 章:黑盒语境下选 oracle falsification 而非白盒变异,有决策文档)。这是<strong>语境</strong>选择而非能力上限:一旦进入有源码访问的白盒语境,几条延伸是自然的——<strong>多视角评审</strong>可直接用于<strong>源码评审</strong>(两个模型独立读同一段实现,分歧即风险);<strong>Wave 8</strong> 可从"黑盒证据改错"扩展为对源码的<strong>变异测试</strong>;<strong>1A 域模型 / 1B 状态流</strong>可作为设计产物与实现做一致性核对。白盒与黑盒不冲突:同一套门禁/评审/记忆原语,黑盒看行为、白盒看实现。</p>
+
+        <h2>13.5 记忆总线贯穿全生命周期</h2>
+        <p>记忆总线(跨 agent SSOT + 治理门:无证据的 confirmed 拒写)今天沉淀的是测试发现与 incident。同一条总线可以贯穿 PRD 缺口、设计决策、契约约定、实现踩坑、线上 incident——成为研发全流程的<strong>单一可信知识库</strong>,让"知识蒸发"在每个环节都被结构性堵住,而不仅是测试环节。</p>
+
+        <h2>13.6 纵向拓展地图与就绪度</h2>
+        <table>
+          <thead><tr><th style="width:23%">BUGate 原语</th><th style="width:24%">今天(黑盒测试)</th><th>纵向拓展</th><th style="width:110px">就绪度</th></tr></thead>
+          <tbody>
+            <tr><td>Wave 0 PRD 健康度评分</td><td>测试准入前给 PRD 打分</td><td>左移为研发最前端的需求质量门(本就与测试无关)</td><td><span class="b b-ok">最接近就绪</span></td></tr>
+            <tr><td>多视角评审(双模型互审)</td><td>评审需求理解 / 对抗用例</td><td>泛化到 PRD / 设计 / API 契约 / 源码评审</td><td><span class="b b-ok">原语就绪</span></td></tr>
+            <tr><td>Memory-bus(SSOT + 治理)</td><td>测试发现 / incident 沉淀</td><td>贯穿研发全生命周期的单一知识库</td><td><span class="b b-ok">原语就绪</span></td></tr>
+            <tr><td>Layer 1 命题 / oracle / 域模型 / 状态流</td><td>测试设计的依据</td><td>开发者 TDD 的可执行规格 + 设计产物</td><td><span class="b b-warn">需 profile 变体</span></td></tr>
+            <tr><td>物理写入门</td><td>测试代码前置门</td><td>守护实现代码路径(TDD 红-绿纪律)</td><td><span class="b b-warn">需配置守护路径</span></td></tr>
+            <tr><td>Wave 8 质量证据</td><td>黑盒 oracle falsification</td><td>白盒源码变异测试</td><td><span class="b b-na">需新增工作 / 白盒语境</span></td></tr>
+          </tbody>
+        </table>
+                <h2>13.7 另一条演进方向:自进化的治理内核(BUGate Loop)</h2>
+        <p>前面 6 节是<strong>纵向</strong>拓展(覆盖更多研发阶段)。还有一条<strong>递归</strong>的方向:BUGate 本身就是一个语义治理内核,它可以从"治理测试开发"进化成"治理并改进<em>自己的</em>治理规则"——一个 <strong>evidence-driven(用真实执行证据)· human-ratified(经人审或元门禁接受)· profile-bounded(限定在 profile 与策略层)</strong> 的自我改进闭环。它<strong>不是</strong>"自己改自己然后自动信自己"。</p>
+        <p>BUGate 已经有这个闭环的胚胎(图 13-1):预编码产物 → 门禁(语义+物理) → 执行/证据 → 自愈+失败分类 → 04/05 → Memory Bus/晋升候选——这条链已经跑通。尚未"内核化"的是最后两步:把晋升候选制度化为<strong>治理提案</strong>,再让提案过一道<strong>元门禁</strong>。</p>
+        <div class="fig">
+          <svg width="100%" viewBox="0 0 760 196" role="img" aria-label="BUGate 自进化治理闭环">
+            <defs><marker id="wp-loop" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#9a9a92" stroke-width="1.4" stroke-linecap="round"/></marker></defs>
+            <g font-size="12.5" font-weight="600">
+              <rect x="14" y="18" width="170" height="46" rx="8" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="26" y="40" fill="var(--teal-ink)">预编码产物</text><text x="26" y="56" font-size="10.5" font-weight="400" fill="var(--teal-ink)">01-03 · 3A/3B</text>
+              <line x1="184" y1="41" x2="196" y2="41" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-loop)"/>
+              <rect x="198" y="18" width="170" height="46" rx="8" fill="var(--coral-fill)" stroke="var(--coral-ink)" stroke-width="0.8"/><text x="210" y="40" fill="var(--coral-ink)">门禁执行</text><text x="210" y="56" font-size="10.5" font-weight="400" fill="var(--coral-ink)">语义 + 物理</text>
+              <line x1="368" y1="41" x2="380" y2="41" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-loop)"/>
+              <rect x="382" y="18" width="170" height="46" rx="8" fill="var(--gray-fill)" stroke="var(--gray-ink)" stroke-width="0.6"/><text x="394" y="40" fill="var(--ink)">执行 / 证据</text><text x="394" y="56" font-size="10.5" font-weight="400" fill="var(--muted)">真实运行</text>
+              <line x1="552" y1="41" x2="564" y2="41" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-loop)"/>
+              <rect x="566" y="18" width="170" height="46" rx="8" fill="var(--gray-fill)" stroke="var(--gray-ink)" stroke-width="0.6"/><text x="578" y="40" fill="var(--ink)">自愈 + 失败分类</text><text x="578" y="56" font-size="10.5" font-weight="400" fill="var(--muted)">三族归因</text>
+              <line x1="651" y1="64" x2="651" y2="116" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-loop)"/>
+              <rect x="566" y="118" width="170" height="46" rx="8" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="578" y="140" fill="var(--teal-ink)">04 报告 / 05 回写</text><text x="578" y="156" font-size="10.5" font-weight="400" fill="var(--teal-ink)">知识沉淀</text>
+              <line x1="566" y1="141" x2="554" y2="141" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-loop)"/>
+              <rect x="382" y="118" width="170" height="46" rx="8" fill="var(--teal-fill)" stroke="var(--teal-ink)" stroke-width="0.6"/><text x="394" y="140" fill="var(--teal-ink)">Memory Bus / 候选</text><text x="394" y="156" font-size="10.5" font-weight="400" fill="var(--teal-ink)">晋升 promotion</text>
+              <line x1="382" y1="141" x2="370" y2="141" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-loop)"/>
+              <rect x="198" y="118" width="170" height="46" rx="8" fill="var(--amber-fill)" stroke="var(--amber-ink)" stroke-width="0.8" stroke-dasharray="4 3"/><text x="210" y="140" fill="var(--amber-ink)">治理提案 06 ※</text><text x="210" y="156" font-size="10.5" font-weight="400" fill="var(--amber-ink)">规则/profile 候选</text>
+              <line x1="198" y1="141" x2="186" y2="141" stroke="#9a9a92" stroke-width="1.4" marker-end="url(#wp-loop)"/>
+              <rect x="14" y="118" width="170" height="46" rx="8" fill="var(--amber-fill)" stroke="var(--amber-ink)" stroke-width="0.8" stroke-dasharray="4 3"/><text x="26" y="140" fill="var(--amber-ink)">元门禁 ※</text><text x="26" y="156" font-size="10" font-weight="400" fill="var(--amber-ink)">宪法·中立·回归·对抗</text>
+              <line x1="9" y1="118" x2="9" y2="66" stroke="var(--brand)" stroke-width="1.6" marker-end="url(#wp-loop)"/>
+            </g>
+          </svg>
+          <div class="figcap">图 13-1 BUGate 自进化治理闭环;※ 两步(治理提案 / 元门禁)尚未"内核化",经人审或元门禁接受后才晋升,回到下一轮(左侧蓝色箭头)</div>
+        </div>
+        <h2>13.8 三层演进与不可逾越的边界</h2>
+        <table>
+          <thead><tr><th style="width:180px">阶段</th><th>做什么</th><th style="width:96px">状态</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Loop v0 · 学习闭环</strong></td><td>失败 / survived falsification / 人工纠错 / missing_implementation 自动进入 <code>05_knowledge_update.md</code> 与 Memory Bus,生成"晋升候选"。</td><td><span class="b b-ok">已有雏形</span></td></tr>
+            <tr><td><strong>Loop v1 · 治理提案闭环</strong></td><td>新增 <code>06_governance_proposal</code>:把反复出现的问题转成候选规则——profile 加固、模板调整、新增 gate 检查、新增 de-SUT term、新增 oracle pattern。<strong>只提案,不自动改核心</strong>。</td><td><span class="b b-warn">待建</span></td></tr>
+            <tr><td><strong>Loop v2 · 自进化内核原型</strong></td><td>每个治理提案跑<strong>元门禁</strong>:宪法检查 → SUT 中立性检查 → demo-sut 回归 → 对抗评审 → 向后兼容 → 人工接受。通过后才晋升为 core rule / profile schema / template / gate。</td><td><span class="b b-na">研究级</span></td></tr>
+          </tbody>
+        </table>
+        <p>这里的 <strong>demo-sut 回归 + 向后兼容</strong>就是治理的<strong>适应度函数</strong>:一条新规则必须"在历史证据上能多抓、不误伤,且不破坏既有",才配晋升——它把"治理质量"本身变成可证伪的指标,而不只是测量"断言质量"。</p>
+        <div class="note warn"><b>不可逾越的边界</b>:自进化的对象只能是<strong>规则候选 / profile 加固 / 模板 / 检查项</strong>;<strong>绝不自动改五条宪法不变量,绝不把某个 SUT 的经验直接写进 core</strong>。否则会从治理内核退化成"自我强化偏见的规则泥团"(Goodhart:一个自我优化的系统会学会把门禁优化到形同虚设——这正是 BUGate 要防的假绿)。换句话说:<strong>内核(宪法 + 不变量检查 + 回归/元门禁)不参与进化,进化的只是它所治理的策略层。</strong>本章两条演进方向都是设计预期(roadmap)、半自治、人/元门禁批准;递归这条合起来可以叫 <strong>BUGate Loop: a self-evolving semantic governance kernel prototype</strong>。</div>
+      </section>
+
+      <!-- 14 结语 -->
+      <section class="chapter" data-title="结语">
+        <div class="kick">第 14 章</div>
+        <h1>结语</h1>
+        <p class="lead">BUGate SDTD 的本质,是把"AI 写测试"从一种依赖资深经验的手艺,改造成一条任何 QA 都能可靠执行、可被机器校验、可被独立审计的工程流水线。</p>
+        <p>它的底层信念只有一条:<strong>当生成测试的是大语言模型时,诚实必须优先于绿色,而诚实不能靠提醒,只能靠机器可校验的产物与物理门禁来强制。</strong>这条信念贯穿了五条宪法、10 阶段流水线、双 runtime 互审、oracle falsification 质量证据,以及那个会拒绝无证据写入的记忆治理门。</p>
+        <p>它也是诚实的:起源期全链路 N=2(UC-AE-24 由 orchestrator <code>--auto</code> 端到端驱动,见第 10 章),self-healing 已在真实日志上运行、但"真实失败"分支尚未触发,这些都被如实标注为"成熟度问题"而非"机制缺失";白盒变异、行为 oracle 证伪等被明确划为"有意不做"的设计取舍。它的方法论根基是公认的 40 年测试研究,原创之处是面向 LLM 失败模式的重新编排——这个归因经得起开源社区的审视。</p>
+        <p>如果你打算用它:<code>git clone</code> 后先跑 <code>check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed</code> 看门禁全绿,再复制 <code>examples/sample-sut.profile.yaml</code> 把你的测试工作区挂上来,用 <code>$bugate-full-check</code> 验证安装。把对外口径定为"受治理的多 agent 黑盒测试开发",不要写"全自动";方法论的经典出处引用已在第 2 章列明,让它是"站在巨人肩膀上的严谨综合"而非"民间发明"。</p>
+        <div class="note ok" style="margin-top:26px"><b>延伸阅读</b>:仓库 <code>README.md</code> / <code>CAPABILITIES.md</code> · 方法论本体 <code>METHOD.md</code>(§2.4 理论基础)与 <code>SOP.md</code> · 诞生编年史 <code>BUGATE_EVOLUTION_TIMELINE.md</code> · 解耦决策 <code>BUGATE_PLATFORM_DECOUPLING_ADR.md</code> · profile 字段 <code>references/profile-schema.md</code> · 配套幻灯片 <code>BUGATE_FULL_SDTD_SLIDES.html</code></div>
+        <p class="small muted" style="margin-top:24px">本白皮书整合自 BUGate 仓库 docs/qa-methodology/ 资料。独立核心 / demo 数字可在仓库 git 历史 / frontmatter 复查;起源历史数字见原 Hypervise 产物。若与仓库现状不符,以仓库为准并更新本文件。</p>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div id="nav"><button id="prev" aria-label="上一章">‹</button><button id="next" aria-label="下一章">›</button></div>
+
+<script>
+(function(){
+  var reader=document.getElementById('reader');
+  var chapters=Array.prototype.slice.call(document.querySelectorAll('.chapter'));
+  var toclist=document.getElementById('toclist');
+  var bar=document.getElementById('bar');
+  var prev=document.getElementById('prev'), next=document.getElementById('next');
+  var toc=document.getElementById('toc'), tocbtn=document.getElementById('tocbtn');
+  var i=0, N=chapters.length;
+
+  chapters.forEach(function(c,idx){
+    var t=c.getAttribute('data-title')||('第 '+idx+' 章');
+    var a=document.createElement('a'); a.href='#'+idx;
+    a.innerHTML='<span class="n">'+(idx===0?'·':idx)+'</span>'+t;
+    a.onclick=function(e){e.preventDefault(); go(idx); if(window.innerWidth<=860) toc.classList.remove('open');};
+    toclist.appendChild(a);
+  });
+  var links=toclist.querySelectorAll('a');
+
+  function render(){
+    chapters.forEach(function(c,idx){ c.classList.toggle('active', idx===i); });
+    links.forEach(function(a,idx){ a.classList.toggle('active', idx===i); });
+    bar.style.width=(N>1?(i/(N-1)*100):100)+'%';
+    prev.disabled=(i===0); next.disabled=(i===N-1);
+    reader.scrollTop=0;
+    if(location.hash!=='#'+i) history.replaceState(null,'','#'+i);
+    var active=links[i]; if(active && active.scrollIntoView) active.scrollIntoView({block:'nearest'});
+  }
+  function go(n){ i=Math.max(0,Math.min(N-1,n)); render(); }
+  prev.onclick=function(){go(i-1)}; next.onclick=function(){go(i+1)};
+  tocbtn.onclick=function(){toc.classList.toggle('open')};
+
+  document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+    if(e.key==='ArrowRight'||e.key==='PageDown'){ if(reader.scrollTop+reader.clientHeight>=reader.scrollHeight-4){e.preventDefault();go(i+1);} }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){ if(reader.scrollTop<=4){e.preventDefault();go(i-1);} }
+    else if(e.key==='Home'){go(0)} else if(e.key==='End'){go(N-1)}
+  });
+
+  var start=parseInt((location.hash||'').replace('#',''),10);
+  if(start>=0 && start<N) i=start;
+  render();
+})();
+</script>
+</body>
+</html>
