@@ -62,7 +62,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from bugate_core import find_root, load_config, rel, read_text
+from bugate_core import find_root, load_config, rel, read_text, strip_inline_comment
 
 
 WRITE_ACTIONS = {"Edit", "Write", "apply_patch", "MultiEdit"}
@@ -136,7 +136,10 @@ def _parse_agent_roles(text: str) -> dict[str, dict[str, list[str]]]:
     bucket_indent: int | None = None
 
     while i < n:
-        raw = lines[i]
+        # Strip trailing inline `# ...` comments (quote-aware), matching the main
+        # config parser, so a comment on a role/sub-list/pattern line can't be
+        # baked into the regex.
+        raw = strip_inline_comment(lines[i])
         stripped = raw.strip()
         # Blank or comment lines do not terminate the block.
         if not stripped or stripped.startswith("#"):
