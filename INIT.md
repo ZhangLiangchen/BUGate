@@ -79,6 +79,8 @@ The core does nothing on its own; you mount a system under test via a **profile*
    profile: sut/<name>.profile.yaml
    ```
 
+   > Local, per-clone edit — **don't commit** this `profile:` line; each clone mounts its own SUT.
+
 3. Full profile reference: [`.shared/skills/bugate/references/profile-schema.md`](.shared/skills/bugate/references/profile-schema.md).
    The methodology and gate flow: [`README.md`](README.md) and [`docs/qa-methodology/METHOD.md`](docs/qa-methodology/METHOD.md).
 

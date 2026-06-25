@@ -49,6 +49,10 @@ Generic English prose (the words order, chain, wallet) and the neutral
 `docs/usecases` default artifact dir are intentionally **not** forbidden — only
 unambiguous SUT tokens are.
 
+> Mounting a SUT locally? Keep your `profile:` pointer in `bugate.config.yaml`
+> uncommitted — it's a per-clone local edit, so the committed core (which this
+> guard scans) stays SUT-neutral.
+
 ### The allow-marker (for deliberate occurrences)
 
 If a forbidden token must appear on a line for a legitimate reason (for example,

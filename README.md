@@ -81,6 +81,8 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
    profile: sut/my-sut.profile.yaml
    ```
 
+   > The `profile:` line is a local, per-clone edit — **don't commit it**; BUGate is a generic framework where each clone mounts its own SUT.
+
 2. In the profile, declare the mounted test workspace surfaces (see [`examples/sample-sut.profile.yaml`](examples/sample-sut.profile.yaml) for the full, commented version):
 
    ```yaml

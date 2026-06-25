@@ -81,6 +81,8 @@ When in doubt, keep it in the SUT profile.
   `.shared/`; they do not require git metadata.
 - `bugate.config.yaml` ships with no guarded paths. Profiles opt into guarded
   implementation paths.
+- A SUT is mounted by a local, uncommitted `profile:` pointer in
+  `bugate.config.yaml` (or `BUGATE_PROFILE`); the committed core stays SUT-neutral.
 
 ## Rejected Alternatives
 

@@ -8,6 +8,9 @@ through `BUGATE_PROFILE=/path/profile.yaml`, the core `bugate.config.yaml`
 test automation surface; it does not copy product source, API dumps, secrets, or
 environment facts into BUGate core.
 
+> When you select via the `bugate.config.yaml` `profile` field, that line is a
+> local, per-clone edit — do not commit it; the committed core stays SUT-neutral.
+
 This document is the full key contract. Keys are grouped into core
 `bugate.config.yaml` fields, SUT-profile fields, and environment variables. Core
 scripts ignore unknown fields, so profiles may add their own keys for runtime

@@ -68,6 +68,8 @@ flowchart LR
    profile: sut/<名字>.profile.yaml
    ```
 
+   > 这是本地逐人的编辑 —— **不要提交**这行 `profile:`；BUGate 是通用框架，每个 clone 各自在本地挂载自己的 SUT。
+
 3. profile 全部字段见 [`.shared/skills/bugate/references/profile-schema.md`](.shared/skills/bugate/references/profile-schema.md)；方法论与门流程见 [`README.md`](README.md) 与 [`docs/qa-methodology/METHOD.md`](docs/qa-methodology/METHOD.md)。
 
 ## Agent 运行时（可选，无需额外安装）
