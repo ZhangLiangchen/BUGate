@@ -56,6 +56,24 @@ commands, auth rules, resource policies, and evidence sources live in the
 profile or the mounted test workspace. See
 [`docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md`](docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md).
 
+**Physical layout — keep the SUT repo separate, symlink it in.** Because the
+mounted workspace is its **own** git repository, don't nest it physically inside
+BUGate's working tree — nested independent repos confuse IDEs, invite an
+accidental `git add`, and blur the two-repo boundary. Keep the SUT in its own
+directory and symlink it under BUGate:
+
+```bash
+# SUT lives beside BUGate at ../my-sut (its own repo + remote); mount it in:
+ln -s ../my-sut my-sut
+# ignore the symlink LOCALLY — no trailing slash, since a symlink is not a
+# directory to git — so BUGate's committed tree carries no SUT name:
+printf '/my-sut\n' >> .git/info/exclude
+```
+
+The symlink is transparent to the gate (`check_bugate.py` matches the textual
+path and reads artifacts through the link), while the two repos keep fully
+independent histories, remotes, and lifecycles.
+
 ## The gate flow
 
 Test development is gated through layered artifacts; code is blocked until the pre-code artifacts reach `gate_status: passed`:

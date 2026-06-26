@@ -81,6 +81,14 @@ The core does nothing on its own; you mount a system under test via a **profile*
 
    > Local, per-clone edit — **don't commit** this `profile:` line; each clone mounts its own SUT.
 
+   > **Separate repo? Symlink it, don't nest it.** If the SUT test workspace is
+   > its own git repo, keep it in its own directory and symlink it in
+   > (`ln -s ../my-sut my-sut`), then ignore the symlink **locally**
+   > (`printf '/my-sut\n' >> .git/info/exclude` — no trailing slash; a symlink
+   > isn't a directory to git). Never nest the SUT repo inside BUGate's tree:
+   > the symlink keeps the gate working on the same relative paths while the two
+   > repos stay fully independent (separate histories, remotes, lifecycles).
+
 3. Full profile reference: [`.shared/skills/bugate/references/profile-schema.md`](.shared/skills/bugate/references/profile-schema.md).
    The methodology and gate flow: [`README.md`](README.md) and [`docs/qa-methodology/METHOD.md`](docs/qa-methodology/METHOD.md).
 

@@ -70,6 +70,12 @@ flowchart LR
 
    > 这是本地逐人的编辑 —— **不要提交**这行 `profile:`；BUGate 是通用框架，每个 clone 各自在本地挂载自己的 SUT。
 
+   > **独立仓库?软链接挂载,不要嵌套。** 若 SUT 测试工作区是它自己的 git 仓库,把它放在独立目录里
+   > 再软链接挂载(`ln -s ../my-sut my-sut`),然后**本地**忽略该软链接
+   > (`printf '/my-sut\n' >> .git/info/exclude` —— 不带尾斜杠,软链接对 git 不是目录)。
+   > 切勿把 SUT 仓库嵌套进 BUGate 工作树:软链接让门引擎在同样的相对路径上照常工作,
+   > 而两个仓库保持完全独立的历史、远程与生命周期。
+
 3. profile 全部字段见 [`.shared/skills/bugate/references/profile-schema.md`](.shared/skills/bugate/references/profile-schema.md)；方法论与门流程见 [`README.md`](README.md) 与 [`docs/qa-methodology/METHOD.md`](docs/qa-methodology/METHOD.md)。
 
 ## Agent 运行时（可选，无需额外安装）
