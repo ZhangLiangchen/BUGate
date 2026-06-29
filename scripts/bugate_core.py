@@ -7,6 +7,7 @@ may add richer tooling, but BUGate core should stay dependency-light.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -244,6 +245,19 @@ def artifact_path(artifact_dir: Path, name: str) -> Path:
     return artifact_dir / name
 
 
+def inventory_sha256(artifact_dir: Path) -> str:
+    """sha256 hex of an artifact dir's 03_inventory.yaml ('' if absent).
+
+    Detects when a generated 03a_test_cases.md has drifted from a newer
+    inventory: the readable-cases generator records this in the 03a frontmatter
+    (``source_inventory_sha256``) and the orchestrator compares it before
+    deciding whether to regenerate, so a freshly-added inventory case flows
+    through to the readable layer automatically.
+    """
+    path = artifact_dir / "03_inventory.yaml"
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else ""
+
+
 def load_config(root: Path | None = None, profile: str | None = None) -> dict[str, Any]:
     root = root or find_root()
     data: dict[str, Any] = {}
@@ -276,16 +290,165 @@ def ids(pattern: str, text: str) -> set[str]:
     return set(re.findall(pattern, text))
 
 
-def proposition_ids(text: str) -> set[str]:
-    return ids(r"\bP-\d{3,}\b", text)
+PROPOSITION_PATTERN = r"\bP-\d{3,}\b"
+ORACLE_PATTERN = r"\bO-\d{3,}\b"
 
 
-def oracle_ids(text: str) -> set[str]:
-    return ids(r"\bO-\d{3,}\b", text)
+def proposition_ids(text: str, pattern: str | None = PROPOSITION_PATTERN) -> set[str]:
+    return ids(pattern, text) if pattern else set()
+
+
+def oracle_ids(text: str, pattern: str | None = ORACLE_PATTERN) -> set[str]:
+    return ids(pattern, text) if pattern else set()
 
 
 def case_ids(text: str) -> set[str]:
     return ids(r"\b(?:CASE|ADV)-[A-Z0-9_-]+\b", text)
+
+
+# ── Semantic-schema dialects ─────────────────────────────────────────────────
+# Core enforces the universal artifact CONTRACT (a brief establishes propositions
+# and oracles, a testability note declares strategy + evidence, an inventory
+# lists intent-bearing cases). The SECTION NAMES and ID conventions that ENCODE
+# that contract are a *dialect*. The default "v1.3" preset is the canonical
+# dialect — its checks are byte-for-byte the previous hard-coded behaviour. A SUT
+# profile whose accumulated artifacts predate / diverge from the canonical schema
+# may select an alternate dialect with `semantic_schema: <name>`; the
+# `--schema <name>` flag overrides per-invocation. Presets stay SUT-neutral: they
+# carry only generic governance section names, never SUT product terms.
+DEFAULT_SEMANTIC_SCHEMA = "v1.3"
+
+SEMANTIC_SCHEMAS: dict[str, dict[str, Any]] = {
+    "v1.3": {
+        "proposition_pattern": PROPOSITION_PATTERN,
+        "oracle_pattern": ORACLE_PATTERN,
+        "modeling_stack": True,
+        "brief": {
+            "require_proposition_ids": True,
+            "require_oracle_ids": True,
+            "sections": ["Scope", "Canonical Business Flows", "Propositions",
+                         "Business Oracles", "Boundaries", "Assumptions", "Open Questions"],
+            "proposition_table": "Propositions",
+            "oracle_table": "Business Oracles",
+            "clarification_table": "Clarification Gate",
+        },
+        "layer2": {"sections": ["Layer Decision", "Evidence Plan"]},
+        "inventory": {
+            "required_case_keys": ["proposition_refs", "oracle_refs", "layer_decision"],
+            "passed_case_keys": ["expected_observations", "preconditions"],
+            "require_data_source_status": True,
+        },
+        "adversarial": {
+            "cases_key": "adversarial_cases",
+            "required_fields": ["risk", "scenario", "expected_oracle_pressure"],
+            "disposition_field": "disposition",
+            "residual_key": "residual_risks",
+        },
+    },
+    # Pre-canonical dialect used by the original in-repo gate: prose assertions
+    # instead of P-/O- ids, narrative section names, a free-form nested inventory.
+    "original-gate": {
+        "proposition_pattern": None,
+        "oracle_pattern": None,
+        # The optional Full-SDTD modeling stack (01a/01b/02a) has no canonical-id
+        # equivalent in this dialect; don't validate it under v1.3 id rules.
+        "modeling_stack": False,
+        "brief": {
+            "require_proposition_ids": False,
+            "require_oracle_ids": False,
+            # Each entry is any-of: the corpus drifted into synonym section names.
+            "sections": [["SUT And Scope", "Scope"],
+                         ["Canonical Business Flow", "Canonical Business Flows"],
+                         ["Assertions That Follow From Business", "PRD-Derived Propositions"],
+                         ["Unknowns And Questions", "Open Questions"]],
+            "proposition_table": "Propositions",
+            "oracle_table": "Business Oracles",
+            "clarification_table": "Clarification Gate",
+        },
+        # Two universal requirements, each any-of across the testability sub-dialects:
+        # (a) a layer/execution decision, (b) an assertion/evidence plan.
+        "layer2": {"sections": [["Execution Boundary", "Test Layer Decision"],
+                                ["Assertion Strategy", "Acceptance Criteria", "Evidence Plan"]]},
+        "inventory": {
+            "required_case_keys": [],
+            "passed_case_keys": [],
+            "require_data_source_status": False,
+        },
+        # 03b dialect: decision/threat_model/coverage_decisions instead of the
+        # canonical disposition/scenario/residual_risks; richer per-case schema.
+        "adversarial": {
+            "cases_key": "adversarial_cases",
+            "required_fields": ["risk", "threat_model", "expected_defense_or_oracle"],
+            "disposition_field": "decision",
+            "residual_key": "coverage_decisions",
+        },
+    },
+}
+
+
+def section_missing(body: str, requirement: Any, *, prefix: str = "## ") -> str | None:
+    """Return a label for an unmet section requirement, or None if satisfied.
+
+    ``requirement`` is a heading name, or a list of acceptable names (any-of):
+    the requirement is met when at least one ``{prefix}{name}`` occurs in body.
+    Any-of lets one dialect tolerate synonym section names across drifted artifacts.
+    """
+    names = requirement if isinstance(requirement, list) else [requirement]
+    if any(f"{prefix}{name}" in body for name in names):
+        return None
+    return " / ".join(str(name) for name in names)
+
+
+def semantic_schema(name: str | None = None, *, layer: str | None = None) -> dict[str, Any]:
+    """Return a schema preset, or one layer block merged over its top-level keys.
+
+    Unknown names fall back to the canonical default. When ``layer`` is given,
+    scalar top-level keys (e.g. proposition_pattern) are visible alongside the
+    layer's own keys so a checker can read both from one dict.
+    """
+    preset = SEMANTIC_SCHEMAS.get(str(name or DEFAULT_SEMANTIC_SCHEMA)) or SEMANTIC_SCHEMAS[DEFAULT_SEMANTIC_SCHEMA]
+    if layer is None:
+        return preset
+    merged = {key: value for key, value in preset.items() if not isinstance(value, dict)}
+    merged.update(preset.get(layer) or {})
+    return merged
+
+
+def artifact_in_profile_scope(artifact_dir: Path, config: dict[str, Any] | None, root: Path | None = None) -> bool:
+    """True if ``artifact_dir`` lives under the profile's artifact_dir_template parent.
+
+    Used to scope a profile-selected dialect to the mounted SUT's own UC dirs, so
+    core/demo fixtures (examples/, templates) keep the default dialect even while
+    a SUT profile is active. Symlink-safe via resolve().
+    """
+    template = str((config or {}).get("artifact_dir_template") or "")
+    if "{uc}" not in template:
+        return False
+    parent_rel = template.split("{uc}", 1)[0].rstrip("/")
+    if not parent_rel:
+        return False
+    try:
+        parent = (resolve_path(parent_rel, root)).resolve()
+        target = artifact_dir.resolve()
+    except OSError:
+        return False
+    return target == parent or parent in target.parents
+
+
+def resolve_schema_name(
+    artifact_dir: Path,
+    config: dict[str, Any] | None = None,
+    *,
+    override: str | None = None,
+    root: Path | None = None,
+) -> str:
+    """Pick the dialect for an artifact dir: --schema override > in-scope profile > default."""
+    if override:
+        return override
+    configured = (config or {}).get("semantic_schema")
+    if configured and artifact_in_profile_scope(artifact_dir, config, root=root):
+        return str(configured)
+    return DEFAULT_SEMANTIC_SCHEMA
 
 
 def markdown_table_rows(text: str) -> list[list[str]]:
@@ -338,7 +501,7 @@ def parse_inventory_cases(text: str) -> list[dict[str, Any]]:
     current: dict[str, Any] | None = None
     current_key: str | None = None
     for raw in text.splitlines():
-        line = raw.rstrip()
+        line = strip_inline_comment(raw)  # quote-safe trailing ' # ...' removal (consistent with the other parsers)
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
@@ -406,7 +569,7 @@ class GateReport:
 
 
 def ensure_no_tbd(report: GateReport, path: Path, body: str, *, enabled: bool) -> None:
-    if enabled and re.search(r"\bTBD\b|待定|TODO", body, re.I):
+    if enabled and re.search(r"\bTBD\b|待定|\bTODO\b", body, re.I):
         report.fail(f"{path.name}: accepted artifact must not contain TBD/TODO placeholders")
 
 

@@ -24,12 +24,36 @@ from __future__ import annotations
 import argparse
 from functools import lru_cache
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 import sdtd_multiview
-from bugate_core import proposition_ids, read_text, write_text
+from bugate_core import (
+    PROPOSITION_PATTERN,
+    load_config,
+    proposition_ids,
+    read_text,
+    resolve_schema_name,
+    semantic_schema,
+    write_text,
+)
+
+
+def proposition_pattern_for(artifact_dir: Path) -> str | None:
+    """Resolve the active dialect's proposition-id pattern for this UC dir.
+
+    Mirrors the semantic gates' schema resolution: a SUT profile in scope selects
+    its dialect, so a prose-assertion dialect (no P-/O- ids) returns ``None`` and
+    the bridge stops requiring/diffing proposition ids. Defaults to the canonical
+    v1.3 pattern when no profile applies or config can't be read.
+    """
+    try:
+        config = load_config(profile=os.environ.get("BUGATE_PROFILE"))
+        return semantic_schema(resolve_schema_name(artifact_dir, config)).get("proposition_pattern")
+    except Exception:
+        return PROPOSITION_PATTERN
 
 # ---------------------------------------------------------------------------
 # DE-SUT configuration: env-driven with neutral defaults, all overridable.
@@ -295,14 +319,23 @@ def write_real_view(out: Path, peer: str, body: str, cleaned: bool) -> None:
 MIN_VIEW_CHARS = 40
 
 
-def view_schema_errors(body: str) -> list[str]:
-    """Schema check for a returned Wave 1 peer view: it must carry propositions."""
+def view_schema_errors(body: str, pattern: str | None) -> list[str]:
+    """Schema check for a returned Wave 1 peer view.
+
+    Always requires substantive content. Requires proposition ids only when the
+    active dialect defines a proposition-id scheme (``pattern``); a prose-assertion
+    dialect (``pattern is None``) is validated on length + structure instead, so a
+    real peer view is no longer rejected just for lacking P-xxx ids.
+    """
     text = (body or "").strip()
     errors: list[str] = []
     if len(text) < MIN_VIEW_CHARS:
         errors.append(f"view too short ({len(text)} < {MIN_VIEW_CHARS} chars)")
-    if not proposition_ids(text):
-        errors.append("no P-xxx proposition ids found in returned view")
+    if pattern:
+        if not proposition_ids(text, pattern):
+            errors.append("no proposition ids found in returned view")
+    elif not re.search(r"^#{1,6}\s|\n[-*]\s|\n\d+\.", text):
+        errors.append("no structured content (heading/list) in returned view")
     return errors
 
 
@@ -331,10 +364,42 @@ def synthesize_divergence(
     *,
     mode: str,
     note: str = "",
+    pattern: str | None = PROPOSITION_PATTERN,
 ) -> None:
-    """Diff the two views' proposition-id sets and write divergence_report.md."""
-    codex_props = proposition_ids(codex_view)
-    claude_props = proposition_ids(claude_view)
+    """Diff the two views' proposition-id sets and write divergence_report.md.
+
+    When the active dialect has no proposition-id scheme (``pattern is None``),
+    id-set diffing is not applicable: capture both views and defer to human review.
+    """
+    if not pattern:
+        lines = [
+            "---",
+            "gate: multiview_divergence",
+            "gate_status: passed",
+            "layer1_update_required: review",
+            "layer1_updated: not_required",
+            "format_cleaned: false",
+            f"dispatch_mode: {mode}",
+            "id_scheme: none",
+            "---",
+            "",
+            "# Divergence Report",
+            "",
+        ]
+        if note:
+            lines += [f"> {note}", ""]
+        lines += [
+            "This SUT dialect has no proposition-id (P-xxx) scheme, so automated "
+            "id-set divergence detection is not applicable. Both independent peer "
+            "views were captured (`codex_view.md`, `claude_view.md`); compare them "
+            "by hand and absorb any missing propositions into 01_business_brief.md "
+            "before Layer 2.",
+            "",
+        ]
+        write_text(out / "divergence_report.md", "\n".join(lines))
+        return
+    codex_props = proposition_ids(codex_view, pattern)
+    claude_props = proposition_ids(claude_view, pattern)
     agreed = sorted(codex_props & claude_props)
     only_codex = sorted(codex_props - claude_props)
     only_claude = sorted(claude_props - codex_props)
@@ -425,9 +490,10 @@ def run_all(artifact_dir: Path) -> int:
     sdtd_multiview.init(artifact_dir, "multiview peer dispatch")
     out = artifact_dir / "00_multiview"
 
+    pattern = proposition_pattern_for(artifact_dir)
     brief_path = artifact_dir / "01_business_brief.md"
     brief = read_text(brief_path) if brief_path.exists() else ""
-    propositions = sorted(proposition_ids(brief))
+    propositions = sorted(proposition_ids(brief, pattern))
 
     prompt_card_path = out / "prompt_card.md"
     prompt_card = read_text(prompt_card_path) if prompt_card_path.exists() else ""
@@ -447,6 +513,7 @@ def run_all(artifact_dir: Path) -> int:
             mode="fallback_placeholder",
             note=f"Real peer dispatch was SKIPPED because {reason}. "
             "This divergence report reflects deterministic placeholder views only.",
+            pattern=pattern,
         )
         print(f"written {out} (fallback mode)")
         return 0
@@ -478,7 +545,7 @@ def run_all(artifact_dir: Path) -> int:
             write_placeholder_view(out, peer, propositions, f"{peer} CLI returned empty output")
             views[peer] = read_text(out / f"{peer}_view.md")
             continue
-        errors = view_schema_errors(cleaned_body)
+        errors = view_schema_errors(cleaned_body, pattern)
         if errors:
             archived = archive_failed_view(out, peer, stdout, errors)
             print(f"{peer}: returned view failed schema ({'; '.join(errors)}); archived {archived.name}, using placeholder")
@@ -493,6 +560,7 @@ def run_all(artifact_dir: Path) -> int:
         views["codex"],
         views["claude"],
         mode="real_peer_dispatch",
+        pattern=pattern,
     )
     print(f"written {out} (real peer dispatch)")
     return 0
@@ -521,6 +589,7 @@ def run_divergence(artifact_dir: Path, force: bool = False) -> int:
         codex_view,
         claude_view,
         mode="fallback_placeholder" if placeholder else "real_peer_dispatch",
+        pattern=proposition_pattern_for(artifact_dir),
     )
     print(f"written {report}")
     return 0

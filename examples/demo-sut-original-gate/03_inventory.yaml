@@ -1,0 +1,16 @@
+gate: layer3_inventory
+gate_status: passed
+
+# Original-gate dialect inventory: each case carries a stable id + business
+# intent. The dialect does not require canonical proposition_refs / oracle_refs /
+# layer_decision keys (the core contract only requires intent-bearing cases).
+cases:
+  - id: COUPON-01
+    priority: P0
+    intent: "A valid, unexpired, unused coupon reduces the order total by its discount amount and the coupon is then marked used."
+  - id: COUPON-02
+    priority: P1
+    intent: "An expired coupon is rejected at checkout and the order total is left unchanged."
+  - id: COUPON-03
+    priority: P1
+    intent: "A coupon already used by the same shopper is rejected and the order total is left unchanged."

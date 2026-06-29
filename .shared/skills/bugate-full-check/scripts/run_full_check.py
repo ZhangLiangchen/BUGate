@@ -325,6 +325,33 @@ def main() -> int:
     )
     add(checks, "Profile hardening fixture", result.returncode == 0, result.stdout)
 
+    # Alternate semantic-schema dialect: a SUT-neutral fixture (full v1.3 artifact
+    # stack written in the original-gate dialect) must pass the whole gate at
+    # --scope all under --schema original-gate, AND the canonical v1.3 default must
+    # still reject it — proving the preset is a real dialect (trio + 03a/03b),
+    # not a no-op.
+    fixture = "examples/demo-sut-original-gate"
+    result = run(
+        ["python3", "scripts/check_bugate_v13_semantics.py", fixture,
+         "--scope", "all", "--require-passed", "--schema", "original-gate"],
+        root,
+        timeout=60,
+    )
+    alt_ok = result.returncode == 0
+    result = run(
+        ["python3", "scripts/check_bugate_v13_semantics.py", fixture,
+         "--scope", "all", "--require-passed", "--schema", "v1.3"],
+        root,
+        timeout=60,
+    )
+    rejects_default = result.returncode != 0
+    add(
+        checks,
+        "Alternate dialect (original-gate)",
+        alt_ok and rejects_default,
+        f"original-gate={'ok' if alt_ok else 'FAIL'} v1.3-rejects={'ok' if rejects_default else 'NO'}",
+    )
+
     # Config boundary.
     result = run(
         [

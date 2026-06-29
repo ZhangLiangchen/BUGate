@@ -14,9 +14,10 @@
 # exits non-zero rather than guessing a SUT path.
 #
 # Optional overrides:
-#   WAVE8_REPORTS_DIR     Output directory (default: <ROOT>/reports).
-#   WAVE8_ARTIFACT_ROOT   Root scanned for 03_inventory.yaml (default: <ROOT>).
-#   BUGATE_PROFILE        Profile path passed through to the falsifier.
+#   WAVE8_FALSIFICATION_SPEC  Spec path (default: profile `falsification_spec`).
+#   WAVE8_REPORTS_DIR         Output directory (default: profile `wave8_reports_dir`, else <ROOT>/reports).
+#   WAVE8_ARTIFACT_ROOT       Root scanned for 03_inventory.yaml (default: profile `wave8_artifact_root`, else <ROOT>).
+#   BUGATE_PROFILE            Profile path passed through to the falsifier and matrix.
 #
 # Enable weekly automation with EITHER:
 #   crontab:  0 9 * * 1  cd /path/to/bugate && WAVE8_EVIDENCE_GLOB='...' bin/wave8-weekly >> reports/wave8_weekly.log 2>&1
@@ -43,11 +44,10 @@ find_root() {
 ROOT="$(find_root)"
 cd "$ROOT"
 
-# Resolve the evidence glob: env var wins, else fall back to the active profile.
-EVIDENCE_GLOB="${WAVE8_EVIDENCE_GLOB:-}"
-if [ -z "$EVIDENCE_GLOB" ]; then
-  EVIDENCE_GLOB="$(
-    python3 - "$ROOT" <<'PY'
+# Resolve SUT-owned Wave 8 config: env vars win, else active profile/config.
+read_profile_value() {
+  local key="$1"
+  python3 - "$ROOT" "$key" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1] + "/scripts")
 try:
@@ -55,9 +55,16 @@ try:
     cfg = load_config()
 except Exception:
     cfg = {}
-print(cfg.get("wave8_evidence_glob") or cfg.get("evidence_glob") or "")
+print(cfg.get(sys.argv[2]) or "")
 PY
-  )"
+}
+
+EVIDENCE_GLOB="${WAVE8_EVIDENCE_GLOB:-}"
+if [ -z "$EVIDENCE_GLOB" ]; then
+  EVIDENCE_GLOB="$(read_profile_value wave8_evidence_glob)"
+fi
+if [ -z "$EVIDENCE_GLOB" ]; then
+  EVIDENCE_GLOB="$(read_profile_value evidence_glob)"
 fi
 
 if [ -z "$EVIDENCE_GLOB" ]; then
@@ -75,8 +82,22 @@ HINT
   exit 1
 fi
 
-REPORTS_DIR="${WAVE8_REPORTS_DIR:-$ROOT/reports}"
-ARTIFACT_ROOT="${WAVE8_ARTIFACT_ROOT:-$ROOT}"
+SPEC_PATH="${WAVE8_FALSIFICATION_SPEC:-}"
+if [ -z "$SPEC_PATH" ]; then
+  SPEC_PATH="$(read_profile_value falsification_spec)"
+fi
+
+REPORTS_DIR="${WAVE8_REPORTS_DIR:-}"
+if [ -z "$REPORTS_DIR" ]; then
+  REPORTS_DIR="$(read_profile_value wave8_reports_dir)"
+fi
+REPORTS_DIR="${REPORTS_DIR:-$ROOT/reports}"
+
+ARTIFACT_ROOT="${WAVE8_ARTIFACT_ROOT:-}"
+if [ -z "$ARTIFACT_ROOT" ]; then
+  ARTIFACT_ROOT="$(read_profile_value wave8_artifact_root)"
+fi
+ARTIFACT_ROOT="${ARTIFACT_ROOT:-$ROOT}"
 mkdir -p "$REPORTS_DIR"
 
 ORACLE_JSON="$REPORTS_DIR/oracle_falsification_result.json"
@@ -86,15 +107,26 @@ MATRIX_MD="$REPORTS_DIR/assertion_coverage_matrix.md"
 echo "[wave8-weekly] $(date -u +%FT%TZ) evidence glob: $EVIDENCE_GLOB"
 
 oracle_args=(--evidence "$EVIDENCE_GLOB" --json-output "$ORACLE_JSON" --md-output "$ORACLE_MD")
+if [ -n "$SPEC_PATH" ]; then
+  oracle_args+=(--spec "$SPEC_PATH")
+fi
 if [ -n "${BUGATE_PROFILE:-}" ]; then
   oracle_args+=(--profile "$BUGATE_PROFILE")
 fi
 python3 "$ROOT/scripts/oracle_falsification.py" "${oracle_args[@]}"
 
-python3 "$ROOT/scripts/generate_assertion_coverage_matrix.py" \
+matrix_args=(
   --mutation-result "$ORACLE_JSON" \
   --artifact-root "$ARTIFACT_ROOT" \
   --output "$MATRIX_MD"
+)
+if [ -n "$SPEC_PATH" ]; then
+  matrix_args+=(--spec "$SPEC_PATH")
+fi
+if [ -n "${BUGATE_PROFILE:-}" ]; then
+  matrix_args+=(--profile "$BUGATE_PROFILE")
+fi
+python3 "$ROOT/scripts/generate_assertion_coverage_matrix.py" "${matrix_args[@]}"
 
 echo "[wave8-weekly] done. Review survived falsifications and bare/missing assertions:"
 echo "  $ORACLE_MD"

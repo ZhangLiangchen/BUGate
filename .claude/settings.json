@@ -28,6 +28,26 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" session-start --core --agent agent"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" stop --core --agent agent"
+          }
+        ]
+      }
     ]
   }
 }

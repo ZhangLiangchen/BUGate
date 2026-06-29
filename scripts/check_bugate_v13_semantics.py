@@ -18,6 +18,8 @@ from bugate_core import (
     parse_nested_yaml,
     read_text,
     required_precode_artifacts,
+    resolve_schema_name,
+    semantic_schema,
     split_frontmatter,
     table_dicts,
 )
@@ -81,16 +83,22 @@ def _check_readable_cases(report: GateReport, artifact_dir: Path, require_passed
             cid = str(case.get("id") or "")
             if cid and cid not in body:
                 report.fail(f"03a_test_cases.md: missing readable case for {cid}")
-    if require_passed and re.search(r"\bTBD\b|待定|TODO", body, re.I):
+    if require_passed and re.search(r"\bTBD\b|待定|\bTODO\b", body, re.I):
         report.fail("03a_test_cases.md: accepted artifact must not contain placeholders")
 
 
-def _check_adversarial(report: GateReport, artifact_dir: Path, require_passed: bool, require_real_dispatch: bool = False) -> None:
+def _check_adversarial(report: GateReport, artifact_dir: Path, require_passed: bool, require_real_dispatch: bool = False, schema: dict | None = None) -> None:
     path = artifact_dir / "03b_adversarial_cases.yaml"
     if not report.require_file(path):
         return
     if require_passed:
         report.require_status(path)
+    # Dialect-driven field names (default .get values are the canonical v1.3 set).
+    sch = schema or {}
+    cases_key = sch.get("cases_key", "adversarial_cases")
+    required_fields = sch.get("required_fields", ["risk", "scenario", "expected_oracle_pressure"])
+    disposition_field = sch.get("disposition_field", "disposition")
+    residual_key = sch.get("residual_key", "residual_risks")
     body = read_text(path)
     data = parse_nested_yaml(body)
     if not isinstance(data, dict):
@@ -98,28 +106,28 @@ def _check_adversarial(report: GateReport, artifact_dir: Path, require_passed: b
         return
     if data.get("gate") not in {None, "adversarial_cases"}:
         report.fail("03b_adversarial_cases.yaml: gate must be adversarial_cases")
-    cases = data.get("adversarial_cases")
+    cases = data.get(cases_key)
     if not isinstance(cases, list) or not cases:
-        report.fail("03b_adversarial_cases.yaml: adversarial_cases must be a non-empty list")
+        report.fail(f"03b_adversarial_cases.yaml: {cases_key} must be a non-empty list")
     else:
         for idx, case in enumerate(cases, start=1):
-            loc = f"03b_adversarial_cases.yaml: adversarial_cases[{idx}]"
+            loc = f"03b_adversarial_cases.yaml: {cases_key}[{idx}]"
             if not isinstance(case, dict):
                 report.fail(f"{loc} must be a mapping")
                 continue
             if not str(case.get("id") or "").strip():
                 report.fail(f"{loc}.id must be set")
             if require_passed:
-                for fld in ("risk", "scenario", "expected_oracle_pressure"):
+                for fld in required_fields:
                     if not str(case.get(fld) or "").strip():
                         report.fail(f"{loc}.{fld} must be non-empty when accepted")
-                if str(case.get("disposition") or "").strip().lower() in {"", "pending"}:
-                    report.fail(f"{loc}.disposition must be decided (not pending) when accepted")
-    if require_passed and "residual_risks" not in data:
-        report.fail("03b_adversarial_cases.yaml: residual_risks must be present (use [] if none)")
+                if str(case.get(disposition_field) or "").strip().lower() in {"", "pending"}:
+                    report.fail(f"{loc}.{disposition_field} must be decided (not pending) when accepted")
+    if require_passed and residual_key not in data:
+        report.fail(f"03b_adversarial_cases.yaml: {residual_key} must be present (use [] if none)")
     if require_real_dispatch and "real_peer_dispatch" not in body:
         report.fail("03b_adversarial_cases.yaml: require_real_adversarial_dispatch is set but the bridge dispatch was not real_peer_dispatch")
-    if require_passed and re.search(r"\bTBD\b|待定|TODO", body, re.I):
+    if require_passed and re.search(r"\bTBD\b|待定|\bTODO\b", body, re.I):
         report.fail("03b_adversarial_cases.yaml: accepted artifact must not contain placeholders")
 
 
@@ -378,25 +386,31 @@ def check(
     require_passed: bool,
     profile: str | None = None,
     require_multiview: bool = False,
+    schema: str | None = None,
 ) -> GateReport:
     config = load_config(profile=profile or os.environ.get("BUGATE_PROFILE"))
     report = GateReport("bugate_v13", artifact_dir)
+    dialect = semantic_schema(resolve_schema_name(artifact_dir, config, override=schema))
     needed = required_precode_artifacts(config) if scope == "pre-code" else ALL_ARTIFACTS
     for name in needed:
         report.require_file(artifact_dir / name)
-    _merge(report, check_brief(artifact_dir, require_passed=require_passed))
-    _merge(report, check_layer2(artifact_dir, require_passed=require_passed))
-    _merge(report, check_inventory(artifact_dir, require_passed=require_passed))
-    # Optional Full-SDTD modeling stack (validated only when the files exist).
-    object_ids = _check_domain_model(report, artifact_dir, require_passed)
-    transition_ids = _check_state_flow(report, artifact_dir, object_ids, require_passed)
-    _check_dimension_matrix(report, artifact_dir, object_ids, transition_ids, require_passed)
+    _merge(report, check_brief(artifact_dir, require_passed=require_passed, schema=schema))
+    _merge(report, check_layer2(artifact_dir, require_passed=require_passed, schema=schema))
+    _merge(report, check_inventory(artifact_dir, require_passed=require_passed, schema=schema))
+    # Optional Full-SDTD modeling stack: validated only when the files exist AND
+    # the active dialect defines its canonical ids (a non-canonical dialect may
+    # carry these artifacts in a form this checker is not meant to score).
+    if dialect.get("modeling_stack", True):
+        object_ids = _check_domain_model(report, artifact_dir, require_passed)
+        transition_ids = _check_state_flow(report, artifact_dir, object_ids, require_passed)
+        _check_dimension_matrix(report, artifact_dir, object_ids, transition_ids, require_passed)
     if "03a_test_cases.md" in needed:
         _check_readable_cases(report, artifact_dir, require_passed)
     if "03b_adversarial_cases.yaml" in needed:
         _check_adversarial(
             report, artifact_dir, require_passed,
             require_real_dispatch=as_bool(config.get("require_real_adversarial_dispatch")),
+            schema=dialect.get("adversarial"),
         )
     # Wave 1 multiview as a per-UC gate, when the profile opts in.
     if require_multiview or as_bool(config.get("require_multiview")):
@@ -416,6 +430,7 @@ def main() -> int:
     parser.add_argument("--require-passed", action="store_true")
     parser.add_argument("--require-multiview", action="store_true", help="Require a Wave 1 00_multiview/divergence_report.md per UC")
     parser.add_argument("--profile", help="Optional SUT profile config path")
+    parser.add_argument("--schema", help="Semantic-schema dialect name (default: profile/auto)")
     args = parser.parse_args()
     return check(
         args.artifact_dir,
@@ -423,6 +438,7 @@ def main() -> int:
         require_passed=args.require_passed,
         profile=args.profile,
         require_multiview=args.require_multiview,
+        schema=args.schema,
     ).exit()
 
 

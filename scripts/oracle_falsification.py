@@ -116,6 +116,10 @@ def _check(op: str, found: bool, actual: Any, expected: Any) -> tuple[bool, str]
         return (not found or actual is None), f"unexpectedly present: {actual!r}"
     if op == "nonempty":
         return (found and bool(actual) and (not hasattr(actual, "__len__") or len(actual) > 0)), "empty or missing"
+    if op == "null_or_nonempty":
+        if not found or actual is None:
+            return True, ""
+        return isinstance(actual, str) and bool(actual.strip()), f"{actual!r} is neither null nor non-empty string"
     if not found:
         return False, "field not present"
     if op == "equals":
@@ -142,14 +146,45 @@ def _check(op: str, found: bool, actual: Any, expected: Any) -> tuple[bool, str]
     return False, f"unknown op {op!r}"
 
 
+def _check_spec(spec: dict, payload: dict) -> tuple[bool, str]:
+    op = str(spec.get("op", "present")).strip().lower()
+    path = spec.get("path", "")
+    found, actual = _get(payload, path)
+    if op == "same_as":
+        other_path = spec.get("value_path") or spec.get("other_path")
+        other_found, expected = _get(payload, str(other_path or ""))
+        if not found or not other_found:
+            return False, f"{path}: field not present for same_as {other_path}"
+        return _eq(actual, expected), f"{path}: {actual!r} != {other_path} {expected!r}"
+    if op == "starts_with_path":
+        other_path = spec.get("value_path") or spec.get("prefix_path")
+        other_found, prefix = _get(payload, str(other_path or ""))
+        if not found or not other_found:
+            return False, f"{path}: field not present for starts_with_path {other_path}"
+        return str(actual).startswith(str(prefix)), f"{path}: {actual!r} does not start with {other_path} {prefix!r}"
+    if op == "integer_ratio_in":
+        denominator_path = spec.get("denominator_path")
+        denom_found, denom = _get(payload, str(denominator_path or ""))
+        if not found or not denom_found:
+            return False, f"{path}: ratio operand missing ({denominator_path})"
+        try:
+            ratio = round(float(actual) / float(denom))
+        except (TypeError, ValueError, ZeroDivisionError) as exc:
+            return False, f"{path}: cannot compute ratio with {denominator_path}: {exc}"
+        allowed = spec.get("value")
+        allowed_values = allowed if isinstance(allowed, list) else [allowed]
+        ok = any(str(ratio) == str(item) for item in allowed_values)
+        return ok, f"{path}/{denominator_path}: rounded ratio {ratio} not in {allowed_values!r}"
+    return _check(op, found, actual, spec.get("value"))
+
+
 def run_oracle(oracle: dict, payload: dict) -> dict[str, str]:
     name = str(oracle.get("name") or oracle.get("id") or "oracle")
     try:
         for spec in oracle.get("assert") or []:
             if not isinstance(spec, dict):
                 continue
-            found, actual = _get(payload, spec.get("path", ""))
-            ok, detail = _check(spec.get("op", "present"), found, actual, spec.get("value"))
+            ok, detail = _check_spec(spec, payload)
             if not ok:
                 return {"oracle": name, "outcome": "assertion_fail", "detail": f"{spec.get('path')}: {detail}"[:300]}
         return {"oracle": name, "outcome": "pass", "detail": ""}
@@ -162,6 +197,8 @@ def apply_mutation(mutation: dict, payload: dict) -> tuple[bool, str]:
     path = mutation.get("path", "")
     if op == "set":
         return _set(payload, path, mutation.get("value"))
+    if op == "set_empty_string":
+        return _set(payload, path, "")
     if op == "delete":
         return _delete(payload, path)
     if op == "numeric_drift":

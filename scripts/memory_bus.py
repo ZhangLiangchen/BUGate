@@ -9,6 +9,10 @@ Design rules:
 - No SUT specifics. The project namespace/tag is a profile/env value, never
   hardcoded. Resolution order: env ``MEMORY_BUS_PROJECT_TAG`` -> config
   ``memory.namespace`` (from ``bugate.config.yaml``) -> default ``project:bugate``.
+- The bus is a generic BUGate component, not SUT-only: any subcommand takes
+  ``--core`` (record/read in BUGate's own base-config namespace, ignoring the
+  mounted SUT profile) or ``--namespace X`` (an explicit tag). One DB, tag-
+  partitioned, so BUGate-core memory and SUT memory never cross-pollute.
 - Standard library only (urllib, json, os, argparse, pathlib, datetime).
 - Degrade gracefully: if the service is unreachable, print a clear hint to run
   ``bin/memory-bus-start`` and exit non-fatally (0) so hooks never block work.
@@ -78,6 +82,25 @@ def project_tag() -> str:
     value = str(config.get("namespace") or "").strip()
     if value:
         return value
+    return DEFAULT_PROJECT_TAG
+
+
+def core_project_tag() -> str:
+    """BUGate's OWN namespace, independent of any mounted SUT profile.
+
+    The memory bus is a generic BUGate component: it must hold BUGate's own
+    governance memory, not only the SUT's. A mounted profile overrides
+    ``memory.namespace`` to the SUT tag, so this reads the BASE
+    ``bugate.config.yaml`` directly (no profile merge) to recover the core tag,
+    falling back to DEFAULT_PROJECT_TAG. Selected via the ``--core`` flag.
+    """
+    try:
+        base = bugate_core.parse_simple_yaml((root() / "bugate.config.yaml").read_text(encoding="utf-8"))
+        value = str(base.get("namespace") or "").strip()
+        if value:
+            return value
+    except Exception:
+        pass
     return DEFAULT_PROJECT_TAG
 
 
@@ -533,7 +556,8 @@ def cmd_session_start(args: argparse.Namespace) -> int:
 def cmd_stop(args: argparse.Namespace) -> int:
     """Best-effort hourly heartbeat so dashboards reflect activity.
 
-    Never blocks the turn. Disable with MEMORY_BUS_STOP_WRITE=0.
+    Safe to wire to a per-turn Stop hook: self-throttles to at most one heartbeat
+    per hour per agent. Never blocks the turn. Disable with MEMORY_BUS_STOP_WRITE=0.
     """
     if os.environ.get("MEMORY_BUS_STOP_WRITE") == "0":
         return 0
@@ -541,6 +565,14 @@ def cmd_stop(args: argparse.Namespace) -> int:
         print(f"Memory service unavailable; skipped stop bookkeeping for {args.agent}.", file=sys.stderr)
         return 0
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:00 UTC")
+    # Self-throttle: skip if this agent already beat this hour (Stop fires per turn).
+    try:
+        for memory in list_project_memories(60):
+            tags = memory_tags(memory)
+            if "scope:heartbeat" in tags and f"agent:{args.agent}" in tags and stamp in memory_content(memory):
+                return 0
+    except MemoryBusError:
+        pass
     content = f"{args.agent} session heartbeat {stamp} in {root().name}."
     tags = build_tags(args.agent, "progress", "draft", scope="heartbeat", broadcast=True)
     try:
@@ -757,6 +789,17 @@ def cmd_lint(args: argparse.Namespace) -> int:
 # CLI                                                                           #
 # --------------------------------------------------------------------------- #
 
+def add_namespace_opts(p: argparse.ArgumentParser) -> None:
+    """Let any subcommand target a namespace other than the active profile's.
+
+    ``--core`` selects BUGate's own namespace (base config, ignoring the mounted
+    SUT profile); ``--namespace X`` selects an explicit tag. Both win over the
+    profile by exporting MEMORY_BUS_PROJECT_TAG in main().
+    """
+    p.add_argument("--namespace", help="target an explicit memory namespace/tag (overrides the active SUT profile)")
+    p.add_argument("--core", action="store_true", help="use BUGate's own core namespace, not the mounted SUT's")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="SUT-neutral memory-bus driver for BUGate")
     parser.add_argument("--url", help="memory service URL (default: MEMORY_BUS_URL or http://localhost:8000)")
@@ -830,6 +873,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_lint)
 
+    for subparser in sub.choices.values():
+        add_namespace_opts(subparser)
     return parser
 
 
@@ -839,6 +884,11 @@ def main() -> int:
     args = parser.parse_args()
     if args.url:
         os.environ["MEMORY_BUS_URL"] = args.url
+    # Namespace selection (wins over the active profile for this invocation).
+    if getattr(args, "core", False):
+        os.environ["MEMORY_BUS_PROJECT_TAG"] = core_project_tag()
+    elif getattr(args, "namespace", None):
+        os.environ["MEMORY_BUS_PROJECT_TAG"] = args.namespace
     return args.func(args)
 
 

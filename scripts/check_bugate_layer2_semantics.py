@@ -15,6 +15,9 @@ from bugate_core import (
     oracle_ids,
     proposition_ids,
     read_text,
+    resolve_schema_name,
+    section_missing,
+    semantic_schema,
     split_frontmatter,
     table_dicts,
 )
@@ -35,31 +38,36 @@ def _check_layer2_strict(report: GateReport, body: str) -> None:
             report.fail(f"02_testability.md: layer2_strict requires a ## {heading} section")
 
 
-def check(artifact_dir: Path, *, require_passed: bool = False) -> GateReport:
+def check(artifact_dir: Path, *, require_passed: bool = False, schema: str | None = None) -> GateReport:
     path = artifact_dir / "02_testability.md"
     brief = artifact_dir / "01_business_brief.md"
     report = GateReport("layer2_testability", artifact_dir)
     if not report.require_file(path):
         return report
+    config = load_config(profile=os.environ.get("BUGATE_PROFILE"))
+    sch = semantic_schema(resolve_schema_name(artifact_dir, config, override=schema), layer="layer2")
     frontmatter, body = split_frontmatter(read_text(path))
     if require_passed:
         report.require_status(path)
     if frontmatter.get("gate") not in {None, "layer2_testability"}:
         report.fail("02_testability.md: frontmatter.gate must be layer2_testability")
-    for heading in ("Layer Decision", "Evidence Plan"):
-        if heading not in body:
-            report.fail(f"02_testability.md: missing {heading} section")
+    for requirement in sch.get("sections", []):
+        missing = section_missing(body, requirement, prefix="")
+        if missing:
+            report.fail(f"02_testability.md: missing {missing} section")
     if brief.exists():
         brief_body = read_text(brief)
-        missing_p = sorted(proposition_ids(brief_body) - proposition_ids(body))
-        missing_o = sorted(oracle_ids(brief_body) - oracle_ids(body))
+        p_pat = sch.get("proposition_pattern")
+        o_pat = sch.get("oracle_pattern")
+        missing_p = sorted(proposition_ids(brief_body, p_pat) - proposition_ids(body, p_pat))
+        missing_o = sorted(oracle_ids(brief_body, o_pat) - oracle_ids(body, o_pat))
         if missing_p:
             report.fail(f"02_testability.md: missing proposition coverage for {', '.join(missing_p)}")
         if missing_o:
             report.fail(f"02_testability.md: missing oracle evidence mapping for {', '.join(missing_o)}")
     else:
         report.warn("01_business_brief.md not found; cross-layer coverage was not checked")
-    if as_bool(load_config(profile=os.environ.get("BUGATE_PROFILE")).get("layer2_strict")):
+    if as_bool(config.get("layer2_strict")):
         _check_layer2_strict(report, body)
     ensure_no_tbd(report, path, body, enabled=require_passed)
     return report
@@ -69,8 +77,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact_dir", type=Path)
     parser.add_argument("--require-passed", action="store_true")
+    parser.add_argument("--schema", help="Semantic-schema dialect name (default: profile/auto)")
     args = parser.parse_args()
-    return check(args.artifact_dir, require_passed=args.require_passed).exit()
+    return check(args.artifact_dir, require_passed=args.require_passed, schema=args.schema).exit()
 
 
 if __name__ == "__main__":

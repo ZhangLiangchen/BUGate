@@ -1,0 +1,29 @@
+gate: adversarial_cases
+gate_status: passed
+
+# Original-gate 03b dialect: per-case uses decision / threat_model /
+# expected_defense_or_oracle (not the canonical disposition / scenario /
+# expected_oracle_pressure), and a top-level coverage_decisions (not
+# residual_risks). Validated by the `original-gate` adversarial schema.
+adversarial_cases:
+  - id: ADV-01
+    category: data_integrity
+    threat_model: "The used-flag write could race with the total computation, letting one coupon be redeemed twice."
+    expected_defense_or_oracle: "Read the used flag back after redemption and assert exactly one redemption per shopper."
+    risk:
+      severity: high
+      blast_radius: "A double redemption under-charges the order total."
+    decision: include_in_layer4
+  - id: ADV-02
+    category: boundary
+    threat_model: "A discount larger than the order total could drive the discounted total below zero."
+    expected_defense_or_oracle: "Assert the discounted total is clamped at zero and never negative."
+    risk:
+      severity: medium
+      blast_radius: "Negative totals corrupt downstream accounting."
+    decision: defer
+
+coverage_decisions:
+  - source_candidate: ADV-01
+    decision: include_in_layer4
+    rationale: "Core double-redemption guard; absorbed into the COUPON-01 used-flag assertion."

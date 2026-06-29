@@ -22,7 +22,7 @@ import json
 import os
 from pathlib import Path
 
-from bugate_core import as_bool, load_config, parse_inventory_cases, parse_nested_yaml, read_text, write_text
+from bugate_core import as_bool, load_config, parse_inventory_cases, parse_nested_yaml, read_text, resolve_path, write_text
 
 
 def _as_list(value) -> list[str]:
@@ -41,6 +41,7 @@ def main() -> int:
     parser.add_argument("--max-missing", type=int, default=0)
     parser.add_argument("--profile", help="Optional SUT profile config path")
     args = parser.parse_args()
+    config = load_config(profile=args.profile or os.environ.get("BUGATE_PROFILE"))
     root = Path(args.artifact_root)
 
     cases = []
@@ -53,8 +54,14 @@ def main() -> int:
     # Defined oracles + name->id map from the spec.
     defined: set[str] = set()
     name_to_id: dict[str, str] = {}
-    if args.spec and Path(args.spec).exists():
-        spec = parse_nested_yaml(read_text(Path(args.spec)))
+    spec_value = args.spec or config.get("falsification_spec")
+    spec_path = None
+    if spec_value:
+        spec_path = Path(str(spec_value))
+        if not spec_path.is_absolute() and not spec_path.exists():
+            spec_path = resolve_path(spec_path)
+    if spec_path and spec_path.exists():
+        spec = parse_nested_yaml(read_text(spec_path))
         for o in (spec.get("oracles") or []) if isinstance(spec, dict) else []:
             if isinstance(o, dict) and o.get("id"):
                 oid = str(o["id"])
@@ -110,8 +117,8 @@ def main() -> int:
             lines.append(f"| {oid} | {state} | {exer} |")
     else:
         lines.append("| none | - | - |")
-    if not args.spec:
-        lines += ["", "> No --spec given: oracles classified from inventory references only; "
+    if not spec_path or not spec_path.exists():
+        lines += ["", "> No falsification spec resolved: oracles classified from inventory references only; "
                   "supply the falsification spec to detect missing_implementation / defined_unused."]
 
     lines += ["", "## Case inventory", "", "| Case | Propositions | Oracles | Implementation target |",
@@ -126,7 +133,7 @@ def main() -> int:
     print(f"written {args.output} "
           f"(covered={counts['covered']} missing_implementation={counts['missing_implementation']} "
           f"defined_unused={counts['defined_unused']})")
-    gate_on = args.gate or as_bool(load_config(profile=args.profile or os.environ.get("BUGATE_PROFILE")).get("require_assertion_coverage"))
+    gate_on = args.gate or as_bool(config.get("require_assertion_coverage"))
     if gate_on and counts["missing_implementation"] > args.max_missing:
         print(f"FAIL: {counts['missing_implementation']} missing_implementation oracle(s) > max {args.max_missing}")
         return 1

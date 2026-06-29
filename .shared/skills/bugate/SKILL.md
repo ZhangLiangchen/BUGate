@@ -93,6 +93,29 @@ SUT profiles may wrap these commands with product-specific paths, peer runtime
 dispatch, evidence fetchers, and assertion runners. Core commands must remain
 valid without any product repository mounted.
 
+## Memory (cross-session, cross-agent)
+
+BUGate keeps memory in the local memory-bus, not in checked-in files, and it is a
+generic BUGate component: it serves both the SUT and BUGate itself. The bus is
+dual-namespace — SUT work records under the active profile's namespace; BUGate's
+OWN governance memory records under the core namespace via `--core`.
+
+- **Recall first.** At the start of a session pull prior context:
+  `python3 scripts/memory_bus.py session-start --agent <role>` (add `--core` for
+  BUGate-core context). A SessionStart hook runs this automatically.
+- **Record progress at milestones — this is agent-driven, not automatic.** After
+  a real decision, finding, or completed step, write it:
+  `python3 scripts/memory_bus.py note --agent <role> --type <progress|finding|decision> --status confirmed --broadcast --msg "<neutral conclusion>"`.
+  Use `--core` when the progress is about BUGate itself (engine/gates/governance);
+  omit it for SUT-specific findings. Attach evidence with `--artifact <path>` or
+  `--metadata key=value`. `<role>` ∈ builder/designer/implementer/reviewer/human/agent.
+- **Hand off** to another agent: `memory_bus.py handoff --from <a> --to <b> --msg "..."`.
+- The Stop hook writes only an hourly liveness heartbeat — bookkeeping, **not** a
+  substitute for recording real progress with `note`.
+
+See `docs/qa-methodology/EXPERIENCE_PROMOTION_PROTOCOL.md` for the full
+record / recall / promote protocol.
+
 ## Boundaries
 
 - No SUT API paths, credentials, product resource IDs, service URLs, or
