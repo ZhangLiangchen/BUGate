@@ -49,6 +49,16 @@ def _action(case: dict) -> str:
     return "TBD"
 
 
+def _skip_block(case: dict) -> str:
+    """Render the flattened skip/xfail/block guard so 03a carries the coverage rule."""
+    parts = []
+    for key, label in (("skip_when", "skip"), ("xfail_when", "xfail"), ("block_when", "block")):
+        value = str(case.get(key) or "").strip()
+        if value and value.lower() != "null":
+            parts.append(f"{label}: {value}")
+    return "; ".join(parts) or "—"
+
+
 def render(artifact_dir: Path) -> str:
     inventory = artifact_dir / "03_inventory.yaml"
     cases = parse_inventory_cases(read_text(inventory)) if inventory.exists() else []
@@ -80,6 +90,11 @@ def render(artifact_dir: Path) -> str:
             f"- Expected observations: {_field(case.get('expected_observations'))}",
             f"- Proposition refs: {_field(case.get('proposition_refs'))}",
             f"- Oracle refs: {_field(case.get('oracle_refs'))}",
+            f"- Evidence anchor: {_field(case.get('evidence_anchor'))}",
+            f"- Side effect: {_field(case.get('classification'))}",
+            f"- Skip/Xfail/Block: {_skip_block(case)}",
+            f"- Oracle contract (derived violation predicates, full API evidence plan, "
+            f"coverage policy): see 03_inventory.yaml case {cid}",
             "",
         ]
     return "\n".join(lines)
