@@ -54,6 +54,29 @@ automation workspace.
 > read and write actions; splitting into `read:` and `write:` sub-lists scopes
 > each side independently.
 
+### Evidence- and skill-source keys
+
+These keys point the flow at where a mounted SUT test workspace keeps its
+black-box **evidence** (endpoint/interface contracts, captured API dumps, wiki,
+recorded cases) and its SUT-specific **skills** (fetchers, environment adapters,
+diagnostics). Core does not parse the documents themselves and imports nothing
+from them; the keys exist so a worker — or an analysis prompt — can resolve the
+contract and skill locations *from the profile* instead of guessing a path or
+hardcoding a product path into Core. Each value is a path or a list of paths,
+relative to the BUGate root (so they may reach into the mounted workspace) or
+absolute. Globs are permitted in list entries.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `evidence_sources` | path \| list[path \| glob] | none (unset → no profile-declared evidence root; the flow must be told a path explicitly) | One or more directories/files holding the SUT's black-box evidence the analysis reads to derive oracles — typically generated interface/endpoint contract docs, plus optional captured dumps, recorded cases, or wiki. The first entry is treated as the primary contract root. |
+| `skill_sources` | path \| list[path] | none (unset → only the core BUGate skill is in scope) | One or more directories that contain SUT-specific skill folders (each a skill dir with its own `SKILL.md`) staged inside the mounted workspace. Lets SUT skills be discovered through the profile without copying them into Core. |
+
+> `evidence_sources` and `skill_sources` are descriptive bindings, not gates:
+> Core scripts ignore unknown fields, so an older gate simply skips them while a
+> resolver or prompt that understands them can locate the SUT's contracts and
+> skills. Keep the *documents and skill bodies* in the mounted workspace, never
+> in Core — these keys only record where they live.
+
 ## Environment variables
 
 These environment variables override or supplement config/profile values at run
@@ -110,6 +133,16 @@ artifact_dir: sut/example/bugate/REQ-001
 # Test implementation paths physically blocked until the pre-code artifacts pass.
 guarded_path_regex:
   - "^sut/example/tests/.*[.]py$"
+
+# Where the mounted workspace keeps black-box evidence (contracts first, then
+# any captured dumps / recorded cases / wiki) the analysis reads to derive oracles.
+evidence_sources:
+  - sut/example/workspace/docs/api          # primary: generated interface/endpoint contracts
+  - sut/example/workspace/docs/raw          # secondary: captured dumps, recorded cases, wiki
+
+# Directories of SUT-specific skill folders staged inside the mounted workspace.
+skill_sources:
+  - sut/example/workspace/.shared/skills
 
 # Artifact filenames that must reach gate_status: passed before guarded writes.
 required_precode_artifacts:

@@ -8,6 +8,10 @@ Semantics (generic, ported from the parent SDTD executor):
   - A falsification case = (evidence file, mutation). It is KILLED when at least
     one bound oracle fails (assertion_fail) or errors (crash) on the mutated
     evidence; it SURVIVES only when every oracle still passes.
+  - Kill kind: a clean kill is a deliberate assertion rejection (assertion_fail);
+    a crash-only kill is any other exception (crash) with no clean rejection — it
+    still fails the case but flags a brittle oracle that needs hardening, so the
+    summary reports crash_only_kills distinctly per the Wave 8 acceptance criteria.
   - Baseline discipline: every oracle must pass on the pristine evidence first,
     otherwise that evidence file is recorded not_run (baseline_failed) — a kill
     claim is only valid against evidence the oracle accepts when correct.
@@ -234,12 +238,19 @@ def falsify_evidence(path: Path, oracles: list[dict], mutations: list[dict]) -> 
             continue
         outcomes = [run_oracle(o, payload) for o in oracles]
         killed_by = [o for o in outcomes if o["outcome"] in {"assertion_fail", "crash"}]
+        clean_kills = [o for o in killed_by if o["outcome"] == "assertion_fail"]
+        # kill_kind separates a clean assertion_fail (the oracle deliberately
+        # rejected the wrong state) from a crash-only kill (some other exception
+        # took the run down). A crash-only kill still fails the case, but it is a
+        # brittle-oracle signal that needs hardening, not a real catch — so the
+        # summary surfaces it distinctly per the Wave 8 acceptance criteria.
         record["cases"].append({
             "mutation": mutation.get("id"),
             "category": mutation.get("category", ""),
             "change": change,
             "expected_fail_reason": mutation.get("expected_fail_reason", ""),
             "result": "killed" if killed_by else "survived",
+            "kill_kind": ("clean" if clean_kills else ("crash_only" if killed_by else "")),
             "killed_by": [{"oracle": o["oracle"], "outcome": o["outcome"], "detail": o["detail"]} for o in killed_by],
             "action": "" if killed_by else mutation.get("action_if_survived", "add an assertion, add a case, or accept the boundary"),
         })
@@ -248,11 +259,16 @@ def falsify_evidence(path: Path, oracles: list[dict], mutations: list[dict]) -> 
 
 def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     killed = survived = invalid = 0
+    crash_only = 0
     survived_cases: list[dict[str, Any]] = []
+    crash_only_cases: list[dict[str, Any]] = []
     for r in records:
         for c in r["cases"]:
             if c["result"] == "killed":
                 killed += 1
+                if c.get("kill_kind") == "crash_only":
+                    crash_only += 1
+                    crash_only_cases.append({"evidence": r["evidence"], **c})
             elif c["result"] == "survived":
                 survived += 1
                 survived_cases.append({"evidence": r["evidence"], **c})
@@ -261,10 +277,12 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     total = killed + survived
     return {
         "killed": killed, "survived": survived, "invalid": invalid,
+        "crash_only_kills": crash_only,
         "not_run_evidence": [r["evidence"] for r in records if r["status"] == "not_run"],
         "score": round(killed / total, 4) if total else None,
         "score_percent": round(killed / total * 100, 1) if total else None,
         "survived_cases": survived_cases,
+        "crash_only_cases": crash_only_cases,
     }
 
 
@@ -275,16 +293,28 @@ def render_markdown(records: list[dict[str, Any]], summary: dict[str, Any]) -> s
         f"- Oracle falsification score: {summary['score_percent']}%",
         f"- killed: {summary['killed']}",
         f"- survived: {summary['survived']}",
-        f"- invalid: {summary['invalid']}", "",
+        f"- invalid: {summary['invalid']}",
+        f"- crash-only kills (fail the case but not via a clean oracle rejection): {summary['crash_only_kills']}", "",
         "A case is killed when at least one oracle fails on the mutated evidence;",
-        "it survives only when every oracle still passes. Baselines: every oracle",
-        "passed on each pristine evidence file before mutation.", "",
+        "it survives only when every oracle still passes. A clean kill is a deliberate",
+        "assertion rejection; a crash-only kill means an oracle raised an unexpected",
+        "error and needs hardening. Baselines: every oracle passed on each pristine",
+        "evidence file before mutation.", "",
         "## Survived falsifications (action required)", "",
     ]
     if summary["survived_cases"]:
         lines += ["| Evidence | Mutation | Category | Action |", "|---|---|---|---|"]
         for c in summary["survived_cases"]:
             lines.append(f"| `{c['evidence']}` | {c['mutation']} | {c['category']} | {c['action']} |")
+    else:
+        lines.append("none")
+    lines += ["", "## Crash-only kills (harden the oracle)", ""]
+    if summary["crash_only_cases"]:
+        lines += ["| Evidence | Mutation | Crashing oracle | Detail |", "|---|---|---|---|"]
+        for c in summary["crash_only_cases"]:
+            crasher = next((k for k in c["killed_by"] if k["outcome"] == "crash"), c["killed_by"][0] if c["killed_by"] else {})
+            detail = str(crasher.get("detail", "")).replace("|", "\\|")
+            lines.append(f"| `{c['evidence']}` | {c['mutation']} | {crasher.get('oracle', '-')} | {detail} |")
     else:
         lines.append("none")
     lines += ["", "## Per-evidence detail", ""]
@@ -375,12 +405,12 @@ def main() -> int:
         "status": "ran",
         "spec": spec_path.name,
         "threshold": threshold,
-        "summary": {k: v for k, v in summary.items() if k != "survived_cases"},
+        "summary": {k: v for k, v in summary.items() if k not in {"survived_cases", "crash_only_cases"}},
         "records": records,
     }
     dump_json(Path(args.json_output), payload)
     write_text(Path(args.md_output), render_markdown(records, summary))
-    print(f"oracle falsification score: {summary['score_percent']}% (killed={summary['killed']} survived={summary['survived']} invalid={summary['invalid']})")
+    print(f"oracle falsification score: {summary['score_percent']}% (killed={summary['killed']} survived={summary['survived']} invalid={summary['invalid']} crash_only={summary['crash_only_kills']})")
     print(f"written {args.json_output} / {args.md_output}")
     if args.gate and summary["score"] is not None and summary["score"] < threshold:
         print(f"FAIL: score {summary['score']:.2f} < threshold {threshold:.2f}")

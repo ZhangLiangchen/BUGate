@@ -286,6 +286,64 @@ def required_precode_artifacts(config: dict[str, Any] | None = None) -> list[str
     return PRECODE_ARTIFACTS[:]
 
 
+def _source_roots(
+    config: dict[str, Any] | None, key: str, root: Path | None = None
+) -> list[Path]:
+    """Resolve a profile path-or-list key into deduped resolved Paths.
+
+    A SUT profile may bind `evidence_sources` / `skill_sources` as a single path or
+    a list; resolve each against the BUGate root, preserving order, dropping blanks
+    and duplicates. Returns [] when the key is absent — these are optional bindings,
+    so the resolver never raises on a profile that omits them.
+    """
+    raw = (config or {}).get(key)
+    if raw is None:
+        return []
+    values = raw if isinstance(raw, list) else [raw]
+    root = root or find_root()
+    roots: list[Path] = []
+    for value in values:
+        text = str(value).strip()
+        if not text:
+            continue
+        path = resolve_path(text, root)
+        if path not in roots:
+            roots.append(path)
+    return roots
+
+
+def evidence_roots(
+    config: dict[str, Any] | None = None,
+    root: Path | None = None,
+    *,
+    existing_only: bool = False,
+) -> list[Path]:
+    """Resolved SUT contract/evidence roots from the profile `evidence_sources` key.
+
+    The first entry is the primary contract root. This lets a flow resolve where a
+    SUT's endpoint/interface contracts live *via the profile* instead of guessing a
+    path. ``existing_only`` filters to roots that exist on disk.
+    """
+    roots = _source_roots(config, "evidence_sources", root)
+    return [p for p in roots if p.exists()] if existing_only else roots
+
+
+def skill_roots(
+    config: dict[str, Any] | None = None,
+    root: Path | None = None,
+    *,
+    existing_only: bool = False,
+) -> list[Path]:
+    """Resolved SUT skill-source dirs from the profile `skill_sources` key.
+
+    Lets a flow resolve SUT-specific skills staged in the mounted workspace through
+    the profile, without those skills entering Core. ``existing_only`` filters to
+    dirs that exist on disk.
+    """
+    roots = _source_roots(config, "skill_sources", root)
+    return [p for p in roots if p.exists()] if existing_only else roots
+
+
 def ids(pattern: str, text: str) -> set[str]:
     return set(re.findall(pattern, text))
 
