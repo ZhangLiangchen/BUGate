@@ -24,27 +24,27 @@ generated.
 - **Root discovery is git-free and split.** Gate scripts resolve the governed
   **workspace** root by walking up from CWD to the nearest `bugate.config.yaml`
   (`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel stays
-  as a workbench fallback), while templates, sibling scripts, and `bin/`
+  as the self-development fallback), while templates, sibling scripts, and `bin/`
   wrappers resolve from the **engine** tree's own location
   (`BUGATE_ENGINE_ROOT` overrides). Works in non-git checkouts.
 
-**Where commands run (imported vs workbench).** Default usage is **imported
-mode**: the engine, skill, hooks, and a **committed** profile live inside the
-SUT automation test repo, and the SUT-facing commands below run from that
-repo's root against its profile. **Core-workbench mode** (this repo as project
-root, a SUT test workspace mounted via symlink + a local uncommitted profile
-pointer) is the maintainer setup; the same commands then run from this repo's
-root. Normative rules: [`CHARTER.md`](CHARTER.md) §2. Per command class:
+**Where commands run.** The one usage mode is **imported**: the engine, skill,
+hooks, and a **committed** profile live inside the SUT automation test repo,
+and the SUT-facing commands below run from that repo's root against its
+profile. When **developing BUGate itself** (this repo as project root; for
+debugging, a SUT test workspace may be mounted via symlink + a local
+uncommitted profile pointer), the same commands run from this repo's root.
+Normative rules: [`CHARTER.md`](CHARTER.md) §2 + Amendment A3. Per command class:
 
 | Command class | Runs in |
 |---|---|
-| Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation, plan lock, prompt reminder, `wave8-weekly` | The **governed workspace** — the SUT repo (imported, default), or this repo against a mounted workspace (workbench) |
+| Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation, plan lock, prompt reminder, `wave8-weekly` | The **governed workspace** — the SUT repo (imported, default), or this repo against a mounted workspace (self-development debugging) |
 | Importer (`bugate_init.py`) — vendors the kit, links skills, merges hooks, scaffolds committed config + profile | The **engine checkout** (this repo, or an already-vendored kit), pointed at a target SUT repo |
 | De-SUT guard (`check_no_sut_terms.py`) | The **engine tree** it is part of — scans the kit subtree anywhere; the full upstream surface only in this repo (CI-enforced here) |
 | Memory bus (`memory_bus.py`, `bin/memory-*`) | Either — namespace isolated per project via `memory.namespace` / `MEMORY_BUS_PROJECT_TAG` |
 
 All script invocations below are from the **governed workspace root** — the
-SUT repo in imported mode, this repo in workbench mode — e.g.
+SUT repo in imported mode, this repo when developing BUGate itself — e.g.
 `python3 scripts/<name>.py …`. Bash wrappers live in `bin/`.
 
 ---
@@ -167,7 +167,7 @@ copy-paste example profile — in:
 Profiles are merged on top of `bugate.config.yaml` by `load_config` and selected
 via `BUGATE_PROFILE`, the config `profile` field, or its `active_profile` alias.
 In imported mode the governed repo commits its own config + profile; selecting
-via the ENGINE repo's config `profile` field is the workbench convention — a
+via the ENGINE repo's config `profile` field is the self-development convention — a
 local, per-clone edit, never committed. The shipped templates pass the pre-code
 gates as-is; governed-layout acceptances fabricate fixtures at run time
 (upstream `tests/`).

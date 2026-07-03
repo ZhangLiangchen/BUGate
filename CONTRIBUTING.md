@@ -60,7 +60,7 @@ workspace's own files are never the surface. The origin SUT's vocabulary lives
 only in `tests/fixtures/legacy-sut-terms.txt` (and in that SUT's own profile)
 — never in engine source.
 
-> Mounting a SUT locally (core-workbench mode, maintainers)? Keep your
+> Mounting a SUT locally while developing BUGate itself (maintainers)? Keep your
 > `profile:` pointer in this repo's `bugate.config.yaml` uncommitted — it's a
 > per-clone local edit — and append the inline marker to that one line so
 > local fixture runs stay green. In imported mode (the default, CHARTER §2.2)
@@ -150,7 +150,7 @@ Rules of thumb:
 
 **Adding a script (`scripts/*.py`):** keep imports stdlib-only; resolve the
 governed workspace root via `bugate_core.find_root()` (nearest
-`bugate.config.yaml` up from CWD, workbench-sentinel fallback, no git
+`bugate.config.yaml` up from CWD, self-development sentinel fallback, no git
 dependency) and engine assets (templates, sibling scripts) via
 `bugate_core.find_engine_root()` — never by assuming a CWD or using git
 metadata. Add it to the relevant CI step if it is a gate. Run it through the

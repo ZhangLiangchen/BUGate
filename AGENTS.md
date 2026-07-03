@@ -9,7 +9,7 @@ test analysis and test-case governance framework.
 - Keep SUT-specific source, API dumps, secrets, environments, fixtures, live
   evidence, and project memories outside BUGate core.
 - Treat the governed SUT workspace — the host test repo in imported mode, a
-  mounted workspace in the maintainer workbench — as the SUT automation test
+  mounted workspace while developing BUGate itself — as the SUT automation test
   framework / test workspace unless a profile explicitly defines a narrower
   evidence boundary.
 - `CLAUDE.md` must remain a symlink to this file.
@@ -57,7 +57,7 @@ commands must not depend on git metadata: hooks locate the engine by walking up
 for `scripts/bugate_core.py`, and gate scripts resolve the governed workspace
 root by walking up from CWD to the nearest `bugate.config.yaml`
 (`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel remains
-as a workbench fallback).
+as the self-development fallback).
 
 Changing `.codex/hooks.json` can require Codex Desktop to re-trust the project
 hook hash before hooks become active.

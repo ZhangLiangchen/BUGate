@@ -7,8 +7,9 @@ business data, source snapshots, endpoints, credentials, or environment facts.
 A **SUT profile** connects the core to a SUT's automation test framework or test
 workspace; it does not import the product system into BUGate core.
 
-Positioning, the normative usage model (**imported** = default, **core
-workbench** = maintainer), naming, and the evolution plan are chartered in
+Positioning, the normative usage model (**imported** is the only usage mode;
+opening this repo is just developing BUGate itself), naming, and the
+evolution plan are chartered in
 [`CHARTER.md`](CHARTER.md) (CHARTER-BUGATE-001).
 
 ## First 5 minutes (start here)
@@ -23,33 +24,34 @@ python3 tests/test_write_guard_layouts.py
 The first line runs the pre-code semantic gates over the shipped artifact
 templates and prints `PASS`. The second fabricates governed workspaces in a
 temp dir and shows the physical write-guard **block, then allow** an edit in
-both layouts (imported default + maintainer workbench) — the repo ships no
+both layouts (imported + engine-development) — the repo ships no
 committed example SUT trees. To see exactly what imported mode installs into
 your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 
-- **What is BUGate, and how is it meant to be used?** [`CHARTER.md`](CHARTER.md) — positioning, the two usage modes (imported = default, workbench = maintainer), naming, and the evolution plan.
+- **What is BUGate, and how is it meant to be used?** [`CHARTER.md`](CHARTER.md) — positioning, the single usage mode (imported), the self-development setup, naming, and the evolution plan.
 - **Bootstrapping with an AI agent?** [`INIT.md`](INIT.md) is a runnable init prompt (Python check → zero-install smoke → config load → optional capabilities).
 - **What can it do / every command?** [`CAPABILITIES.md`](CAPABILITIES.md).
 - **Turn on optional runtimes** (AI CLIs, MCP memory service + ONNX, role isolation): [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
 - **The methodology** (why): [`docs/qa-methodology/`](docs/qa-methodology/) — start with its [README](docs/qa-methodology/README.md) (English summary + glossary) then `METHOD.md` / `SOP.md`.
 
-## Usage modes — imported (default) vs core workbench (maintainer)
+## Usage — one mode: imported. (Opening this repo = developing BUGate itself.)
 
-BUGate is used in exactly one of two ways (normative rules: [`CHARTER.md`](CHARTER.md) §2):
+BUGate has exactly **one usage mode** (normative rules: [`CHARTER.md`](CHARTER.md)
+§2, Amendment A3):
 
-- **Imported mode — the default.** Your agent runtime opens the **SUT automation
-  test repo** as the project root, and BUGate is imported into it — skills,
-  hooks, gate scripts, and a **committed** profile — as the agent's governance
-  layer. The SUT keeps its own test harness, domain skills, and CI; the gate
-  checks run in that repo's CI, where the guarded changes actually happen. This
-  is the mode to teach, demo, and present.
-- **Core workbench mode — maintainers only.** Open *this* repository as the
-  project root and mount a SUT test workspace via a symlink and a local,
-  uncommitted `profile:` pointer. Reserved for developing BUGate itself:
-  debugging core scripts/hooks/skill discovery; evolving the methodology,
-  profile schema, or gates; running the template gates and ephemeral-fixture
-  smokes (`tests/`); and cross-SUT regression (verifying the core stays clean
-  of any one SUT). It is not the user-facing story.
+- **Imported mode.** Your agent runtime opens the **SUT automation test repo**
+  as the project root, and BUGate is imported into it — skills, hooks, gate
+  scripts, and a **committed** profile — as the agent's governance layer. The
+  SUT keeps its own test harness, domain skills, and CI; the gate checks run in
+  that repo's CI, where the guarded changes actually happen.
+
+Opening *this* repository in Claude Code / Codex is **not a usage mode** — it
+is simply **developing BUGate itself** (maintainers): debugging core
+scripts/hooks/skill discovery; evolving the methodology, profile schema, or
+gates; running the template gates and ephemeral-fixture smokes (`tests/`); and
+cross-SUT regression. For debugging against a real SUT, a test workspace can
+be mounted via a symlink and a local, uncommitted `profile:` pointer
+(Quickstart B below) — a development practice, not a way of *using* BUGate.
 
 > Both imported-mode channels ship in-repo (CHARTER §5.2–§5.3): the
 > **installer** — `python3 scripts/bugate_init.py <sut-repo>` — and the
@@ -169,7 +171,7 @@ governs from inside it. The layout is exercised end-to-end in CI on ephemeral
 fixtures: [`tests/test_write_guard_layouts.py`](tests/test_write_guard_layouts.py)
 plus a `bugate init` scratch-repo run with the R4 negative control.
 
-### B) Core workbench mode — mount a SUT into this repo (maintainers)
+### B) Developing BUGate itself — optionally mount a SUT for debugging (maintainers)
 
 1. Write a profile under a local `sut/` dir and point `bugate.config.yaml` at it (or keep `mode: core` for the unmounted engine). The full key contract lives in [`profile-schema.md`](.shared/skills/bugate/references/profile-schema.md); `scripts/bugate_init.py` scaffolds the same file shape for imported repos.
 
@@ -199,7 +201,7 @@ plus a `bugate init` scratch-repo run with the R4 negative control.
    python3 scripts/check_bugate_inventory_semantics.py <uc-dir>
    ```
 
-**Workbench physical layout — keep the SUT repo separate, symlink it in.**
+**Self-development physical layout — keep the SUT repo separate, symlink it in.**
 Because the mounted workspace is its **own** git repository, don't nest it
 physically inside BUGate's working tree — nested independent repos confuse
 IDEs, invite an accidental `git add`, and blur the two-repo boundary. Keep the
@@ -232,7 +234,7 @@ python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --
 
 ## Agent runtimes
 
-BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo in workbench mode, vendored into the SUT repo in imported mode (Quickstart A), or as a **Claude Code plugin** (everything under `.claude-plugin/` — the manifest's path fields point skills/commands/agents at `.shared/`, no top-level component dirs needed). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as workbench fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
+BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo while developing BUGate itself, vendored into the SUT repo in imported mode (Quickstart A), or as a **Claude Code plugin** (everything under `.claude-plugin/` — the manifest's path fields point skills/commands/agents at `.shared/`, no top-level component dirs needed). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as the self-development fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
 
 Field-tested setup notes: use the vendor native installers for `codex` and
 `claude`, not stale npm wrappers; keep `~/.local/bin` ahead of older app or
@@ -251,7 +253,7 @@ For a repeatable end-to-end capability audit after setup, invoke the
 ```
 bugate.config.yaml          # core config; a SUT profile overrides its values
 AGENTS.md                   # agent behavior protocol (SUT-neutral)
-CHARTER.md                  # charter: positioning, usage modes (imported vs workbench), evolution plan
+CHARTER.md                  # charter: positioning, the single usage mode (imported) + self-development rules, evolution plan
 scripts/                    # gate engine + SDTD orchestration (stdlib-only)
 .shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
 docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records

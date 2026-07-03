@@ -1,6 +1,6 @@
 # BUGate — Init Prompt
 
-> **Paste this whole file to your AI coding agent (Claude Code / Codex) right after cloning BUGate**, and it will verify your environment, confirm the gate engine works, and route you to the right usage path — **imported mode** (default: BUGate goes into your SUT test repo) or the **maintainer workbench** (mount a SUT into this repo). A human can follow the same steps manually.
+> **Paste this whole file to your AI coding agent (Claude Code / Codex) right after cloning BUGate**, and it will verify your environment, confirm the gate engine works, and route you to the right path — **imported mode** (the only usage mode: BUGate goes into your SUT test repo) or **developing BUGate itself** (maintainers; optionally mount a SUT into this repo for debugging). A human can follow the same steps manually.
 >
 > **Good news first:** the BUGate *core* is **zero-dependency** — pure Python standard library. There is **nothing to `pip install`** to use the gate engine. "Installing dependencies" here means *verifying Python* and *optionally* adding the agent-memory subsystem.
 
@@ -10,9 +10,9 @@
 
 You are bootstrapping a freshly cloned **BUGate** repository — a SUT-agnostic, AI-driven black-box test gate engine. Do the following in order, report the result of each step, and stop to ask the user only if a step fails.
 
-### Step 0 — Choose the path (imported vs workbench)
+### Step 0 — Choose the path (use it vs develop it)
 
-BUGate has two usage modes (normative rules: `CHARTER.md` §2). Ask the user which applies:
+BUGate has one usage mode — imported (normative rules: `CHARTER.md` §2 + Amendment A3). Ask which path applies:
 
 - **User path — imported mode (default).** They are adopting BUGate to govern a
   SUT automation test repo. Run Steps 1–3 below to verify the core, then run
@@ -24,7 +24,7 @@ BUGate has two usage modes (normative rules: `CHARTER.md` §2). Ask the user whi
   For a real end-to-end import — the SUT BUGate was extracted from, re-adopting
   its own kit — read
   [`docs/case-studies/origin-sut-import.md`](docs/case-studies/origin-sut-import.md).
-- **Maintainer path — core workbench.** They are developing BUGate itself
+- **Maintainer path — developing BUGate itself (not a usage mode).** They are working on the tool
   (core scripts/hooks, methodology, profile schema, gates, demos, cross-SUT
   regression). Continue with **all** steps below, including "Mount a SUT" via
   symlink + local uncommitted profile pointer.
@@ -63,18 +63,18 @@ Expect `mode= core | guard= [] | precode= 5`. The core ships **unmounted**: the 
 BUGate runs as a skill under Claude Code and Codex:
 
 - Skill: `.shared/skills/bugate/` (discovered via the symlinks in `.claude/skills/` and `.codex/skills/`).
-- Hooks: `.claude/settings.json` and `.codex/hooks.json`. Root resolution is **git-free** and split: hooks find the engine by walking up for `scripts/bugate_core.py`; gate scripts find the governed workspace via the nearest `bugate.config.yaml` (sentinel fallback for the workbench).
+- Hooks: `.claude/settings.json` and `.codex/hooks.json`. Root resolution is **git-free** and split: hooks find the engine by walking up for `scripts/bugate_core.py`; gate scripts find the governed workspace via the nearest `bugate.config.yaml` (sentinel fallback for self-development).
 - **Codex only:** changing any hook requires re-trusting its hash in the Codex hook-management UI.
 
 No install is needed for this — the hooks invoke the same stdlib-only scripts you verified in Step 2.
 
 ---
 
-## Mount a SUT (maintainer workbench path)
+## Mount a SUT (debugging aid while developing BUGate)
 
 > For governing a SUT day-to-day, use **imported mode** instead (Step 0; README
 > Quickstart A) — BUGate goes into the SUT repo, and the profile is committed
-> there. The mount below is the **workbench** setup: this repo stays the
+> there. The mount below is a **self-development debugging** setup: this repo stays the
 > project root, and the profile pointer stays local and uncommitted.
 
 The core does nothing on its own; you mount a system under test via a **profile**.
@@ -167,7 +167,7 @@ Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT
 |---|---|---|---|
 | 4-layer gate engine (core) | **nothing** | gate scripts + templates | — (always works) |
 | Run under an agent | nothing | `.claude` / `.codex` hooks | — |
-| Mount a SUT (workbench) / import into a SUT repo | nothing | `bugate.config.yaml` + profile schema | — |
+| Mount a SUT (self-development debug) / import into a SUT repo | nothing | `bugate.config.yaml` + profile schema | — |
 | Dual-agent cross-audit | `codex` + `claude` CLIs | `sdtd_multiview*` | yes → deterministic placeholder |
 | Agent memory + promotion | `mcp-memory-service` + ONNX model | `memory_bus.py` + `bin/memory-*` | yes → install hint, non-fatal |
 | Agent-role isolation | nothing | `check_agent_role_paths.py` | — (default-OFF) |

@@ -8,7 +8,7 @@ in each:
 
   - **imported layout** — the governed repo is the workspace root, marked by
     its committed ``bugate.config.yaml``; profile paths are repo-relative.
-  - **workbench layout** — the engine-repo shape found via the legacy
+  - **engine-development layout** — the engine-repo shape found via the legacy
     ``AGENTS.md`` + ``.shared/`` sentinel fallback (no config file), with the
     SUT tree beneath it and the profile bound via ``BUGATE_PROFILE``.
 
@@ -88,12 +88,12 @@ def build_imported(tmp: Path) -> Path:
     return ws
 
 
-def build_workbench(tmp: Path) -> Path:
-    eng = tmp / "workbench"
+def build_engine_dev(tmp: Path) -> Path:
+    eng = tmp / "engine-dev"
     (eng / ".shared").mkdir(parents=True)
     (eng / "AGENTS.md").write_text("# sentinel\n", encoding="utf-8")
     # Deliberately NO bugate.config.yaml here: this exercises the legacy
-    # sentinel fallback, which is exactly the workbench regression to keep.
+    # sentinel fallback, which is exactly the self-development regression to keep.
     (eng / "sutws" / "usecases").mkdir(parents=True)
     (eng / "sutws" / "demo.profile.yaml").write_text(
         "artifact_dir_template: sutws/usecases/{uc}/\n"
@@ -122,8 +122,8 @@ def main() -> int:
         check("pending UC blocked", run_guard(ws, "tests/pending/test_x.py"), 2)
         check("unbound UC fail-closed", run_guard(ws, "tests/other/test_x.py"), 2)
 
-        print("workbench layout (sentinel fallback, profile via BUGATE_PROFILE):")
-        eng = build_workbench(tmp)
+        print("engine-development layout (sentinel fallback, profile via BUGATE_PROFILE):")
+        eng = build_engine_dev(tmp)
         profile = "sutws/demo.profile.yaml"
         check("passed UC allowed", run_guard(eng, "sutws/tests/ok/test_x.py", profile_env=profile), 0)
         check("pending UC blocked", run_guard(eng, "sutws/tests/pending/test_x.py", profile_env=profile), 2)

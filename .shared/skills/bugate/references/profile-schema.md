@@ -4,13 +4,14 @@ BUGate core reads a deliberately small profile surface. A profile is a YAML file
 whose keys are merged on top of `bugate.config.yaml` by `load_config`. In
 imported mode (the default, CHARTER §2.2) the profile lives **in the governed
 SUT test repo and is committed there**, beside the tests it guards; in the
-maintainer workbench it lives in or beside the mounted SUT test workspace. It is
+self-development setup (developing BUGate itself) it lives in or beside the
+mounted SUT test workspace. It is
 selected through `BUGATE_PROFILE=/path/profile.yaml`, the workspace
 `bugate.config.yaml` `profile` field, or its `active_profile` alias. The profile
 binds BUGate to a test automation surface; it does not copy product source, API
 dumps, secrets, or environment facts into BUGate core.
 
-> Workbench (maintainer) convention only: when the ENGINE repo's own
+> BUGate-self-development convention only (maintainers): when the ENGINE repo's own
 > `bugate.config.yaml` `profile` field points at a mounted SUT, that line is a
 > local, per-clone edit — do not commit it; the committed core stays
 > SUT-neutral. In imported mode the opposite holds: the governed repo's config
@@ -70,7 +71,7 @@ from them; the keys exist so a worker — or an analysis prompt — can resolve 
 contract and skill locations *from the profile* instead of guessing a path or
 hardcoding a product path into Core. Each value is a path or a list of paths,
 relative to the workspace root — in imported mode plain repo-relative paths, in
-the workbench they may traverse the mount — or absolute. Globs are permitted in
+a self-development mount they may traverse the mount — or absolute. Globs are permitted in
 list entries.
 
 | Field | Type | Default | Meaning |
@@ -172,7 +173,7 @@ guarded_path_regex:
 
 # Where the governed workspace keeps black-box evidence (contracts first, then
 # any captured dumps / recorded cases / wiki) the analysis reads to derive
-# oracles. Imported mode: plain repo-relative paths (e.g. docs/api). Workbench:
+# oracles. Imported mode: plain repo-relative paths (e.g. docs/api). Self-development mounts:
 # paths may traverse the mount, as below.
 evidence_sources:
   - sut/example/workspace/docs/api          # primary: generated interface/endpoint contracts

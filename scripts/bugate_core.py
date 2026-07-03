@@ -55,7 +55,7 @@ def find_root(start: Path | None = None) -> Path:
        ``bugate.config.yaml`` — the imported-mode contract: the governed repo
        commits its own config, so the config marks the workspace;
     3. legacy sentinel fallback (``AGENTS.md`` + ``.shared/``) for pre-split
-       layouts where the engine repo is itself the workspace (core workbench).
+       layouts where the engine repo is itself the workspace (BUGate self-development).
 
     The engine's own location is a separate concern — see ``find_engine_root``.
     """
@@ -72,7 +72,7 @@ def find_root(start: Path | None = None) -> Path:
             return candidate
     raise SystemExit(
         "BUGate workspace root not found: expected bugate.config.yaml in an "
-        "ancestor (imported mode), an AGENTS.md + .shared workbench layout, "
+        "ancestor (imported mode), an AGENTS.md + .shared engine-development layout, "
         "or BUGATE_PROJECT_ROOT set"
     )
 

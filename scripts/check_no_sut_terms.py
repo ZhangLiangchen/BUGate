@@ -31,7 +31,7 @@ Scan surface — anchored on the ENGINE root, never the governed workspace:
     ``CHARTER.md`` sentinel (the charter never ships in the vendored kit).
 
   A governed workspace's OWN files are never the scan surface: when the
-  workspace root is a strict descendant of the engine root (workbench-style
+  workspace root is a strict descendant of the engine root (engine-development
   layouts) its subtree is excluded, and in a vendored layout the SUT repo's
   files are simply not kit members. Files that legitimately DECLARE the terms
   (the active config/profile, ``--terms-file`` lists) are excluded likewise.
@@ -238,7 +238,7 @@ def scan(
     ]
     hygiene_patterns = [(re.compile(term), label) for term, label in GENERAL_HYGIENE]
 
-    # A governed workspace nested under the engine root (workbench/demo
+    # A governed workspace nested under the engine root (engine-development
     # layouts) is the SUT's own territory, never the kit's scan surface.
     workspace_subtree: Path | None = None
     if workspace_root is not None:

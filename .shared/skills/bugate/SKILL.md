@@ -12,7 +12,7 @@ framework. It separates reusable method from SUT-specific facts.
 
 1. Identify the active SUT profile and the governed automation test
    workspace — the repo you are working in (imported mode, the default) or a
-   mounted workspace (maintainer workbench). If none exists, stay in core mode
+   mounted workspace (while developing BUGate itself). If none exists, stay in core mode
    and do not invent product facts.
 2. Build or review the business brief before test design.
 3. Decide testability and the cheapest sufficient test layer.
@@ -127,7 +127,7 @@ record / recall / promote protocol.
 - No SUT API paths, credentials, product resource IDs, service URLs, or
   environment names belong in this skill.
 - The governed SUT workspace — the host test repo in imported mode, a mounted
-  workspace in the maintainer workbench — means the SUT's automation test
+  workspace mounted while developing BUGate itself — means the SUT's automation test
   framework / test workspace: tests, BUGate artifacts, fixtures, runners,
   captured evidence, and local test rules. Product source, API dumps, secrets,
   and live environment details stay outside BUGate core and enter only through
