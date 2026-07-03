@@ -50,6 +50,9 @@ jobs:
       - name: Write-guard dual-layout acceptance (ephemeral fixtures)
         run: python3 tests/test_write_guard_layouts.py
 
+      - name: Installer scaffold + hook-inertness acceptance (ephemeral fixtures)
+        run: python3 tests/test_init_scaffold.py
+
       - name: bugate init end-to-end (ephemeral SUT repo, R4 negative control)
         run: |
           sut="$(mktemp -d)"

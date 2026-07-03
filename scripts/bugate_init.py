@@ -46,11 +46,15 @@ IGNORE_NAMES = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
 
 # Hook commands are templated on the vendor dir. ROOT is the governed WORKSPACE
 # root, found via the committed config this installer scaffolds; the engine is
-# then addressed at its known vendored location beneath it.
+# then addressed at its known vendored location beneath it. When no config
+# marks a workspace above CWD, the hook exits 0 (inert) — the same lazy-guard
+# contract as the plugin channel's hooks.json, so both channels degrade
+# identically instead of hard-blocking every write with a resolver error.
 _ROOT_SNIPPET = (
     "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; "
     "p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or "
-    "next(str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()))')\"; "
+    "next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; "
+    "[ -n \"$ROOT\" ] || exit 0; "
 )
 
 
@@ -118,8 +122,10 @@ CONFIG_SCAFFOLD = """\
 profile: bugate.profile.yaml
 """
 
-PROFILE_SCAFFOLD = """\
-# BUGate SUT profile — COMMIT this file beside the tests it governs.
+# Raw string: the sut_identity_terms example must reach the scaffolded file as
+# a literal backslash-b (the simple YAML parser does not unescape), never as a
+# 0x08 control character.
+PROFILE_SCAFFOLD = r"""# BUGate SUT profile — COMMIT this file beside the tests it governs.
 # Schema: {vendor_dir}/.shared/skills/bugate/references/profile-schema.md
 
 # Per-UC fail-closed binding: each guarded test file maps to its own
