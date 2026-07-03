@@ -10,14 +10,16 @@ framework. It separates reusable method from SUT-specific facts.
 
 ## Required Workflow
 
-1. Identify the active SUT profile and mounted automation test workspace. If
-   none exists, stay in core mode and do not invent product facts.
+1. Identify the active SUT profile and the governed automation test
+   workspace — the repo you are working in (imported mode, the default) or a
+   mounted workspace (maintainer workbench). If none exists, stay in core mode
+   and do not invent product facts.
 2. Build or review the business brief before test design.
 3. Decide testability and the cheapest sufficient test layer.
 4. Map inventory, propositions, oracles, evidence, and implementation targets.
 5. Generate human-readable test cases when the workflow requires review.
 6. Run adversarial or exploratory review for high-risk changes.
-7. Only then implement or review concrete tests in the mounted SUT automation
+7. Only then implement or review concrete tests in the governed SUT automation
    test workspace.
 
 ## Artifact Stack
@@ -58,7 +60,7 @@ The pre-code gates are not advisory. A PreToolUse hook runs
 profile-guarded implementation path and the configured pre-code artifacts are
 not present and accepted, the hook returns a non-zero decision and the write is
 blocked. Claude triggers it through the matched `file_path`; Codex triggers it
-through the `apply_patch` header. With no SUT profile mounted
+through the `apply_patch` header. With no SUT profile active
 (`guarded_path_regex: []`) nothing is guarded, so the core stays usable.
 
 **Code-first requests.** If the user asks to skip straight to test
@@ -75,7 +77,7 @@ guarded writes until then, jumping to code is rejected rather than helpful.
 - Read `references/testability-gate.md` before accepting Layer 2.
 - Read `references/case-blueprint.md` before accepting Layer 3.
 - Read `references/test-design-gate.md` before accepting readable/adversarial cases.
-- Read `references/profile-schema.md` when mounting a SUT profile or changing guard behavior.
+- Read `references/profile-schema.md` when binding a SUT profile or changing guard behavior.
 
 ## Core Commands
 
@@ -91,7 +93,7 @@ guarded writes until then, jumping to code is rejected rather than helpful.
 
 SUT profiles may wrap these commands with product-specific paths, peer runtime
 dispatch, evidence fetchers, and assertion runners. Core commands must remain
-valid without any product repository mounted.
+valid without any product repository attached.
 
 ## Memory (cross-session, cross-agent)
 
@@ -101,8 +103,9 @@ dual-namespace — SUT work records under the active profile's namespace; BUGate
 OWN governance memory records under the core namespace via `--core`.
 
 - **Recall first.** At the start of a session pull prior context:
-  `python3 scripts/memory_bus.py session-start --agent <role>` (add `--core` for
-  BUGate-core context). A SessionStart hook runs this automatically.
+  `python3 scripts/memory_bus.py session-start --agent <role>` (add `--core`
+  for BUGate-core context, ignoring the active SUT profile's namespace). A
+  SessionStart hook runs this automatically.
 - **Record progress at milestones — this is agent-driven, not automatic.** After
   a real decision, finding, or completed step, write it:
   `python3 scripts/memory_bus.py note --agent <role> --type <progress|finding|decision> --status confirmed --broadcast --msg "<neutral conclusion>"`.
@@ -120,11 +123,12 @@ record / recall / promote protocol.
 
 - No SUT API paths, credentials, product resource IDs, service URLs, or
   environment names belong in this skill.
-- A mounted SUT workspace means the SUT's automation test framework / test
-  workspace: tests, BUGate artifacts, fixtures, runners, captured evidence, and
-  local test rules. Product source, API dumps, secrets, and live environment
-  details stay outside BUGate core and enter only through profile-controlled
-  evidence/config boundaries.
+- The governed SUT workspace — the host test repo in imported mode, a mounted
+  workspace in the maintainer workbench — means the SUT's automation test
+  framework / test workspace: tests, BUGate artifacts, fixtures, runners,
+  captured evidence, and local test rules. Product source, API dumps, secrets,
+  and live environment details stay outside BUGate core and enter only through
+  profile-controlled evidence/config boundaries.
 - SUT profiles may add stricter artifact names, guarded paths, commands, and
   evidence rules, but they must not weaken the core invariants.
 - If source code is available, treat it as one possible evidence source, not as

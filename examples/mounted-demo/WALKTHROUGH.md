@@ -1,4 +1,10 @@
-# Mounted-SUT walkthrough: watch the write-guard block, then allow
+# Mounted-SUT walkthrough (maintainer workbench): watch the write-guard block, then allow
+
+> This demo exercises the **core-workbench layout** — the engine repo is the
+> workspace root and the SUT tree hangs beneath it (maintainer mode, CHARTER
+> §2.3). The first-class counterpart for the default **imported mode** is
+> [`examples/imported-demo/`](../imported-demo/), where the governed repo is
+> the workspace root and config + profile are committed.
 
 This is the piece `examples/demo-sut/` can't show on its own: a **runnable** mount
 where you see the physical write-guard (`scripts/check_bugate.py`) **intercept** an

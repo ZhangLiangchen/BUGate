@@ -21,7 +21,7 @@ ADR layer split:
 | Layer | Where it lives | What it holds |
 |---|---|---|
 | **Core** | this repository | neutral method, templates, gates, hooks, adapters |
-| **SUT Profile** | a mounted SUT workspace / profile package | paths, commands, evidence sources, guarded patterns, resource policy, runtime kind |
+| **SUT Profile** | the governed SUT workspace / profile package | paths, commands, evidence sources, guarded patterns, resource policy, runtime kind |
 | **SUT** | the product repository | source, API docs, fixtures, tests, secrets, live evidence |
 
 Concretely (AGENTS.md Core Rules 1–2 and 5):
@@ -31,7 +31,7 @@ Concretely (AGENTS.md Core Rules 1–2 and 5):
 - Put SUT paths, resource policies, environment names, auth rules, and tool
   commands in a **SUT profile**, not in core.
 - If a change needs SUT-specific facts, stop at the profile boundary and add a
-  profile key (or ask for a mounted SUT) instead of inventing product details.
+  profile key (or ask for a governed SUT workspace) instead of inventing product details.
 
 ### The forbidden-term guard
 
@@ -49,9 +49,11 @@ Generic English prose (the words order, chain, wallet) and the neutral
 `docs/usecases` default artifact dir are intentionally **not** forbidden — only
 unambiguous SUT tokens are.
 
-> Mounting a SUT locally? Keep your `profile:` pointer in `bugate.config.yaml`
-> uncommitted — it's a per-clone local edit, so the committed core (which this
-> guard scans) stays SUT-neutral.
+> Mounting a SUT locally (core-workbench mode, maintainers)? Keep your
+> `profile:` pointer in this repo's `bugate.config.yaml` uncommitted — it's a
+> per-clone local edit, so the committed core (which this guard scans) stays
+> SUT-neutral. In imported mode (the default, CHARTER §2.2) the reverse holds:
+> the governed SUT repo commits its own config + profile.
 
 ### The allow-marker (for deliberate occurrences)
 
@@ -113,7 +115,7 @@ fastest sanity check that the engine still imports and config still loads.
 | `.shared/skills/bugate/` | the shared skill: `SKILL.md`, `references/`, `templates/`, `adapters/` |
 | `docs/qa-methodology/` | SUT-neutral method, SOP, ADR, protocols |
 | `examples/` | `demo-sut/` (worked, passing gate stack), `sample-sut.profile.yaml` |
-| `bugate.config.yaml` | core default config; ships **unmounted** (no guarded paths) |
+| `bugate.config.yaml` | core default config; ships with **no profile bound** (no guarded paths) |
 
 Rules of thumb:
 
@@ -139,7 +141,7 @@ the four gates against the templates dir after editing.
 
 **Adding an adapter:** adapters live under
 `.shared/skills/bugate/adapters/` (ADR Implementation Notes). Keep them neutral;
-SUT-specific wiring belongs in the mounted workspace, not the adapter.
+SUT-specific wiring belongs in the governed workspace, not the adapter.
 
 **Hooks** (`.claude/`, `.codex/`) must call only SUT-neutral scripts from
 `scripts/` and must not depend on git metadata (AGENTS.md Hook Policy). Note:

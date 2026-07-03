@@ -8,8 +8,10 @@ test analysis and test-case governance framework.
 - Keep shared runtime instructions in `.shared/skills/bugate/`.
 - Keep SUT-specific source, API dumps, secrets, environments, fixtures, live
   evidence, and project memories outside BUGate core.
-- Treat a mounted SUT as the SUT automation test framework / test workspace
-  unless a profile explicitly defines a narrower evidence boundary.
+- Treat the governed SUT workspace — the host test repo in imported mode, a
+  mounted workspace in the maintainer workbench — as the SUT automation test
+  framework / test workspace unless a profile explicitly defines a narrower
+  evidence boundary.
 - `CLAUDE.md` must remain a symlink to this file.
 
 ## Roles
@@ -29,14 +31,14 @@ test analysis and test-case governance framework.
 1. Do not add SUT source code, product API snapshots, environment secrets,
    credentials, generated caches, or project-specific fixtures to BUGate core.
 2. Put SUT paths, resource policies, environment names, auth rules, and tool
-   commands in a SUT profile or mounted test workspace.
+   commands in a SUT profile or the governed test workspace.
 3. Treat BUGate artifacts as pre-code governance: business brief, testability
    decision, inventory/oracle mapping, readable test cases, adversarial review,
    execution report, and knowledge update.
 4. A test implementation must not be generated before the configured pre-code
    artifacts are present and accepted for that SUT profile.
 5. If a rule requires SUT-specific facts, stop at the profile boundary and ask
-   for a profile or mounted SUT test workspace instead of inventing details.
+   for a profile or governed SUT test workspace instead of inventing details.
 
 ## Startup
 
@@ -46,7 +48,7 @@ For non-trivial BUGate work:
 2. Read `docs/qa-methodology/METHOD.md` when method rationale is needed.
 3. Read `docs/qa-methodology/SOP.md` when execution procedure is needed.
 4. Inspect the active SUT profile only if the task explicitly involves a
-   mounted SUT test workspace.
+   governed (imported or mounted) SUT test workspace.
 
 ## Hook Policy
 
@@ -104,7 +106,7 @@ The purpose of a test is to find defects, not to manufacture green runs.
 4. New business assertions must be evidence-first: read source, contracts, live
    responses, or probe output before encoding an expectation. Do not let an
    agent invent identifiers, addresses, secrets, account handles, or record ids;
-   bind them to a profile/mounted evidence source instead.
+   bind them to a profile-declared evidence source instead.
 5. Resolve file paths through a project/test helper; do not hard-code fragile
    relative-path math.
 

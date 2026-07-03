@@ -77,12 +77,16 @@ When in doubt, keep it in the SUT profile.
 
 - Runtime adapters live under `.shared/skills/bugate/adapters/`.
 - Codex and Claude discovery paths are symlinks to the shared BUGate skill.
-- Hook commands resolve the repository root by walking to `AGENTS.md` and
-  `.shared/`; they do not require git metadata.
+- Hook commands locate the engine by walking up for `scripts/bugate_core.py`;
+  gate scripts resolve the governed workspace root via the nearest
+  `bugate.config.yaml` (legacy `AGENTS.md` + `.shared/` sentinel as workbench
+  fallback). No git metadata required.
 - `bugate.config.yaml` ships with no guarded paths. Profiles opt into guarded
   implementation paths.
-- A SUT is mounted by a local, uncommitted `profile:` pointer in
-  `bugate.config.yaml` (or `BUGATE_PROFILE`); the committed core stays SUT-neutral.
+- Workbench (maintainer) convention: a SUT is mounted by a local, uncommitted
+  `profile:` pointer in the engine repo's `bugate.config.yaml` (or
+  `BUGATE_PROFILE`); the committed core stays SUT-neutral. In imported mode
+  (CHARTER §2.2, default) the governed repo commits its own config + profile.
 
 ## Rejected Alternatives
 

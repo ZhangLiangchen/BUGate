@@ -1,4 +1,6 @@
 # Worked "mounted SUT" profile for the write-guard walkthrough (see WALKTHROUGH.md).
+# Workbench (maintainer) layout: paths below are engine-repo-relative because the
+# workspace root is the engine repo. Imported-mode counterpart: ../imported-demo/.
 # It binds a tiny fake test tree (tests/<uc>/...) to per-UC artifact dirs
 # (usecases/<uc>/) via a {uc} template + a (?P<uc>...) capture, so scripts/check_bugate.py
 # physically blocks edits to a UC's tests until that UC's pre-code artifacts pass.

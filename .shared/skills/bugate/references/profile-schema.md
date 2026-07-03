@@ -1,15 +1,20 @@
 # BUGate SUT Profile Schema
 
 BUGate core reads a deliberately small profile surface. A profile is a YAML file
-whose keys are merged on top of `bugate.config.yaml` by `load_config`. Profiles
-can live in or beside a mounted SUT automation test workspace and be selected
-through `BUGATE_PROFILE=/path/profile.yaml`, the core `bugate.config.yaml`
-`profile` field, or its `active_profile` alias. The profile binds BUGate to a
-test automation surface; it does not copy product source, API dumps, secrets, or
-environment facts into BUGate core.
+whose keys are merged on top of `bugate.config.yaml` by `load_config`. In
+imported mode (the default, CHARTER §2.2) the profile lives **in the governed
+SUT test repo and is committed there**, beside the tests it guards; in the
+maintainer workbench it lives in or beside the mounted SUT test workspace. It is
+selected through `BUGATE_PROFILE=/path/profile.yaml`, the workspace
+`bugate.config.yaml` `profile` field, or its `active_profile` alias. The profile
+binds BUGate to a test automation surface; it does not copy product source, API
+dumps, secrets, or environment facts into BUGate core.
 
-> When you select via the `bugate.config.yaml` `profile` field, that line is a
-> local, per-clone edit — do not commit it; the committed core stays SUT-neutral.
+> Workbench (maintainer) convention only: when the ENGINE repo's own
+> `bugate.config.yaml` `profile` field points at a mounted SUT, that line is a
+> local, per-clone edit — do not commit it; the committed core stays
+> SUT-neutral. In imported mode the opposite holds: the governed repo's config
+> and profile are committed (they are that repo's own governance contract).
 
 This document is the full key contract. Keys are grouped into core
 `bugate.config.yaml` fields, SUT-profile fields, and environment variables. Core
@@ -35,7 +40,7 @@ These keys are read from the core config and may be overridden by a profile.
 ## SUT-profile keys
 
 These keys are normally supplied by the SUT profile and bind BUGate's gate to a
-specific requirement and guarded implementation tree inside the mounted test
+specific requirement and guarded implementation tree inside the governed test
 automation workspace.
 
 | Field | Type | Default | Meaning |
@@ -56,25 +61,26 @@ automation workspace.
 
 ### Evidence- and skill-source keys
 
-These keys point the flow at where a mounted SUT test workspace keeps its
+These keys point the flow at where the governed SUT test workspace keeps its
 black-box **evidence** (endpoint/interface contracts, captured API dumps, wiki,
 recorded cases) and its SUT-specific **skills** (fetchers, environment adapters,
 diagnostics). Core does not parse the documents themselves and imports nothing
 from them; the keys exist so a worker — or an analysis prompt — can resolve the
 contract and skill locations *from the profile* instead of guessing a path or
 hardcoding a product path into Core. Each value is a path or a list of paths,
-relative to the BUGate root (so they may reach into the mounted workspace) or
-absolute. Globs are permitted in list entries.
+relative to the workspace root — in imported mode plain repo-relative paths, in
+the workbench they may traverse the mount — or absolute. Globs are permitted in
+list entries.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `evidence_sources` | path \| list[path \| glob] | none (unset → no profile-declared evidence root; the flow must be told a path explicitly) | One or more directories/files holding the SUT's black-box evidence the analysis reads to derive oracles — typically generated interface/endpoint contract docs, plus optional captured dumps, recorded cases, or wiki. The first entry is treated as the primary contract root. |
-| `skill_sources` | path \| list[path] | none (unset → only the core BUGate skill is in scope) | One or more directories that contain SUT-specific skill folders (each a skill dir with its own `SKILL.md`) staged inside the mounted workspace. Lets SUT skills be discovered through the profile without copying them into Core. |
+| `skill_sources` | path \| list[path] | none (unset → only the core BUGate skill is in scope) | One or more directories that contain SUT-specific skill folders (each a skill dir with its own `SKILL.md`) staged inside the governed workspace. Lets SUT skills be resolved declaratively through the profile without copying them into Core (in imported mode the runtime usually also discovers them natively as the repo's own skills). |
 
 > `evidence_sources` and `skill_sources` are descriptive bindings, not gates:
 > Core scripts ignore unknown fields, so an older gate simply skips them while a
 > resolver or prompt that understands them can locate the SUT's contracts and
-> skills. Keep the *documents and skill bodies* in the mounted workspace, never
+> skills. Keep the *documents and skill bodies* in the governed workspace, never
 > in Core — these keys only record where they live.
 
 ## Environment variables
@@ -134,13 +140,15 @@ artifact_dir: sut/example/bugate/REQ-001
 guarded_path_regex:
   - "^sut/example/tests/.*[.]py$"
 
-# Where the mounted workspace keeps black-box evidence (contracts first, then
-# any captured dumps / recorded cases / wiki) the analysis reads to derive oracles.
+# Where the governed workspace keeps black-box evidence (contracts first, then
+# any captured dumps / recorded cases / wiki) the analysis reads to derive
+# oracles. Imported mode: plain repo-relative paths (e.g. docs/api). Workbench:
+# paths may traverse the mount, as below.
 evidence_sources:
   - sut/example/workspace/docs/api          # primary: generated interface/endpoint contracts
   - sut/example/workspace/docs/raw          # secondary: captured dumps, recorded cases, wiki
 
-# Directories of SUT-specific skill folders staged inside the mounted workspace.
+# Directories of SUT-specific skill folders staged inside the governed workspace.
 skill_sources:
   - sut/example/workspace/.shared/skills
 

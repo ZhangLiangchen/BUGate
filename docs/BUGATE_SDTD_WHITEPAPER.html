@@ -148,6 +148,7 @@
           诚信声明:独立核心与 demo 数字可在 BUGate 仓库 git 历史 / frontmatter 复查;起源历史数字(第 10 章)见原 Hypervise 产物;无臆造。<br>开源协议:MIT · 仓库:github.com/ZhangLiangchen/BUGate
         </div>
         <div class="note brand" style="margin-top:30px"><b>怎么读这份文档</b>:左侧目录点击跳转,右下角箭头或键盘 <code>←/→</code> 翻章,每章可上下滚动,浏览器「打印」即导出 PDF。建议先读第 1 章(远景)与第 11 章(能力边界),再按顺序展开;<strong>第 13 章</strong>给出纵向拓展前景(从黑盒测试前移到 PRD / 设计 / TDD / 白盒)。</div>
+        <div class="note" style="margin-top:14px; border-left:3px solid #d97706; padding-left:12px"><b>2026-07-03 更新(CHARTER-BUGATE-001)</b>:使用形态已定章——默认与终态是<strong>导入模式</strong>(agent 打开 SUT 自动化测试仓为项目根,BUGate 以 skills / hooks / profile / gate scripts 版本化导入,profile 提交进 SUT 仓);「把 SUT 挂载进 BUGate 仓」的布局自此限定为<strong>维护者工作台模式</strong>。第 12 章的挂载叙事按此口径阅读,规范细则见仓根 <code>CHARTER.md</code> §2。</div>
       </section>
 
       <!-- 1 远景与目标 -->
@@ -520,7 +521,8 @@
       <section class="chapter" data-title="挂载一个 SUT(profile)">
         <div class="kick">第 12 章</div>
         <h1>挂载一个 SUT:profile 机制</h1>
-        <p class="lead">早期 BUGate 与 Hypervise 耦合,开源的关键是把"随框架走的核心"与"按 SUT 重建的内容"分开。<strong>这一步现在已经完成</strong>:BUGate 是独立的 SUT 无关核心,一个 SUT 通过一份声明式 <code>profile</code> 挂载,曾经的 S1-S9 硬编码接缝已收敛进单一配置。</p>
+        <p class="lead">早期 BUGate 与 Hypervise 耦合,开源的关键是把"随框架走的核心"与"按 SUT 重建的内容"分开。<strong>这一步现在已经完成</strong>:BUGate 是独立的 SUT 无关核心,一个 SUT 通过一份声明式 <code>profile</code> 绑定,曾经的 S1-S9 硬编码接缝已收敛进单一配置。</p>
+        <div class="note" style="border-left:3px solid #d97706; padding-left:12px"><b>勘误 / 更新(2026-07-03, CHARTER-BUGATE-001)</b>:本章写作时以"SUT 测试工作区挂载进 BUGate 仓"为主叙事;定章后该布局仅为<strong>维护者工作台</strong>。默认形态是<strong>导入模式</strong>:SUT 测试仓为项目根,BUGate 被导入其中,profile 与 <code>bugate.config.yaml</code> <strong>提交进 SUT 仓</strong>(同库同审),门禁跑在 SUT 仓 CI;根发现已拆分(工作区根=最近的 <code>bugate.config.yaml</code>,引擎资产按引擎自身位置解析)。四部分解耦模型不变,变的只是宿主方向。运行示例见 <code>examples/imported-demo/</code>(一等)与 <code>examples/mounted-demo/</code>(维护者)。</div>
 
         <h2>12.1 四部分解耦(回顾)</h2>
         <p>挂载关系是第 5.5 节的四部分:<strong>BUGate Core</strong>(本仓库,SUT 无关)→ <strong>SUT Profile</strong>(桥接契约)→ <strong>Mounted Workspace</strong>(通常即 SUT 的自动化测试框架 / 测试工作区)→ <strong>SUT / Product Runtime</strong>(黑盒目标)。核心纪律:挂载的是测试工作区,产品源码 / 密钥 / 环境事实不进入核心,Runtime 只作为黑盒证据被观测。</p>

@@ -2,8 +2,10 @@
 #
 # A profile is merged on top of bugate.config.yaml by bugate_core.load_config.
 # Point BUGate at it via `profile:` in bugate.config.yaml or the BUGATE_PROFILE
-# env var. The `profile:` line in bugate.config.yaml is a local, per-clone edit —
-# do not commit it; the committed core stays SUT-neutral.
+# env var. Imported mode (default): the governed SUT repo COMMITS its own
+# config + profile (see examples/imported-demo/). Core-workbench mode
+# (maintainers): the `profile:` line in the ENGINE repo's bugate.config.yaml is
+# a local, per-clone edit — do not commit it; the committed core stays SUT-neutral.
 # Replace every placeholder path/regex below with the real ones for
 # your system under test. See .shared/skills/bugate/references/profile-schema.md
 # for the full field reference, and examples/demo-sut/ for a filled gate stack.
