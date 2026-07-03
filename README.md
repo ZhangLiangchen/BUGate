@@ -55,13 +55,14 @@ be mounted via a symlink and a local, uncommitted `profile:` pointer
 
 > Both imported-mode channels ship in-repo (CHARTER §5.2–§5.3): the
 > **installer** — `python3 scripts/bugate_init.py <sut-repo>` — and the
-> **Claude Code plugin**, packaged entirely inside `.claude-plugin/`
-> (manifest + hooks; skills/commands/agents resolved from `.shared/` via
-> manifest path fields, hooks calling the engine via
-> `${CLAUDE_PLUGIN_ROOT}`, inert in repos without a committed
-> `bugate.config.yaml`). Codex has no plugin system — `bugate init` covers that
-> side. Quickstart A below shows the installer first, then the manual
-> equivalent.
+> **Claude Code plugin** (manifest + hooks in `.claude-plugin/`;
+> skills/commands resolved from `.shared/` via manifest path fields, gate
+> agents via the top-level `agents` symlink — the plugin runtime loads agents
+> only from that default directory — and hooks calling the engine via
+> `${CLAUDE_PLUGIN_ROOT}`). Hooks from either channel are inert (exit 0)
+> wherever no committed `bugate.config.yaml` marks a workspace root. Codex has
+> no plugin system — `bugate init` covers that side. Quickstart A below shows
+> the installer first, then the manual equivalent.
 
 ## Core/Profile/Mounted Workspace Model
 
@@ -234,7 +235,7 @@ python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --
 
 ## Agent runtimes
 
-BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo while developing BUGate itself, vendored into the SUT repo in imported mode (Quickstart A), or as a **Claude Code plugin** (everything under `.claude-plugin/` — the manifest's path fields point skills/commands/agents at `.shared/`, no top-level component dirs needed). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as the self-development fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
+BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo while developing BUGate itself, vendored into the SUT repo in imported mode (Quickstart A), or as a **Claude Code plugin** (`.claude-plugin/` carries the manifest + hooks; its path fields point skills/commands at `.shared/`, while the gate agents load through the top-level `agents` symlink — the plugin runtime discovers agents only in that default directory, so that one component keeps a top-level entry). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as the self-development fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
 
 Field-tested setup notes: use the vendor native installers for `codex` and
 `claude`, not stale npm wrappers; keep `~/.local/bin` ahead of older app or
@@ -254,6 +255,7 @@ For a repeatable end-to-end capability audit after setup, invoke the
 bugate.config.yaml          # core config; a SUT profile overrides its values
 AGENTS.md                   # agent behavior protocol (SUT-neutral)
 CHARTER.md                  # charter: positioning, the single usage mode (imported) + self-development rules, evolution plan
+agents -> .shared/…/agents  # gate agents for the plugin runtime (it only loads agents from this default dir)
 scripts/                    # gate engine + SDTD orchestration (stdlib-only)
 .shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
 docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records

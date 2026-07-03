@@ -1,5 +1,6 @@
 {
   "name": "bugate",
+  "description": "BUGate marketplace: the Agentic QA governance kit / SDTD gate engine plugin for AI test development.",
   "owner": {
     "name": "BUGate maintainers"
   },
