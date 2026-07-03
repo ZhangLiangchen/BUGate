@@ -12,6 +12,7 @@ from pathlib import Path
 from bugate_core import (
     ALL_ARTIFACTS,
     OPTIONAL_PRECODE_ARTIFACTS,
+    find_engine_root,
     find_root,
     inventory_sha256,
     read_text,
@@ -19,8 +20,9 @@ from bugate_core import (
 )
 
 
-ROOT = find_root()
-TEMPLATE_DIR = ROOT / ".shared" / "skills" / "bugate" / "templates"
+ROOT = find_root()  # workspace root: gate subprocesses run against it
+ENGINE_ROOT = find_engine_root()  # engine root: templates + sibling gate scripts
+TEMPLATE_DIR = ENGINE_ROOT / ".shared" / "skills" / "bugate" / "templates"
 
 
 def _artifacts(full_sdtd: bool) -> list[str]:
@@ -55,7 +57,7 @@ def status(artifact_dir: Path, full_sdtd: bool = False) -> int:
 
 
 def run_script(name: str, *args: str) -> int:
-    cmd = [sys.executable, str(ROOT / "scripts" / name), *args]
+    cmd = [sys.executable, str(ENGINE_ROOT / "scripts" / name), *args]
     proc = subprocess.run(cmd, cwd=ROOT)
     return proc.returncode
 

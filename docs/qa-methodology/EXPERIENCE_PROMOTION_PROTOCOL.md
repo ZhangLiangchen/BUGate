@@ -316,12 +316,13 @@ unique `conversation_id` is a regression (§7).
 
 ### 5.5 Root resolution is git-independent
 
-Both `promote-memory`'s `find_root()` and `bugate_core.find_root()` resolve the
-repository root by walking up to a directory containing `AGENTS.md` **and**
-`.shared/`. They do not require git metadata (ADR Implementation Notes: hooks
-"resolve the repository root by walking to `AGENTS.md` and `.shared/`; they do not
-require git metadata"). A promotion therefore lands correctly whether or not the
-checkout is a git repo.
+Root resolution never touches git metadata. `bin/` wrappers such as
+`promote-memory` resolve the **engine** tree from their own location;
+`bugate_core.find_root()` resolves the governed **workspace** root by walking
+up from CWD to the nearest `bugate.config.yaml` (`BUGATE_PROJECT_ROOT`
+overrides; the legacy `AGENTS.md` + `.shared/` sentinel remains as a workbench
+fallback). A promotion therefore lands correctly whether or not the checkout is
+a git repo.
 
 ### 5.6 How a Core rule re-enters future sessions
 

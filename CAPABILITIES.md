@@ -21,8 +21,12 @@ generated.
   is supplied. The memory bus needs a user-installed `mcp-memory-service`; its
   wrappers no-op or print an install hint when it is absent. Nothing in core
   requires a SUT repository to be mounted.
-- **Root discovery is git-free.** Scripts and `bin/` wrappers walk up for the
-  `AGENTS.md` + `.shared/` sentinel, so BUGate works in non-git checkouts.
+- **Root discovery is git-free and split.** Gate scripts resolve the governed
+  **workspace** root by walking up from CWD to the nearest `bugate.config.yaml`
+  (`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel stays
+  as a workbench fallback), while templates, sibling scripts, and `bin/`
+  wrappers resolve from the **engine** tree's own location
+  (`BUGATE_ENGINE_ROOT` overrides). Works in non-git checkouts.
 
 **Where commands run (imported vs workbench).** Default usage is **imported
 mode**: the engine, skill, hooks, and a **committed** profile live inside the

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -36,12 +37,52 @@ OPTIONAL_PRECODE_ARTIFACTS = [
 ]
 
 
+WORKSPACE_SENTINEL = "bugate.config.yaml"
+
+
 def find_root(start: Path | None = None) -> Path:
+    """Locate the governed WORKSPACE root (where config, profile, artifacts live).
+
+    Resolution order:
+    1. ``BUGATE_PROJECT_ROOT`` env var — explicit override;
+    2. the nearest ancestor of ``start`` (default CWD) carrying
+       ``bugate.config.yaml`` — the imported-mode contract: the governed repo
+       commits its own config, so the config marks the workspace;
+    3. legacy sentinel fallback (``AGENTS.md`` + ``.shared/``) for pre-split
+       layouts where the engine repo is itself the workspace (core workbench).
+
+    The engine's own location is a separate concern — see ``find_engine_root``.
+    """
+    env = os.environ.get("BUGATE_PROJECT_ROOT", "").strip()
+    if env:
+        return Path(env).resolve()
     start = (start or Path.cwd()).resolve()
-    for candidate in [start, *start.parents]:
+    candidates = [start, *start.parents]
+    for candidate in candidates:
+        if (candidate / WORKSPACE_SENTINEL).exists():
+            return candidate
+    for candidate in candidates:
         if (candidate / "AGENTS.md").exists() and (candidate / ".shared").exists():
             return candidate
-    raise SystemExit("BUGate root not found: expected AGENTS.md and .shared")
+    raise SystemExit(
+        "BUGate workspace root not found: expected bugate.config.yaml in an "
+        "ancestor (imported mode), an AGENTS.md + .shared workbench layout, "
+        "or BUGATE_PROJECT_ROOT set"
+    )
+
+
+def find_engine_root() -> Path:
+    """Locate the ENGINE root (where BUGate's own scripts/ and .shared/ live).
+
+    Independent of the workspace root: in imported mode the engine is vendored
+    into (or shipped as a plugin alongside) the governed repo, so it is resolved
+    from this file's location, never from CWD. ``BUGATE_ENGINE_ROOT`` overrides
+    for layouts that relocate the asset tree away from the scripts.
+    """
+    env = os.environ.get("BUGATE_ENGINE_ROOT", "").strip()
+    if env:
+        return Path(env).resolve()
+    return Path(__file__).resolve().parents[1]
 
 
 def resolve_path(value: str | Path, root: Path | None = None) -> Path:

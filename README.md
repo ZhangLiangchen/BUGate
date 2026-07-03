@@ -110,10 +110,12 @@ governance contract is reviewed and versioned with the tests it guards:
    `.codex/skills/` symlinks).
 2. **Wire the hooks**: merge the hook blocks from this repo's
    `.claude/settings.json` and `.codex/hooks.json` into the SUT repo's own
-   files. Two current constraints, both removed by the CHARTER §5.3
-   root-discovery split: hook root discovery walks up for the `AGENTS.md` +
-   `.shared/` sentinel, so the SUT repo needs both; and Codex requires a
-   one-time re-trust of the changed hook hash.
+   files. The hooks locate the engine by walking up for
+   `scripts/bugate_core.py` (the CHARTER §5.3 root-discovery split — the SUT
+   repo does **not** need BUGate's `AGENTS.md`/`.shared/` sentinel), and the
+   committed `bugate.config.yaml` from step 3 marks the workspace root the
+   gates govern. One constraint remains: Codex requires a one-time re-trust of
+   the changed hook hash.
 3. **Create and commit the config + profile** in the SUT repo:
 
    ```yaml
@@ -134,7 +136,8 @@ governance contract is reviewed and versioned with the tests it guards:
    (`scripts/check_bugate.py` exits 2).
 
 Daily agent sessions then open the **SUT repo** — not this one — and BUGate
-governs from inside it.
+governs from inside it. A runnable miniature of this layout ships at
+[`examples/imported-demo/`](examples/imported-demo/).
 
 ### B) Core workbench mode — mount a SUT into this repo (maintainers)
 
@@ -200,7 +203,7 @@ python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --re
 
 ## Agent runtimes
 
-BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo in workbench mode, or vendored into the SUT repo in imported mode (Quickstart A). The gate engine is **stdlib-only** (no third-party deps) and resolves the repo root git-free via a sentinel (`AGENTS.md` + `.shared/`). Note: adding or changing a Codex hook requires re-trusting its hash.
+BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo in workbench mode, or vendored into the SUT repo in imported mode (Quickstart A). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as workbench fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
 
 Field-tested setup notes: use the vendor native installers for `codex` and
 `claude`, not stale npm wrappers; keep `~/.local/bin` ahead of older app or

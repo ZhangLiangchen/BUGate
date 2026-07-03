@@ -1,21 +1,10 @@
 #!/usr/bin/env bash
 # Ensure the local memory service is up; start it in the background if not.
-# Git-free root via sentinel walk-up (AGENTS.md + .shared), pwd fallback.
+# Engine root resolved from this script's own location.
 set -euo pipefail
 
-find_root() {
-  local dir
-  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || echo "$PWD")"
-  while [ "$dir" != "/" ]; do
-    if [ -f "$dir/AGENTS.md" ] && [ -d "$dir/.shared" ]; then
-      echo "$dir"
-      return 0
-    fi
-    dir="$(dirname "$dir")"
-  done
-  echo "$PWD"
-}
-ROOT="$(find_root)"
+# Engine root: bin/ sits one level below the engine tree root.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 LOG_FILE="${TMPDIR:-/tmp}/bugate-memory-bus.log"
 PORT="${MCP_HTTP_PORT:-8000}"

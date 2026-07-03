@@ -18,7 +18,7 @@ import re
 import sys
 from pathlib import Path
 
-from bugate_core import find_root, rel
+from bugate_core import find_engine_root, rel
 
 # Unambiguous SUT-specific tokens lifted from the extraction's parent SUT. These
 # must never appear in BUGate core. ASCII tokens use word boundaries so generic
@@ -120,7 +120,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--quiet", action="store_true", help="Only print on failure")
     args = parser.parse_args()
-    root = find_root()
+    # The guard audits the CORE tree itself, so it anchors on the engine root —
+    # never the governed workspace (whose files legitimately name its SUT).
+    root = find_engine_root()
     hits = scan(root, Path(__file__).resolve())
     if hits:
         sys.stderr.write("BUGate de-SUT guard FAILED: SUT-specific terms found in core:\n")

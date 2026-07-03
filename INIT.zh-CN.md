@@ -96,7 +96,7 @@ flowchart LR
 
 ## Agent 运行时（可选，无需额外安装）
 
-在 Claude Code / Codex 里跑：技能在 `.shared/skills/bugate/`，hooks 在 `.claude/`、`.codex/`。根定位是 **git-free**（靠 `AGENTS.md` + `.shared/` 哨兵）。**Codex** 改任何 hook 需在其 hook 管理界面**重新信任 hash**。这些都复用第 2 步验证过的标准库脚本，无需安装。
+在 Claude Code / Codex 里跑：技能在 `.shared/skills/bugate/`，hooks 在 `.claude/`、`.codex/`。根定位 **git-free** 且已拆分：hook 向上找 `scripts/bugate_core.py` 定位引擎；门脚本自 CWD 向上找最近的 `bugate.config.yaml` 定位被治理工作区（`AGENTS.md` + `.shared/` 哨兵为工作台 fallback）。**Codex** 改任何 hook 需在其 hook 管理界面**重新信任 hash**。这些都复用第 2 步验证过的标准库脚本，无需安装。
 
 ## 🔌 可选能力 —— 运行时你自己装，驱动脚本我们提供
 

@@ -125,10 +125,13 @@ Rules of thumb:
   Core scripts ignore unknown profile keys, so a profile may add its own runtime
   commands, evidence fetchers, environments, resources, or auth.
 
-**Adding a script (`scripts/*.py`):** keep imports stdlib-only; resolve the repo
-root via `bugate_core.find_root()` (it walks up to `AGENTS.md` + `.shared/`, with
-no git dependency) rather than assuming a CWD or using git metadata. Add it to
-the relevant CI step if it is a gate. Run it through the de-SUT guard.
+**Adding a script (`scripts/*.py`):** keep imports stdlib-only; resolve the
+governed workspace root via `bugate_core.find_root()` (nearest
+`bugate.config.yaml` up from CWD, workbench-sentinel fallback, no git
+dependency) and engine assets (templates, sibling scripts) via
+`bugate_core.find_engine_root()` — never by assuming a CWD or using git
+metadata. Add it to the relevant CI step if it is a gate. Run it through the
+de-SUT guard.
 
 **Adding a template (`.shared/skills/bugate/templates/`):** keep every field and
 example SUT-neutral. Templates are checked by the semantics gates above, so run

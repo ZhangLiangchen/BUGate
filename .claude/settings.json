@@ -6,15 +6,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_bugate.py\""
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next(str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_bugate.py\""
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_plan_lock.py\""
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next(str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_plan_lock.py\""
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_agent_role_paths.py\""
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next(str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/check_agent_role_paths.py\""
           }
         ]
       }
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/bugate_prompt_reminder.py\""
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next(str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/bugate_prompt_reminder.py\""
           }
         ]
       }
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" session-start --core --agent agent"
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next(str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" session-start --core --agent agent"
           }
         ]
       }
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'from pathlib import Path; p=Path.cwd(); print(next(str(c) for c in [p,*p.parents] if (c/\"AGENTS.md\").exists() and (c/\".shared\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" stop --core --agent agent"
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next(str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()))')\"; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" stop --core --agent agent"
           }
         ]
       }

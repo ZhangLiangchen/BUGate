@@ -58,7 +58,7 @@ Expect `mode= core | guard= [] | precode= 5`. The core ships **unmounted**: the 
 BUGate runs as a skill under Claude Code and Codex:
 
 - Skill: `.shared/skills/bugate/` (discovered via the symlinks in `.claude/skills/` and `.codex/skills/`).
-- Hooks: `.claude/settings.local.json` and `.codex/hooks.json`. Root resolution is **git-free** (sentinel: `AGENTS.md` + `.shared/`).
+- Hooks: `.claude/settings.json` and `.codex/hooks.json`. Root resolution is **git-free** and split: hooks find the engine by walking up for `scripts/bugate_core.py`; gate scripts find the governed workspace via the nearest `bugate.config.yaml` (sentinel fallback for the workbench).
 - **Codex only:** changing any hook requires re-trusting its hash in the Codex hook-management UI.
 
 No install is needed for this — the hooks invoke the same stdlib-only scripts you verified in Step 2.

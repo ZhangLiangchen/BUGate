@@ -52,7 +52,7 @@ scope: Wave 0 - Wave 3（最小可行闭环）
 
 确认以下已就位（以**已发布的 BUGate 引擎**为准，参见 METHOD.md §10）：
 
-- [ ] BUGate 已 clone / 挂载，`AGENTS.md` + `.shared/` sentinel 可被脚本定位，`python3` 可用（核心纯标准库）。
+- [ ] BUGate 引擎已接入（导入模式 vendor 进 SUT 测试仓 / 维护者工作台直接用引擎仓），工作区根可定位（自 CWD 向上最近的 `bugate.config.yaml`；`AGENTS.md` + `.shared/` 哨兵为工作台 fallback），`python3` 可用（核心纯标准库）。
 - [ ] 已写好一个 SUT profile（见 `.shared/skills/bugate/references/profile-schema.md`，可拷贝 `examples/sample-sut.profile.yaml`），设置 `artifact_dir` 等。
 - [ ] 用 `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init` 生成 01–05 gate 产物（无独立"初始化脚本"）。
 - [ ] PRD / 需求文档可访问，作为 Layer 1 的证据来源。

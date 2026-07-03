@@ -3,27 +3,12 @@
 #
 # The memory service binary + its ONNX model are installed by the USER. This
 # wrapper only configures the storage dir / API keys and launches it. It is
-# git-free: the project root is found via a sentinel walk-up (AGENTS.md + .shared)
-# with a pwd fallback, so it works in plain (non-git) checkouts too.
+# git-free: the engine root is resolved from this script's own location,
+# so it works in plain (non-git) checkouts too.
 set -euo pipefail
 
-# --- git-free root: walk up for the AGENTS.md + .shared sentinel -------------
-find_root() {
-  local dir="${PWD}"
-  # Prefer the directory containing this script's parent, then walk up.
-  local start
-  start="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || echo "$PWD")"
-  dir="$start"
-  while [ "$dir" != "/" ]; do
-    if [ -f "$dir/AGENTS.md" ] && [ -d "$dir/.shared" ]; then
-      echo "$dir"
-      return 0
-    fi
-    dir="$(dirname "$dir")"
-  done
-  echo "$PWD"
-}
-ROOT="$(find_root)"
+# Engine root: bin/ sits one level below the engine tree root.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-$ROOT/.memory_bus}"
 export MCP_MEMORY_STORAGE_BACKEND="${MCP_MEMORY_STORAGE_BACKEND:-sqlite_vec}"

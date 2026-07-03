@@ -15,17 +15,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from bugate_core import gate_status, load_config, required_precode_artifacts
+from bugate_core import find_root, gate_status, load_config, required_precode_artifacts
 
 
 PATCH_HEADER_RE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$|^\*\*\* Move to: (.+)$", re.MULTILINE)
-
-
-def find_root(start: Path) -> Path:
-    for candidate in [start, *start.parents]:
-        if (candidate / "AGENTS.md").exists() and (candidate / ".shared").exists():
-            return candidate
-    raise SystemExit("BUGate root not found: expected AGENTS.md and .shared")
 
 
 def guarded_patterns(config: dict[str, Any]) -> list[str]:

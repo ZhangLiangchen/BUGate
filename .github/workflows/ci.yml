@@ -40,6 +40,24 @@ jobs:
       - name: Per-UC hardening gates ON (multiview + adversarial absorption, demo)
         run: BUGATE_PROFILE=examples/sample-sut.profile.yaml python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
 
+      - name: Write-guard dual-layout acceptance (imported default + workbench)
+        run: |
+          # Imported layout: the governed repo is the workspace root (committed
+          # config marks it); the engine resolves from its own location.
+          cd examples/imported-demo
+          python3 ../../scripts/check_bugate.py tests/link/test_redirect.py </dev/null
+          if python3 ../../scripts/check_bugate.py tests/new/test_new.py </dev/null; then
+            echo "negative control failed: pending UC was not blocked (imported)"; exit 1
+          fi
+          cd ../..
+          # Workbench layout: the engine repo is the workspace root, the SUT
+          # tree is mounted beneath it and bound via a local profile.
+          export BUGATE_PROFILE=examples/mounted-demo/demo.profile.yaml
+          python3 scripts/check_bugate.py examples/mounted-demo/tests/link/test_redirect.py </dev/null
+          if python3 scripts/check_bugate.py examples/mounted-demo/tests/new/test_new.py </dev/null; then
+            echo "negative control failed: pending UC was not blocked (workbench)"; exit 1
+          fi
+
       - name: Wave 0 PRD health gate (demo)
         run: python3 scripts/check_prd_health.py --input examples/demo-sut/prd_health.yaml --json-output /tmp/h.json --md-output /tmp/h.md --gate
 

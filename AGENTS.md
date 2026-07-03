@@ -51,8 +51,11 @@ For non-trivial BUGate work:
 ## Hook Policy
 
 Codex and Claude hooks call only SUT-neutral scripts from `scripts/`. Hook
-commands must not depend on git metadata; scripts resolve the repository root by
-walking up to `AGENTS.md` and `.shared/`.
+commands must not depend on git metadata: hooks locate the engine by walking up
+for `scripts/bugate_core.py`, and gate scripts resolve the governed workspace
+root by walking up from CWD to the nearest `bugate.config.yaml`
+(`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel remains
+as a workbench fallback).
 
 Changing `.codex/hooks.json` can require Codex Desktop to re-trust the project
 hook hash before hooks become active.
