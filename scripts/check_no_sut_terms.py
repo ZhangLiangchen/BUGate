@@ -50,6 +50,7 @@ SCAN_ROOTS = [
     "examples",
     ".github",
     "AGENTS.md",
+    "CHARTER.md",
     "README.md",
     "INIT.md",
     "INIT.zh-CN.md",

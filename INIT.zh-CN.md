@@ -7,6 +7,18 @@
 
 BUGate 是一个与被测系统（SUT）无关的、AI 驱动的黑盒测试「门」引擎。核心纯 Python 标准库实现，**clone 即用**。实际挂载时，BUGate 挂载的是 SUT 的**自动化测试框架/测试工作区**，不是把产品源码、接口快照、密钥或运行环境塞进核心仓库。
 
+## 先选路径：导入模式（默认） vs 工作台模式（维护者）
+
+BUGate 有两种使用形态（规范定义见 [`CHARTER.md`](CHARTER.md) §2）：
+
+- **使用者路径 —— 导入模式（默认）。** 你要用 BUGate 治理某个 SUT 的自动化测试仓：
+  先按下文完成核心验证，然后按 README「Quickstart A) Imported mode」把引擎 +
+  skill 装进 **SUT 测试仓**、在那边接线 hooks，并把 `bugate.config.yaml` +
+  profile **提交进 SUT 仓**。日常 agent 会话打开的是 **SUT 测试仓**，不是本仓。
+- **维护者路径 —— 工作台模式。** 你在开发 BUGate 本身（core 脚本/hooks、方法论、
+  profile schema、语义门、demo、跨 SUT 回归）：留在本仓，按下文「工作台模式：
+  挂载 SUT 测试工作区」用软链接 + 本地不提交的 profile 指针挂载测试工作区。
+
 ## ✅ 必须依赖（只有一个）
 
 | 依赖 | 版本 | 说明 |
@@ -32,7 +44,11 @@ python3 scripts/check_bugate_brief_semantics.py     .shared/skills/bugate/templa
 
 全部通过 = 核心就绪（没有安装任何依赖）。
 
-## 挂载 SUT 的自动化测试框架/测试工作区
+## 工作台模式：挂载 SUT 测试工作区（维护者路径）
+
+> 日常治理 SUT 请用**导入模式**（见上文「先选路径」与 README Quickstart A）：
+> BUGate 装进 SUT 仓、profile 提交在 SUT 仓。下面的挂载方式是**工作台**设置：
+> 本仓保持项目根，profile 指针保持本地不提交。
 
 核心默认「未挂载」（`bugate.config.yaml` 是 `mode: core`，守卫关闭）。要在真实系统上用，profile 应指向 SUT 的测试工作区：测试代码、BUGate 工件目录、测试运行命令、证据采集位置、角色隔离规则等。产品源码、API dump、密钥、环境名、固定资源 ID 仍属于 SUT/业务侧或测试工作区的外部配置，不进入 BUGate core。
 
@@ -277,7 +293,7 @@ Codex 或 Claude Code，让 agent 做一次端到端体检。目标不是只看 
 |---|---|---|---|
 | 4 层门引擎(核心) | **无** | 门脚本 + 模板 | —(永远可用) |
 | 在 agent 里跑 | 无 | `.claude` / `.codex` hooks | — |
-| 挂载 SUT 测试工作区 | 无 | `bugate.config.yaml` + profile schema | — |
+| 挂载 SUT 测试工作区(工作台)/导入 SUT 仓 | 无 | `bugate.config.yaml` + profile schema | — |
 | 双 agent 互审 | `codex` + `claude` CLI | `sdtd_multiview*` | 会 → 确定性占位 |
 | Agent 记忆 + 晋级 | `mcp-memory-service` + ONNX 模型 | `memory_bus.py` + `bin/memory-*` | 会 → 安装提示,非致命 |
 | Agent 角色隔离 | 无 | `check_agent_role_paths.py` | —(默认 OFF) |

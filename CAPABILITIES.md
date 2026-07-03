@@ -24,7 +24,22 @@ generated.
 - **Root discovery is git-free.** Scripts and `bin/` wrappers walk up for the
   `AGENTS.md` + `.shared/` sentinel, so BUGate works in non-git checkouts.
 
-All script invocations below are from the repo root, e.g.
+**Where commands run (imported vs workbench).** Default usage is **imported
+mode**: the engine, skill, hooks, and a **committed** profile live inside the
+SUT automation test repo, and the SUT-facing commands below run from that
+repo's root against its profile. **Core-workbench mode** (this repo as project
+root, a SUT test workspace mounted via symlink + a local uncommitted profile
+pointer) is the maintainer setup; the same commands then run from this repo's
+root. Normative rules: [`CHARTER.md`](CHARTER.md) §2. Per command class:
+
+| Command class | Runs in |
+|---|---|
+| Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation, plan lock, prompt reminder, `wave8-weekly` | The **governed workspace** — the SUT repo (imported, default), or this repo against a mounted workspace (workbench) |
+| De-SUT guard (`check_no_sut_terms.py`) | **This repo only** — core hygiene, enforced in core CI |
+| Memory bus (`memory_bus.py`, `bin/memory-*`) | Either — namespace isolated per project via `memory.namespace` / `MEMORY_BUS_PROJECT_TAG` |
+
+All script invocations below are from the **governed workspace root** — the
+SUT repo in imported mode, this repo in workbench mode — e.g.
 `python3 scripts/<name>.py …`. Bash wrappers live in `bin/`.
 
 ---
