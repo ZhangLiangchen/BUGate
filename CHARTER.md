@@ -4,7 +4,7 @@ id: CHARTER-BUGATE-001
 title: BUGate positioning, usage model, and evolution plan
 status: accepted
 created_at: 2026-07-03
-amended_at: 2026-07-03 (A1)
+amended_at: 2026-07-04 (A2; A1 2026-07-03)
 authority: ADR-BUGATE-001
 companions:
   - docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md
@@ -193,6 +193,8 @@ Agent runtime
 1. debug core scripts / hooks / skill discovery；
 2. 演进方法论、profile schema、semantic gates；
 3. 运行 demo-sut、sample profile、core smoke；
+   *（修订记录 A2 有本条的生效文本：示例树已移除，核心冒烟改为模板门 +
+   临时构造 fixture 验收；原文按「不悄改」原则保留。）*
 4. 跨 SUT 回归，验证 core 未被任何一个 SUT 污染。
 
 规则：
@@ -299,6 +301,9 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
   **引擎根** = 由安装方式决定（插件根 / console-script / vendored 目录）。
   `guarded_path_regex`、`artifact_dir`、per-UC fail-closed 绑定、profile 合并均已参数化，无需改动。
 - **验收**：同一引擎版本在工作台布局与导入布局两种根形态下门禁行为一致（mounted-demo 双跑绿）。
+  *（修订记录 A2 加注：该验收已于 2026-07-03 以当时的双示例树达成；示例树随后
+  移除，双布局一致性此后由临时构造 fixture 的验收测试与安装器 e2e 在 CI 持续
+  强制。）*
 
 ### 5.4 P2 — 附加通道与治理左移
 
@@ -386,6 +391,40 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
   （`tests/fixtures/legacy-sut-terms.txt`）与其自身 profile；guard 扫描面锚定
   engine root 的 kit 子树，治理工作区自身文件不在扫描面。附录 A 术语表
   de-SUT guard 条目同步为身份防渗语义。
+
+### A2 — 上游仓纯净化：零示例树，验收临时构造（2026-07-04）
+
+- **批准**：human owner 直接指令（2026-07-04：移除 SUT 挂载物与 examples/，
+  并为宪章走本修正案）。决策记录锚点：ADR-BUGATE-002
+  （`docs/qa-methodology/BUGATE_HOSTING_CORRECTION_ADR.md`）§3 的
+  2026-07-04 更新注记；落地提交 `7fba928`。
+- **立法本意**：导入模式的引擎仓必须**在字面上**是纯 kit——上游提交树不携带
+  任何 SUT 自动化测试框架，也不收藏任何 SUT 形状的示例树（示例即演示性
+  config/profile/usecases/tests 目录组合）。演示与验收职能不因此消失，而是
+  改由**临时构造 fixture**（运行时在临时目录搭建、用完即弃）承担——被治理
+  布局只在运行时存在，不在上游提交树里存在。
+- **§2.3 活动清单第 3 类生效文本**（原文保留于 §2.3）：
+
+  > 3. 运行核心冒烟：模板门（`.shared/skills/bugate/templates` 过 pre-code
+  >    语义门）与临时构造 fixture 验收（上游 `tests/` 的双布局写门验收、
+  >    de-SUT 元测试、安装器 e2e），以及 full-check 自检。
+
+- **§5.3 验收条生效文本**（原文保留于 §5.3）：
+
+  > **验收**：同一引擎版本在工作台布局与导入布局两种根形态下门禁行为一致，
+  > 由临时构造 fixture 的双布局验收测试与 `bugate init` 临时仓 e2e（含 R4
+  > 负向对照）在 CI 持续强制。（首次达成于 2026-07-03，以当时的双示例树。）
+
+- **机制连带**：examples/ 整树移除（含通过态门栈示例、方言 fixture、两种
+  布局演示与样例 profile）；de-SUT guard 的上游扫描面去掉 examples 条目；
+  full-check 的全部被治理布局探针改为临时构造；入门文档的五分钟路径改以
+  模板门 + 临时 fixture 演示 + 安装器 dry-run 呈现。
+- **边界（防矫枉过正）**：①模板（`.shared/skills/bugate/templates/`）是引擎
+  资产而非示例 SUT 树，保留且随 kit 分发；②上游 `tests/` 的验收测试与
+  fixture 词表为上游专用，不随 kit vendor；③工作台模式的挂载**机制**
+  （§2.3 R7：symlink + 本地未提交 profile 指针）不受本修正案影响——被裁决
+  的是"上游提交树收藏示例树"，不是"维护者本地挂载一个真实 SUT 工作区"；
+  ④历史文本（§6 锚点、案例研究、既往 ADR 正文）不追改，按日期注记读。
 
 ---
 
