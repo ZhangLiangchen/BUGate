@@ -39,7 +39,8 @@ root. Normative rules: [`CHARTER.md`](CHARTER.md) §2. Per command class:
 | Command class | Runs in |
 |---|---|
 | Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation, plan lock, prompt reminder, `wave8-weekly` | The **governed workspace** — the SUT repo (imported, default), or this repo against a mounted workspace (workbench) |
-| De-SUT guard (`check_no_sut_terms.py`) | **This repo only** — core hygiene, enforced in core CI |
+| Importer (`bugate_init.py`) — vendors the kit, links skills, merges hooks, scaffolds committed config + profile | The **engine checkout** (this repo, or an already-vendored kit), pointed at a target SUT repo |
+| De-SUT guard (`check_no_sut_terms.py`) | The **engine tree** it is part of — scans the kit subtree anywhere; the full upstream surface only in this repo (CI-enforced here) |
 | Memory bus (`memory_bus.py`, `bin/memory-*`) | Either — namespace isolated per project via `memory.namespace` / `MEMORY_BUS_PROJECT_TAG` |
 
 All script invocations below are from the **governed workspace root** — the

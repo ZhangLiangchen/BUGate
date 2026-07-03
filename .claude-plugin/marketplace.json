@@ -1,0 +1,13 @@
+{
+  "name": "bugate",
+  "owner": {
+    "name": "BUGate maintainers"
+  },
+  "plugins": [
+    {
+      "name": "bugate",
+      "source": "./",
+      "description": "Spec-Driven Test Development governance for AI coding agents: layered pre-code gates plus a fail-closed physical write guard, activated per-repo by a committed bugate.config.yaml + SUT profile."
+    }
+  ]
+}
