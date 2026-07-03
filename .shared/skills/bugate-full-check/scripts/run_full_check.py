@@ -196,8 +196,15 @@ def main() -> int:
     onnx_files = list(onnx_root.rglob("*.onnx")) if onnx_root.exists() else []
     add(checks, "ONNX model files", bool(onnx_files), f"{len(onnx_files)} .onnx file(s) under {onnx_root}")
 
+    # System-level bus home, same resolution as bin/memory-bus-start:
+    # MCP_MEMORY_BASE_DIR > BUGATE_MEMORY_HOME > ~/.bugate/memory-bus.
+    bus_home = (
+        os.environ.get("MCP_MEMORY_BASE_DIR")
+        or os.environ.get("BUGATE_MEMORY_HOME")
+        or str(Path.home() / ".bugate" / "memory-bus")
+    )
     memory_env = {
-        "MCP_MEMORY_BASE_DIR": str(root / ".memory_bus"),
+        "MCP_MEMORY_BASE_DIR": bus_home,
         "MCP_MEMORY_STORAGE_BACKEND": "sqlite_vec",
         "MCP_MEMORY_USE_ONNX": "1",
         "PATH": f"{root / '.venv/bin'}:{os.environ.get('PATH', '')}",

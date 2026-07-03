@@ -9,6 +9,9 @@ Design rules:
 - No SUT specifics. The project namespace/tag is a profile/env value, never
   hardcoded. Resolution order: env ``MEMORY_BUS_PROJECT_TAG`` -> config
   ``memory.namespace`` (from ``bugate.config.yaml``) -> default ``project:bugate``.
+- The bus is MACHINE-level, not repo-level: one local service instance whose
+  data home resolves system-wide (see ``memory_home``). N workspaces share it
+  and are isolated by namespace tag, never by per-project databases.
 - The bus is a generic BUGate component, not SUT-only: any subcommand takes
   ``--core`` (record/read in BUGate's own base-config namespace, ignoring the
   mounted SUT profile) or ``--namespace X`` (an explicit tag). One DB, tag-
@@ -38,6 +41,7 @@ import bugate_core  # noqa: E402  (local sibling module)
 
 DEFAULT_URL = "http://localhost:8000"
 DEFAULT_PROJECT_TAG = "project:bugate"
+DEFAULT_MEMORY_HOME = Path.home() / ".bugate" / "memory-bus"
 START_HINT = "Start it with bin/memory-bus-start (or bin/memory-bus-ensure)."
 
 VALID_AGENTS = ("builder", "designer", "implementer", "reviewer", "human", "agent")
@@ -104,10 +108,42 @@ def core_project_tag() -> str:
     return DEFAULT_PROJECT_TAG
 
 
+def memory_home() -> Path:
+    """System-level bus data home shared by every workspace on this machine.
+
+    Resolution: ``MCP_MEMORY_BASE_DIR`` (the service's own env var, highest)
+    > ``BUGATE_MEMORY_HOME`` > ``~/.bugate/memory-bus``. Wrappers and clients
+    all resolve through this order, so any repo that starts the service lands
+    on the same directory by construction (no per-repo split-brain databases).
+    """
+    for env in ("MCP_MEMORY_BASE_DIR", "BUGATE_MEMORY_HOME"):
+        value = os.environ.get(env, "").strip()
+        if value:
+            return Path(value).expanduser()
+    return DEFAULT_MEMORY_HOME
+
+
 def load_local_env() -> None:
-    """Load API keys from .memory_bus/client.env without overriding the env."""
-    env_path = root() / ".memory_bus" / "client.env"
-    if not env_path.exists():
+    """Load client API keys from client.env without overriding the env.
+
+    Search order: the system-level home (``memory_home()/client.env``) first,
+    then the legacy per-repo ``.memory_bus/client.env`` as a deprecated
+    fallback (a stderr hint asks for a move to the system home). Real env vars
+    always win — file values never overwrite existing ``os.environ`` entries.
+    """
+    system_path = memory_home() / "client.env"
+    legacy_path = root() / ".memory_bus" / "client.env"
+    if system_path.exists():
+        env_path = system_path
+    elif legacy_path.exists():
+        env_path = legacy_path
+        if system_path != legacy_path:
+            print(
+                f"memory-bus: using legacy client.env at {legacy_path}; "
+                f"move it to {system_path} (system-level bus home).",
+                file=sys.stderr,
+            )
+    else:
         return
     for line in env_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -585,8 +621,9 @@ def cmd_stop(args: argparse.Namespace) -> int:
 def cmd_archive(args: argparse.Namespace) -> int:
     """Back up every memory under the active namespace to a local JSON file.
 
-    DE-SUT: default output is <root>/.memory_bus/backups/, which is already
-    git-ignored. No SUT-specific export location is hardcoded.
+    DE-SUT: default output is <memory_home>/backups/ — the system-level bus
+    home outside any working tree, so no SUT-specific export location is
+    hardcoded and nothing lands in a repo.
     """
     if not service_available():
         warn_unavailable()
@@ -602,7 +639,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
         if not out_path.is_absolute():
             out_path = (Path.cwd() / out_path).resolve()
     else:
-        out_path = root() / ".memory_bus" / "backups" / f"memory_backup_{stamp}.json"
+        out_path = memory_home() / "backups" / f"memory_backup_{stamp}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "exported_at": datetime.now(timezone.utc).isoformat(),
@@ -862,7 +899,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_stop)
 
     p = sub.add_parser("archive", help="back up namespace memories to a local JSON file")
-    p.add_argument("--out", help="output path (default: <root>/.memory_bus/backups/memory_backup_<ts>.json)")
+    p.add_argument("--out", help="output path (default: <bus-home>/backups/memory_backup_<ts>.json)")
     p.add_argument("--limit", type=int, default=10000, help="max memories to archive")
     p.set_defaults(func=cmd_archive)
 

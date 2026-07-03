@@ -141,11 +141,31 @@ bin/memory-bus-start
 ```
 
 The wrapper resolves the `memory` binary from `<root>/.venv/bin/memory` or
-`PATH`, configures `MCP_MEMORY_BASE_DIR` (default `<root>/.memory_bus`, git-ignored),
+`PATH`, configures the **system-level data home** `MCP_MEMORY_BASE_DIR`
+(resolution: `MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` > `~/.bugate/memory-bus`),
 `MCP_MEMORY_STORAGE_BACKEND` (`sqlite_vec`), and `MCP_MEMORY_USE_ONNX` (`1`),
-generates client API keys once into `.memory_bus/client.env`, then launches the
-service on `127.0.0.1:${MCP_HTTP_PORT:-8000}`. If the `memory` binary is not
-found it prints the `pip install` + `bin/memory-model-fetch` hint and exits 1.
+generates client API keys once into `<bus-home>/client.env` (0600, never in
+git), then launches the service on `127.0.0.1:${MCP_HTTP_PORT:-8000}`. If the
+`memory` binary is not found it prints the `pip install` +
+`bin/memory-model-fetch` hint and exits 1.
+
+The bus is **machine-level by design** (ADR-BUGATE-003): ONE service instance
+per machine, shared by every BUGate-governed workspace; projects are isolated
+by namespace tag (`project:<name>` from each workspace's profile), never by
+per-repo databases — so a restart triggered from any repo resolves to the same
+database by construction (no split brain). Clients load `client.env` from the
+system home first; a legacy in-repo `.memory_bus/client.env` still works but
+prints a deprecation hint. The service itself takes daily `.db` backups into
+`<bus-home>/backups/` (tune with `MCP_BACKUP_*` env vars).
+
+**Optional hardening (macOS):** register the bus as a user-level LaunchAgent
+so it starts at login and is restarted if it dies. Without the agent nothing
+changes — `bin/memory-bus-ensure` still starts the bus on demand:
+
+```bash
+bin/memory-bus-install-launchd              # RunAtLoad + KeepAlive
+bin/memory-bus-install-launchd --uninstall  # stop + remove
+```
 The driver's project namespace comes from the SUT profile (`memory.namespace`)
 or `MEMORY_BUS_PROJECT_TAG`, defaulting to `project:bugate`. Once running, use
 the `bin/memory-service-*` and `bin/promote-memory` wrappers (e.g.
@@ -167,7 +187,8 @@ bin/memory-service-search --query "memory smoke" --limit 1
 ```
 
 Use the BUGate wrappers for verification; a raw `memory status` command may use
-the service's default environment instead of this repo's `.memory_bus/` database.
+the service's default environment instead of the shared bus home database
+(`~/.bugate/memory-bus/` by default).
 
 ### Fallback
 

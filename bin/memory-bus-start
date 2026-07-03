@@ -10,7 +10,11 @@ set -euo pipefail
 # Engine root: bin/ sits one level below the engine tree root.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-$ROOT/.memory_bus}"
+# System-level bus home: ONE machine-wide service/database shared by every
+# workspace (namespace tags isolate projects). Any repo's wrapper resolves to
+# the same dir, eliminating per-repo split-brain databases by construction.
+# Resolution: MCP_MEMORY_BASE_DIR > BUGATE_MEMORY_HOME > ~/.bugate/memory-bus.
+export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-${BUGATE_MEMORY_HOME:-$HOME/.bugate/memory-bus}}"
 export MCP_MEMORY_STORAGE_BACKEND="${MCP_MEMORY_STORAGE_BACKEND:-sqlite_vec}"
 # PyTorch-free embeddings via ONNX. The model must already exist under
 # ~/.cache/mcp_memory/onnx_models (pre-download once; the in-service downloader

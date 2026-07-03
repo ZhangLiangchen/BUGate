@@ -6,7 +6,8 @@ set -euo pipefail
 # Engine root: bin/ sits one level below the engine tree root.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-$ROOT/.memory_bus}"
+# System-level bus home (see bin/memory-bus-start for the resolution contract).
+export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-${BUGATE_MEMORY_HOME:-$HOME/.bugate/memory-bus}}"
 if [ -f "$MCP_MEMORY_BASE_DIR/client.env" ]; then
   set -a
   . "$MCP_MEMORY_BASE_DIR/client.env"

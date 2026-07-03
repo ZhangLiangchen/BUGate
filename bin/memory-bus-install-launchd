@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# OPTIONAL hardening: register the system-level memory bus as a user-level
+# macOS LaunchAgent (RunAtLoad + KeepAlive), so the service starts at login and
+# is restarted if it dies. Without this agent nothing changes: the bus is still
+# started on demand by bin/memory-bus-ensure and degrades gracefully when down.
+#
+# Usage:
+#   bin/memory-bus-install-launchd              # install (or refresh) + start
+#   bin/memory-bus-install-launchd --uninstall  # stop + remove the agent
+#
+# The agent runs bin/memory-bus-start --foreground so launchd owns the process
+# (KeepAlive needs an attached child, not the default self-daemonizing launch).
+# The bus data home follows the system-level resolution contract:
+# MCP_MEMORY_BASE_DIR > BUGATE_MEMORY_HOME > ~/.bugate/memory-bus.
+set -euo pipefail
+
+# Engine root: bin/ sits one level below the engine tree root.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+LABEL="com.bugate.memory-bus"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+BUS_HOME="${MCP_MEMORY_BASE_DIR:-${BUGATE_MEMORY_HOME:-$HOME/.bugate/memory-bus}}"
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "memory-bus-install-launchd: launchd is macOS-only; keep using bin/memory-bus-ensure on this platform." >&2
+  exit 2
+fi
+
+UID_NUM="$(id -u)"
+
+if [ "${1:-}" = "--uninstall" ]; then
+  launchctl bootout "gui/$UID_NUM/$LABEL" 2>/dev/null || launchctl remove "$LABEL" 2>/dev/null || true
+  rm -f "$PLIST"
+  echo "Uninstalled LaunchAgent $LABEL (service stopped, plist removed)."
+  echo "The bus still starts on demand via bin/memory-bus-ensure."
+  exit 0
+fi
+
+mkdir -p "$HOME/Library/LaunchAgents" "$BUS_HOME"
+
+cat > "$PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>$ROOT/bin/memory-bus-start</string>
+    <string>--foreground</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MCP_MEMORY_BASE_DIR</key><string>$BUS_HOME</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$BUS_HOME/launchd.log</string>
+  <key>StandardErrorPath</key><string>$BUS_HOME/launchd.log</string>
+</dict>
+</plist>
+PLIST
+
+# Stop a plain (non-launchd) instance first so the agent does not fight an
+# existing listener for the port, then replace any previous registration.
+"$ROOT/bin/memory-bus-stop" >/dev/null 2>&1 || true
+launchctl bootout "gui/$UID_NUM/$LABEL" 2>/dev/null || true
+if ! launchctl bootstrap "gui/$UID_NUM" "$PLIST" 2>/dev/null; then
+  launchctl load -w "$PLIST"
+fi
+
+echo "Installed LaunchAgent $LABEL (RunAtLoad + KeepAlive)."
+echo "Bus home: $BUS_HOME  Log: $BUS_HOME/launchd.log"
+echo "Uninstall with: bin/memory-bus-install-launchd --uninstall"
