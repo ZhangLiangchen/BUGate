@@ -4,7 +4,7 @@ id: CHARTER-BUGATE-001
 title: BUGate positioning, usage model, and evolution plan
 status: accepted
 created_at: 2026-07-03
-amended_at: 2026-07-04 (A2; A1 2026-07-03)
+amended_at: 2026-07-04 (A3, A2; A1 2026-07-03)
 authority: ADR-BUGATE-001
 companions:
   - docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md
@@ -37,6 +37,8 @@ provenance: >
    形式导入，作为 Agent 的约束层。**工作台模式（Core Workbench）**——打开 BUGate 仓本身、
    经 symlink + 本地 profile 挂载一个 SUT 测试工作区——**有且仅有**开发 BUGate 自身时使用，
    是维护者模式，不是对外主叙事。
+   *（修订记录 A3：使用形态自此**唯一**=导入模式；"工作台"去形态化——打开本仓只是
+   BUGate 自身的开发态，不是 BUGate 的一种使用方式。生效表述见 §7/A3。）*
 3. **演进方向** — 像 Spec Kit / Superpowers 一样**被导入** SUT 测试工作区，而不是把 SUT 作为
    BUGate core 仓库的内容来拥有。路线：叙事与文档翻转（P0）→ 安装器与双通道分发（P1）→
    根发现拆分（P1）→ MCP 附加通道与治理左移（P2）。
@@ -153,10 +155,15 @@ CI 中没有 agent 也必须能跑；物理拦截也只有 hook 能做。
 | **工作台模式**（Core Workbench） | 打开 BUGate 仓，SUT 测试工作区经 symlink + 本地 profile 挂载 | **维护者专用**（§2.3） |
 | **导入模式**（Imported Governance Layer） | 打开 SUT 测试仓，BUGate 版本化导入 | **默认与终态**（本文裁决） |
 
+*（修订记录 A3 生效读法：上表退役为二元——**使用形态有且仅有导入模式**；"工作台模式"
+行自此读作"BUGate 自身开发态"（非使用形态）；内嵌模式为历史形态。）*
+
 内嵌模式的退出终态由此明确：**起源 SUT 测试仓以导入模式引入 kit，替换冻结的内嵌栈**。
 TRANSITION_PROTOCOL 的三桶分类、strangler-fig 与退出判据全部不变，改变的只是终态的宿主方向。
 
 ### 2.2 默认：导入模式（Imported Governance Layer）
+
+*（修订记录 A3 生效节题：「唯一使用形态：导入模式」。）*
 
 ```text
 Agent runtime
@@ -187,6 +194,10 @@ Agent runtime
   *（修订记录 A1 加注：「永不进 core」按三层判别式读，行为性事实零让步。）*
 
 ### 2.3 例外：工作台模式（Core Workbench）
+
+*（修订记录 A3 生效节题：「BUGate 自身开发态（maintainer development）」——本节
+四类活动与 R7–R9 全部保留原效力，但语义为"开发这个工具时的调试与中立性纪律"，
+不再是一种使用形态。）*
 
 适用范围**有且仅有**开发 BUGate 自身，具体为以下四类活动：
 
@@ -426,6 +437,36 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
   的是"上游提交树收藏示例树"，不是"维护者本地挂载一个真实 SUT 工作区"；
   ④历史文本（§6 锚点、案例研究、既往 ADR 正文）不追改，按日期注记读。
 
+### A3 — 使用形态唯一化：「工作台」去形态化（2026-07-04）
+
+- **批准**：human owner 直接指令（2026-07-04）。锚点：本修正案随派生文档
+  同批提交（见 git 历史当日提交）。
+- **立法本意**：BUGate 作为产品**有且仅有一种使用形态：导入模式**。此前定名
+  的"工作台模式"不是 BUGate 的使用形态，而是**开发 BUGate 自身**这件普通的
+  软件开发活动——把本仓作为项目在 Claude Code / Codex 中打开，对引擎做完善
+  与修改。两者分属不同概念层：导入模式是"**用**这个工具"，开发态是"**改**这
+  个工具"；"改工具"不构成工具的使用方式。
+- **生效表述**：
+  - §0 裁决 2 生效读法：使用规范 = 导入模式（唯一）。打开 BUGate 仓本身即
+    进入 **BUGate 自身开发态（maintainer development）**；开发态下可以用
+    symlink + 本地未提交 `profile:` 指针挂载一个真实 SUT 测试工作区，作为
+    调试与跨 SUT 回归手段——那是开发实践，不是使用形态。
+  - §2.1 生效读法：形态表退役为二元——使用形态唯一 = 导入；内嵌 = 历史
+    形态；原"工作台模式"行读作"开发态"。
+  - §2.2 生效节题：「唯一使用形态：导入模式（Imported Governance Layer）」。
+  - §2.3 生效节题：「BUGate 自身开发态（maintainer development）」。四类
+    活动清单与 **R7 / R8 / R9 保留全部原效力**，语义重述为开发态纪律；其中
+    R8 的加强读法：对外叙事**不得把开发态表述为 BUGate 的一种使用方式**。
+- **术语与派生连带**：附录 A"工作台模式"词条改注（本修正案标记）；README /
+  INIT / CAPABILITIES / profile-schema / CONTRIBUTING / AGENTS / 测试与
+  守卫脚本注释中的 "workbench (maintainer) mode / 工作台模式" 表述统一改为
+  "developing BUGate itself / BUGate 自身开发（态）"；布局术语 "workbench
+  layout" 改称 "engine-development layout"。历史文本（§5 演进计划原文、§6
+  锚点、A1/A2 正文、既往 ADR、案例研究、白皮书正文）不追改，按日期注记读。
+- **边界（防矫枉过正）**：本修正案**零机制变更**——挂载手续（R7）、根发现的
+  哨兵 fallback、临时构造验收、de-SUT 纪律全部原样；改变的只是概念归类与
+  对外表述。
+
 ---
 
 ## 附录 A — 术语表
@@ -433,7 +474,7 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
 | 术语 | 含义 |
 |---|---|
 | **导入模式** Imported Governance Layer | 默认使用形态：SUT 测试仓为项目根，BUGate 版本化导入其中作为约束层 |
-| **工作台模式** Core Workbench | 维护者形态：BUGate 仓为项目根，SUT 测试工作区经 symlink + 本地 profile 挂载 |
+| **BUGate 自身开发态** maintainer development（原"工作台模式" Core Workbench，修订记录 A3 去形态化） | 开发 BUGate 本身时把本仓作为项目打开；**不是使用形态**。调试时可经 symlink + 本地未提交 profile 指针挂载一个 SUT 测试工作区（R7 手续不变） |
 | **内嵌模式** Embedded | 历史形态：BUGate 手工融合在起源 SUT 测试仓内；已冻结，按迁移协议退役 |
 | **治理控制面 / 执行数据面** | BUGate 管"何时、凭何证据允许做"；SUT 框架管"怎么执行" |
 | **admission control** | 物理写门的机制类比：拦截写操作、按产物 `gate_status` 裁决、fail-closed |
