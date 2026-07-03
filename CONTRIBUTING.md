@@ -54,7 +54,7 @@ discipline is three-layered:
    wants a domain word defended lists it itself.
 
 The scan surface anchors on the **engine root's kit subtree** (`scripts/`,
-`bin/`, `.shared/skills/`; plus docs/examples/root files when the engine root
+`bin/`, `.shared/skills/`; plus docs/ and root files when the engine root
 is this upstream repo, detected by the `CHARTER.md` sentinel). A governed
 workspace's own files are never the surface. The origin SUT's vocabulary lives
 only in `tests/fixtures/legacy-sut-terms.txt` (and in that SUT's own profile)
@@ -103,18 +103,19 @@ python3 scripts/check_bugate_layer2_semantics.py    .shared/skills/bugate/templa
 python3 scripts/check_bugate_inventory_semantics.py .shared/skills/bugate/templates
 python3 scripts/check_bugate_v13_semantics.py       .shared/skills/bugate/templates --scope pre-code
 
-# 3. De-SUT guard: hygiene + legacy regression + second-SUT defense + meta-test
+# 3. De-SUT guard: hygiene + legacy regression + meta-test (the meta-test also
+#    covers the second-SUT profile-declared defense on fabricated fixtures)
 python3 scripts/check_no_sut_terms.py
 python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt
-( cd examples/imported-demo && python3 ../../scripts/check_no_sut_terms.py )
 python3 tests/test_desut_guard.py
 
-# 4. The worked demo passes the strict gate
-python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+# 4. Write-guard dual-layout acceptance (ephemeral fixtures — the repo ships
+#    no committed example SUT trees)
+python3 tests/test_write_guard_layouts.py
 ```
 
-CI also runs the per-UC hardening gates, the Wave 0 PRD-health gate, the Wave 8
-falsification + coverage-matrix gates, an orchestrator init smoke, and a
+CI also runs the `bugate init` scratch-repo e2e (R4 negative control), the
+Wave 0 / Wave 8 graceful-degradation checks, an orchestrator init smoke, and a
 stdlib-only import check — see `ci.yml` for the exact invocations. If your change
 touches any of those subsystems, run the matching steps too. The simplest way to
 catch everything is to run each step listed in `ci.yml` locally before opening
@@ -133,8 +134,7 @@ fastest sanity check that the engine still imports and config still loads.
 | `bin/` | thin wrappers (e.g. memory-bus / promote helpers) |
 | `.shared/skills/bugate/` | the shared skill: `SKILL.md`, `references/`, `templates/`, `adapters/` |
 | `docs/qa-methodology/` | SUT-neutral method, SOP, ADR, protocols |
-| `examples/` | `demo-sut/` (worked, passing gate stack), `sample-sut.profile.yaml` |
-| `tests/` | upstream-only guard meta-tests + fixtures (`fixtures/legacy-sut-terms.txt` is the one legitimate home of the origin SUT's vocabulary); not part of the vendored kit |
+| `tests/` | upstream-only ephemeral-fixture acceptances (dual-layout write guard, de-SUT meta-test) + fixtures (`fixtures/legacy-sut-terms.txt` is the one legitimate home of the origin SUT's vocabulary); not part of the vendored kit |
 | `docs/case-studies/` | narrative allowlist: real import/migration stories (identity-scan exempt, hygiene enforced) |
 | `bugate.config.yaml` | core default config; ships with **no profile bound** (no guarded paths) |
 

@@ -166,6 +166,8 @@ copy-paste example profile — in:
 
 Profiles are merged on top of `bugate.config.yaml` by `load_config` and selected
 via `BUGATE_PROFILE`, the config `profile` field, or its `active_profile` alias.
-Selecting via the config `profile` field is a local, per-clone edit — do not commit it.
-For a filled, passing reference of the whole artifact stack, see
-`examples/demo-sut/`.
+In imported mode the governed repo commits its own config + profile; selecting
+via the ENGINE repo's config `profile` field is the workbench convention — a
+local, per-clone edit, never committed. The shipped templates pass the pre-code
+gates as-is; governed-layout acceptances fabricate fixtures at run time
+(upstream `tests/`).

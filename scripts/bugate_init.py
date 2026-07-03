@@ -121,7 +121,6 @@ profile: bugate.profile.yaml
 PROFILE_SCAFFOLD = """\
 # BUGate SUT profile — COMMIT this file beside the tests it governs.
 # Schema: {vendor_dir}/.shared/skills/bugate/references/profile-schema.md
-# Runnable miniature of this layout: the engine repo's examples/imported-demo/.
 
 # Per-UC fail-closed binding: each guarded test file maps to its own
 # docs/usecases/<uc>/ artifact dir via the {{uc}} capture below.

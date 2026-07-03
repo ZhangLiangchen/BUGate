@@ -72,6 +72,12 @@ sentinel files. Both layouts are CI-enforced by the dual-layout write-guard
 acceptance (`examples/imported-demo/` as the first-class imported layout,
 `examples/mounted-demo/` as the workbench layout).
 
+> *2026-07-04 update:* the committed example trees were removed for
+> imported-mode purity (the upstream repo carries no SUT-shaped directories at
+> all). The same dual-layout acceptance now runs on ephemeral fixtures —
+> `tests/test_write_guard_layouts.py` — plus a `bugate init` scratch-repo e2e
+> with the R4 negative control in CI. The decisions above are unchanged.
+
 ## 4. Decision 3 — distribution channels
 
 Shipped now (CHARTER §5.2's two-channel requirement):

@@ -50,8 +50,11 @@ Create them with `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init --f
 `check_bugate_v13_semantics.py` validates them only when present, chaining
 `OBJ-`/`STATE-`/`TR-` ids across stages.
 
-For a filled, passing reference of the whole stack (a neutral demo SUT), see
-`examples/demo-sut/`.
+The shipped templates pass the pre-code gates as-is
+(`python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code`);
+the write-guard acceptance fabricates governed workspaces at run time
+(upstream `tests/test_write_guard_layouts.py` — no example SUT trees ship in
+the kit or the repo).
 
 ## Gate Enforcement
 

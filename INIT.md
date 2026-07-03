@@ -79,11 +79,10 @@ No install is needed for this — the hooks invoke the same stdlib-only scripts 
 
 The core does nothing on its own; you mount a system under test via a **profile**.
 
-1. Create a profile by copying the sample, then declare your SUT's surfaces:
-
-   ```bash
-   mkdir -p sut && cp examples/sample-sut.profile.yaml sut/<name>.profile.yaml
-   ```
+1. Create a profile under a local `sut/` dir (full key contract:
+   [`profile-schema.md`](.shared/skills/bugate/references/profile-schema.md);
+   `scripts/bugate_init.py` scaffolds the same file shape for imported repos),
+   declaring your SUT's surfaces:
 
    ```yaml
    artifact_dir: docs/usecases                 # where UC artifacts (01–03…) live
@@ -95,7 +94,9 @@ The core does nothing on its own; you mount a system under test via a **profile*
      - 03_inventory.yaml
    ```
 
-   A filled, passing example gate stack lives in [`examples/demo-sut/`](examples/demo-sut/).
+   The shipped templates under `.shared/skills/bugate/templates/` pass the
+   pre-code gates as-is (Step 2), and the write-guard acceptance fabricates
+   its workspaces at run time (`tests/test_write_guard_layouts.py`).
 
 2. Point the core at it in `bugate.config.yaml`:
 

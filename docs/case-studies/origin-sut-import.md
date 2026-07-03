@@ -158,8 +158,9 @@ told with its real name, in the repo that used to forbid the word.
 ## 6. What a new adopter should take from this
 
 1. **Vendor the kit, commit the contract.** Config + profile live in the SUT
-   repo, reviewed with the tests they guard (README Quickstart A;
-   `examples/imported-demo/` is the runnable miniature).
+   repo, reviewed with the tests they guard (README Quickstart A; the layout
+   is exercised on ephemeral fixtures by `tests/test_write_guard_layouts.py`
+   and the CI `bugate init` e2e).
 2. **Let the profile absorb your specificity.** Paths, dialects, identity
    terms, role fences — everything one-SUT-shaped has a profile key; the
    engine stays reusable.

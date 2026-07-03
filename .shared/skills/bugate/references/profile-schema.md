@@ -219,8 +219,8 @@ memory:
 spec (`oracles:` as field assertions, `mutations:` as field-path ops, plus an
 `evidence`/`evidence_glob`). The engine is SUT-neutral and imports no SUT code;
 without a spec it reports `profile_required`. `falsification_threshold` is the
-kill-rate gate (`--gate` exits non-zero below it). See the worked example at
-`examples/demo-sut/falsification_spec.yaml`.
+kill-rate gate (`--gate` exits non-zero below it). The spec shape is documented
+in `scripts/oracle_falsification.py`'s module docstring.
 
 ### Optional hardening keys
 
@@ -236,7 +236,8 @@ kill-rate gate (`--gate` exits non-zero below it). See the worked example at
   self-assessment (scores 1-5); the engine computes a 0-100 composite + grade
   A–D + routing and passes through a structured gap report. `--gate` exits
   non-zero below `prd_health_min` (default 60). Without a spec it reports
-  `profile_required`. See `examples/demo-sut/prd_health.yaml`.
+  `profile_required`; the spec shape is documented in
+  `scripts/check_prd_health.py`'s module docstring.
 - `verifiability_min` — enables the Layer 1 **verifiability-ratio gate** in
   `check_bugate_brief_semantics.py`. A proposition counts as verifiable unless its
   `verifiability` cell reads unverifiable / deferred / unknown / tbd. The gate

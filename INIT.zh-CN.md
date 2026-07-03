@@ -236,9 +236,9 @@ Codex 或 Claude Code，让 agent 做一次端到端体检。目标不是只看 
 要求:
 1. 先读取 .shared/skills/bugate/SKILL.md，确认当前是 core mode 还是挂载了
    SUT profile 及其自动化测试工作区。不要编造任何 SUT 事实。
-2. 验证 core 4-layer gate:
+2. 验证 core 4-layer gate（仓内无示例 SUT 树，一律模板 + 临时构造）:
    - python3 -m py_compile scripts/*.py
-   - python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+   - python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
 3. 验证 Codex / Claude Code:
    - type -a codex; type -a claude
    - codex --version; claude --version
@@ -247,9 +247,9 @@ Codex 或 Claude Code，让 agent 做一次端到端体检。目标不是只看 
 4. 验证双端 bridge:
    - python3 scripts/sdtd_multiview_cli_bridge.py check-env
    - python3 scripts/sdtd_adversarial_cli_bridge.py check-env
-   - 复制 examples/demo-sut 到 /tmp 临时目录，在临时目录分别 run-all multi-view
-     与 adversarial，确认 Codex 和 Claude 都写出 real peer view，而不是
-     fallback_placeholder。
+   - 用 python3 scripts/sdtd_orchestrator.py <tmp>/peer-uc --init 在 /tmp 生成
+     模板 UC，在其上分别 run-all multi-view 与 adversarial，确认 Codex 和
+     Claude 都写出 real peer view，而不是 fallback_placeholder。
 5. 验证 memory-bus:
    - bin/memory-bus-status
    - bin/memory-service-note --agent agent --type finding --msg "memory smoke"
@@ -258,26 +258,20 @@ Codex 或 Claude Code，让 agent 做一次端到端体检。目标不是只看 
    - MCP_MEMORY_BASE_DIR="${BUGATE_MEMORY_HOME:-$HOME/.bugate/memory-bus}" MCP_MEMORY_STORAGE_BACKEND=sqlite_vec
      MCP_MEMORY_USE_ONNX=1 PATH="$PWD/.venv/bin:$PATH" memory status
      需要看到服务 healthy，并尽量确认 onnxruntime/ONNX 路径被触发。
-6. 验证 Wave 0 / Wave 8:
-   - python3 scripts/check_prd_health.py --input examples/demo-sut/prd_health.yaml --gate
-   - python3 scripts/oracle_falsification.py --spec examples/demo-sut/falsification_spec.yaml --gate
-   - python3 scripts/generate_assertion_coverage_matrix.py --artifact-root examples/demo-sut
-     --spec examples/demo-sut/falsification_spec.yaml --mutation-result <上一步 json> --output <tmp md>
-   所有输出写到 /tmp，结束后清理。
-7. 验证物理写守卫:
-   - BUGATE_PROFILE=examples/mounted-demo/demo.profile.yaml
-     python3 scripts/check_bugate.py examples/mounted-demo/tests/link/test_redirect.py </dev/null
-     应返回 0。
-   - 同 profile 检查 examples/mounted-demo/tests/new/test_new.py 应返回 2 并列出缺失工件。
-8. 验证 Wave 7 角色隔离:
-   - 用 examples/sample-sut.profile.yaml 和 BUGATE_AGENT_ROLE=implementer 测试
-     sut/example/docs/source_mirror/spec.md，应被阻止。
-   - 用 BUGATE_AGENT_ROLE=designer 测试 sut/example/tests/test_x.py，应被阻止。
-   - 测一个允许路径，应返回 0。
-9. 验证 profile hardening gates:
-   - BUGATE_PROFILE=examples/sample-sut.profile.yaml
-     python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
-10. 清理所有 /tmp 自检产物，不要改动 SUT 事实或 demo 源文件。
+6. 验证 Wave 0 / Wave 8（优雅降级契约，无需 spec fixture）:
+   - python3 scripts/check_prd_health.py --gate 应输出 profile_required 且退出码 0
+   - python3 scripts/oracle_falsification.py --gate 同上
+   - python3 scripts/generate_assertion_coverage_matrix.py --help 应正常退出
+7. 验证物理写守卫（双布局，临时构造 fixture）:
+   - python3 tests/test_write_guard_layouts.py 应输出 PASS(both layouts)——
+     imported(config 标记根)与 workbench(哨兵 fallback)各自 放行/阻断/fail-closed。
+8. 验证 Wave 7 角色隔离（临时 profile，见 full-check 的构造方式）:
+   - 在 /tmp 造一个含 agent_roles 的 profile，用 BUGATE_PROFILE=<该文件> 加
+     BUGATE_AGENT_ROLE=implementer 测被禁路径应返回 2，允许路径应返回 0。
+9. 验证 profile hardening gates（强制生效探针）:
+   - 用 orchestrator --init 的模板 UC + 一个 require_multiview: true 的临时
+     profile 跑 v13 pre-code，应因缺 divergence_report.md 而拒绝（非 0 退出）。
+10. 清理所有 /tmp 自检产物，不要改动 SUT 事实或模板源文件。
 
 最后输出一个表格，分为:
 - 已安装并验证可用

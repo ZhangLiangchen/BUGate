@@ -31,56 +31,48 @@ jobs:
       - name: V13 pre-code semantics gate
         run: python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
 
-      # De-SUT guard (CHARTER A1: block seepage, not mention) — four readings:
+      # De-SUT guard (CHARTER A1: block seepage, not mention) — three readings:
       # built-in hygiene, the origin SUT's legacy terms can never seep back,
-      # a second SUT's profile-declared identity stays out of the kit tree,
-      # and the meta-test proves every red/green verdict with negative controls.
+      # and the meta-test proves every red/green verdict (incl. the second-SUT
+      # profile-declared defense) with fabricated fixtures and negative controls.
       - name: De-SUT guard — general hygiene (kit tree, no term list)
         run: python3 scripts/check_no_sut_terms.py
 
       - name: De-SUT guard — legacy origin-SUT regression (fixture terms)
         run: python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt
 
-      - name: De-SUT guard — second-SUT identity defense (imported-demo profile)
-        run: cd examples/imported-demo && python3 ../../scripts/check_no_sut_terms.py
-
       - name: De-SUT guard — exemption + seepage negative controls (meta-test)
         run: python3 tests/test_desut_guard.py
 
-      - name: Worked demo passes the strict gate
-        run: python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+      # The repo ships no committed example SUT trees (imported-mode purity):
+      # every governed-layout acceptance below fabricates its fixtures at run
+      # time and asserts the guard's block/allow/fail-closed behavior.
+      - name: Write-guard dual-layout acceptance (ephemeral fixtures)
+        run: python3 tests/test_write_guard_layouts.py
 
-      - name: Per-UC hardening gates ON (multiview + adversarial absorption, demo)
-        run: BUGATE_PROFILE=examples/sample-sut.profile.yaml python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
-
-      - name: Write-guard dual-layout acceptance (imported default + workbench)
+      - name: bugate init end-to-end (ephemeral SUT repo, R4 negative control)
         run: |
-          # Imported layout: the governed repo is the workspace root (committed
-          # config marks it); the engine resolves from its own location.
-          cd examples/imported-demo
-          python3 ../../scripts/check_bugate.py tests/link/test_redirect.py </dev/null
-          if python3 ../../scripts/check_bugate.py tests/new/test_new.py </dev/null; then
-            echo "negative control failed: pending UC was not blocked (imported)"; exit 1
+          sut="$(mktemp -d)"
+          python3 scripts/bugate_init.py "$sut"
+          # enable the guard the way an adopter would
+          python3 - "$sut" <<'PY'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1]) / "bugate.profile.yaml"
+          p.write_text(p.read_text().replace(
+              "guarded_path_regex: []",
+              'guarded_path_regex:\n  - "(^|/)tests/(?P<uc>[^/]+)/[^/]+[.]py$"'))
+          PY
+          cd "$sut"
+          if python3 .bugate/scripts/check_bugate.py tests/pay/test_pay.py </dev/null; then
+            echo "negative control failed: ungated UC was not blocked"; exit 1
           fi
-          cd ../..
-          # Workbench layout: the engine repo is the workspace root, the SUT
-          # tree is mounted beneath it and bound via a local profile.
-          export BUGATE_PROFILE=examples/mounted-demo/demo.profile.yaml
-          python3 scripts/check_bugate.py examples/mounted-demo/tests/link/test_redirect.py </dev/null
-          if python3 scripts/check_bugate.py examples/mounted-demo/tests/new/test_new.py </dev/null; then
-            echo "negative control failed: pending UC was not blocked (workbench)"; exit 1
-          fi
+          python3 .bugate/scripts/check_no_sut_terms.py   # vendored kit self-scan
+          cd - >/dev/null && rm -rf "$sut"
 
-      - name: Wave 0 PRD health gate (demo)
-        run: python3 scripts/check_prd_health.py --input examples/demo-sut/prd_health.yaml --json-output /tmp/h.json --md-output /tmp/h.md --gate
-
-      - name: Wave 8 falsification gate + coverage matrix (demo)
+      - name: Wave 0 / Wave 8 degrade gracefully without a profile spec
         run: |
-          python3 scripts/oracle_falsification.py --spec examples/demo-sut/falsification_spec.yaml \
-            --json-output /tmp/of.json --md-output /tmp/of.md --gate
-          python3 scripts/generate_assertion_coverage_matrix.py --artifact-root examples/demo-sut \
-            --spec examples/demo-sut/falsification_spec.yaml --mutation-result /tmp/of.json --output /tmp/matrix.md \
-            --gate --max-missing 1
+          python3 scripts/check_prd_health.py --gate | grep -q "profile_required"
+          python3 scripts/oracle_falsification.py --gate | grep -q "profile_required"
 
       - name: Orchestrator init smoke (full SDTD)
         run: |

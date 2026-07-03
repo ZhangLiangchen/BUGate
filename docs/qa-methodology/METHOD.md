@@ -644,7 +644,7 @@ project-root/
 │   ├── templates/                     # 01–05 gate 产物模板（+ 可选 01a/01b/02a）
 │   └── adapters/{claude,codex}/       # 各 runtime 的 agent / 命令路由卡
 ├── docs/qa-methodology/               # 本方法论文档集（METHOD/SOP/...）
-├── examples/sample-sut.profile.yaml   # 可拷贝的样例 profile
+├── tests/                             # 上游专用：临时构造 fixture 验收 + de-SUT 元测试（不随 kit 分发）
 │
 ├── <artifact_dir>/                    # profile 指定，例如 docs/usecases/UC-<PREFIX>-<NN>-<slug>/
 │   ├── 01_business_brief.md           #   每个用例一套 gate 产物
@@ -689,7 +689,7 @@ agent_roles:
 ### 10.3 项目初始化清单（已发布引擎）
 
 1. 接入 BUGate 引擎（导入模式：vendor / 子模块进 SUT 测试仓；维护者工作台：直接用引擎仓）。根定位已拆分：工作区根 = 自 CWD 向上最近的 `bugate.config.yaml`（`AGENTS.md` + `.shared/` 哨兵为工作台 fallback），模板等引擎资产按引擎自身位置解析。
-2. 写一个 SUT profile（见 `references/profile-schema.md`，可拷贝 `examples/sample-sut.profile.yaml`），设置 `artifact_dir`、`guarded_path_regex`、`agent_roles`、命令等。
+2. 写一个 SUT profile（键契约见 `references/profile-schema.md`；`scripts/bugate_init.py` 会为导入仓脚手架同形状文件），设置 `artifact_dir`、`guarded_path_regex`、`agent_roles`、命令等。
 3. `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init`（复杂用例加 `--full-sdtd` 一并生成 01a/01b/02a）。
 4. 逐层跑门：`check_bugate_brief_semantics.py` / `check_bugate_layer2_semantics.py` / `check_bugate_inventory_semantics.py`，再 `check_bugate_v13_semantics.py <artifact_dir> --scope pre-code`。
 5. 需要双 agent 互审时跑 `sdtd_multiview_cli_bridge.py` / `sdtd_adversarial_cli_bridge.py`（检测到 CLI runtime 才真派发，否则确定性回退）。

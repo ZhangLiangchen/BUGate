@@ -522,9 +522,9 @@ def semantic_schema(name: str | None = None, *, layer: str | None = None) -> dic
 def artifact_in_profile_scope(artifact_dir: Path, config: dict[str, Any] | None, root: Path | None = None) -> bool:
     """True if ``artifact_dir`` lives under the profile's artifact_dir_template parent.
 
-    Used to scope a profile-selected dialect to the mounted SUT's own UC dirs, so
-    core/demo fixtures (examples/, templates) keep the default dialect even while
-    a SUT profile is active. Symlink-safe via resolve().
+    Used to scope a profile-selected dialect to the governed SUT's own UC dirs, so
+    core fixtures (templates, ephemeral test workspaces) keep the default dialect
+    even while a SUT profile is active. Symlink-safe via resolve().
     """
     template = str((config or {}).get("artifact_dir_template") or "")
     if "{uc}" not in template:

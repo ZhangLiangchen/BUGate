@@ -14,14 +14,13 @@ guarded_path_regex: []
 
 # Wave 8 oracle falsification (default unmounted → oracle_falsification.py reports
 # profile_required). A SUT profile points at a declarative oracle/mutation spec and
-# an optional score threshold (0-1). See references/profile-schema.md and the worked
-# spec at examples/demo-sut/falsification_spec.yaml.
+# an optional score threshold (0-1). Spec shape: references/profile-schema.md.
 #   falsification_spec: sut/example/falsification_spec.yaml
 #   falsification_threshold: 0.7
 
 # Wave 0 PRD health check (default unmounted → check_prd_health.py reports
 # profile_required). Point at a declarative 8-dimension self-assessment; the
-# engine scores 0-100 + grade A-D. See examples/demo-sut/prd_health.yaml.
+# engine scores 0-100 + grade A-D. Spec shape: references/profile-schema.md.
 #   prd_health_spec: sut/example/prd_health.yaml
 #   prd_health_min: 60
 

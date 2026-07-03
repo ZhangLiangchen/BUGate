@@ -26,12 +26,12 @@ Scan surface — anchored on the ENGINE root, never the governed workspace:
   - the kit subtree (``scripts/``, ``bin/``, ``.shared/skills/``): the fixed
     kit layout a ``bugate init`` vendors into a SUT repo, scanned in every
     layout;
-  - upstream-only assets (docs/, examples/, .github/, root docs, config):
-    scanned only when the engine root IS the upstream BUGate repo, detected by
-    the ``CHARTER.md`` sentinel (the charter never ships in the vendored kit).
+  - upstream-only assets (docs/, .github/, root docs, config): scanned only
+    when the engine root IS the upstream BUGate repo, detected by the
+    ``CHARTER.md`` sentinel (the charter never ships in the vendored kit).
 
   A governed workspace's OWN files are never the scan surface: when the
-  workspace root is a strict descendant of the engine root (workbench and demo
+  workspace root is a strict descendant of the engine root (workbench-style
   layouts) its subtree is excluded, and in a vendored layout the SUT repo's
   files are simply not kit members. Files that legitimately DECLARE the terms
   (the active config/profile, ``--terms-file`` lists) are excluded likewise.
@@ -79,7 +79,6 @@ KIT_SCAN_ROOTS = list(KIT_LAYOUT)
 UPSTREAM_SENTINEL = "CHARTER.md"
 UPSTREAM_SCAN_ROOTS = [
     "docs",
-    "examples",
     ".github",
     "AGENTS.md",
     "CHARTER.md",

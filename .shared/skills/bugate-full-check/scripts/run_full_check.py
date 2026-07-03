@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Run a SUT-neutral BUGate capability self-check.
 
-The script intentionally exercises BUGate core and demo/profile fixtures without
-adding SUT-specific facts. It writes transient artifacts only under /tmp and
-prints a compact Markdown summary.
+The script exercises BUGate core without adding SUT-specific facts. The repo
+ships no committed example SUT trees (imported-mode purity), so every
+governed-workspace probe fabricates its fixtures under /tmp at run time; only
+a compact Markdown summary is printed.
 """
 from __future__ import annotations
 
@@ -37,6 +38,7 @@ def run(
     cmd: list[str],
     root: Path,
     *,
+    cwd: Optional[Path] = None,
     input_text: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
     timeout: int = 120,
@@ -46,7 +48,7 @@ def run(
         merged_env.update(env)
     return subprocess.run(
         cmd,
-        cwd=root,
+        cwd=cwd or root,
         input=input_text,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -68,11 +70,37 @@ def compact(text: str, limit: int = 280) -> str:
     return text[: limit - 3] + "..."
 
 
-def require_tmp_path(prefix: str, suffix: str = "") -> str:
-    handle = tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix, delete=False)
-    path = handle.name
-    handle.close()
-    return path
+PRECODE_NAMES = [
+    "01_business_brief.md",
+    "02_testability.md",
+    "03_inventory.yaml",
+    "03a_test_cases.md",
+    "03b_adversarial_cases.yaml",
+]
+
+
+def build_guard_workspace(base: Path) -> Path:
+    """Fabricate a minimal governed workspace (imported layout) for guard probes."""
+    ws = base / "ws"
+    for uc, passed in (("ok", True), ("pending", False)):
+        (ws / "tests" / uc).mkdir(parents=True)
+        (ws / "tests" / uc / "test_x.py").write_text("# guarded placeholder\n", encoding="utf-8")
+        uc_dir = ws / "usecases" / uc
+        uc_dir.mkdir(parents=True)
+        names = PRECODE_NAMES if passed else PRECODE_NAMES[:1]
+        status = "passed" if passed else "pending"
+        for name in names:
+            (uc_dir / name).write_text(f"---\ngate_status: {status}\n---\n", encoding="utf-8")
+    (ws / "bugate.config.yaml").write_text("profile: bugate.profile.yaml\n", encoding="utf-8")
+    (ws / "bugate.profile.yaml").write_text(
+        "artifact_dir_template: usecases/{uc}/\n"
+        'guarded_path_regex:\n  - "(^|/)tests/(?P<uc>[^/]+)/[^/]+[.]py$"\n'
+        + "required_precode_artifacts:\n"
+        + "".join(f"  - {n}\n" for n in PRECODE_NAMES)
+        + 'agent_roles:\n  implementer:\n    - "^mirror/.*$"\n',
+        encoding="utf-8",
+    )
+    return ws
 
 
 def main() -> int:
@@ -98,15 +126,14 @@ def main() -> int:
         [
             "python3",
             "scripts/check_bugate_v13_semantics.py",
-            "examples/demo-sut",
+            ".shared/skills/bugate/templates",
             "--scope",
-            "all",
-            "--require-passed",
+            "pre-code",
         ],
         root,
         timeout=60,
     )
-    add(checks, "4-layer demo gate", result.returncode == 0, result.stdout)
+    add(checks, "4-layer gate engine (templates, pre-code)", result.returncode == 0, result.stdout)
 
     # Runtime binaries and auth.
     codex_path = shutil.which("codex") or "not_found"
@@ -144,8 +171,13 @@ def main() -> int:
     if args.mode == "full":
         with tempfile.TemporaryDirectory(prefix="bugate-full-check.") as tmp:
             tmp_root = Path(tmp)
-            uc_dir = tmp_root / "demo-sut"
-            shutil.copytree(root / "examples/demo-sut", uc_dir)
+            uc_dir = tmp_root / "peer-uc"
+            result = run(
+                ["python3", "scripts/sdtd_orchestrator.py", str(uc_dir), "--init"],
+                root,
+                timeout=60,
+            )
+            add(checks, "Peer fixture init (templates)", result.returncode == 0, result.stdout)
             peer_env = {"SDTD_CLI_TIMEOUT_SECONDS": str(args.timeout_seconds)}
 
             result = run(
@@ -212,152 +244,102 @@ def main() -> int:
     result = run(["memory", "status"], root, env=memory_env, timeout=60)
     add(checks, "ONNX memory status", result.returncode == 0 and "healthy" in result.stdout.lower(), result.stdout)
 
-    # Wave 0 / Wave 8.
-    prd_json = require_tmp_path("bugate-prd.", ".json")
-    prd_md = require_tmp_path("bugate-prd.", ".md")
-    try:
-        result = run(
-            [
-                "python3",
-                "scripts/check_prd_health.py",
-                "--input",
-                "examples/demo-sut/prd_health.yaml",
-                "--gate",
-                "--json-output",
-                prd_json,
-                "--md-output",
-                prd_md,
-            ],
-            root,
-            timeout=60,
-        )
-        add(checks, "Wave 0 PRD health", result.returncode == 0, result.stdout)
-    finally:
-        Path(prd_json).unlink(missing_ok=True)
-        Path(prd_md).unlink(missing_ok=True)
-
-    of_json = require_tmp_path("bugate-of.", ".json")
-    of_md = require_tmp_path("bugate-of.", ".md")
-    matrix_md = require_tmp_path("bugate-matrix.", ".md")
-    try:
-        result = run(
-            [
-                "python3",
-                "scripts/oracle_falsification.py",
-                "--spec",
-                "examples/demo-sut/falsification_spec.yaml",
-                "--gate",
-                "--json-output",
-                of_json,
-                "--md-output",
-                of_md,
-            ],
-            root,
-            timeout=60,
-        )
-        add(checks, "Wave 8 falsification", result.returncode == 0, result.stdout)
-        result = run(
-            [
-                "python3",
-                "scripts/generate_assertion_coverage_matrix.py",
-                "--artifact-root",
-                "examples/demo-sut",
-                "--spec",
-                "examples/demo-sut/falsification_spec.yaml",
-                "--mutation-result",
-                of_json,
-                "--output",
-                matrix_md,
-            ],
-            root,
-            timeout=60,
-        )
-        add(checks, "Wave 8 coverage matrix", result.returncode == 0, result.stdout)
-    finally:
-        Path(of_json).unlink(missing_ok=True)
-        Path(of_md).unlink(missing_ok=True)
-        Path(matrix_md).unlink(missing_ok=True)
-
-    # Write guard and role isolation.
-    guard_env = {"BUGATE_PROFILE": "examples/mounted-demo/demo.profile.yaml"}
-    result = run(
-        ["python3", "scripts/check_bugate.py", "examples/mounted-demo/tests/link/test_redirect.py"],
-        root,
-        input_text="",
-        env=guard_env,
-        timeout=30,
-    )
-    add(checks, "Write guard allows passed UC", result.returncode == 0, result.stdout)
-    result = run(
-        ["python3", "scripts/check_bugate.py", "examples/mounted-demo/tests/new/test_new.py"],
-        root,
-        input_text="",
-        env=guard_env,
-        timeout=30,
-    )
-    add(checks, "Write guard blocks pending UC", result.returncode == 2, result.stdout)
-
-    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "sut/example/docs/source_mirror/spec.md"}})
-    result = run(
-        ["python3", "scripts/check_agent_role_paths.py"],
-        root,
-        input_text=payload,
-        env={"BUGATE_PROFILE": "examples/sample-sut.profile.yaml", "BUGATE_AGENT_ROLE": "implementer"},
-        timeout=30,
-    )
-    add(checks, "Role guard blocks forbidden path", result.returncode == 2, result.stdout)
-
-    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "sut/example/tests/test_x.py"}})
-    result = run(
-        ["python3", "scripts/check_agent_role_paths.py"],
-        root,
-        input_text=payload,
-        env={"BUGATE_PROFILE": "examples/sample-sut.profile.yaml", "BUGATE_AGENT_ROLE": "implementer"},
-        timeout=30,
-    )
-    add(checks, "Role guard allows permitted path", result.returncode == 0, result.stdout or "allowed")
-
-    result = run(
-        [
-            "python3",
-            "scripts/check_bugate_v13_semantics.py",
-            "examples/demo-sut",
-            "--scope",
-            "all",
-            "--require-passed",
-        ],
-        root,
-        env={"BUGATE_PROFILE": "examples/sample-sut.profile.yaml"},
-        timeout=60,
-    )
-    add(checks, "Profile hardening fixture", result.returncode == 0, result.stdout)
-
-    # Alternate semantic-schema dialect: a SUT-neutral fixture (full v1.3 artifact
-    # stack written in the original-gate dialect) must pass the whole gate at
-    # --scope all under --schema original-gate, AND the canonical v1.3 default must
-    # still reject it — proving the preset is a real dialect (trio + 03a/03b),
-    # not a no-op.
-    fixture = "examples/demo-sut-original-gate"
-    result = run(
-        ["python3", "scripts/check_bugate_v13_semantics.py", fixture,
-         "--scope", "all", "--require-passed", "--schema", "original-gate"],
-        root,
-        timeout=60,
-    )
-    alt_ok = result.returncode == 0
-    result = run(
-        ["python3", "scripts/check_bugate_v13_semantics.py", fixture,
-         "--scope", "all", "--require-passed", "--schema", "v1.3"],
-        root,
-        timeout=60,
-    )
-    rejects_default = result.returncode != 0
+    # Wave 0 / Wave 8 — no committed demo specs: the capability probe is the
+    # graceful-degradation contract (engine wired, reports profile_required,
+    # exit 0 until a SUT profile supplies a real spec).
+    result = run(["python3", "scripts/check_prd_health.py", "--gate"], root, timeout=60)
     add(
         checks,
-        "Alternate dialect (original-gate)",
-        alt_ok and rejects_default,
-        f"original-gate={'ok' if alt_ok else 'FAIL'} v1.3-rejects={'ok' if rejects_default else 'NO'}",
+        "Wave 0 engine (profile_required degrade)",
+        result.returncode == 0 and "profile_required" in result.stdout,
+        result.stdout,
     )
+    result = run(["python3", "scripts/oracle_falsification.py", "--gate"], root, timeout=60)
+    add(
+        checks,
+        "Wave 8 engine (profile_required degrade)",
+        result.returncode == 0 and "profile_required" in result.stdout,
+        result.stdout,
+    )
+    result = run(["python3", "scripts/generate_assertion_coverage_matrix.py", "--help"], root, timeout=30)
+    add(checks, "Wave 8 coverage-matrix CLI present", result.returncode == 0, "argparse help ok")
+
+    # Write guard and role isolation — fabricated governed workspace.
+    with tempfile.TemporaryDirectory(prefix="bugate-guard.") as tmp:
+        ws = build_guard_workspace(Path(tmp))
+        guard = str(root / "scripts" / "check_bugate.py")
+        neutral_env = {"BUGATE_PROFILE": ""}
+        result = run([sys.executable, guard, "tests/ok/test_x.py"],
+                     root, cwd=ws, input_text="", env=neutral_env, timeout=30)
+        add(checks, "Write guard allows passed UC", result.returncode == 0, result.stdout or "allowed")
+        result = run([sys.executable, guard, "tests/pending/test_x.py"],
+                     root, cwd=ws, input_text="", env=neutral_env, timeout=30)
+        add(checks, "Write guard blocks pending UC", result.returncode == 2, result.stdout)
+
+        role_env = {
+            "BUGATE_PROFILE": str(ws / "bugate.profile.yaml"),
+            "BUGATE_AGENT_ROLE": "implementer",
+        }
+        payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "mirror/spec.md"}})
+        result = run(["python3", "scripts/check_agent_role_paths.py"],
+                     root, input_text=payload, env=role_env, timeout=30)
+        add(checks, "Role guard blocks forbidden path", result.returncode == 2, result.stdout)
+        payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "tests/ok/test_x.py"}})
+        result = run(["python3", "scripts/check_agent_role_paths.py"],
+                     root, input_text=payload, env=role_env, timeout=30)
+        add(checks, "Role guard allows permitted path", result.returncode == 0, result.stdout or "allowed")
+
+    # Hardening flags enforce (fabricated): a template-initialized UC must be
+    # REJECTED once the profile demands the Wave-1 multiview report.
+    with tempfile.TemporaryDirectory(prefix="bugate-harden.") as tmp:
+        uc = Path(tmp) / "uc"
+        result = run(["python3", "scripts/sdtd_orchestrator.py", str(uc), "--init"], root, timeout=60)
+        init_ok = result.returncode == 0
+        prof = Path(tmp) / "harden.profile.yaml"
+        prof.write_text(
+            f"artifact_dir_template: {tmp}/{{uc}}/\nrequire_multiview: true\n",
+            encoding="utf-8",
+        )
+        result = run(
+            ["python3", "scripts/check_bugate_v13_semantics.py", str(uc), "--scope", "pre-code"],
+            root,
+            env={"BUGATE_PROFILE": str(prof)},
+            timeout=60,
+        )
+        enforced = result.returncode != 0 and "divergence_report" in result.stdout
+        add(checks, "Hardening flags enforce (multiview)", init_ok and enforced, result.stdout)
+
+    # Alternate semantic-schema dialect: dialect selection must be a real fork —
+    # a minimal original-gate Layer-1 brief passes under --schema original-gate
+    # and is rejected by the canonical v1.3 schema (canonical ids + sections).
+    with tempfile.TemporaryDirectory(prefix="bugate-dialect.") as tmp:
+        uc = Path(tmp)
+        (uc / "01_business_brief.md").write_text(
+            "---\ngate: layer1_business_brief\ngate_status: passed\n---\n\n"
+            "## SUT And Scope\nA neutral request flow under test.\n\n"
+            "## Canonical Business Flow\nSubmit -> validate -> settle.\n\n"
+            "## Assertions That Follow From Business\n- A settled request is queryable.\n\n"
+            "## Unknowns And Questions\n- None open.\n",
+            encoding="utf-8",
+        )
+        result = run(
+            ["python3", "scripts/check_bugate_brief_semantics.py", str(uc),
+             "--require-passed", "--schema", "original-gate"],
+            root, timeout=60,
+        )
+        alt_ok = result.returncode == 0
+        result = run(
+            ["python3", "scripts/check_bugate_brief_semantics.py", str(uc),
+             "--require-passed", "--schema", "v1.3"],
+            root, timeout=60,
+        )
+        rejects_default = result.returncode != 0
+        add(
+            checks,
+            "Alternate dialect (original-gate, Layer 1)",
+            alt_ok and rejects_default,
+            f"original-gate={'ok' if alt_ok else 'FAIL'} v1.3-rejects={'ok' if rejects_default else 'NO'}",
+        )
 
     # Config boundary.
     result = run(

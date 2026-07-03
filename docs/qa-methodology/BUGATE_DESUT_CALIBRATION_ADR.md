@@ -101,11 +101,12 @@ and no environment-variable bypass exist.
 
 The old FORBIDDEN list migrated to `tests/fixtures/legacy-sut-terms.txt`
 (identity terms active; industry words retired-but-archived per layer 3).
-Upstream CI runs four readings: built-in hygiene; the legacy fixture (the
-origin SUT's identity can never seep back); a second-SUT defense against the
-`examples/imported-demo` profile; and a meta-test
-(`tests/test_desut_guard.py`) proving every red/green verdict with negative
-controls. The origin SUT's vocabulary now exists only in the fixture and in
+Upstream CI runs three readings (originally four; the committed example trees
+were removed for imported-mode purity on 2026-07-04, and the second-SUT
+profile-declared defense folded into the meta-test's fabricated fixtures):
+built-in hygiene; the legacy fixture (the origin SUT's identity can never seep
+back); and the meta-test (`tests/test_desut_guard.py`) proving every red/green
+verdict — including the second-SUT defense — with negative controls. The origin SUT's vocabulary now exists only in the fixture and in
 that SUT's own profile — never in engine source.
 
 ## Consequences

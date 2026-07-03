@@ -16,10 +16,16 @@ workbench** = maintainer), naming, and the evolution plan are chartered in
 Zero install (Python 3.9+, standard library only; 3.10+ recommended). From the repo root:
 
 ```bash
-python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
+python3 tests/test_write_guard_layouts.py
 ```
 
-That runs every pre-code gate against a filled, **passing** demo stack (a neutral URL-shortener use case) and prints `PASS`. To watch the physical write-guard **block, then allow** an edit, walk through [`examples/mounted-demo/WALKTHROUGH.md`](examples/mounted-demo/WALKTHROUGH.md).
+The first line runs the pre-code semantic gates over the shipped artifact
+templates and prints `PASS`. The second fabricates governed workspaces in a
+temp dir and shows the physical write-guard **block, then allow** an edit in
+both layouts (imported default + maintainer workbench) — the repo ships no
+committed example SUT trees. To see exactly what imported mode installs into
+your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 
 - **What is BUGate, and how is it meant to be used?** [`CHARTER.md`](CHARTER.md) — positioning, the two usage modes (imported = default, workbench = maintainer), naming, and the evolution plan.
 - **Bootstrapping with an AI agent?** [`INIT.md`](INIT.md) is a runnable init prompt (Python check → zero-install smoke → config load → optional capabilities).
@@ -41,9 +47,9 @@ BUGate is used in exactly one of two ways (normative rules: [`CHARTER.md`](CHART
   project root and mount a SUT test workspace via a symlink and a local,
   uncommitted `profile:` pointer. Reserved for developing BUGate itself:
   debugging core scripts/hooks/skill discovery; evolving the methodology,
-  profile schema, or gates; running `examples/` smokes; and cross-SUT
-  regression (verifying the core stays clean of any one SUT). It is not the
-  user-facing story.
+  profile schema, or gates; running the template gates and ephemeral-fixture
+  smokes (`tests/`); and cross-SUT regression (verifying the core stays clean
+  of any one SUT). It is not the user-facing story.
 
 > Both imported-mode channels ship in-repo (CHARTER §5.2–§5.3): the
 > **installer** — `python3 scripts/bugate_init.py <sut-repo>` — and the
@@ -158,16 +164,13 @@ versioned with the tests it guards:
    (`scripts/check_bugate.py` exits 2).
 
 Daily agent sessions then open the **SUT repo** — not this one — and BUGate
-governs from inside it. A runnable miniature of this layout ships at
-[`examples/imported-demo/`](examples/imported-demo/).
+governs from inside it. The layout is exercised end-to-end in CI on ephemeral
+fixtures: [`tests/test_write_guard_layouts.py`](tests/test_write_guard_layouts.py)
+plus a `bugate init` scratch-repo run with the R4 negative control.
 
 ### B) Core workbench mode — mount a SUT into this repo (maintainers)
 
-1. Copy the sample profile and point `bugate.config.yaml` at it (or keep `mode: core` for the unmounted engine):
-
-   ```bash
-   mkdir -p sut && cp examples/sample-sut.profile.yaml sut/my-sut.profile.yaml
-   ```
+1. Write a profile under a local `sut/` dir and point `bugate.config.yaml` at it (or keep `mode: core` for the unmounted engine). The full key contract lives in [`profile-schema.md`](.shared/skills/bugate/references/profile-schema.md); `scripts/bugate_init.py` scaffolds the same file shape for imported repos.
 
    ```yaml
    # bugate.config.yaml
@@ -176,7 +179,7 @@ governs from inside it. A runnable miniature of this layout ships at
 
    > The `profile:` line is a local, per-clone edit — **don't commit it**; BUGate is a generic framework where each clone mounts its own SUT.
 
-2. In the profile, declare the mounted test workspace surfaces (see [`examples/sample-sut.profile.yaml`](examples/sample-sut.profile.yaml) for the full, commented version):
+2. In the profile, declare the mounted test workspace surfaces:
 
    ```yaml
    artifact_dir: docs/usecases             # where BUGate UC artifacts live in the test workspace
@@ -217,10 +220,13 @@ The core ships with `guarded_path_regex: []` (write-guard **disabled**) and an
 empty `artifact_dir`; a SUT profile turns these on for a mounted test
 workspace.
 
-**Worked example.** [`examples/demo-sut/`](examples/demo-sut/) is a filled, passing 01–05 gate stack for a neutral fictional SUT (a URL shortener), including the optional `01a`/`01b`/`02a` modeling artifacts. It doubles as a smoke fixture — the repo's own gates run against it green:
+**Worked verification.** The repo ships **no committed example SUT trees**
+(imported-mode purity): the governed-layout acceptances fabricate their
+fixtures at run time — see [`tests/`](tests/) and the CI steps — and the
+shipped artifact templates pass the pre-code gates as-is:
 
 ```bash
-python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
+python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
 ```
 
 ## Agent runtimes
@@ -249,8 +255,7 @@ scripts/                    # gate engine + SDTD orchestration (stdlib-only)
 .shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
 docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records
 docs/case-studies/          # narrative allowlist: real import/migration stories (identity-scan exempt)
-examples/                   # sample SUT profile + filled demo gate stacks (imported + workbench)
-tests/                      # upstream-only guard meta-tests + fixtures (legacy de-SUT term list)
+tests/                      # upstream-only ephemeral-fixture acceptances (dual-layout write guard, de-SUT meta-test) + legacy term fixture
 .github/workflows/          # CI: py_compile, semantics gates, de-SUT guard (hygiene/legacy/second-SUT/meta)
 ```
 
