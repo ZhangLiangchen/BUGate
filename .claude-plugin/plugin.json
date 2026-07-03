@@ -1,8 +1,18 @@
 {
   "name": "bugate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Agentic QA governance kit / SDTD gate engine: pre-code artifact gates, a physical write guard, gate agents, dual-runtime peer bridges, and governed memory for AI test development. Inert until the project carries a committed bugate.config.yaml.",
   "author": {
     "name": "BUGate maintainers"
-  }
+  },
+  "skills": [
+    "./.shared/skills/"
+  ],
+  "commands": [
+    "./.shared/skills/bugate/adapters/claude/commands/"
+  ],
+  "agents": [
+    "./.shared/skills/bugate/adapters/claude/agents/"
+  ],
+  "hooks": "./.claude-plugin/hooks.json"
 }
