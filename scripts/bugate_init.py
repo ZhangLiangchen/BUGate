@@ -20,7 +20,11 @@ What it does, in order:
   4. scaffolds a committed ``bugate.config.yaml`` (the workspace-root marker)
      and ``bugate.profile.yaml`` (inert until ``guarded_path_regex`` is filled);
   5. creates the ``docs/usecases/`` skeleton;
-  6. prints the acceptance steps — including the Codex re-trust caveat (hooks
+  6. probes the MACHINE-LEVEL memory bus (reuse-first, ADR-BUGATE-003): all
+     governed repos on a machine share one running ``mcp-memory-service``
+     instance, isolated by namespace tag — init never scaffolds or starts a
+     per-repo service, it only reports whether the shared one is already up;
+  7. prints the acceptance steps — including the Codex re-trust caveat (hooks
      stay silently inactive until the changed hook hash is re-trusted) and the
      R4 negative control.
 
@@ -143,6 +147,11 @@ required_precode_artifacts:
 # sut_identity_terms:
 #   - "\bmy-product-name\b"
 
+# Memory-bus namespace on the MACHINE-LEVEL shared service (ADR-BUGATE-003):
+# every governed repo on this machine shares one mcp-memory-service instance
+# (data home ~/.bugate/memory-bus), isolated by this tag. Declaring the
+# namespace is ALL the memory setup this repo needs — never scaffold or start
+# a per-repo service dir.
 memory:
   namespace: project:{name}
 """
@@ -236,6 +245,37 @@ def scaffold(target: Path, vendor_dir: str, dry: bool) -> list[str]:
     return notes
 
 
+def bus_probe() -> list[str]:
+    """Reuse-first machine-level memory-bus check (ADR-BUGATE-003).
+
+    The bus is ONE service per machine shared by every governed repo
+    (namespace-tag isolation), so init never scaffolds or starts a per-repo
+    service — it only reports whether the shared instance is already running.
+    Non-fatal by design: the memory runtime is optional and its absence must
+    never block an import.
+    """
+    try:
+        import memory_bus  # sibling module; loads client.env system-home-first
+
+        memory_bus.load_local_env()
+        url = memory_bus.base_url()
+        home = memory_bus.memory_home()
+        if memory_bus.service_available():
+            return [
+                f"memory-bus: RUNNING at {url} (data home {home}) — reusing the "
+                "machine-level shared instance; this repo only declares "
+                "memory.namespace in its profile"
+            ]
+        return [
+            f"memory-bus: no service detected at {url} — OPTIONAL. One install "
+            "serves every repo on this machine; see the engine repo's "
+            "docs/SETUP-OPTIONAL.md §2, then start with bin/memory-bus-ensure. "
+            "Hooks no-op gracefully until then"
+        ]
+    except Exception as exc:  # probe must never block an import
+        return [f"memory-bus: probe skipped ({exc.__class__.__name__}: {exc}) — optional runtime, hooks degrade gracefully"]
+
+
 NEXT_STEPS = """\
 Imported-mode setup written. Next steps (CHARTER §2.2):
 
@@ -252,6 +292,10 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
        # expect exit 2 and the missing-artifact list
   5. Per-UC flow from here on:
        python3 {vendor_dir}/scripts/sdtd_orchestrator.py docs/usecases/<UC> --init
+  6. Memory bus (optional, machine-level): this repo REUSES the one shared
+     mcp-memory-service instance per machine under its own profile namespace —
+     check with {vendor_dir}/bin/memory-bus-status (start: …/memory-bus-ensure);
+     install once per machine ONLY if the probe above says none is running.
 """
 
 
@@ -281,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
     notes += link_skills(target, vendor_dir, args.dry_run, args.force)
     notes += wire_hooks(target, vendor_dir, args.dry_run)
     notes += scaffold(target, vendor_dir, args.dry_run)
+    notes += bus_probe()
 
     prefix = "[dry-run] " if args.dry_run else ""
     for note in notes:

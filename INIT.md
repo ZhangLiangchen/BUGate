@@ -140,11 +140,12 @@ Tune via env: `SDTD_CODEX_MODEL` / `SDTD_CLAUDE_MODEL` / `SDTD_*_EFFORT`, proxy 
 
 Cross-session memory and a confirm/promote loop for learned findings.
 
-- **You install (MCP):** `pip install mcp-memory-service`, then pre-download the ONNX embedding model into `~/.cache/mcp_memory/onnx_models` (one-time; its in-service downloader cannot traverse a SOCKS proxy).
+- **Check first (reuse-first):** `bin/memory-bus-status` — the bus is machine-level, so if any repo on this machine already hosts it there is NOTHING to install: just declare `memory.namespace` in your profile. (`bugate init` runs this probe for you and reports the result.)
+- **You install (MCP, only if no service is running machine-wide — once per machine):** `pip install mcp-memory-service`, then pre-download the ONNX embedding model into `~/.cache/mcp_memory/onnx_models` (one-time; its in-service downloader cannot traverse a SOCKS proxy).
 - **We ship:** `scripts/memory_bus.py` + `bin/memory-bus-*` + `bin/memory-service-*` + `bin/promote-memory`.
 
 ```bash
-bin/memory-bus-start                                    # launches the service (resolves `memory` from .venv or PATH)
+bin/memory-bus-start                                    # reuses a running service, else launches one (resolves `memory` from .venv or PATH)
 bin/memory-bus-status
 bin/memory-service-note --agent <a> --type finding --msg "..."
 bin/promote-memory ...                                  # promote a finding to status:confirmed

@@ -120,12 +120,15 @@ data home resolves system-wide (`MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` >
 `~/.bugate/memory-bus`, keys in `<bus-home>/client.env`), shared by every
 governed workspace on the machine. Projects are isolated by namespace tag
 (`project:<name>`), never by per-repo databases; a legacy in-repo
-`.memory_bus/client.env` still works as a deprecated fallback.
+`.memory_bus/client.env` still works as a deprecated fallback. Initialization
+is **reuse-first**: `memory-bus-ensure`/`memory-bus-start` probe for a healthy
+running instance before launching and never spawn a duplicate, and
+`bugate init` only reports the probe result — it scaffolds no per-repo service.
 
 | Command (`bin/…` → `memory_bus.py …`) | Purpose | Key flags |
 |---|---|---|
 | `memory-bus-ensure` | Health-check the service; start it in the background if down | env `MCP_HTTP_PORT`, `MEMORY_BUS_ENSURE_WAIT_SECONDS`; exits 0 even if it can't start |
-| `memory-bus-start` | Launch `mcp-memory-service` (resolves `memory` from `.venv/bin` or PATH; configures ONNX storage) | data home env `MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` (default `~/.bugate/memory-bus`); `MCP_MEMORY_STORAGE_BACKEND`, `MCP_MEMORY_USE_ONNX`, `MCP_HTTP_PORT`; prints install hint if `memory` binary absent |
+| `memory-bus-start` | Reuse a healthy running `mcp-memory-service`, else launch it (resolves `memory` from `.venv/bin` or PATH; configures ONNX storage) | data home env `MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` (default `~/.bugate/memory-bus`); `MCP_MEMORY_STORAGE_BACKEND`, `MCP_MEMORY_USE_ONNX`, `MCP_HTTP_PORT`; prints install hint if `memory` binary absent |
 | `memory-bus-status` → `status` | Health-check / status | `--json`, `--timeout`, `--no-fail` |
 | `memory-bus-stop` → `stop` | Stop the service | no-op if `memory` binary absent |
 | `memory-bus-install-launchd` | OPTIONAL macOS hardening: user LaunchAgent for the bus (RunAtLoad + KeepAlive) | `--uninstall` removes it; absence changes nothing (`memory-bus-ensure` still starts on demand) |

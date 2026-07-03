@@ -111,6 +111,17 @@ only talks to the running service.
 
 ### Install
 
+**Check first — reuse before installing.** The bus is machine-level: another
+BUGate-governed repo on this machine may already run the shared instance.
+
+```bash
+bin/memory-bus-status   # "Memory service OK" → NOTHING to install; just
+                        # declare memory.namespace in your profile and stop here
+```
+
+Only when no service exists machine-wide, install the runtime **once per
+machine** (in the checkout that will host it):
+
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -U pip

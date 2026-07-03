@@ -16,6 +16,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Resolution: MCP_MEMORY_BASE_DIR > BUGATE_MEMORY_HOME > ~/.bugate/memory-bus.
 export MCP_MEMORY_BASE_DIR="${MCP_MEMORY_BASE_DIR:-${BUGATE_MEMORY_HOME:-$HOME/.bugate/memory-bus}}"
 export MCP_MEMORY_STORAGE_BACKEND="${MCP_MEMORY_STORAGE_BACKEND:-sqlite_vec}"
+
+# Reuse-first: if a healthy memory service already answers on the target port,
+# reuse it and exit — N governed repos share ONE machine-level instance
+# (namespace tags isolate projects), so start must never spawn a duplicate.
+# This also avoids `memory launch`'s own conflict path, which trusts only its
+# pid file and would KILL a live listener whose pid file went stale.
+if python3 "$ROOT/scripts/memory_bus.py" status --json >/dev/null 2>&1; then
+  echo "memory-bus-start: healthy memory service already running on 127.0.0.1:${MCP_HTTP_PORT:-8000}; reusing the machine-level shared instance."
+  exit 0
+fi
 # PyTorch-free embeddings via ONNX. The model must already exist under
 # ~/.cache/mcp_memory/onnx_models (pre-download once; the in-service downloader
 # cannot traverse a socks all_proxy). Set MCP_MEMORY_USE_ONNX=0 to fall back.
