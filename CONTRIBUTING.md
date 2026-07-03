@@ -33,41 +33,57 @@ Concretely (AGENTS.md Core Rules 1–2 and 5):
 - If a change needs SUT-specific facts, stop at the profile boundary and add a
   profile key (or ask for a governed SUT workspace) instead of inventing product details.
 
-### The forbidden-term guard
+### The de-SUT guard (identity-seepage defense)
 
-`scripts/check_no_sut_terms.py` greps the core tree
-(`scripts`, `bin`, `.shared/skills`, `docs`, `examples`, `.github`, plus the
-root `AGENTS.md` / `README.md` / `INIT*.md` / `CONTRIBUTING.md` /
-`bugate.config.yaml`) for unambiguous product/identity tokens and exits non-zero
-on any match. Run it before every PR:
+`scripts/check_no_sut_terms.py` defends the kit's **reusability**: the engine
+subtree that gets vendored into a governed SUT repo must not carry facts true
+for only one SUT — *block seepage, not mention* (CHARTER Amendment A1,
+[ADR-BUGATE-004](docs/qa-methodology/BUGATE_DESUT_CALIBRATION_ADR.md)). The
+discipline is three-layered:
 
-```bash
-python3 scripts/check_no_sut_terms.py
-```
+1. **Behavioral SUT facts** (defaults, endpoints, resources, credentials,
+   environment names) — never in core, no exemption. The guard's built-in
+   general hygiene patterns (machine-local user paths, credential/key shapes)
+   catch the machine-detectable slice; the rest is review discipline.
+2. **Identity terms** (product/system/account/person names) — forbidden in the
+   kit tree by default, but the term list is **profile-supplied**
+   (`sut_identity_terms`) or given via `--terms-file`; the engine bakes in no
+   product vocabulary. Narrative/provenance mentions are legitimate through
+   explicit markers (below).
+3. **Industry/domain vocabulary** — not defended by core; a SUT profile that
+   wants a domain word defended lists it itself.
 
-Generic English prose (the words order, chain, wallet) and the neutral
-`docs/usecases` default artifact dir are intentionally **not** forbidden — only
-unambiguous SUT tokens are.
+The scan surface anchors on the **engine root's kit subtree** (`scripts/`,
+`bin/`, `.shared/skills/`; plus docs/examples/root files when the engine root
+is this upstream repo, detected by the `CHARTER.md` sentinel). A governed
+workspace's own files are never the surface. The origin SUT's vocabulary lives
+only in `tests/fixtures/legacy-sut-terms.txt` (and in that SUT's own profile)
+— never in engine source.
 
 > Mounting a SUT locally (core-workbench mode, maintainers)? Keep your
 > `profile:` pointer in this repo's `bugate.config.yaml` uncommitted — it's a
-> per-clone local edit, so the committed core (which this guard scans) stays
-> SUT-neutral. In imported mode (the default, CHARTER §2.2) the reverse holds:
-> the governed SUT repo commits its own config + profile.
+> per-clone local edit — and append the inline marker to that one line so
+> local fixture runs stay green. In imported mode (the default, CHARTER §2.2)
+> the reverse holds: the governed SUT repo commits its own config + profile.
 
-### The allow-marker (for deliberate occurrences)
+### Exemption channels (narrative mention only)
 
-If a forbidden token must appear on a line for a legitimate reason (for example,
-the guard's own term list, or documentation *about* the guard), append the
-trailing marker to that line:
+Explicit, per-site, auditable — there is no global switch and no
+environment-variable bypass:
 
-```text
-# bugate: allow-sut-term
-```
+- **Inline marker** — append `# bugate: allow-sut-term` to the line; in
+  Markdown use the comment form `<!-- bugate: allow-sut-term -->` so rendering
+  stays clean. Waives both scans for that line.
+- **File-level frontmatter** — `desut: provenance-allowed` on a *narrative*
+  Markdown doc outside the kit subtree (engine/templates/schema files never
+  qualify). Waives the identity scan; general hygiene still runs.
+- **Allowlisted directory** — `docs/case-studies/` (real import/migration
+  stories). Waives the identity scan; general hygiene still runs.
 
-The guard skips any line containing `bugate: allow-sut-term`. Use it sparingly
-and only for genuinely necessary occurrences — it is an escape hatch, not a way
-to smuggle product facts into core.
+Every channel legitimizes narrative/provenance **mention** only. Using one to
+carry a behavioral fact (an endpoint, a path the engine reads, a default) is a
+violation — that verdict is owned by code review and the semantic gates, not
+by the grep.
 
 ---
 
@@ -87,8 +103,11 @@ python3 scripts/check_bugate_layer2_semantics.py    .shared/skills/bugate/templa
 python3 scripts/check_bugate_inventory_semantics.py .shared/skills/bugate/templates
 python3 scripts/check_bugate_v13_semantics.py       .shared/skills/bugate/templates --scope pre-code
 
-# 3. De-SUT forbidden-term guard
+# 3. De-SUT guard: hygiene + legacy regression + second-SUT defense + meta-test
 python3 scripts/check_no_sut_terms.py
+python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt
+( cd examples/imported-demo && python3 ../../scripts/check_no_sut_terms.py )
+python3 tests/test_desut_guard.py
 
 # 4. The worked demo passes the strict gate
 python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed
@@ -115,6 +134,8 @@ fastest sanity check that the engine still imports and config still loads.
 | `.shared/skills/bugate/` | the shared skill: `SKILL.md`, `references/`, `templates/`, `adapters/` |
 | `docs/qa-methodology/` | SUT-neutral method, SOP, ADR, protocols |
 | `examples/` | `demo-sut/` (worked, passing gate stack), `sample-sut.profile.yaml` |
+| `tests/` | upstream-only guard meta-tests + fixtures (`fixtures/legacy-sut-terms.txt` is the one legitimate home of the origin SUT's vocabulary); not part of the vendored kit |
+| `docs/case-studies/` | narrative allowlist: real import/migration stories (identity-scan exempt, hygiene enforced) |
 | `bugate.config.yaml` | core default config; ships with **no profile bound** (no guarded paths) |
 
 Rules of thumb:
@@ -172,9 +193,9 @@ restatement test, the (recommended) two-SUT corroboration bar, and the mechanics
   stdlib-only invariant is enforced in CI.
 - **Run the §2 checks locally** before opening the PR — your PR should be green
   on the same gates CI runs.
-- **Honor the de-SUT contract.** No SUT source/secrets/product facts; run
-  `scripts/check_no_sut_terms.py`; use `# bugate: allow-sut-term` only for
-  genuinely necessary occurrences.
+- **Honor the de-SUT contract.** No behavioral SUT facts in core, ever;
+  identity terms only under an explicit narrative exemption (§1); run the four
+  §2 guard readings. Exemption markers legitimize *mention*, never facts.
 - **When you add a config/profile flag**, document it in the canonical
   references so it does not drift: the command/capability index
   [`CAPABILITIES.md`](CAPABILITIES.md) and, for any profile-readable key, the

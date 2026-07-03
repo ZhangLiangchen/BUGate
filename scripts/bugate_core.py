@@ -39,6 +39,12 @@ OPTIONAL_PRECODE_ARTIFACTS = [
 
 WORKSPACE_SENTINEL = "bugate.config.yaml"
 
+# The fixed kit layout: the subtrees `bugate init` vendors into a governed repo
+# and the de-SUT guard therefore scans as the reusable surface. Init may vendor
+# a subset of an entry (e.g. one skill dir under .shared/skills); the guard
+# scans the whole entry. tests/test_desut_guard.py asserts the two stay aligned.
+KIT_LAYOUT = ("scripts", "bin", ".shared/skills")
+
 
 def find_root(start: Path | None = None) -> Path:
     """Locate the governed WORKSPACE root (where config, profile, artifacts live).

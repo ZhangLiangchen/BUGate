@@ -1,0 +1,41 @@
+# Legacy de-SUT term list — regression fixture (CHARTER A1 / ADR-BUGATE-004).
+#
+# This is the FULL hard-coded FORBIDDEN list that lived in
+# scripts/check_no_sut_terms.py before the term list was profile-ized. It is
+# kept as a fixture for one purpose: upstream CI runs the guard with this file
+# (--terms-file) so the ORIGIN SUT's identity can never seep back into the
+# reusable core tree. The origin SUT's terms exist only here and in that SUT's
+# own profile — never in engine source.
+#
+# Two sections:
+#   - ACTIVE (uncommented): identity terms of the origin SUT — product name,
+#     internal system names, product API identifiers, account/person handles,
+#     origin memory namespace. These stay a hard regression line.
+#   - RETIRED (commented): industry/domain vocabulary de-listed by CHARTER A1
+#     layer 3 (API-doc tool names, chain names, cryptography terms, generic
+#     industry words). Core no longer defends them; a SUT profile that wants
+#     one defended lists it in its own sut_identity_terms. Kept for archival
+#     provenance of the original list.
+#
+# One regex per line; lines starting with # are ignored. Matching is
+# case-insensitive; ASCII tokens use word boundaries so generic English
+# (e.g. "strongest") does not trip the guard.
+
+# --- ACTIVE: origin-SUT identity terms (regression red line) ---
+\bhypervise\b
+\bxblock\b
+\bmarlon\b
+\bxyc2\b
+\bscenario_driven\b
+\bwalletId\b
+\bcrossWithdraw\b
+project:hypervise
+
+# --- RETIRED by CHARTER A1 layer 3: industry/domain vocabulary (archived) ---
+# \bmnemonic\b
+# \beip1559\b
+# \bswagger\b
+# \btapd\b
+# \bvault\b
+# \btron\b
+# 钱包

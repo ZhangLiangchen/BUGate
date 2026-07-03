@@ -31,8 +31,21 @@ jobs:
       - name: V13 pre-code semantics gate
         run: python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
 
-      - name: De-SUT forbidden-term guard
+      # De-SUT guard (CHARTER A1: block seepage, not mention) — four readings:
+      # built-in hygiene, the origin SUT's legacy terms can never seep back,
+      # a second SUT's profile-declared identity stays out of the kit tree,
+      # and the meta-test proves every red/green verdict with negative controls.
+      - name: De-SUT guard — general hygiene (kit tree, no term list)
         run: python3 scripts/check_no_sut_terms.py
+
+      - name: De-SUT guard — legacy origin-SUT regression (fixture terms)
+        run: python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt
+
+      - name: De-SUT guard — second-SUT identity defense (imported-demo profile)
+        run: cd examples/imported-demo && python3 ../../scripts/check_no_sut_terms.py
+
+      - name: De-SUT guard — exemption + seepage negative controls (meta-test)
+        run: python3 tests/test_desut_guard.py
 
       - name: Worked demo passes the strict gate
         run: python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --require-passed

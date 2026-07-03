@@ -55,6 +55,27 @@ The artifacts here are deliberately minimal — enough to drive the guard. For a
 filled, semantically complete stack that passes every gate, see
 [`examples/demo-sut/`](../demo-sut/).
 
+## The identity defense, demonstrated
+
+The demo SUT calls itself **demosut** — this README, the profile, and the
+workspace's own artifacts may say so freely, because a governed workspace's own
+files are never the de-SUT scan surface (the guard excludes the workspace-root
+subtree). What the profile's `sut_identity_terms` forbids is the *other*
+direction: "demosut" seeping into the reusable engine/kit subtree that will be
+upgraded, re-vendored, and reused for the next SUT.
+
+```bash
+cd examples/imported-demo   # workspace root = this SUT; its files leave the scan surface
+
+# Scans the engine's kit tree with THIS SUT's identity-term list. Green as
+# shipped; plant the SUT's name in an engine file and it turns red:
+python3 ../../scripts/check_no_sut_terms.py
+```
+
+Run it from the workspace root (as above): the workspace is discovered from
+CWD, and that discovery is what tells the guard which subtree is the SUT's own
+territory.
+
 In a real SUT repo the hook wiring (`.claude/settings.json` / `.codex/hooks.json`
 blocks, README Quickstart A) runs the same `check_bugate.py` on every write, so
 step 2 is what an agent hits when it tries to jump to implementation before the

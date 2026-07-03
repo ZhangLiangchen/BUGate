@@ -138,9 +138,10 @@ required_precode_artifacts:
 # De-SUT identity defense (CHARTER A1): list THIS SUT's identity terms
 # (product / internal-system / account names, as case-insensitive regexes) so
 # the guard keeps them from seeping into the reusable vendored kit at
-# {vendor_dir}/. This repo's own files are not the scan surface.
+# {vendor_dir}/. This repo's own files are not the scan surface. The simple
+# YAML parser does not unescape, so write \b literally (single backslash):
 # sut_identity_terms:
-#   - "\\bmy-product-name\\b"
+#   - "\bmy-product-name\b"
 
 memory:
   namespace: project:{name}

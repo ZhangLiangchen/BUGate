@@ -19,5 +19,12 @@ required_precode_artifacts:
   - 03a_test_cases.md
   - 03b_adversarial_cases.yaml
 
+# De-SUT identity defense (CHARTER A1): the demo SUT's identity terms. The
+# guard keeps these from seeping into the vendored engine/kit subtree; the
+# governed workspace's own files (this repo) are not the scan surface, so the
+# SUT may freely name itself here, in its docs, and in its artifacts.
+sut_identity_terms:
+  - "\bdemosut\b"
+
 memory:
   namespace: project:imported-demo

@@ -4,10 +4,12 @@ id: CHARTER-BUGATE-001
 title: BUGate positioning, usage model, and evolution plan
 status: accepted
 created_at: 2026-07-03
+amended_at: 2026-07-03 (A1)
 authority: ADR-BUGATE-001
 companions:
   - docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md
   - docs/qa-methodology/TRANSITION_PROTOCOL.md
+  - docs/qa-methodology/BUGATE_DESUT_CALIBRATION_ADR.md
 provenance: >
   Produced by independent dual-agent analysis (Claude Code and Codex reached
   convergent conclusions from separate contexts, then were cross-checked),
@@ -182,6 +184,7 @@ Agent runtime
   fork-per-product 的碎片化变体，必然规则漂移。
 - **R6（必须）** SUT 领域知识（endpoint 契约、资源策略、环境事实、领域 skills、凭证）留在
   SUT 仓或 profile，**永不进 core**（de-SUT guard 与 Promotion Rule 强制）。
+  *（修订记录 A1 加注：「永不进 core」按三层判别式读，行为性事实零让步。）*
 
 ### 2.3 例外：工作台模式（Core Workbench）
 
@@ -200,6 +203,7 @@ Agent runtime
   maintainer workbench，对外只出现在维护者小节。
 - **R9（禁止）** 把任何挂载 SUT 的事实（名称、路径、实体、环境、凭证、固定资源）提交进
   BUGate core——`check_no_sut_terms.py` 与 CI 兜底，但中立性首先是写作纪律。
+  *（修订记录 A1 有本条的细化生效文本；原文按「不悄改」原则保留。）*
 
 ### 2.4 反模式（禁止清单）
 
@@ -336,6 +340,55 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
 
 ---
 
+## 7. 修订记录（Amendments）
+
+> 修订原则：R 条款原文**不悄改**——原文保留在原节并加指针标注，生效文本记于本节，
+> 每条修正案带日期、批准人与决策记录锚点。
+
+### A1 — de-SUT 校准：从「全面封锁」到「身份防渗」（2026-07-03）
+
+- **批准**：human owner 拍板（2026-07-03）。决策记录：ADR-BUGATE-004
+  （`docs/qa-methodology/BUGATE_DESUT_CALIBRATION_ADR.md`）。
+- **立法本意重述**：de-SUT 防线的目的随宿主方向翻转（§0 裁决 2/3）而校准。
+  旧目的（工作台/内嵌时代）：core 仓与 SUT 完全隔离，零 SUT 词汇。
+  新目的（导入模式）：保护 kit 的**可复用性**——vendored 进 SUT 仓的 core 子树
+  不得携带「只对某个 SUT 成立的行为性事实」。一句话：**防渗，不防提及**。
+- **三层判别式**（guard 与写作者同一把尺）：
+  1. **行为性事实**——影响引擎行为、或会被下一个 SUT 继承的默认值、端点、资源、
+     凭证、环境名 → **永远禁止进 core，必须走 profile**。判据与 ADR-BUGATE-001
+     Promotion Rule 不变，一寸不让。
+  2. **身份词**——SUT/产品/内部系统/人名/账号名 → **默认禁止**；叙事/出处语境
+     （README 起源段、case study、迁移史、真实导入教程）经**显式标记**豁免合法。
+  3. **行业领域词**——API 文档工具名、公链名、密码学词汇、行业中文词等 → 移出
+     core 全局词表，不再当 SUT 词防守；是否防由各 SUT profile 的
+     `sut_identity_terms` 自行声明。
+- **R9 细化生效文本**（原文保留于 §2.3）：
+
+  > **R9（禁止）** 把任何挂载/被治理 SUT 的**行为性事实**（判别式第 ① 层：路径、
+  > 实体、环境、凭证、固定资源、端点、默认值），以及**无豁免标记的身份词**
+  > （判别式第 ② 层），提交进 BUGate core；经显式标记（行内
+  > `bugate: allow-sut-term`——含 `<!-- bugate: allow-sut-term -->` 注释形式、
+  > 文件级 frontmatter `desut: provenance-allowed`（仅叙事类文档）、白名单目录
+  > `docs/case-studies/`）的**叙事性/出处性提及**除外。用豁免标记携带行为性事实
+  > 仍是违规（在 code review 与语义门语境定性，不靠 grep 硬判）。
+  > `check_no_sut_terms.py` 与 CI 兜底，但中立性首先是写作纪律。
+
+- **R6 加注**（同义细化，原文保留于 §2.2）：R6 的「永不进 core」自本修正案起按
+  三层判别式读——第 ① 层零让步；第 ② 层默认禁止、显式标记豁免；第 ③ 层由 SUT
+  profile 自行声明。经验晋升协议「进 core 的规则必须可中立表述」判据不变
+  （TRANSITION_PROTOCOL §2.2/2.3 加注同步）。
+- **豁免红线**：豁免必须**显式、逐处、可审计**（行内标记 / 文件级 frontmatter /
+  白名单目录）；禁止全局关闸或环境变量一键放水。引擎、模板、schema、任何默认值
+  不接受任何豁免形式。白名单目录仍跑通用卫生检查（本机绝对用户路径、凭证/密钥
+  形态 pattern）。
+- **机制连带**：core 内置全局词表清空，词表 profile 化（`sut_identity_terms`）；
+  起源 SUT 的身份词从引擎源码迁出，只存于上游回归 fixture
+  （`tests/fixtures/legacy-sut-terms.txt`）与其自身 profile；guard 扫描面锚定
+  engine root 的 kit 子树，治理工作区自身文件不在扫描面。附录 A 术语表
+  de-SUT guard 条目同步为身份防渗语义。
+
+---
+
 ## 附录 A — 术语表
 
 | 术语 | 含义 |
@@ -345,7 +398,7 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
 | **内嵌模式** Embedded | 历史形态：BUGate 手工融合在起源 SUT 测试仓内；已冻结，按迁移协议退役 |
 | **治理控制面 / 执行数据面** | BUGate 管"何时、凭何证据允许做"；SUT 框架管"怎么执行" |
 | **admission control** | 物理写门的机制类比：拦截写操作、按产物 `gate_status` 裁决、fail-closed |
-| **de-SUT guard** | `check_no_sut_terms.py`：core 树的 SUT 词汇泄漏防线，CI 强制 |
+| **de-SUT guard** | `check_no_sut_terms.py`：身份防渗防线（修订记录 A1）——防止当前 SUT 的身份词与行为性事实渗入可复用的 core/kit 子树；词表由 SUT profile 声明，CI 以 fixture 词表回归，通用卫生检查内置 |
 | **profile** | 把 core 绑定到一个 SUT 测试工作区的声明式桥接契约；导入模式下提交进 SUT 仓 |
 | **mounted workspace** | 被治理的 SUT 自动化测试工作区（测试、产物、fixtures、证据所在地） |
 | **Methodology-as-Code** | BUGate 的实现范式：把方法论编译成可版本化、可机器强制执行的门禁工作流 |

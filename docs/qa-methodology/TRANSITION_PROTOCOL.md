@@ -153,6 +153,23 @@ smuggle a product token into Core for the transition — in Core the only
 legitimate allowance is the mounted-profile pointer line. A migration that needs
 that marker on substantive content has mis-bucketed: the content is (b)/(c).
 
+> **Amendment note (2026-07-03, CHARTER A1 / ADR-BUGATE-004).** The de-SUT
+> guard's term list is now **profile-supplied** (`sut_identity_terms`; the
+> origin SUT's terms live on as the upstream regression fixture
+> `tests/fixtures/legacy-sut-terms.txt`), and narrative/provenance mentions of
+> a SUT's *identity* in documentation may carry an explicit allow marker or
+> live under `docs/case-studies/`. **Neither change loosens this classifier.**
+> In §2.2/§2.3's context — deciding whether a rule or capability enters Core —
+> the strict criterion is unchanged: a candidate's intended-Core text must be
+> statable neutrally, with no identity term and no behavioral SUT fact
+> (endpoint, path, resource, credential, environment, default). Run the
+> classification scan with the terms in force —
+> `python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt`
+> plus the active SUT's profile — and an allow marker on **substantive**
+> content still means the item is mis-bucketed (b)/(c). The A1 calibration
+> affects the narrative-document context only (origin stories, case studies,
+> import tutorials), never bucket classification, never the Promotion Rule.
+
 ---
 
 ## 3. Stub/Regression vs Correct Handoff — what NOT to migrate

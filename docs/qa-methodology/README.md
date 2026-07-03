@@ -14,6 +14,8 @@ profile or mounted workspace. On any conflict,
 | [EXPERIENCE_PROMOTION_PROTOCOL.md](EXPERIENCE_PROMOTION_PROTOCOL.md) | How a SUT-local lesson is decided to either stay local or be promoted into SUT-neutral BUGate Core. |
 | [BUGATE_PLATFORM_DECOUPLING_ADR.md](BUGATE_PLATFORM_DECOUPLING_ADR.md) | ADR-BUGATE-001: the accepted BUGate Core / SUT Profile / Mounted Workspace / SUT / Product Runtime four-part architecture and its promotion rule. |
 | [TRANSITION_PROTOCOL.md](TRANSITION_PROTOCOL.md) | PROTO-BUGATE-TRANS-001: the *journey* from an old embedded BUGate to the decoupled core — asymmetric strangler-fig, the 3-bucket capability-gap classifier, the transition-gap ledger, and retirement exit criteria. |
+| [BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md](BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md) | ADR-BUGATE-003: the machine-level memory bus — one service instance per machine (`~/.bugate/memory-bus`), namespace-tag isolation instead of per-repo databases, client resolution order, and the 2026-07-03 migration/rollback record. |
+| [BUGATE_DESUT_CALIBRATION_ADR.md](BUGATE_DESUT_CALIBRATION_ADR.md) | ADR-BUGATE-004: de-SUT calibration — "block seepage, not mention"; the three-layer discriminator, profile-supplied identity terms, narrative exemption channels, and the upstream legacy-fixture regression. The narrative dividend lives in [`../case-studies/`](../case-studies/). |
 | [BUGATE_EVOLUTION_TIMELINE.md](BUGATE_EVOLUTION_TIMELINE.md) | SUT-neutral summary of how BUGate evolved from a method into a profile-driven pre-code governance framework. |
 
 ## Recommended reading order

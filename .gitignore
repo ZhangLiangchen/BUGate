@@ -62,3 +62,4 @@ id_rsa*
 /self_healing.json
 /self_healing.md
 /self_healing_repair_plan.md
+bugate.config.yaml

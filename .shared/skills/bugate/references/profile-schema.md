@@ -30,7 +30,7 @@ These keys are read from the core config and may be overridden by a profile.
 |---|---|---|---|
 | `profile` | path | none (falls back to `active_profile`, then no profile loaded) | Relative or absolute path to a SUT profile YAML whose keys are merged on top of `bugate.config.yaml` by `load_config`; also re-resolved in `check_agent_role_paths.py`. |
 | `active_profile` | path | none | Alternate key for the profile path; used only if `profile` is absent (`load_config` tries `profile` then `active_profile`). |
-| `memory.namespace` | str | `project:bugate` (`DEFAULT_PROJECT_TAG`, after `MEMORY_BUS_PROJECT_TAG` env) | Project namespace/tag used for all Memory Service reads/writes. |
+| `memory.namespace` | str | `project:bugate` (`DEFAULT_PROJECT_TAG`, after `MEMORY_BUS_PROJECT_TAG` env) | Project namespace/tag used for all Memory Service reads/writes. In imported mode this is the ONLY memory scaffolding a governed repo declares: all repos share the machine-level bus (one DB under `~/.bugate/memory-bus`), isolated by this tag — do not scaffold a per-repo service dir (ADR-BUGATE-003). |
 | `namespace` | str | `project:bugate` | Flattened form of `memory.namespace` surfaced by `parse_simple_yaml` (nested `memory:` → `namespace:` collapses to a top-level `namespace` key); same project-tag fallback. |
 
 > `memory.namespace` is read both as the nested key and, because the simple YAML
@@ -50,6 +50,7 @@ automation workspace.
 | `guarded_path_regex` | str or list[str] of regexes | `[]` (empty → guard is a no-op, returns `0`) | Regex patterns; any edited/patched path matching one is physically blocked until the pre-code BUGate artifacts pass. |
 | `required_precode_artifacts` | list[str] | `['01_business_brief.md', '02_testability.md', '03_inventory.yaml', '03a_test_cases.md', '03b_adversarial_cases.yaml']` (`PRECODE_ARTIFACTS`) | Overrides the list of pre-code artifact filenames that must reach `gate_status: passed` before guarded files may be edited; used by `check_bugate.precode_passed`. |
 | `agent_roles` | mapping: role → (bare list[str] \| `{read: list[str], write: list[str]}`) of regexes | none (no roles → agent-role guard is a no-op) | Per-role forbidden path regexes for Wave 7 role isolation; a bare list applies to both read and write, or use `read:` / `write:` sub-lists to scope each independently. |
+| `sut_identity_terms` | str \| list[str] of regexes | none (no list → the de-SUT guard's identity scan is inert; its built-in general hygiene checks still run) | This SUT's identity terms — product, internal-system, account, or person names — that `check_no_sut_terms.py` keeps out of the reusable engine/kit subtree. Case-insensitive regexes, one per entry; the simple YAML parser does not unescape, so `\b` is written literally. See "De-SUT identity terms" below. |
 
 > `guarded_path_regex` accepts either a single regex string or a list of regex
 > strings. With no patterns the guard is a no-op.
@@ -83,6 +84,34 @@ list entries.
 > skills. Keep the *documents and skill bodies* in the governed workspace, never
 > in Core — these keys only record where they live.
 
+### De-SUT identity terms
+
+`sut_identity_terms` feeds the de-SUT guard (`scripts/check_no_sut_terms.py`),
+whose purpose is the kit's **reusability**: the engine subtree vendored into a
+governed repo must not carry facts true for only one SUT ("block seepage, not
+mention" — CHARTER Amendment A1). The discipline is three-layered, and this key
+covers exactly the middle layer:
+
+1. **Behavioral SUT facts** (defaults, endpoints, resources, credentials,
+   environment names) are barred from core unconditionally — review discipline
+   plus the guard's built-in general hygiene patterns; no profile key and no
+   exemption marker can allow them.
+2. **Identity terms** — what this key lists. Forbidden in the kit tree by
+   default; *narrative/provenance* mentions in upstream documentation are
+   legitimate only through explicit, per-site exemption channels (inline
+   `bugate: allow-sut-term`, file-level `desut: provenance-allowed`
+   frontmatter on narrative docs, or the `docs/case-studies/` allowlist).
+3. **Industry/domain vocabulary** is *not* defended by core. If this SUT wants
+   a domain word (a chain name, an API-doc tool name, a trade term) defended,
+   it lists that word here itself.
+
+The scan surface is anchored on the **engine root's kit subtree** — the files
+that will be reused for the next SUT. The governed workspace's own files
+(artifacts, tests, its README, this profile) are never the scan surface, so a
+SUT names itself freely on its own territory. Upstream CI additionally runs the
+guard with a legacy fixture list (`tests/fixtures/legacy-sut-terms.txt`) so the
+origin SUT's identity cannot seep back into core.
+
 ## Environment variables
 
 These environment variables override or supplement config/profile values at run
@@ -102,6 +131,7 @@ profile.
 |---|---|---|---|
 | `MEMORY_BUS_PROJECT_TAG` | str | unset (falls back to config `memory.namespace`, then `project:bugate`) | Highest-priority override for the Memory Service project namespace/tag. |
 | `MEMORY_BUS_URL` | URL | `http://localhost:8000` (`DEFAULT_URL`) | Base URL of the local `mcp-memory-service` HTTP API; trailing slash stripped. Also set programmatically from the `--url` CLI flag. |
+| `BUGATE_MEMORY_HOME` | path | unset (falls back to `~/.bugate/memory-bus`; the service's own `MCP_MEMORY_BASE_DIR` outranks it) | System-level bus data home where the service keeps `sqlite_vec.db`, `client.env`, `backups/`. Wrappers and clients resolve it identically; clients load `client.env` from here first, then fall back (deprecated, stderr hint) to the workspace `.memory_bus/client.env`. |
 | `MCP_API_KEY_AGENT` | token | unset (then tries `MCP_API_KEY_HUMAN`, then `MCP_API_KEY`; if all unset, no auth header) | First-choice bearer/API-key token for Memory Service auth (sent as `Authorization: Bearer` and `X-API-Key`). |
 | `MCP_API_KEY_HUMAN` | token | unset | Second-choice Memory Service auth token, used if `MCP_API_KEY_AGENT` is unset. |
 | `MCP_API_KEY` | token | unset | Last-resort Memory Service auth token, used if both `MCP_API_KEY_AGENT` and `MCP_API_KEY_HUMAN` are unset. |
@@ -159,6 +189,10 @@ required_precode_artifacts:
   - 03_inventory.yaml
   - 03a_test_cases.md
   - 03b_adversarial_cases.yaml
+
+# This SUT's identity terms the de-SUT guard keeps out of the engine/kit tree.
+sut_identity_terms:
+  - "\bexamplesut\b"
 
 # Wave 7 agent-role path isolation (consulted when BUGATE_AGENT_ROLE is set).
 agent_roles:

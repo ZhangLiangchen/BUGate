@@ -45,10 +45,14 @@ BUGate is used in exactly one of two ways (normative rules: [`CHARTER.md`](CHART
   regression (verifying the core stays clean of any one SUT). It is not the
   user-facing story.
 
-> A first-class installer (`bugate init`) and plugin packaging for imported
-> mode are the next milestone (CHARTER §5.2–§5.3). Until they ship, imported
-> mode is a manual vendor step (Quickstart A below); the workbench remains the
-> fully-scripted path.
+> Both imported-mode channels ship in-repo (CHARTER §5.2–§5.3): the
+> **installer** — `python3 scripts/bugate_init.py <sut-repo>` — and the
+> **Claude Code plugin** packaging (`.claude-plugin/` + `hooks/` +
+> `skills`/`commands`/`agents`, hooks calling the engine via
+> `${CLAUDE_PLUGIN_ROOT}`, inert in repos without a committed
+> `bugate.config.yaml`). Codex has no plugin system — `bugate init` covers that
+> side. Quickstart A below shows the installer first, then the manual
+> equivalent.
 
 ## Core/Profile/Mounted Workspace Model
 
@@ -100,9 +104,27 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
 
 ### A) Imported mode — govern your SUT test repo (default)
 
-Until `bugate init` ships (CHARTER §5.2), import manually. Everything below
-lands in the **SUT repo** and is **committed** there — in imported mode the
-governance contract is reviewed and versioned with the tests it guards:
+**Fast path — the installer.** From this repo:
+
+```bash
+python3 scripts/bugate_init.py <sut-repo>    # add --dry-run to preview
+```
+
+It vendors the kit into `<sut-repo>/.bugate/`, links skill discovery, merges
+the hook blocks into the SUT repo's `.claude/settings.json` +
+`.codex/hooks.json` (existing hooks preserved), scaffolds a **committed**
+`bugate.config.yaml` + `bugate.profile.yaml`, creates `docs/usecases/`, and
+prints the acceptance checklist — including the Codex re-trust caveat and the
+R4 negative control. Idempotent; re-run to refresh the vendored kit.
+
+**Plugin channel (Claude Code).** Install this repo as a plugin: skills,
+commands, gate agents, and hooks load via `${CLAUDE_PLUGIN_ROOT}`, and the
+hooks are inert in any repo without a committed `bugate.config.yaml`. You still
+commit the config + profile in the SUT repo (steps 3–4).
+
+**Manual equivalent** — everything below lands in the **SUT repo** and is
+**committed** there; in imported mode the governance contract is reviewed and
+versioned with the tests it guards:
 
 1. **Vendor the engine and skill** into the SUT test repo (copy or git
    submodule): `scripts/` (the stdlib-only gate engine) and
@@ -203,7 +225,7 @@ python3 scripts/check_bugate_v13_semantics.py examples/demo-sut --scope all --re
 
 ## Agent runtimes
 
-BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo in workbench mode, or vendored into the SUT repo in imported mode (Quickstart A). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as workbench fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
+BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo in workbench mode, vendored into the SUT repo in imported mode (Quickstart A), or as a **Claude Code plugin** (`.claude-plugin/` manifest; `skills`/`commands`/`agents`/`hooks` load from the plugin root). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as workbench fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
 
 Field-tested setup notes: use the vendor native installers for `codex` and
 `claude`, not stale npm wrappers; keep `~/.local/bin` ahead of older app or
@@ -226,9 +248,30 @@ CHARTER.md                  # charter: positioning, usage modes (imported vs wor
 scripts/                    # gate engine + SDTD orchestration (stdlib-only)
 .shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
 docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records
-examples/                   # sample SUT profile + a filled, passing demo gate stack
-.github/workflows/          # CI: py_compile, semantics gates, de-SUT guard
+docs/case-studies/          # narrative allowlist: real import/migration stories (identity-scan exempt)
+examples/                   # sample SUT profile + filled demo gate stacks (imported + workbench)
+tests/                      # upstream-only guard meta-tests + fixtures (legacy de-SUT term list)
+.github/workflows/          # CI: py_compile, semantics gates, de-SUT guard (hygiene/legacy/second-SUT/meta)
 ```
+
+## Provenance
+
+BUGate was not designed in the abstract — it was **extracted**. The gate stack
+grew up embedded in the automation test workspace of
+hypervise, a production multi-chain wallet platform, <!-- bugate: allow-sut-term -->
+where "prove your business understanding before you write test code" was first
+enforced against a live SUT. The methodology, the fail-closed write guard, the
+schema-driven semantic gates, and the falsification waves were all field-tested
+there, then de-SUT'd into this neutral core (ADR-BUGATE-001), migrated by the
+strangler-fig discipline of
+[`TRANSITION_PROTOCOL`](docs/qa-methodology/TRANSITION_PROTOCOL.md), and
+finally re-imported into the origin repo in the default imported mode. The
+full-circle story — including the real committed profile — is
+[`docs/case-studies/origin-sut-import.md`](docs/case-studies/origin-sut-import.md).
+
+The identity mention above is explicitly marked narrative provenance: per
+CHARTER Amendment A1, the de-SUT guard blocks *seepage into the reusable kit*,
+not *mention in the story*.
 
 ## License
 

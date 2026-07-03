@@ -103,7 +103,7 @@ SUT repo in imported mode, this repo in workbench mode — e.g.
 | Capability | Wave | Script | Key flags / env | Profile / env key | Graceful fallback | Example |
 |---|---|---|---|---|---|---|
 | Agent-role path isolation — deny a role's edits/reads to forbidden paths | 7 | `check_agent_role_paths.py` | reads PreToolUse payload on stdin | `BUGATE_AGENT_ROLE` (active role), `agent_roles` (per-role regexes, bare list or `read:`/`write:` sub-lists) | `BUGATE_AGENT_ROLE` unset/empty → returns 0 (no-op); no rules for the role/action → allow | `BUGATE_AGENT_ROLE=implementer python3 scripts/check_agent_role_paths.py` |
-| De-SUT guard — fail if SUT-specific tokens leak into core | core hygiene | `check_no_sut_terms.py` | `--quiet` | n/a | Per-line opt-out via trailing `# bugate: allow-sut-term`; exits 1 on any hit | `python3 scripts/check_no_sut_terms.py --quiet` |
+| De-SUT guard — keep a SUT's identity terms + behavioral leakage out of the reusable kit subtree (CHARTER A1: block seepage, not mention) | core hygiene | `check_no_sut_terms.py` | `--terms-file <list>` (repeatable; upstream CI uses `tests/fixtures/legacy-sut-terms.txt`), `--profile`, `--quiet` | `sut_identity_terms` (profile), `BUGATE_PROFILE` | No term list → identity scan inert, built-in general hygiene still runs; narrative exemptions: inline `bugate: allow-sut-term` (HTML-comment form for Markdown), file-level `desut: provenance-allowed`, `docs/case-studies/`; exits 1 on any hit | `python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt` |
 | Plan lock — block implementation while `.bugate/plan.lock` exists | gate enforcement | `check_plan_lock.py` | none | n/a | No lock file → returns 0; core never creates the lock itself | `python3 scripts/check_plan_lock.py` |
 | Prompt reminder — nudge toward pre-code gates when a prompt looks like test-implementation work | gate enforcement | `bugate_prompt_reminder.py` | reads prompt payload on stdin | n/a | Emits the reminder only on keyword match; always exits 0 | `echo '{"prompt":"write the e2e test"}' \| python3 scripts/bugate_prompt_reminder.py` |
 
@@ -115,17 +115,25 @@ The memory bus is an **optional** long-term truth layer backed by a user-install
 and delegate to the matching `memory_bus.py` subcommand. Auth/namespace come from
 env (`MEMORY_BUS_URL`, `MEMORY_BUS_PROJECT_TAG`, `MCP_API_KEY*`); see profile-schema.
 
+The bus is **machine-level** (ADR-BUGATE-003): one local service instance whose
+data home resolves system-wide (`MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` >
+`~/.bugate/memory-bus`, keys in `<bus-home>/client.env`), shared by every
+governed workspace on the machine. Projects are isolated by namespace tag
+(`project:<name>`), never by per-repo databases; a legacy in-repo
+`.memory_bus/client.env` still works as a deprecated fallback.
+
 | Command (`bin/…` → `memory_bus.py …`) | Purpose | Key flags |
 |---|---|---|
 | `memory-bus-ensure` | Health-check the service; start it in the background if down | env `MCP_HTTP_PORT`, `MEMORY_BUS_ENSURE_WAIT_SECONDS`; exits 0 even if it can't start |
-| `memory-bus-start` | Launch `mcp-memory-service` (resolves `memory` from `.venv/bin` or PATH; configures ONNX storage) | env `MCP_MEMORY_BASE_DIR`, `MCP_MEMORY_STORAGE_BACKEND`, `MCP_MEMORY_USE_ONNX`, `MCP_HTTP_PORT`; prints install hint if `memory` binary absent |
+| `memory-bus-start` | Launch `mcp-memory-service` (resolves `memory` from `.venv/bin` or PATH; configures ONNX storage) | data home env `MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` (default `~/.bugate/memory-bus`); `MCP_MEMORY_STORAGE_BACKEND`, `MCP_MEMORY_USE_ONNX`, `MCP_HTTP_PORT`; prints install hint if `memory` binary absent |
 | `memory-bus-status` → `status` | Health-check / status | `--json`, `--timeout`, `--no-fail` |
 | `memory-bus-stop` → `stop` | Stop the service | no-op if `memory` binary absent |
+| `memory-bus-install-launchd` | OPTIONAL macOS hardening: user LaunchAgent for the bus (RunAtLoad + KeepAlive) | `--uninstall` removes it; absence changes nothing (`memory-bus-ensure` still starts on demand) |
 | `memory-recent` → `recent` | Newest agent-visible memories | `--agent` (required), `--limit`, `--json`, `--no-header` |
 | `memory-handoff` → `handoff` | Record a handoff between agents | `--from`, `--to`, `--msg` (required); `--status`, `--scope`, `--task`, `--tag`, `--artifact` |
 | `memory-service-note` → `note` | Write a memory entry | `--agent`, `--type`, `--msg` (required); `--status`, `--scope`, `--task`, `--to`, `--broadcast`, `--tag`, `--artifact`, `--metadata` |
 | `memory-service-search` → `search` | Query memories (semantic + tag fallback) | `--query` (required), `--tag`, `--limit`, `--json` |
-| `memory-service-archive` → `archive` | Back up namespace memories to local JSON | `--out`, `--limit` |
+| `memory-service-archive` → `archive` | Back up namespace memories to local JSON | `--out` (default `<bus-home>/backups/`), `--limit` |
 | `memory-service-lint` → `lint` | Validate memories against governance rules | `--include-warnings`, `--limit`, `--show`, `--json` |
 | `promote-memory` → `note --status confirmed` | Promote a working note to a confirmed memory | `--agent`, `--type`, `--msg` (required); `--from-id` (→ `promoted_from` metadata), `--task`, `--artifact` |
 | `memory-model-fetch` | Pre-download the ONNX embedding model offline/behind proxy | env `BUGATE_ONNX_MODEL`, `MCP_MEMORY_ONNX_DIR`; needs an HF CLI |

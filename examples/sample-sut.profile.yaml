@@ -28,6 +28,18 @@ required_precode_artifacts:
   - 03a_test_cases.md
   - 03b_adversarial_cases.yaml
 
+# De-SUT identity defense (CHARTER A1 / scripts/check_no_sut_terms.py): this
+# SUT's identity terms — product / internal-system / account / person names —
+# that must never seep into the reusable core/kit tree. One regex per entry,
+# case-insensitive; the simple YAML parser does not unescape, so \b is written
+# literally. Layering per the charter: behavioral SUT facts are always barred
+# from core (review + built-in hygiene, not listable away); identity terms are
+# listed HERE, not in the engine; industry/domain words are defended only if
+# this SUT chooses to list them itself.
+sut_identity_terms:
+  - "\bexamplesut\b"
+  - "\bexample-internal-system\b"
+
 # Agent-role path isolation (consulted by scripts/check_agent_role_paths.py when
 # BUGATE_AGENT_ROLE is set). Core ships no roles; the profile supplies them.
 agent_roles:
