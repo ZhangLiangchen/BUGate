@@ -49,12 +49,21 @@ automation workspace.
 | `artifact_dir` | path | none (falls back to `artifact_root`; if neither set, the guard reports it as unconfigured and blocks) | Directory holding the UC's pre-code artifacts whose `gate_status` is checked before allowing edits to guarded paths. |
 | `artifact_root` | path | none | Alternate key for the artifact directory; used only if `artifact_dir` is absent. |
 | `guarded_path_regex` | str or list[str] of regexes | `[]` (empty → guard is a no-op, returns `0`) | Regex patterns; any edited/patched path matching one is physically blocked until the pre-code BUGate artifacts pass. |
-| `required_precode_artifacts` | list[str] | `['01_business_brief.md', '02_testability.md', '03_inventory.yaml', '03a_test_cases.md', '03b_adversarial_cases.yaml']` (`PRECODE_ARTIFACTS`) | Overrides the list of pre-code artifact filenames that must reach `gate_status: passed` before guarded files may be edited; used by `check_bugate.precode_passed`. |
+| `required_precode_artifacts` | list[str] | `['01_business_brief.md', '02_testability.md', '03_inventory.yaml', '03a_test_cases.md', '03b_adversarial_cases.yaml']` (`PRECODE_ARTIFACTS`) | Overrides the list of pre-code artifact filenames that must reach `gate_status: passed` before guarded files may be edited; used by `check_bugate.precode_passed`. The same list drives `check_bugate_v13_semantics.py --scope pre-code`: an artifact's presence is required and its layer gate chained only when it is in this set, so the write guard and the CI chain unlock/validate from one source of truth. `--scope all` always validates the full canonical set; out-of-set artifacts can still be gated by invoking their layer checker directly. |
 | `agent_roles` | mapping: role → (bare list[str] \| `{read: list[str], write: list[str]}`) of regexes | none (no roles → agent-role guard is a no-op) | Per-role forbidden path regexes for Wave 7 role isolation; a bare list applies to both read and write, or use `read:` / `write:` sub-lists to scope each independently. |
 | `sut_identity_terms` | str \| list[str] of regexes | none (no list → the de-SUT guard's identity scan is inert; its built-in general hygiene checks still run) | This SUT's identity terms — product, internal-system, account, or person names — that `check_no_sut_terms.py` keeps out of the reusable engine/kit subtree. Case-insensitive regexes, one per entry; the simple YAML parser does not unescape, so `\b` is written literally. See "De-SUT identity terms" below. |
 
 > `guarded_path_regex` accepts either a single regex string or a list of regex
 > strings. With no patterns the guard is a no-op.
+
+> Matching is **textual, on the path string exactly as the runtime payload
+> delivers it** (relative or absolute); the guard performs no
+> workspace-membership check. A same-shaped absolute path *outside* the
+> governed repo (e.g. `/other/repo/tests/<uc>/x.py` while this repo's pattern
+> is `(^|/)tests/…`) is therefore also blocked — a deliberate fail-closed
+> overreach, not an unlock risk. Write patterns as specifically as practical
+> (anchor on distinctive directory names) if sibling repos share your test
+> layout shape.
 
 > `agent_roles` is consulted only when `BUGATE_AGENT_ROLE` is set to a role name
 > defined in the mapping. A bare list under a role applies its regexes to both

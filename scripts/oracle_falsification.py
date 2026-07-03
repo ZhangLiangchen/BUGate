@@ -198,7 +198,12 @@ def run_oracle(oracle: dict, payload: dict) -> dict[str, str]:
 
 def apply_mutation(mutation: dict, payload: dict) -> tuple[bool, str]:
     op = str(mutation.get("op", "set")).strip().lower()
-    path = mutation.get("path", "")
+    path = str(mutation.get("path") or "")
+    if not _split(path):
+        # A pathless mutation is a spec mistake (e.g. `field:` instead of
+        # `path:`): record it as an invalid case, symmetric with unknown ops,
+        # instead of crashing the run inside the path helpers.
+        return False, "missing mutation path (each mutation needs a dotted `path:`)"
     if op == "set":
         return _set(payload, path, mutation.get("value"))
     if op == "set_empty_string":

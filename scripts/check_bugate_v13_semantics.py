@@ -394,9 +394,18 @@ def check(
     needed = required_precode_artifacts(config) if scope == "pre-code" else ALL_ARTIFACTS
     for name in needed:
         report.require_file(artifact_dir / name)
-    _merge(report, check_brief(artifact_dir, require_passed=require_passed, schema=schema))
-    _merge(report, check_layer2(artifact_dir, require_passed=require_passed, schema=schema))
-    _merge(report, check_inventory(artifact_dir, require_passed=require_passed, schema=schema))
+    # Each layer's semantic gate chains only when its artifact is in the
+    # required set — the same source of truth the physical write guard unlocks
+    # on, and the same idiom the 03a/03b gates below already follow. A repo
+    # with a shortened required_precode_artifacts can therefore gate its CI on
+    # this chain without the skipped layers failing as missing; the individual
+    # layer checkers remain directly invocable for anything out-of-set.
+    if "01_business_brief.md" in needed:
+        _merge(report, check_brief(artifact_dir, require_passed=require_passed, schema=schema))
+    if "02_testability.md" in needed:
+        _merge(report, check_layer2(artifact_dir, require_passed=require_passed, schema=schema))
+    if "03_inventory.yaml" in needed:
+        _merge(report, check_inventory(artifact_dir, require_passed=require_passed, schema=schema))
     # Optional Full-SDTD modeling stack: validated only when the files exist AND
     # the active dialect defines its canonical ids (a non-canonical dialect may
     # carry these artifacts in a form this checker is not meant to score).
