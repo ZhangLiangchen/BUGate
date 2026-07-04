@@ -122,6 +122,30 @@ SUT names itself freely on its own territory. Upstream CI additionally runs the
 guard with a legacy fixture list (`tests/fixtures/legacy-sut-terms.txt`) so the
 origin SUT's identity cannot seep back into core.
 
+## Imported-mode `.gitignore` backstop
+
+`bugate init` appends one clearly-marked, idempotent block (between
+`# >>> BUGate imported-mode ignores … >>>` / `# <<< … <<<`) to the governed
+repo's **root** `.gitignore`, creating the file if absent. The block keeps the
+scorers' **default** outputs and machine-local agent/memory state out of the SUT
+repo's `git status`:
+
+- default scorer outputs, anchored to the repo root with a leading `/` (exactly
+  where they land when a scorer runs without an explicit `--*-output`):
+  `oracle_falsification_result.{json,md}`, `prd_health_result.json`,
+  `prd_health_report.md`, `assertion_coverage_matrix.md`, and
+  `self_healing.{json,md}` / `self_healing_repair_plan.md`;
+- local state: `<vendor-dir>/plan.lock`, `.memory_bus/`, `.claude/memory/`,
+  `.codex/memories/`.
+
+Idempotency is textual: the block is appended only when its BEGIN marker is
+absent, so a re-run never duplicates it and **never rewrites the SUT's own
+lines**. The committed governance contract (`bugate.config.yaml` /
+`bugate.profile.yaml`) is deliberately **not** ignored — it must stay
+committable — and only root-anchored default names are matched, so a same-named
+artifact committed deeper in the tree is untouched. The updated `.gitignore` is
+part of what the importer tells you to commit.
+
 ## Environment variables
 
 These environment variables override or supplement config/profile values at run

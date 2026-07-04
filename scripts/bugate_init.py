@@ -21,17 +21,22 @@ What it does, in order:
   4. scaffolds a committed ``bugate.config.yaml`` (the workspace-root marker)
      and ``bugate.profile.yaml`` (inert until ``guarded_path_regex`` is filled);
   5. creates the ``docs/usecases/`` skeleton;
-  6. probes the MACHINE-LEVEL memory bus (reuse-first, ADR-BUGATE-003): all
+  6. appends a marked, idempotent ignore block to the repo's root
+     ``.gitignore`` (creating it if absent) so the default scorer outputs and
+     local agent/memory state don't litter the SUT repo's ``git status`` — the
+     SUT's own lines and the committed governance contract are left untouched;
+  7. probes the MACHINE-LEVEL memory bus (reuse-first, ADR-BUGATE-003): all
      governed repos on a machine share one running ``mcp-memory-service``
      instance, isolated by namespace tag — init never scaffolds or starts a
      per-repo service, it only reports whether the shared one is already up;
-  7. prints the acceptance steps — including the Codex re-trust caveat (hooks
+  8. prints the acceptance steps — including the Codex re-trust caveat (hooks
      stay silently inactive until the changed hook hash is re-trusted) and the
      R4 negative control.
 
 Everything is stdlib-only and idempotent: re-running refreshes the vendored kit
 and the BUGate hook wiring (a refreshed Codex hook needs its hash re-trusted
-again) while config, profile, and the repo's own hooks stay untouched.
+again) while config, profile, the repo's own hooks, and the repo's own
+.gitignore lines stay untouched (the marked ignore block is appended once).
 """
 from __future__ import annotations
 
@@ -184,6 +189,61 @@ memory:
   namespace: project:{name}
 """
 
+# A clearly-marked, textually-idempotent .gitignore block. The markers make
+# idempotency a substring test (never a fuzzy diff): re-running init appends the
+# block only when BEGIN is absent, so the SUT's own lines are never rewritten or
+# doubled. Scorer defaults are anchored to the repo root with a leading `/` —
+# exactly where the scorers drop them when run without an explicit --*-output
+# (see the scorer argparse defaults) — so a same-named committed artifact deeper
+# in the tree is not swept up. The governance contract (bugate.config.yaml /
+# bugate.profile.yaml) is deliberately NOT ignored: it must stay committable.
+GITIGNORE_BEGIN = "# >>> BUGate imported-mode ignores (managed by bugate_init.py) >>>"
+GITIGNORE_END = "# <<< BUGate imported-mode ignores <<<"
+GITIGNORE_BLOCK = """\
+{begin}
+# Default scorer outputs written to the repo root when run without --*-output
+# (oracle_falsification.py / check_prd_health.py /
+# generate_assertion_coverage_matrix.py / self_healing_mvp.py).
+/oracle_falsification_result.json
+/oracle_falsification_result.md
+/prd_health_result.json
+/prd_health_report.md
+/assertion_coverage_matrix.md
+/self_healing.json
+/self_healing.md
+/self_healing_repair_plan.md
+# Local agent + memory state — machine-local, never committed.
+/{vendor_dir}/plan.lock
+/.memory_bus/
+/.claude/memory/
+/.codex/memories/
+{end}
+"""
+
+
+def scaffold_gitignore(target: Path, vendor_dir: str, dry: bool) -> list[str]:
+    """Append the marked BUGate ignore block to the SUT repo's root .gitignore.
+
+    Create it if absent; otherwise PRESERVE the SUT's own lines and append our
+    block only when the BEGIN marker is not already present, so a re-run neither
+    duplicates the block nor rewrites the repo's own entries.
+    """
+    path = target / ".gitignore"
+    block = GITIGNORE_BLOCK.format(begin=GITIGNORE_BEGIN, end=GITIGNORE_END, vendor_dir=vendor_dir)
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if GITIGNORE_BEGIN in existing:
+        return ["keep existing .gitignore (BUGate block already present)"]
+    if not existing:
+        note = "scaffold .gitignore (BUGate ignore block)"
+        new_text = block
+    else:
+        note = "append BUGate ignore block to existing .gitignore"
+        sep = "" if existing.endswith("\n") else "\n"
+        new_text = existing + sep + "\n" + block
+    if not dry:
+        path.write_text(new_text, encoding="utf-8")
+    return [note]
+
 
 def vendor_kit(engine_root: Path, target: Path, vendor_dir: str, dry: bool) -> list[str]:
     notes = []
@@ -310,8 +370,10 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
   1. Fill bugate.profile.yaml: add `guarded_path_regex` for this repo's test
      layout (keep the (?P<uc>...) capture) — the write guard is inert until then.
   2. COMMIT: bugate.config.yaml, bugate.profile.yaml, {vendor_dir}/,
-     .claude/ + .codex/ hook wiring, docs/usecases/ — the governance contract
-     reviews and versions with the tests it guards.
+     .claude/ + .codex/ hook wiring, docs/usecases/, and the updated .gitignore
+     (a marked block backstops the default scorer outputs + local agent/memory
+     state out of git status) — the governance contract reviews and versions
+     with the tests it guards.
   3. Codex only: RE-TRUST the changed hook hash in the Codex hook-management
      UI. Until then Codex hooks are SILENTLY inactive (known behavior).
   4. Acceptance — R4 negative control: pick a guarded test path whose UC has no
@@ -353,6 +415,7 @@ def main(argv: list[str] | None = None) -> int:
     notes += link_skills(target, vendor_dir, args.dry_run, args.force)
     notes += wire_hooks(target, vendor_dir, args.dry_run)
     notes += scaffold(target, vendor_dir, args.dry_run)
+    notes += scaffold_gitignore(target, vendor_dir, args.dry_run)
     notes += bus_probe()
 
     prefix = "[dry-run] " if args.dry_run else ""

@@ -143,12 +143,83 @@ def scenario_merge_refreshes_stale_wiring() -> None:
     )
 
 
+def scenario_gitignore_backstop() -> None:
+    print("S5 .gitignore backstop: marked block written once; SUT's own lines preserved")
+    begin = bugate_init.GITIGNORE_BEGIN
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+
+        def run_init(sut: Path) -> subprocess.CompletedProcess:
+            return subprocess.run(
+                [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(sut)],
+                capture_output=True, text=True,
+            )
+
+        # (a) fresh init creates .gitignore with the marked block + the scorer defaults.
+        fresh = tmp / "fresh"
+        fresh.mkdir()
+        cp = run_init(fresh)
+        check("fresh init succeeds", cp.returncode == 0, cp.stderr[-300:])
+        gi = fresh / ".gitignore"
+        text = gi.read_text(encoding="utf-8") if gi.exists() else ""
+        check("fresh .gitignore carries the BUGate marker", begin in text, text[:200])
+        check(
+            "fresh block ignores the scorer defaults",
+            all(name in text for name in (
+                "/oracle_falsification_result.json",
+                "/prd_health_result.json",
+                "/prd_health_report.md",
+                "/assertion_coverage_matrix.md",
+            )),
+            text,
+        )
+        check(
+            "committed governance contract is NOT ignored",
+            "bugate.config.yaml" not in text and "bugate.profile.yaml" not in text,
+            text,
+        )
+
+        # (b) re-running init does not duplicate the block.
+        cp2 = run_init(fresh)
+        check("re-run init succeeds", cp2.returncode == 0, cp2.stderr[-300:])
+        text2 = gi.read_text(encoding="utf-8")
+        check("re-run does not duplicate the marked block", text2.count(begin) == 1, str(text2.count(begin)))
+        check("re-run leaves the .gitignore byte-identical", text2 == text)
+
+        # (c) a pre-existing SUT .gitignore is preserved; our block is appended after it.
+        seeded = tmp / "seeded"
+        seeded.mkdir()
+        own_lines = "node_modules/\n*.log\n/build/\n"
+        (seeded / ".gitignore").write_text(own_lines, encoding="utf-8")
+        cp3 = run_init(seeded)
+        check("seeded init succeeds", cp3.returncode == 0, cp3.stderr[-300:])
+        seeded_text = (seeded / ".gitignore").read_text(encoding="utf-8")
+        check(
+            "SUT's own .gitignore lines are intact",
+            all(line in seeded_text for line in ("node_modules/", "*.log", "/build/")),
+            seeded_text,
+        )
+        check("BUGate block is appended (marker present, once)", seeded_text.count(begin) == 1, seeded_text)
+        check(
+            "BUGate block comes after the SUT's own lines",
+            seeded_text.index("node_modules/") < seeded_text.index(begin),
+            seeded_text,
+        )
+        # re-running against the seeded repo is still a no-op.
+        run_init(seeded)
+        check(
+            "seeded re-run does not duplicate the block",
+            (seeded / ".gitignore").read_text(encoding="utf-8").count(begin) == 1,
+        )
+
+
 def main() -> int:
     for scenario in (
         scenario_scaffold_hygiene,
         scenario_root_snippet_contract,
         scenario_wired_hook_inert_without_config,
         scenario_merge_refreshes_stale_wiring,
+        scenario_gitignore_backstop,
     ):
         scenario()
     if FAILURES:
