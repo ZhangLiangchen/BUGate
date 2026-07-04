@@ -31,27 +31,29 @@ jobs:
       - name: V13 pre-code semantics gate
         run: python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
 
-      # De-SUT guard (CHARTER A1: block seepage, not mention) — three readings:
-      # built-in hygiene, the origin SUT's legacy terms can never seep back,
-      # and the meta-test proves every red/green verdict (incl. the second-SUT
-      # profile-declared defense) with fabricated fixtures and negative controls.
+      # De-SUT guard (CHARTER A1: block seepage, not mention) — two hygiene
+      # readings run here; the meta-test that proves every red/green verdict
+      # (incl. the second-SUT profile-declared defense) runs in the test loop
+      # below with the rest of tests/test_*.py.
       - name: De-SUT guard — general hygiene (kit tree, no term list)
         run: python3 scripts/check_no_sut_terms.py
 
       - name: De-SUT guard — legacy origin-SUT regression (fixture terms)
         run: python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt
 
-      - name: De-SUT guard — exemption + seepage negative controls (meta-test)
-        run: python3 tests/test_desut_guard.py
-
-      # The repo ships no committed example SUT trees (imported-mode purity):
-      # every governed-layout acceptance below fabricates its fixtures at run
-      # time and asserts the guard's block/allow/fail-closed behavior.
-      - name: Write-guard dual-layout acceptance (ephemeral fixtures)
-        run: python3 tests/test_write_guard_layouts.py
-
-      - name: Installer scaffold + hook-inertness acceptance (ephemeral fixtures)
-        run: python3 tests/test_init_scaffold.py
+      # Meta-tests and ephemeral-fixture acceptances (imported-mode purity: the
+      # repo ships no committed example SUT trees, so each fabricates its own
+      # fixtures at run time). One loop runs every tests/test_*.py, echoes each
+      # file, and fails the job if any test fails, so a new test file is picked
+      # up automatically.
+      - name: Meta-tests and acceptances (every tests/test_*.py)
+        run: |
+          rc=0
+          for t in tests/test_*.py; do
+            echo "== $t =="
+            python3 "$t" || rc=1
+          done
+          exit $rc
 
       - name: bugate init end-to-end (ephemeral SUT repo, R4 negative control)
         run: |
