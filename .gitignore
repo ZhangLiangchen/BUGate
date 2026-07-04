@@ -53,7 +53,6 @@ id_rsa*
 
 # Default report outputs from the scorers when run without explicit --*-output
 # (oracle_falsification.py / check_prd_health.py / generate_assertion_coverage_matrix.py).
-# The committed examples/demo-sut artifacts are NOT matched by these names.
 /oracle_falsification_result.json
 /oracle_falsification_result.md
 /prd_health_result.json
@@ -62,4 +61,6 @@ id_rsa*
 /self_healing.json
 /self_healing.md
 /self_healing_repair_plan.md
-bugate.config.yaml
+
+# Only the engine repo's own root core config (a SUT repo commits its own).
+/bugate.config.yaml
