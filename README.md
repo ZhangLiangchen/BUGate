@@ -249,7 +249,8 @@ the extra runtime packages listed in [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIO
 
 For a repeatable end-to-end capability audit after setup, invoke the
 `$bugate-full-check` skill. Its fallback prompt is documented in
-[`INIT.zh-CN.md`](INIT.zh-CN.md).
+[`INIT.md`](INIT.md) ("Full-capability self-check"; Chinese mirror in
+[`INIT.zh-CN.md`](INIT.zh-CN.md)).
 
 ## Layout
 

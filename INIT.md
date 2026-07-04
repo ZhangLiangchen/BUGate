@@ -161,6 +161,101 @@ Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT
 
 ---
 
+## Full-capability self-check (after setup)
+
+Once the core, the agent runtime, and any optional runtimes are installed and
+logged in, run one **end-to-end** capability audit. Prefer the built-in skill —
+it is discovered via `.claude/skills/bugate-full-check` and
+`.codex/skills/bugate-full-check`:
+
+```text
+Use $bugate-full-check to verify this BUGate checkout end to end.
+```
+
+The skill lives at `.shared/skills/bugate-full-check/` and ships a runnable
+driver:
+
+```bash
+python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode smoke
+python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
+```
+
+If the runtime cannot auto-discover the skill yet, hand the agent the **fallback
+prompt** below verbatim. The goal is not to stop at `check-env`, but to
+distinguish "installed" / "core works" / "optional runtimes work" / "a real SUT
+test workspace is activated through a profile". (Field setup gotchas — native
+installers, `PATH` ordering, the extra ONNX runtime packages — live in
+[`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).)
+
+```text
+Run a full-capability self-check on this BUGate repo, strictly following
+AGENTS.md and .shared/skills/bugate/SKILL.md.
+
+Requirements:
+1. First read .shared/skills/bugate/SKILL.md and confirm whether this is core
+   mode or has a SUT profile (and its automation test workspace) mounted. Do not
+   invent any SUT fact.
+2. Verify the core 4-layer gate (no example SUT tree in-repo; templates +
+   ephemeral fixtures only):
+   - python3 -m py_compile scripts/*.py
+   - python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
+3. Verify Codex / Claude Code:
+   - type -a codex; type -a claude
+   - codex --version; claude --version
+   - Run "Reply exactly: ok" through both codex exec and claude -p to confirm
+     real model calls, not just check-env.
+4. Verify both peer bridges:
+   - python3 scripts/sdtd_multiview_cli_bridge.py check-env
+   - python3 scripts/sdtd_adversarial_cli_bridge.py check-env
+   - Use python3 scripts/sdtd_orchestrator.py <tmp>/peer-uc --init to scaffold a
+     template UC under /tmp, then run-all multi-view and adversarial on it, and
+     confirm both Codex and Claude write a real peer view, not
+     fallback_placeholder.
+5. Verify the memory bus:
+   - bin/memory-bus-status
+   - bin/memory-service-note --agent agent --type finding --msg "memory smoke"
+   - bin/memory-service-search --query "memory smoke" --limit 1
+   - find ~/.cache/mcp_memory/onnx_models -name '*.onnx' -print
+   - MCP_MEMORY_BASE_DIR="${BUGATE_MEMORY_HOME:-$HOME/.bugate/memory-bus}" MCP_MEMORY_STORAGE_BACKEND=sqlite_vec
+     MCP_MEMORY_USE_ONNX=1 PATH="$PWD/.venv/bin:$PATH" memory status
+     Expect a healthy service and, where possible, confirm the onnxruntime/ONNX
+     path is exercised.
+6. Verify Wave 0 / Wave 8 (graceful-degradation contract, no spec fixture):
+   - python3 scripts/check_prd_health.py --gate must print profile_required and exit 0
+   - python3 scripts/oracle_falsification.py --gate likewise
+   - python3 scripts/generate_assertion_coverage_matrix.py --help must exit cleanly
+7. Verify the physical write guard (dual layout, ephemeral fixtures):
+   - python3 tests/test_write_guard_layouts.py must print PASS (both layouts) —
+     imported (config-marked root) and engine-development (sentinel fallback)
+     each allow / block / fail-closed.
+8. Verify Wave 7 role isolation (temp profile, as full-check constructs it):
+   - Build a profile with agent_roles under /tmp, and with BUGATE_PROFILE=<that file>
+     plus BUGATE_AGENT_ROLE=implementer confirm a forbidden path returns 2 and an
+     allowed path returns 0.
+9. Verify profile hardening gates (enforced-effect probe):
+   - With the orchestrator --init template UC plus a temp profile carrying
+     require_multiview: true, run v13 pre-code and confirm it is rejected
+     (non-zero exit) for the missing divergence_report.md.
+10. Clean up every /tmp self-check artifact; do not touch SUT facts or template
+    source files.
+
+Finally output a table split into:
+- installed and verified working
+- present but needs a real SUT profile / test workspace to activate
+- gates that by design need human acceptance
+- parts not yet scripted or only defined in the methodology
+
+The conclusion must clearly separate:
+- "BUGate core + optional runtimes are working"
+- "every gate for a real SUT test workspace is activated"
+
+If bugate.config.yaml is still mode: core with guarded_path_regex: [], you may
+not claim a real SUT test workspace is fully gated — only that core/demo/optional
+runtimes are verified.
+```
+
+---
+
 ## Summary
 
 | Goal | You install | We ship | Degrades if absent? |

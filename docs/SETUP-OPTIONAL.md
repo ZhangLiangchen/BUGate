@@ -255,3 +255,27 @@ path. An allowed path returns 0.
 Default **OFF**: if `BUGATE_AGENT_ROLE` is unset/empty, or the active profile
 defines no `agent_roles` rules for the role/action, the guard is a **no-op**
 (exit 0, allow everything).
+
+---
+
+## Field-tested gotchas
+
+A few setup traps that are cheap to hit and cheap to avoid. The CLI-resolution
+and memory-bus notes above cover the rest; these are the ones with no obvious
+home elsewhere.
+
+- **Stale npm CLI wrappers shadow the native install.** If a global
+  `@anthropic-ai/claude-code` (or a Homebrew/app `codex`) resolves ahead of the
+  native binary, `check-env` may pass while dispatch behaves oddly. Remove the
+  wrapper (`npm uninstall -g @anthropic-ai/claude-code`) and keep `~/.local/bin`
+  ahead of older app/Homebrew paths on `PATH`; confirm with `type -a codex` /
+  `type -a claude`.
+- **Codex skill discovery needs valid YAML frontmatter.** If Codex logs
+  `failed to load skill … invalid YAML`, check the frontmatter of
+  `.shared/skills/bugate/SKILL.md` first — a `description:` that contains a colon
+  must be quoted.
+- **Confirm the ONNX model actually landed.** After `bin/memory-model-fetch`,
+  verify a usable model exists rather than assuming the download finished:
+  `find ~/.cache/mcp_memory/onnx_models -name '*.onnx' -print`. With a usable
+  `onnx/model.onnx` present the service starts; to defer the model entirely,
+  `MCP_MEMORY_USE_ONNX=0 bin/memory-bus-start`.
