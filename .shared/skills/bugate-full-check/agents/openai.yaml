@@ -1,4 +1,0 @@
-interface:
-  display_name: "BUGate Full Check"
-  short_description: "Audit BUGate setup and gates"
-  default_prompt: "Use $bugate-full-check to verify this BUGate checkout end to end."
