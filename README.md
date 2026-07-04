@@ -125,7 +125,9 @@ the hook blocks into the SUT repo's `.claude/settings.json` +
 `.codex/hooks.json` (existing hooks preserved), scaffolds a **committed**
 `bugate.config.yaml` + `bugate.profile.yaml`, creates `docs/usecases/`, and
 prints the acceptance checklist — including the Codex re-trust caveat and the
-R4 negative control. Idempotent; re-run to refresh the vendored kit.
+R4 negative control. Idempotent; re-running refreshes the vendored kit and the
+BUGate hook wiring (upgrading an older import's hook shape; the repo's own
+hooks are never rewritten).
 
 **Plugin channel (Claude Code).** Install this repo as a plugin: skills,
 commands, gate agents, and hooks load via `${CLAUDE_PLUGIN_ROOT}`, and the

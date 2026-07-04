@@ -15,8 +15,9 @@ What it does, in order:
   2. links runtime skill discovery: ``.claude/skills/bugate`` and
      ``.codex/skills/bugate`` → the vendored skill tree;
   3. merges the BUGate hook blocks into the repo's ``.claude/settings.json``
-     and ``.codex/hooks.json`` (existing hooks are preserved; ours are appended
-     only when absent);
+     and ``.codex/hooks.json`` (the repo's own hooks are preserved; ours are
+     appended when absent and refreshed when their wired text has drifted from
+     the current template — so a re-run also upgrades an older import's wiring);
   4. scaffolds a committed ``bugate.config.yaml`` (the workspace-root marker)
      and ``bugate.profile.yaml`` (inert until ``guarded_path_regex`` is filled);
   5. creates the ``docs/usecases/`` skeleton;
@@ -29,7 +30,8 @@ What it does, in order:
      R4 negative control.
 
 Everything is stdlib-only and idempotent: re-running refreshes the vendored kit
-and leaves existing config/profile/hooks untouched unless --force.
+and the BUGate hook wiring (a refreshed Codex hook needs its hash re-trusted
+again) while config, profile, and the repo's own hooks stay untouched.
 """
 from __future__ import annotations
 
@@ -94,21 +96,42 @@ def hook_blocks(vendor_dir: str, runtime: str) -> dict:
 
 
 def merge_hooks(existing: dict, blocks: dict, vendor_dir: str) -> tuple[dict, list[str]]:
-    """Append our hook entries to an existing hooks file, never rewriting theirs.
+    """Merge the BUGate hook entries into an existing hooks file.
 
-    Idempotency: an event block is skipped when any existing command in that
-    event already calls a script under the vendor dir.
+    Refresh ours, never theirs. Ownership is decided per entry by the vendor
+    marker: an entry is OURS when every command in it calls a script under the
+    vendor dir. The repo's own entries are never rewritten. Our entries are
+    appended when absent and REWRITTEN in place when their text has drifted
+    from the current template — the upgrade path: re-running init brings an
+    older import's wiring (e.g. a pre-lazy-guard hook shape) up to the current
+    contract. An entry that mixes a vendor call into the repo's own hooks is
+    treated as wired-but-theirs and left untouched.
     """
     added: list[str] = []
     hooks = existing.setdefault("hooks", {})
     marker = f"{vendor_dir}/scripts/"
+
+    def commands(entry: dict) -> list[str]:
+        return [h.get("command") or "" for h in (entry.get("hooks") or [])]
+
+    def is_ours(entry: dict) -> bool:
+        cmds = commands(entry)
+        return bool(cmds) and all(marker in c for c in cmds)
+
+    def is_marked(entry: dict) -> bool:
+        return any(marker in c for c in commands(entry))
+
     for event, entries in blocks.items():
         current = hooks.setdefault(event, [])
-        already = any(
-            marker in (h.get("command") or "")
-            for entry in current for h in (entry.get("hooks") or [])
-        )
-        if already:
+        ours = [e for e in current if is_ours(e)]
+        if any(is_marked(e) and not is_ours(e) for e in current) and not ours:
+            continue  # wired through the repo's own mixed entry — not ours to touch
+        if ours:
+            if ours == entries:
+                continue  # already wired at the current contract
+            current[:] = [e for e in current if not is_ours(e)]
+            current.extend(entries)
+            added.append(f"{event} (refreshed)")
             continue
         current.extend(entries)
         added.append(event)
