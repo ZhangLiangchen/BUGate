@@ -13,7 +13,9 @@ What it does, in order:
   1. vendors the kit (``scripts/``, ``bin/``, ``.shared/skills/bugate/``) from
      this engine tree into ``<sut-repo>/<vendor-dir>/``;
   2. links runtime skill discovery: ``.claude/skills/bugate`` and
-     ``.codex/skills/bugate`` → the vendored skill tree;
+     ``.codex/skills/bugate`` → the vendored skill tree, and copies the Codex
+     gate-review agents into ``.codex/agents/`` (Codex's agent channel — the
+     Claude equivalents load via the plugin);
   3. merges the BUGate hook blocks into the repo's ``.claude/settings.json``
      and ``.codex/hooks.json`` (the repo's own hooks are preserved; ours are
      appended when absent and refreshed when their wired text has drifted from
@@ -50,6 +52,13 @@ from bugate_core import find_engine_root
 
 KIT_DIRS = ["scripts", "bin", ".shared/skills/bugate"]
 IGNORE_NAMES = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
+
+# Codex has no plugin system, so the installer is its channel for the gate-review
+# agents (the Claude equivalents load via the plugin). The agent TOMLs travel
+# inside the vendored kit and reference the skill through the .codex/skills/bugate
+# symlink this installer also creates, so one file resolves in the engine repo and
+# in any SUT repo regardless of vendor dir.
+CODEX_AGENTS_KIT_REL = ".shared/skills/bugate/adapters/codex/agents"
 
 # Hook commands are templated on the vendor dir. ROOT is the governed WORKSPACE
 # root, found via the committed config this installer scaffolds; the engine is
@@ -288,6 +297,31 @@ def link_skills(target: Path, vendor_dir: str, dry: bool, force: bool) -> list[s
     return notes
 
 
+def install_codex_agents(engine_root: Path, target: Path, vendor_dir: str, dry: bool) -> list[str]:
+    """Copy the Codex gate-review agents into the SUT repo's .codex/agents/.
+
+    Codex discovers project-local agents from .codex/agents/ and has no plugin
+    channel, so the installer copies our gate agents there as committed files.
+    Refresh-ours: our own named TOMLs are (re)written each run so an upgrade
+    reaches them; any other agent the SUT owns in that dir is left untouched.
+    The kit source is read from the vendored location, so this works whether
+    init runs from the engine repo or an already-vendored kit.
+    """
+    notes: list[str] = []
+    src_dir = engine_root / CODEX_AGENTS_KIT_REL
+    if not src_dir.is_dir():
+        notes.append(f"codex agents: source {CODEX_AGENTS_KIT_REL}/ missing — skipped")
+        return notes
+    dst_dir = target / ".codex" / "agents"
+    for src in sorted(src_dir.glob("*.toml")):
+        dst = dst_dir / src.name
+        notes.append(f"{'refresh' if dst.exists() else 'install'} .codex/agents/{src.name}")
+        if not dry:
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dst)
+    return notes
+
+
 def wire_hooks(target: Path, vendor_dir: str, dry: bool) -> list[str]:
     notes = []
     for runtime, path in (("claude", target / ".claude" / "settings.json"),
@@ -370,12 +404,14 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
   1. Fill bugate.profile.yaml: add `guarded_path_regex` for this repo's test
      layout (keep the (?P<uc>...) capture) — the write guard is inert until then.
   2. COMMIT: bugate.config.yaml, bugate.profile.yaml, {vendor_dir}/,
-     .claude/ + .codex/ hook wiring, docs/usecases/, and the updated .gitignore
-     (a marked block backstops the default scorer outputs + local agent/memory
-     state out of git status) — the governance contract reviews and versions
-     with the tests it guards.
+     .claude/ + .codex/ hook wiring, .codex/agents/ (the Codex gate agents),
+     docs/usecases/, and the updated .gitignore (a marked block backstops the
+     default scorer outputs + local agent/memory state out of git status) — the
+     governance contract reviews and versions with the tests it guards.
   3. Codex only: RE-TRUST the changed hook hash in the Codex hook-management
-     UI. Until then Codex hooks are SILENTLY inactive (known behavior).
+     UI. Until then Codex hooks are SILENTLY inactive (known behavior). The
+     .codex/agents/ gate agents are picked up on the next Codex session (no
+     re-trust needed — they are agents, not hooks).
   4. Acceptance — R4 negative control: pick a guarded test path whose UC has no
      passed pre-code artifacts and confirm the block:
        python3 {vendor_dir}/scripts/check_bugate.py <a-guarded-test>.py </dev/null
@@ -413,6 +449,7 @@ def main(argv: list[str] | None = None) -> int:
     notes = []
     notes += vendor_kit(engine_root, target, vendor_dir, args.dry_run)
     notes += link_skills(target, vendor_dir, args.dry_run, args.force)
+    notes += install_codex_agents(engine_root, target, vendor_dir, args.dry_run)
     notes += wire_hooks(target, vendor_dir, args.dry_run)
     notes += scaffold(target, vendor_dir, args.dry_run)
     notes += scaffold_gitignore(target, vendor_dir, args.dry_run)

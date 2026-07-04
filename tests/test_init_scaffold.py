@@ -213,6 +213,51 @@ def scenario_gitignore_backstop() -> None:
         )
 
 
+def scenario_codex_agents_installed() -> None:
+    print("S6 codex agents: installed into .codex/agents/, vendor-agnostic, refresh-ours")
+    names = {"brief-gate.toml", "testability-gate.toml", "inventory-gate.toml"}
+    with tempfile.TemporaryDirectory() as td:
+        sut = Path(td) / "sut"
+        sut.mkdir()
+        cp = subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(sut)],
+            capture_output=True, text=True,
+        )
+        check("init succeeds", cp.returncode == 0, cp.stderr[-300:])
+        agents_dir = sut / ".codex" / "agents"
+        present = {p.name for p in agents_dir.glob("*.toml")} if agents_dir.is_dir() else set()
+        check("all three gate agents installed", names <= present, str(present))
+        brief = (agents_dir / "brief-gate.toml").read_text(encoding="utf-8") if (agents_dir / "brief-gate.toml").exists() else ""
+        check(
+            "agent references the skill vendor-agnostically via .codex/skills/bugate",
+            ".codex/skills/bugate/SKILL.md" in brief and ".shared/skills/bugate/SKILL.md" not in brief,
+            brief,
+        )
+        # The installer-created .codex/skills/bugate symlink resolves the reference.
+        check(
+            "the referenced SKILL.md resolves through the installed symlink",
+            (sut / ".codex" / "skills" / "bugate" / "SKILL.md").exists(),
+        )
+        # refresh-ours: a SUT-owned agent survives a re-run; ours are refreshed, not duplicated.
+        (agents_dir / "sut-own.toml").write_text('name = "sut-own"\n', encoding="utf-8")
+        cp2 = subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(sut)],
+            capture_output=True, text=True,
+        )
+        check("re-run succeeds", cp2.returncode == 0, cp2.stderr[-300:])
+        after = {p.name for p in agents_dir.glob("*.toml")}
+        check("SUT's own agent is preserved on re-run", "sut-own.toml" in after, str(after))
+        check("our agents are not duplicated", after == names | {"sut-own.toml"}, str(after))
+        # dry-run writes nothing.
+        dry = Path(td) / "dry"
+        dry.mkdir()
+        subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(dry), "--dry-run"],
+            capture_output=True, text=True,
+        )
+        check("dry-run installs no codex agents", not (dry / ".codex" / "agents").exists())
+
+
 def main() -> int:
     for scenario in (
         scenario_scaffold_hygiene,
@@ -220,6 +265,7 @@ def main() -> int:
         scenario_wired_hook_inert_without_config,
         scenario_merge_refreshes_stale_wiring,
         scenario_gitignore_backstop,
+        scenario_codex_agents_installed,
     ):
         scenario()
     if FAILURES:
