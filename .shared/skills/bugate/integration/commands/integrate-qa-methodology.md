@@ -24,9 +24,17 @@ entirely different.
 3. Fill in what the methodology requires but the existing scheme lacks.
 4. In the overlap, make both cooperate with the smallest possible change.
 
-All generated onboarding artifacts go under
-`.shared/skills/bugate/integration/workbench/`. That directory is an output dir;
-its generated contents stay out of BUGate core.
+All generated onboarding artifacts go under a **workspace-local output
+directory**, `docs/qa-methodology-integration/`, resolved relative to the
+governed workspace root (the nearest `bugate.config.yaml` walking up from CWD).
+In imported mode this is the SUT repo's own docs area, so the generated output
+lives with the host project — never inside the vendored kit subtree. Do **not**
+write generated output into `.shared/skills/bugate/integration/workbench/`; that
+directory is a maintainer convenience for engine (self-)development only (see its
+`README.md`) and, when the kit is vendored to `<sut>/.bugate/.shared/...`, it
+carries no gitignore exemption, so committing `.bugate/` would sweep generated
+output back into the reusable kit. Below, `<output-dir>` means this
+workspace-local `docs/qa-methodology-integration/` path.
 
 ## Five phases, in strict order
 
@@ -36,8 +44,9 @@ Using Read / Glob / Grep only, fully explore the project's existing QA- and
 test-related configuration, in this order:
 
 1. The `.claude/` tree: skills/, agents/, rules/, hooks/, commands/.
-2. The shared skill integration workbench (if present), paying special
-   attention to any CONTEXT / PROGRESS / CONVENTIONS files.
+2. Any prior integration output directory the project already carries (e.g. a
+   previous `docs/qa-methodology-integration/`), paying special attention to any
+   CONTEXT / PROGRESS / CONVENTIONS files.
 3. Repo root: CLAUDE.md, AGENTS.md, PROGRESS.md, README.md.
 4. `.githooks/`, `scripts/`, `hooks/` — every QA/test-related script.
 5. Any `.md` mentioning: business brief, propositions, oracle, audit,
@@ -58,7 +67,7 @@ For each relevant file, emit a **factual summary** (describe, do not explain):
 - Offering any "recommendation" before all relevant files are read.
 
 At the end of Phase 1, write
-`.shared/skills/bugate/integration/workbench/current-scheme-inventory.md`.
+`<output-dir>/current-scheme-inventory.md`.
 
 ### Phase 2: Read the methodology
 
@@ -71,7 +80,8 @@ complete understanding. **Capture deliberately** (not just skim):
   readable / forbidden paths.
 - The PreToolUse hook intercept design.
 - What the pre-commit / gate check scripts should validate.
-- Which sub-directories and artifacts the integration workbench should grow.
+- Which sub-directories and artifacts the workspace-local output directory
+  should grow.
 - The METHOD.md frontmatter changelog and its v1.0 -> v1.1 changes.
 
 Also note how the nine Waves converge onto the published BUGate engine: the
@@ -81,15 +91,13 @@ Also note how the nine Waves converge onto the published BUGate engine: the
 inventory lands in `03_inventory.yaml`, and so on.
 
 At the end of Phase 2, write
-`.shared/skills/bugate/integration/workbench/methodology-requirements.md`,
-listing every agent / hook / script / schema / artifact the methodology
-requires.
+`<output-dir>/methodology-requirements.md`, listing every agent / hook / script
+/ schema / artifact the methodology requires.
 
 ### Phase 3: Gap and overlap analysis (produce a reviewable, gated plan)
 
 From the Phase 1 and Phase 2 outputs, write
-`.shared/skills/bugate/integration/workbench/integration-plan.md` with this
-structure:
+`<output-dir>/integration-plan.md` with this structure:
 
 ```markdown
 # Integration plan: existing gate x business-understanding constraint layer
@@ -133,7 +141,7 @@ structure:
 For example:
 - Existing skill X and methodology agent Y overlap ~70% — merge / coexist / replace?
 - Existing hook intercepts one path set, methodology wants a wider set — widen it?
-- Existing workbench decision dir is close to the validated-model/unresolved
+- Existing decision/output dir is close to the validated-model/unresolved
   concept — merge them?
 ```
 
@@ -166,7 +174,7 @@ it end to end:
 
 - Recommended scenario: run Wave 0 (PRD health check) over one PRD section of
   the project.
-- Write `.shared/skills/bugate/integration/workbench/dry-run-report.md` with:
+- Write `<output-dir>/dry-run-report.md` with:
   - The commands / agent calls executed.
   - The actual files produced.
   - A point-by-point comparison against the SOP "Wave 0 pass criteria".
