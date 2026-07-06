@@ -356,7 +356,7 @@ def main() -> int:
         Check(
             "Activation boundary",
             "WARN" if core_mode else "PASS",
-            "Core mode with no guarded paths; real SUT gates require a mounted profile."
+            "Core mode with no guarded paths; real SUT gates require an imported SUT profile."
             if core_mode
             else compact(result.stdout),
         )

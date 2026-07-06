@@ -60,11 +60,11 @@ workspace's own files are never the surface. The legacy SUT vocabulary used for
 upstream regression lives only in `tests/fixtures/legacy-sut-terms.txt` — never
 in engine source.
 
-> Mounting a SUT locally while developing BUGate itself (maintainers)? Keep your
-> `profile:` pointer in this repo's `bugate.config.yaml` uncommitted — it's a
-> per-clone local edit — and append the inline marker to that one line so
-> local fixture runs stay green. In imported mode (the default, CHARTER §2.2)
-> the reverse holds: the governed SUT repo commits its own config + profile.
+> Developing BUGate itself (maintainers)? Core iteration stays pure — validate
+> with the template gates and ephemeral fixtures, and **do not mount a SUT into
+> this repo** (CHARTER Amendment A4). Real-SUT validation happens by importing
+> BUGate into an external or scratch SUT test repo. In imported mode (the
+> default, CHARTER §2.2) the governed SUT repo commits its own config + profile.
 
 ### Exemption channels (narrative mention only)
 

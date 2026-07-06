@@ -2,7 +2,8 @@
 """Resolve a SUT profile's evidence/skill source roots, SUT-neutral.
 
 The profile binds `evidence_sources` (where the SUT's endpoint/interface contracts
-live) and `skill_sources` (where SUT-specific skills are staged in the mount). This
+live) and `skill_sources` (where SUT-specific skills are staged in the imported SUT
+test repo). This
 CLI turns those bindings into concrete paths so a flow/agent can answer "where is
 the contract for this SUT?" by reading the profile instead of guessing a path.
 

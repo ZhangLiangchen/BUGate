@@ -7,17 +7,17 @@ description: "Run and interpret a SUT-neutral BUGate capability self-check. Use 
 
 ## Purpose
 
-Use this skill to verify a BUGate checkout after setup or before mounting a real
-SUT. It distinguishes:
+Use this skill to verify a BUGate checkout after setup or before importing it
+into a real SUT test repo. It distinguishes:
 
 - installed binaries and services,
 - BUGate core/demo capability,
-- optional runtime capability,
+- runtime capability — required (the memory bus) and optional (dual-agent CLIs, role isolation),
 - profile-activated gates for a real SUT.
 
-Do not claim "all gates are activated for a real SUT" unless an active SUT
-profile is mounted and guarded paths/resources are configured. In core mode,
-report that core/demo/optional runtime checks are available, not that a real SUT
+Do not claim "all gates are activated for a real SUT" unless an imported SUT
+profile is active and guarded paths/resources are configured. In core mode,
+report that core/demo/runtime checks are available, not that a real SUT
 is protected.
 
 ## Required Context
@@ -52,9 +52,9 @@ Use `--timeout-seconds <n>` if peer dispatch needs a longer per-command window.
 - Wave 7 role isolation is default-off until `BUGATE_AGENT_ROLE` and profile
   `agent_roles` are set.
 - Physical write guarding is default-off in core mode because
-  `guarded_path_regex: []`; mounted profiles turn it on.
+  `guarded_path_regex: []`; an imported SUT profile turns it on.
 - Wave 9 change-driven regeneration is currently methodology-level unless the
-  mounted SUT supplies stale-detection tooling.
+  imported SUT repo supplies stale-detection tooling.
 
 ## Expected Final Answer
 
@@ -67,10 +67,11 @@ After running the check, summarize results in four groups:
 
 Finish with a precise conclusion such as:
 
-> BUGate core plus optional runtimes are verified. This does not yet mean a real
-> SUT's gates are activated, because the active config is still core mode.
+> BUGate core, the required memory bus, and the optional runtimes are verified.
+> This does not yet mean a real SUT's gates are activated, because the active
+> config is still core mode.
 
 or:
 
-> BUGate is mounted to `<profile>` and the configured guarded paths/profile gates
-> are active.
+> BUGate is imported into the `<profile>` SUT repo and the configured guarded
+> paths/profile gates are active.
