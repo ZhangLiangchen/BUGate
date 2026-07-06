@@ -1,10 +1,23 @@
 {
   "name": "bugate",
-  "version": "0.2.1",
+  "displayName": "BUGate",
+  "version": "0.2.2",
   "description": "Agentic QA governance kit / SDTD gate engine: pre-code artifact gates, a physical write guard, gate agents, dual-runtime peer bridges, and governed memory for AI test development. Inert until the project carries a committed bugate.config.yaml.",
   "author": {
     "name": "BUGate maintainers"
   },
+  "homepage": "https://github.com/ZhangLiangchen/BUGate",
+  "repository": "https://github.com/ZhangLiangchen/BUGate",
+  "license": "MIT",
+  "keywords": [
+    "testing",
+    "qa",
+    "test-development",
+    "sdtd",
+    "black-box-testing",
+    "agent-governance",
+    "gate"
+  ],
   "skills": [
     "./.shared/skills/"
   ],

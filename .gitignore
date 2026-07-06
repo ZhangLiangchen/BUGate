@@ -24,6 +24,9 @@ Thumbs.db
 .shared/memory-service-archive/
 .codex/memories/
 .claude/memory/
+# Personal, per-clone Claude Code overrides — never committed (Claude Code
+# ignores it globally too; this makes the ignore portable to every clone).
+.claude/settings.local.json
 
 # Secrets / environments — never commit
 .env

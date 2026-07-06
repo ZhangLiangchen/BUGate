@@ -1,2 +1,4 @@
+# Hooks are enabled by default in current Codex; kept explicit so the project's
+# intent is visible and older Codex builds still opt into BUGate's guard hooks.
 [features]
 hooks = true

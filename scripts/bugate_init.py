@@ -53,11 +53,11 @@ from bugate_core import find_engine_root
 KIT_DIRS = ["scripts", "bin", ".shared/skills/bugate"]
 IGNORE_NAMES = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
 
-# Codex has no plugin system, so the installer is its channel for the gate-review
-# agents (the Claude equivalents load via the plugin). The agent TOMLs travel
-# inside the vendored kit and reference the skill through the .codex/skills/bugate
-# symlink this installer also creates, so one file resolves in the engine repo and
-# in any SUT repo regardless of vendor dir.
+# Codex plugins package skills/hooks/MCP but not custom agents, so the installer
+# is Codex's channel for the gate-review agents (the Claude equivalents load via
+# the plugin). The agent TOMLs travel inside the vendored kit and reference the
+# skill through the .codex/skills/bugate symlink this installer also creates, so
+# one file resolves in the engine repo and in any SUT repo regardless of vendor dir.
 CODEX_AGENTS_KIT_REL = ".shared/skills/bugate/adapters/codex/agents"
 
 # Hook commands are templated on the vendor dir. ROOT is the governed WORKSPACE
@@ -300,8 +300,9 @@ def link_skills(target: Path, vendor_dir: str, dry: bool, force: bool) -> list[s
 def install_codex_agents(engine_root: Path, target: Path, vendor_dir: str, dry: bool) -> list[str]:
     """Copy the Codex gate-review agents into the SUT repo's .codex/agents/.
 
-    Codex discovers project-local agents from .codex/agents/ and has no plugin
-    channel, so the installer copies our gate agents there as committed files.
+    Codex discovers project-local agents from .codex/agents/, and its plugins
+    cannot bundle agents, so the installer copies our gate agents there as
+    committed files.
     Refresh-ours: our own named TOMLs are (re)written each run so an upgrade
     reaches them; any other agent the SUT owns in that dir is left untouched.
     The kit source is read from the vendored location, so this works whether

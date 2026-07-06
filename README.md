@@ -60,9 +60,10 @@ be mounted via a symlink and a local, uncommitted `profile:` pointer
 > agents via the top-level `agents` symlink — the plugin runtime loads agents
 > only from that default directory — and hooks calling the engine via
 > `${CLAUDE_PLUGIN_ROOT}`). Hooks from either channel are inert (exit 0)
-> wherever no committed `bugate.config.yaml` marks a workspace root. Codex has
-> no plugin system — `bugate init` covers that side. Quickstart A below shows
-> the installer first, then the manual equivalent.
+> wherever no committed `bugate.config.yaml` marks a workspace root. Codex's
+> own plugin system packages skills/hooks/MCP but not custom agents, so
+> `bugate init` is its channel (and wires the gate agents into `.codex/agents/`).
+> Quickstart A below shows the installer first, then the manual equivalent.
 
 ## Core/Profile/Mounted Workspace Model
 
