@@ -39,13 +39,13 @@ The split was chartered in three moves, each with a decision record:
    target shape: an importable kit plus a single per-project configuration in
    the SUT repo — what the charter now calls imported mode.
 2. **The four-part model (2026-06-16, ADR-BUGATE-001).** Core / SUT profile /
-   governed workspace / SUT runtime, with a one-way Promotion Rule: a lesson
+   imported SUT test repo / SUT runtime, with a one-way Promotion Rule: a lesson
    enters core only if it can be stated without referencing one SUT's
    entities, paths, environments, credentials, or fixtures.
 3. **De-SUT-ing the core (from 2026-06-17).** Neutral skill tree, profile
-   mechanism, the `examples/demo-sut` worked fixture, and a forbidden-term CI
-   guard. In that era the guard was a **total blockade**: a hard-coded list of
-   origin-SUT vocabulary (product name, internal system names, API
+   mechanism, artifact templates, ephemeral-fixture acceptances, and a
+   forbidden-term CI guard. In that era the guard was a **total blockade**:
+   a hard-coded list of legacy-SUT vocabulary (product name, internal system names, API
    identifiers, even industry words like chain names) that could appear
    nowhere in core — not even in this sentence's form. The blockade was the
    right tool while the embedded stack and the core shared one working tree;
@@ -78,12 +78,12 @@ Concrete moves out of the embedded stack:
 
 ## 4. The import (2026-07-03, the full circle)
 
-CHARTER-BUGATE-001 then flipped the host direction: the default usage mode is
-**imported** — the agent opens the *SUT test repo* as project root and BUGate
-is vendored in as its governance layer; opening the BUGate repo with a SUT
-symlink-mounted under it is the maintainer workbench, not the product story.
-The embedded era's exit state follows: the origin repo re-adopts its own
-extracted kit **in imported mode**, replacing the frozen embedded stack.
+CHARTER-BUGATE-001 then flipped the host direction, and CHARTER A4 later retired
+the extraction-era SUT-mount bridge entirely: the default and only usage mode is
+**imported** — the agent opens the *SUT test repo* as project root and BUGate is
+vendored in as its governance layer. Opening BUGate core is now pure engine
+iteration only. The embedded era's exit state follows: the origin repo re-adopts
+its own extracted kit **in imported mode**, replacing the frozen embedded stack.
 
 What the origin SUT's committed configuration looks like under imported mode
 (sanitized excerpt of the real profile; resource policies, environments, and

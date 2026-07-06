@@ -3,12 +3,12 @@
 # This is the FULL hard-coded FORBIDDEN list that lived in
 # scripts/check_no_sut_terms.py before the term list was profile-ized. It is
 # kept as a fixture for one purpose: upstream CI runs the guard with this file
-# (--terms-file) so the ORIGIN SUT's identity can never seep back into the
-# reusable core tree. The origin SUT's terms exist only here and in that SUT's
+# (--terms-file) so the legacy SUT identity can never seep back into the
+# reusable core tree. The legacy SUT terms exist only here and in that SUT's
 # own profile — never in engine source.
 #
 # Two sections:
-#   - ACTIVE (uncommented): identity terms of the origin SUT — product name,
+#   - ACTIVE (uncommented): identity terms of the legacy SUT — product name,
 #     internal system names, product API identifiers, account/person handles,
 #     origin memory namespace. These stay a hard regression line.
 #   - RETIRED (commented): industry/domain vocabulary de-listed by CHARTER A1

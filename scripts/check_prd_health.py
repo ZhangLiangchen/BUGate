@@ -8,7 +8,8 @@ derive the grade + routing decision. Also passes through a structured gap report
 NOT read the PRD: it consumes a declarative self-assessment (the QA/agent fills
 the dimension scores after reading the PRD) — mirroring the falsification engine.
 
-Without an input spec it reports profile_required (core stays usable unmounted).
+Without an input spec it reports profile_required (core stays usable in pure
+core mode).
 """
 from __future__ import annotations
 

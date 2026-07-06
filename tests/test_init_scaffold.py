@@ -214,7 +214,7 @@ def scenario_gitignore_backstop() -> None:
 
 
 def scenario_codex_agents_installed() -> None:
-    print("S6 codex agents: installed into .codex/agents/, vendor-agnostic, refresh-ours")
+    print("S6 codex agents/skills: official .agents skill path, compat bridge, refresh-ours")
     names = {"brief-gate.toml", "testability-gate.toml", "inventory-gate.toml"}
     with tempfile.TemporaryDirectory() as td:
         sut = Path(td) / "sut"
@@ -229,14 +229,24 @@ def scenario_codex_agents_installed() -> None:
         check("all three gate agents installed", names <= present, str(present))
         brief = (agents_dir / "brief-gate.toml").read_text(encoding="utf-8") if (agents_dir / "brief-gate.toml").exists() else ""
         check(
-            "agent references the skill vendor-agnostically via .codex/skills/bugate",
-            ".codex/skills/bugate/SKILL.md" in brief and ".shared/skills/bugate/SKILL.md" not in brief,
+            "agent references the skill vendor-agnostically via .agents/skills/bugate",
+            ".agents/skills/bugate/SKILL.md" in brief and ".shared/skills/bugate/SKILL.md" not in brief,
             brief,
         )
-        # The installer-created .codex/skills/bugate symlink resolves the reference.
+        # The official Codex path resolves the reference, and the legacy bridge
+        # stays in place for older clients during the migration window.
         check(
-            "the referenced SKILL.md resolves through the installed symlink",
+            "the referenced SKILL.md resolves through the installed .agents symlink",
+            (sut / ".agents" / "skills" / "bugate" / "SKILL.md").exists(),
+        )
+        check(
+            "legacy .codex skill bridge still resolves",
             (sut / ".codex" / "skills" / "bugate" / "SKILL.md").exists(),
+        )
+        check(
+            "full-check skill resolves for Claude, Codex, and legacy Codex paths",
+            all((sut / runtime / "skills" / "bugate-full-check" / "SKILL.md").exists()
+                for runtime in (".claude", ".agents", ".codex")),
         )
         # refresh-ours: a SUT-owned agent survives a re-run; ours are refreshed, not duplicated.
         (agents_dir / "sut-own.toml").write_text('name = "sut-own"\n', encoding="utf-8")
@@ -256,6 +266,7 @@ def scenario_codex_agents_installed() -> None:
             capture_output=True, text=True,
         )
         check("dry-run installs no codex agents", not (dry / ".codex" / "agents").exists())
+        check("dry-run installs no skill links", not (dry / ".agents" / "skills").exists())
 
 
 def main() -> int:

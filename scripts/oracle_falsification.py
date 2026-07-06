@@ -20,7 +20,7 @@ Semantics (generic, ported from the parent SDTD executor):
 The engine is in core; the ORACLES, MUTATIONS, and evidence glob come from a
 SUT-supplied declarative spec (``--spec`` or config ``falsification_spec``) — no
 SUT code is imported. Without a spec, the run degrades to status=profile_required
-(the pre-spec behavior), so the core stays usable unmounted.
+(the pre-spec behavior), so the core stays usable in pure core mode.
 
 The Markdown/JSON output embeds the score + killed/survived so
 ``generate_assertion_coverage_matrix.py --mutation-result`` can flip the Wave 8

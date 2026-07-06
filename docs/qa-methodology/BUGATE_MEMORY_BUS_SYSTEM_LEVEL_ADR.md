@@ -80,7 +80,7 @@ cross-pollution. What had to change was only (a) who owns the data home and
   `(0,0,0)` → moved `sqlite_vec.db` + `client.env` to `~/.bugate/memory-bus/`
   (dir 700, key 600) → restarted via `memory-bus-ensure`.
 - Ledger reconciliation: total 1537 memories, 38 in the core namespace, 1499
-  in the mounted SUT namespace — identical before/after; latest-entry content
+  in the legacy SUT namespace — identical before/after; latest-entry content
   hashes preserved and retrievable through the API.
 - Backups follow the home automatically (the service scheduler derives its
   backup dir from the base dir): `/api/backup/status` reports
@@ -88,7 +88,7 @@ cross-pollution. What had to change was only (a) who owns the data home and
   backup both landed there. Pre-migration `.db` snapshots stay in the old
   directory as a read-only archive with a pointer README.
 - Split-brain reproduction test GREEN both ways: with the service killed,
-  `ensure` from the origin workspace and from the core checkout each brought
+  `ensure` from the legacy workspace and from the core checkout each brought
   the SAME historical database up from the system home.
 - LaunchAgent verified: install (RunAtLoad), `kill -9` respawn (KeepAlive),
   uninstall (label + plist removed, port freed), then normal on-demand mode

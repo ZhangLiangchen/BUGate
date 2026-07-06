@@ -1,0 +1,20 @@
+{
+  "name": "bugate",
+  "interface": {
+    "displayName": "BUGate"
+  },
+  "plugins": [
+    {
+      "name": "bugate",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

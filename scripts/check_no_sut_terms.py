@@ -21,7 +21,7 @@ is three-layered, and this guard mechanizes the machine-checkable slice:
   3. Industry/domain vocabulary — deliberately NOT defended by core; a SUT
      profile that wants a domain word defended must list it itself.
 
-Scan surface — anchored on the ENGINE root, never the governed workspace:
+Scan surface — anchored on the ENGINE root, never the imported SUT repo:
 
   - the kit subtree (``scripts/``, ``bin/``, ``.shared/skills/``): the fixed
     kit layout a ``bugate init`` vendors into a SUT repo, scanned in every
@@ -30,10 +30,10 @@ Scan surface — anchored on the ENGINE root, never the governed workspace:
     when the engine root IS the upstream BUGate repo, detected by the
     ``CHARTER.md`` sentinel (the charter never ships in the vendored kit).
 
-  A governed workspace's OWN files are never the scan surface: when the
-  workspace root is a strict descendant of the engine root (engine-development
-  layouts) its subtree is excluded, and in a vendored layout the SUT repo's
-  files are simply not kit members. Files that legitimately DECLARE the terms
+  The imported SUT repo's OWN files are never the scan surface: when a generated
+  imported-repo fixture is a strict descendant of the engine root during tests
+  its subtree is excluded, and in a vendored layout the SUT repo's files are
+  simply not kit members. Files that legitimately DECLARE the terms
   (the active config/profile, ``--terms-file`` lists) are excluded likewise.
 
 Exemption channels — explicit, per-site, auditable; no global kill switch:
@@ -108,7 +108,7 @@ ALLOW_MARKER = "bugate: allow-sut-term"
 FRONTMATTER_EXEMPT_VALUE = "provenance-allowed"
 
 # SUT-agnostic general hygiene: behavioral/environmental leakage that is never
-# legitimate in a reusable kit, regardless of which SUT is mounted. Common
+# legitimate in a reusable kit, regardless of which SUT imports it. Common
 # placeholder usernames are tolerated so tutorials can show path shapes.
 GENERAL_HYGIENE: list[tuple[str, str]] = [
     (
@@ -238,8 +238,8 @@ def scan(
     ]
     hygiene_patterns = [(re.compile(term), label) for term, label in GENERAL_HYGIENE]
 
-    # A governed workspace nested under the engine root (engine-development
-    # layouts) is the SUT's own territory, never the kit's scan surface.
+    # If a generated imported-repo fixture is created under the engine root during
+    # tests, it is SUT territory for that fixture, never the kit's scan surface.
     workspace_subtree: Path | None = None
     if workspace_root is not None:
         ws = workspace_root.resolve()
@@ -302,11 +302,11 @@ def main() -> int:
     args = parser.parse_args()
 
     # The guard audits the reusable KIT tree, so it anchors on the engine root —
-    # never the governed workspace (whose files legitimately name its SUT).
+    # never the imported SUT repo (whose files legitimately name its SUT).
     engine_root = find_engine_root()
 
-    # The governed workspace supplies the identity-term list (and is excluded
-    # from the surface). No workspace in sight -> hygiene-only run.
+    # The active imported SUT repo supplies the identity-term list (and is
+    # excluded from the surface). No project root in sight -> hygiene-only run.
     workspace_root: Path | None = None
     config: dict = {}
     try:

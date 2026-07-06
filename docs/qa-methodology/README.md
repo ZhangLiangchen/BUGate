@@ -2,7 +2,7 @@
 
 SUT-neutral navigation index for the methodology doc set. This directory holds
 reusable method and operating guidance only; SUT-specific facts live in a
-profile or mounted workspace. On any conflict,
+profile or the imported SUT test repo. On any conflict,
 `.shared/skills/bugate/SKILL.md` is the canonical source.
 
 ## Documents
@@ -11,8 +11,9 @@ profile or mounted workspace. On any conflict,
 |---|---|
 | [METHOD.md](METHOD.md) | The "why": full AI-assisted black-box test methodology, the nine-Wave flow, theory mapping, and rationale. |
 | [SOP.md](SOP.md) | The "what to do next": step-by-step execution handbook for the Wave 0–3 minimum viable loop. |
+| [AGENTIC_QA_PLATFORM_GUIDE.md](AGENTIC_QA_PLATFORM_GUIDE.md) | Working guide for evolving BUGate from an Agentic QA Governance Kernel into an enterprise Agentic QA Platform with a self-hosted agent control center and multi-role SOP orchestration. |
 | [EXPERIENCE_PROMOTION_PROTOCOL.md](EXPERIENCE_PROMOTION_PROTOCOL.md) | How a SUT-local lesson is decided to either stay local or be promoted into SUT-neutral BUGate Core. |
-| [BUGATE_PLATFORM_DECOUPLING_ADR.md](BUGATE_PLATFORM_DECOUPLING_ADR.md) | ADR-BUGATE-001: the accepted BUGate Core / SUT Profile / Mounted Workspace / SUT / Product Runtime four-part architecture and its promotion rule. |
+| [BUGATE_PLATFORM_DECOUPLING_ADR.md](BUGATE_PLATFORM_DECOUPLING_ADR.md) | ADR-BUGATE-001: the accepted BUGate Core / SUT Profile / Governed SUT Test Repo / SUT Product Runtime architecture and its promotion rule. |
 | [TRANSITION_PROTOCOL.md](TRANSITION_PROTOCOL.md) | PROTO-BUGATE-TRANS-001: the *journey* from an old embedded BUGate to the decoupled core — asymmetric strangler-fig, the 3-bucket capability-gap classifier, the transition-gap ledger, and retirement exit criteria. |
 | [BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md](BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md) | ADR-BUGATE-003: the machine-level memory bus — one service instance per machine (`~/.bugate/memory-bus`), namespace-tag isolation instead of per-repo databases, client resolution order, and the 2026-07-03 migration/rollback record. |
 | [BUGATE_DESUT_CALIBRATION_ADR.md](BUGATE_DESUT_CALIBRATION_ADR.md) | ADR-BUGATE-004: de-SUT calibration — "block seepage, not mention"; the three-layer discriminator, profile-supplied identity terms, narrative exemption channels, and the upstream legacy-fixture regression. The narrative dividend lives in [`../case-studies/`](../case-studies/). |
@@ -34,8 +35,9 @@ digest of `METHOD.md` (§2–§3, §10) and the ADR — it is a summary, not a
 replacement; the Chinese files remain canonical.
 
 The method is a **dual-layer, nine-Wave flow**. **Wave 0** is the admission
-gate: a 9-dimension PRD health check that decides whether the PRD is usable as a
-business source-of-truth and emits a structured gap report. The first layer, the
+gate: an 8-scored-dimension PRD health check plus traceability bonus that
+decides whether the PRD is usable as a business source-of-truth and emits a
+structured gap report. The first layer, the
 **business-understanding audit (Waves 1–4)**, shifts the QA's job from judging
 *correctness* to judging *evidence*: multiple AIs independently extract
 propositions (Wave 1), the QA does citation traceback and routes the divergences
@@ -63,9 +65,9 @@ Architecturally, BUGate is a **four-part model** (per
 artifact templates, structural gate criteria, hook mechanism, and adapter
 layout; the **SUT Profile** is the bridge contract for paths, commands, evidence
 sources, guarded test patterns, resource policy, runtime kind, role policy, and
-namespace; the **Mounted Workspace** is usually the SUT automation test
-framework / test workspace, owning test code, BUGate artifacts, fixtures,
-runners, generated cases, captured evidence, and local test rules; the
+namespace; the **Governed SUT Test Repo** is the imported SUT automation test
+workspace, owning test code, BUGate artifacts, fixtures, runners, generated
+cases, captured evidence, and local test rules; the
 **SUT / Product Runtime** is product-owned, covering black-box API/UI/runtime
 behavior, product docs/contracts/environments, and optional source/API
 dump/secrets only as evidence sources. Core must never depend on any single
@@ -77,8 +79,8 @@ restated in product-neutral terms.
 **Two meanings of "layer" — disambiguated.** The word is overloaded; keep them
 separate:
 
-- **Architecture parts (four-part model):** **BUGate Core / SUT Profile /
-  Mounted Workspace / SUT / Product Runtime** — the ownership/decoupling split
+- **Architecture parts:** **BUGate Core / SUT Profile / Governed SUT Test Repo /
+  SUT Product Runtime** — the ownership/decoupling split
   from the ADR (see above). About *who owns what*.
 - **Gate "Layers 1–4":** the pre-code artifact stages enforced by the gates.
   About *what artifact you produce next*. These are unrelated to the four-part
@@ -99,7 +101,7 @@ separate:
 
 **The nine Waves, one line each:**
 
-- **Wave 0** — PRD health check (9-dimension admission gate + gap report).
+- **Wave 0** — PRD health check (8 scored dimensions + traceability bonus + gap report).
 - **Wave 1** — multiple AIs independently extract propositions (multiview).
 - **Wave 2** — QA citation-traceback audit + divergence routing.
 - **Wave 3** — structured interview turns dev tacit knowledge into record.

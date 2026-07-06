@@ -161,7 +161,7 @@ git), then launches the service on `127.0.0.1:${MCP_HTTP_PORT:-8000}`. If the
 `bin/memory-model-fetch` hint and exits 1.
 
 The bus is **machine-level by design** (ADR-BUGATE-003): ONE service instance
-per machine, shared by every BUGate-governed workspace; projects are isolated
+per machine, shared by every BUGate-enabled repo; projects are isolated
 by namespace tag (`project:<name>` from each workspace's profile), never by
 per-repo databases — so a restart triggered from any repo resolves to the same
 database by construction (no split brain). Clients load `client.env` from the
@@ -239,9 +239,12 @@ the full shape. Patterns are Python regexes; deny wins, everything else is
 allowed.
 
 The PreToolUse wiring is **already shipped** in `.codex/hooks.json` and
-`.claude/settings.json` (matcher `Edit|Write`), which resolve the repo root via
-the `AGENTS.md` + `.shared` sentinel walk-up and call the guard. (Codex Desktop
-requires re-trusting the hook hash after any hook change.)
+`.claude/settings.json` (matcher `Edit|Write`). Hooks locate the engine by
+walking up for `scripts/bugate_core.py` or through the plugin/vendor root, then
+the guard resolves the active project by walking up from CWD to the nearest
+`bugate.config.yaml`. In BUGate core, role isolation is verified through
+temporary fixture profiles, not by mounting a SUT. Codex Desktop requires
+re-trusting the hook hash after any hook change.
 
 ### Verify
 

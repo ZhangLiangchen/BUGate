@@ -21,7 +21,7 @@ companion: BUGATE_PLATFORM_DECOUPLING_ADR.md
 
 `BUGATE_PLATFORM_DECOUPLING_ADR.md` (ADR-BUGATE-001, `status: accepted`,
 2026-06-16) describes the **end state**: a four-part split (Core / Profile /
-Mounted Workspace / SUT Runtime) with a one-way Promotion Rule.
+Governed SUT Test Repo / SUT Runtime) with a one-way Promotion Rule.
 `EXPERIENCE_PROMOTION_PROTOCOL.md` (PROTO-BUGATE-EXP-001) describes how a single
 **memory** is promoted upward and inward. Neither describes the **journey** — the
 finite, auditable process of moving a gate stack that originally lived embedded
@@ -111,7 +111,7 @@ must be split until each piece belongs to one.
 | Bucket | Gap kind | Lands in | One-line test |
 |---|---|---|---|
 | **(a) Neutral capability** | A Core layer/Wave is a stub or regression versus the embedded stack's working logic, and the logic is method-level. | **BUGate Core**, restated SUT-neutral. | The logic survives the §2.3 de-SUT guard with no product token. |
-| **(b) SUT contract / data / skill** | An endpoint contract, fixture, resource policy, environment name, or a SUT-specific skill the embedded stack carried. | **SUT Profile** or **Mounted Workspace** — **never Core**. | The capability *requires* a product name/path/entity to state. |
+| **(b) SUT contract / data / skill** | An endpoint contract, fixture, resource policy, environment name, or a SUT-specific skill the embedded stack carried. | **SUT Profile** or **Governed SUT Test Repo** — **never Core**. | The capability *requires* a product name/path/entity to state. |
 | **(c) Constraint / methodology** | An operating rule from the embedded stack's own `AGENTS.md` (or equivalent). | **Split:** the neutral half → Core docs / `.shared`; the SUT-specific half → Profile. | Part of the rule is statable neutrally; part trips the de-SUT guard. |
 
 ### 2.2 The classifier is the de-SUT guard
@@ -144,18 +144,20 @@ The procedure for an ambiguous item:
    confirm it is genuinely method-level (not a product detail in neutral costume —
    the two-SUT signal of PROTO-BUGATE-EXP-001 §3.1 applies) and land it in Core.
 4. **Flags** → at least part of the item is SUT-specific. If the *whole* item
-   flags, it is bucket (b): route it to the Profile / Mounted Workspace
+   flags, it is bucket (b): route it to the Profile / Governed SUT Test Repo
    unchanged. If only *part* flags, it is bucket (c): split off the flagging part
    to the Profile and re-run step 2 on the neutral remainder.
 
 The `# bugate: allow-sut-term` marker that the guard honors is **not** a way to
 smuggle a product token into Core for the transition — in Core the only
-legitimate allowance is the mounted-profile pointer line. A migration that needs
-that marker on substantive content has mis-bucketed: the content is (b)/(c).
+legitimate allowance is narrative/provenance mention explicitly permitted by
+CHARTER A1; behavioral SUT facts and SUT profile pointers do not belong in Core.
+A migration that needs that marker on substantive content has mis-bucketed: the
+content is (b)/(c).
 
 > **Amendment note (2026-07-03, CHARTER A1 / ADR-BUGATE-004).** The de-SUT
 > guard's term list is now **profile-supplied** (`sut_identity_terms`; the
-> origin SUT's terms live on as the upstream regression fixture
+> legacy SUT terms live on as the upstream regression fixture
 > `tests/fixtures/legacy-sut-terms.txt`), and narrative/provenance mentions of
 > a SUT's *identity* in documentation may carry an explicit allow marker or
 > live under `docs/case-studies/`. **Neither change loosens this classifier.**
@@ -324,7 +326,7 @@ simultaneously. Retirement is a gate, not a date.
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | **No bucket-(a) gap in N sessions.** No new `transition-gap` / `bucket:a` fallback or stub-regression finding has appeared for N consecutive sessions (N fixed by the owning profile/task). | The ledger's retirement-gauge read (§4.3) shows a quiet bucket-(a) stream. |
-| 2 | **All bucket-(b) contracts resolve via Profile.** Every SUT contract/data/skill gap the embedded stack carried is satisfied by the SUT Profile or Mounted Workspace — none still requires the embedded executor. | Each `bucket:b` ledger entry is closed against a profile/workspace artifact. |
+| 2 | **All bucket-(b) contracts resolve via Profile.** Every SUT contract/data/skill gap the embedded stack carried is satisfied by the SUT Profile or Governed SUT Test Repo — none still requires the embedded executor. | Each `bucket:b` ledger entry is closed against a profile/repo artifact. |
 | 3 | **The embedded `AGENTS.md` is fully partitioned.** Every operating rule from the embedded stack's `AGENTS.md` (bucket (c)) has been split: neutral half landed in Core docs/`.shared`, SUT-specific half landed in the Profile. Nothing rule-bearing remains only in the old repo. | Each `bucket:c` ledger entry is closed; no orphan rule remains old-only. |
 
 ### 6.1 Until then

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Hook-surface parity: the three hand-maintained hook-JSON files agree.
+"""Hook-surface parity: the hand-maintained hook-JSON files agree.
 
-BUGate wires the same guards through three separately edited surfaces, in two
+BUGate wires the same guards through separately edited surfaces, in two
 root-resolution dialects. This meta-test pins the cross-surface contract that
 already drifted once (the F2 regression, where a hardening fix landed on one
 surface but not the others):
@@ -9,9 +9,11 @@ surface but not the others):
   * ``.claude/settings.json``      — engine repo; engine-root dialect;
     ``SessionStart``/``Stop`` carry the ``--core`` memory flag.
   * ``.codex/hooks.json``          — engine repo; ``apply_patch`` matcher;
-    engine-root dialect.
-  * ``.claude-plugin/hooks.json``  — plugin channel; ``Edit|Write`` matcher;
-    workspace-root dialect (``bugate.config.yaml`` + ``CLAUDE_PLUGIN_ROOT``).
+    engine-root dialect; ``SessionStart``/``Stop`` carry the ``--core``
+    memory flag.
+  * ``hooks/hooks.json``           — plugin channel for both runtimes;
+    ``Edit|Write`` and ``apply_patch`` matchers; workspace-root dialect
+    (``bugate.config.yaml`` + ``CLAUDE_PLUGIN_ROOT``).
 
 For every hook command that invokes a BUGate python script, BOTH hardening
 properties must be present so the resolver is inert outside a governed tree
@@ -70,9 +72,9 @@ def matchers(surface: dict) -> list[str]:
 
 
 def scenario_files_parse() -> dict[str, dict]:
-    print("S1 the three surfaces parse as JSON and carry hook commands")
+    print("S1 the hook surfaces parse as JSON and carry hook commands")
     parsed: dict[str, dict] = {}
-    for rel in (".claude/settings.json", ".codex/hooks.json", ".claude-plugin/hooks.json"):
+    for rel in (".claude/settings.json", ".codex/hooks.json", "hooks/hooks.json"):
         path = REPO / rel
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -137,7 +139,7 @@ def scenario_engine_dialect(parsed: dict[str, dict]) -> None:
 
 def scenario_plugin_dialect(parsed: dict[str, dict]) -> None:
     print("S4 plugin surface resolves via bugate.config.yaml + BUGATE_PROJECT_ROOT + CLAUDE_PLUGIN_ROOT")
-    data = parsed.get(".claude-plugin/hooks.json")
+    data = parsed.get("hooks/hooks.json")
     if data is not None:
         cmds = commands(data)
         check(
@@ -191,11 +193,22 @@ def scenario_matchers_and_core(parsed: dict[str, dict]) -> None:
             matchers(codex) == ["apply_patch"],
             str(matchers(codex)),
         )
-    plugin = parsed.get(".claude-plugin/hooks.json")
+        for event in ("SessionStart", "Stop"):
+            cmds = [
+                h["command"]
+                for entry in codex["hooks"].get(event, [])
+                for h in entry["hooks"]
+            ]
+            check(
+                f".codex/hooks.json: {event} carries the --core flag",
+                cmds and all("--core" in c for c in cmds),
+                f"{event} commands: {cmds}",
+            )
+    plugin = parsed.get("hooks/hooks.json")
     if plugin is not None:
         check(
-            ".claude-plugin/hooks.json: PreToolUse matcher is Edit|Write",
-            matchers(plugin) == ["Edit|Write"],
+            "hooks/hooks.json: PreToolUse matchers cover Claude and Codex",
+            matchers(plugin) == ["Edit|Write", "apply_patch"],
             str(matchers(plugin)),
         )
 

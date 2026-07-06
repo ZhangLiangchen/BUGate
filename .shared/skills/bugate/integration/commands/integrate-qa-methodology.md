@@ -12,8 +12,8 @@ truth.
 ## Key premise
 
 A target project usually already has *some* gate-like setup — skills, hooks,
-possibly agents, slash commands, `.claude/rules/`, `.githooks/`, and an
-integration workbench. The new methodology overlaps with that setup in intent,
+possibly agents, slash commands, `.claude/rules/`, `.githooks/`, and local
+integration output. The new methodology overlaps with that setup in intent,
 but its implementation details, naming conventions, and file locations may be
 entirely different.
 
@@ -26,12 +26,12 @@ entirely different.
 
 All generated onboarding artifacts go under a **workspace-local output
 directory**, `docs/qa-methodology-integration/`, resolved relative to the
-governed workspace root (the nearest `bugate.config.yaml` walking up from CWD).
+active project root (the nearest `bugate.config.yaml` walking up from CWD).
 In imported mode this is the SUT repo's own docs area, so the generated output
 lives with the host project — never inside the vendored kit subtree. Do **not**
-write generated output into `.shared/skills/bugate/integration/workbench/`; that
-directory is a maintainer convenience for engine (self-)development only (see its
-`README.md`) and, when the kit is vendored to `<sut>/.bugate/.shared/...`, it
+write generated output into `.shared/skills/bugate/integration/scratch-output/`;
+that directory is a maintainer convenience for engine self-development only (see
+its `README.md`) and, when the kit is vendored to `<sut>/.bugate/.shared/...`, it
 carries no gitignore exemption, so committing `.bugate/` would sweep generated
 output back into the reusable kit. Below, `<output-dir>` means this
 workspace-local `docs/qa-methodology-integration/` path.

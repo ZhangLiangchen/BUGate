@@ -14,8 +14,8 @@ Design rules:
   and are isolated by namespace tag, never by per-project databases.
 - The bus is a generic BUGate component, not SUT-only: any subcommand takes
   ``--core`` (record/read in BUGate's own base-config namespace, ignoring the
-  mounted SUT profile) or ``--namespace X`` (an explicit tag). One DB, tag-
-  partitioned, so BUGate-core memory and SUT memory never cross-pollute.
+  active imported SUT profile) or ``--namespace X`` (an explicit tag). One DB,
+  tag-partitioned, so BUGate-core memory and SUT memory never cross-pollute.
 - Standard library only (urllib, json, os, argparse, pathlib, datetime).
 - Degrade gracefully: if the service is unreachable, print a clear hint to run
   ``bin/memory-bus-start`` and exit non-fatally (0) so hooks never block work.
@@ -90,10 +90,10 @@ def project_tag() -> str:
 
 
 def core_project_tag() -> str:
-    """BUGate's OWN namespace, independent of any mounted SUT profile.
+    """BUGate's OWN namespace, independent of any active SUT profile.
 
     The memory bus is a generic BUGate component: it must hold BUGate's own
-    governance memory, not only the SUT's. A mounted profile overrides
+    governance memory, not only the SUT's. An imported SUT profile overrides
     ``memory.namespace`` to the SUT tag, so this reads the BASE
     ``bugate.config.yaml`` directly (no profile merge) to recover the core tag,
     falling back to DEFAULT_PROJECT_TAG. Selected via the ``--core`` flag.
@@ -829,12 +829,12 @@ def cmd_lint(args: argparse.Namespace) -> int:
 def add_namespace_opts(p: argparse.ArgumentParser) -> None:
     """Let any subcommand target a namespace other than the active profile's.
 
-    ``--core`` selects BUGate's own namespace (base config, ignoring the mounted
+    ``--core`` selects BUGate's own namespace (base config, ignoring the active
     SUT profile); ``--namespace X`` selects an explicit tag. Both win over the
     profile by exporting MEMORY_BUS_PROJECT_TAG in main().
     """
     p.add_argument("--namespace", help="target an explicit memory namespace/tag (overrides the active SUT profile)")
-    p.add_argument("--core", action="store_true", help="use BUGate's own core namespace, not the mounted SUT's")
+    p.add_argument("--core", action="store_true", help="use BUGate's own core namespace, not the active SUT's")
 
 
 def build_parser() -> argparse.ArgumentParser:

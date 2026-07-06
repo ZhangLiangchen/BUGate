@@ -49,12 +49,13 @@ loop runs **between** BUGate Core and the SUT-side parts:
 |---|---|---|
 | **BUGate Core** | This repository | SUT-neutral method, gates, templates, hook mechanism, adapter. |
 | **SUT Profile** | Bridge contract | Paths, commands, evidence sources, guarded test patterns, resource policy, runtime kind, role policy, namespace. |
-| **Mounted Workspace** | Usually the SUT automation test framework / test workspace | Test code, BUGate artifacts, fixtures, runners, generated cases, captured evidence, local test rules. |
+| **Governed SUT Test Repo** | The SUT automation test repository that imports BUGate | Test code, BUGate artifacts, fixtures, runners, generated cases, captured evidence, local test rules. |
 | **SUT / Product Runtime** | Product-owned | Black-box API/UI/runtime behavior, product docs/contracts/environments, optional source/API dump/secrets only as evidence, live behavior. |
 
 Promotion is **strictly upward and inward**: a lesson recorded against a SUT (or
-its profile, mounted workspace, or runtime evidence) may only move *into* Core,
-never sideways into another SUT and never back out of Core as a product detail.
+its profile, governed SUT test repo, or runtime evidence) may only move *into*
+Core, never sideways into another SUT and never back out of Core as a product
+detail.
 The ADR Promotion Rule's tie-breaker is the default posture: **"When in doubt,
 keep it in the SUT profile."**
 
@@ -128,9 +129,10 @@ order:
 3. default `project:bugate`
 
 This resolved namespace is the boundary that keeps one SUT's recorded experience
-out of another's. A capture lands under whatever namespace the active profile
-resolves — so two SUTs mounted with two namespaces do not bleed into each other,
-and a Core-bound promotion lands under the Core namespace rather than a product's.
+out of another's. A capture lands under whatever namespace the active imported
+SUT repo/profile resolves, so two SUT repos with two namespaces do not bleed into
+each other, and a Core-bound promotion lands under the Core namespace rather than
+a product's.
 
 ### 2.5 Default recording posture
 

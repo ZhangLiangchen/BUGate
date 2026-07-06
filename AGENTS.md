@@ -8,10 +8,9 @@ test analysis and test-case governance framework.
 - Keep shared runtime instructions in `.shared/skills/bugate/`.
 - Keep SUT-specific source, API dumps, secrets, environments, fixtures, live
   evidence, and project memories outside BUGate core.
-- Treat the governed SUT workspace — the host test repo in imported mode, a
-  mounted workspace while developing BUGate itself — as the SUT automation test
-  framework / test workspace unless a profile explicitly defines a narrower
-  evidence boundary.
+- Treat the imported SUT test repo as the only place where BUGate governs real
+  SUT tests. BUGate core development stays pure: do not mount a SUT inside this
+  repository or point this repository's committed config at a SUT.
 - `CLAUDE.md` must remain a symlink to this file.
 
 ## Roles
@@ -31,14 +30,14 @@ test analysis and test-case governance framework.
 1. Do not add SUT source code, product API snapshots, environment secrets,
    credentials, generated caches, or project-specific fixtures to BUGate core.
 2. Put SUT paths, resource policies, environment names, auth rules, and tool
-   commands in a SUT profile or the governed test workspace.
+   commands in a SUT profile or the imported SUT test repo.
 3. Treat BUGate artifacts as pre-code governance: business brief, testability
    decision, inventory/oracle mapping, readable test cases, adversarial review,
    execution report, and knowledge update.
 4. A test implementation must not be generated before the configured pre-code
    artifacts are present and accepted for that SUT profile.
 5. If a rule requires SUT-specific facts, stop at the profile boundary and ask
-   for a profile or governed SUT test workspace instead of inventing details.
+   for a profile in the imported SUT test repo instead of inventing details.
 
 ## Startup
 
@@ -47,15 +46,15 @@ For non-trivial BUGate work:
 1. Read `.shared/skills/bugate/SKILL.md`.
 2. Read `docs/qa-methodology/METHOD.md` when method rationale is needed.
 3. Read `docs/qa-methodology/SOP.md` when execution procedure is needed.
-4. Inspect the active SUT profile only if the task explicitly involves a
-   governed (imported or mounted) SUT test workspace.
+4. Inspect the active SUT profile only inside an imported SUT test repo, or when
+   reviewing a generated imported-repo fixture.
 
 ## Hook Policy
 
 Codex and Claude hooks call only SUT-neutral scripts from `scripts/`. Hook
 commands must not depend on git metadata: hooks locate the engine by walking up
-for `scripts/bugate_core.py`, and gate scripts resolve the governed workspace
-root by walking up from CWD to the nearest `bugate.config.yaml`
+for `scripts/bugate_core.py`, and gate scripts resolve the active project root
+by walking up from CWD to the nearest `bugate.config.yaml`
 (`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel remains
 as the self-development fallback).
 

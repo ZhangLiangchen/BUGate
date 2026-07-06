@@ -52,7 +52,7 @@ scope: Wave 0 - Wave 3（最小可行闭环）
 
 确认以下已就位（以**已发布的 BUGate 引擎**为准，参见 METHOD.md §10）：
 
-- [ ] BUGate 引擎已接入（导入模式 vendor 进 SUT 测试仓 / 开发 BUGate 本身时直接用引擎仓），工作区根可定位（自 CWD 向上最近的 `bugate.config.yaml`；`AGENTS.md` + `.shared/` 哨兵为开发态 fallback），`python3` 可用（核心纯标准库）。
+- [ ] BUGate 引擎已接入导入后的 SUT 测试仓（推荐用 `scripts/bugate_init.py <sut-repo>`；也可 plugin / vendor / 子模块），工作区根可定位（自 CWD 向上最近的 `bugate.config.yaml`），`python3` 可用（核心纯标准库）。开发 BUGate core 本身时不挂载 SUT，只运行模板门与临时 fixture 验收。
 - [ ] 已写好一个 SUT profile（键契约见 `.shared/skills/bugate/references/profile-schema.md`；`scripts/bugate_init.py` 可脚手架同形状文件），设置 `artifact_dir` 等。
 - [ ] 用 `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init` 生成 01–05 gate 产物（无独立"初始化脚本"）。
 - [ ] PRD / 需求文档可访问，作为 Layer 1 的证据来源。
@@ -69,7 +69,7 @@ scope: Wave 0 - Wave 3（最小可行闭环）
 2. 跑对应的 `check_bugate_*_semantics.py`。若一个**源自已通过测试**的产物却过不了门，说明这是**模板/门的缺陷**——先修模板，再推广。
 3. 如果反推任何**单个**产物耗时超过约 30 分钟，说明模板过重——削减它。
 
-把种子测试理解为「挂载的 SUT 工作区里任意一个稳定、已通过的测试」，本步即保持 SUT 无关。
+把种子测试理解为「导入后的 SUT 测试仓里任意一个稳定、已通过的测试」，本步即保持 SUT 无关。
 
 ---
 
@@ -88,7 +88,7 @@ scope: Wave 0 - Wave 3（最小可行闭环）
 
 ### 输出
 
-- `.ai/wave-0/prd-health-report.yaml` —— 9 维度评分 + 综合分 + 等级
+- `.ai/wave-0/prd-health-report.yaml` —— 8 个计分维度 + 可追踪性加分项 + 综合分 + 等级
 - `.ai/wave-0/prd-gap-report.yaml` —— 结构化缺口清单，每条带 suggested_interview_question
 - `.ai/wave-0/prd-routing-decision.md` —— 进入 Wave 1 / 先补洞 / 反向重建模式的明确决定
 
@@ -106,9 +106,9 @@ scope: Wave 0 - Wave 3（最小可行闭环）
    - Confluence 需先导出
    - 总长度 > 50K 字时，分章节分别处理
 
-2. 调用 `prd-health-checker` agent，对 PRD 执行 9 维度评估：
+2. 调用 `prd-health-checker` agent，对 PRD 执行 8 个计分维度 + 可追踪性加分项评估：
    ```
-   9 维度健康度评估标准见 METHOD.md §3（PRD 健康度评估）
+   8 个计分维度 + 可追踪性加分项见 METHOD.md §3（PRD 健康度评估）
    ```
 
 3. AI 产出 `prd-health-report.yaml` 草稿，结构如下：

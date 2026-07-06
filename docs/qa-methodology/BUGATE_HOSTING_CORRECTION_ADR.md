@@ -1,7 +1,8 @@
 # ADR-BUGATE-002 — Hosting-Direction Correction: Imported Mode Becomes Real
 
 - **Status:** accepted (2026-07-03, human-ratified via CHARTER-BUGATE-001 and
-  the signed K/W/C disposal review)
+  the signed K/W/C disposal review); amended by CHARTER A4 (2026-07-06) to
+  retire the maintainer SUT-mount exception.
 - **Authority:** [`CHARTER.md`](../../CHARTER.md) (CHARTER-BUGATE-001 §2, §5)
 - **Companions:** ADR-BUGATE-001
   ([`BUGATE_PLATFORM_DECOUPLING_ADR.md`](BUGATE_PLATFORM_DECOUPLING_ADR.md)),
@@ -16,7 +17,7 @@
 
 Between the extraction (2026-06) and the charter (2026-07-03), this repository
 drifted into building the **maintainer workbench as if it were the production
-form**: BUGate opened as the project root, a SUT test workspace mounted beneath
+form**: BUGate opened as the project root, a SUT test workspace linked beneath
 it by symlink + a local uncommitted profile pointer, and indirection layers
 grown so that BUGate-as-root could reach out into external SUTs. The charter
 ruled that hosting direction inverted (§2.4 anti-patterns): the runtime binds
@@ -35,22 +36,21 @@ off by the human owner before any change.
   (merge, guards, artifact templates, semantic-schema dialects, UC binding);
   the whole gate engine; ADR-BUGATE-001's four-part model and the transition
   protocol (orthogonal to hosting direction); the de-SUT guard + CI; templates,
-  demos, graceful degradation; the dual-runtime gate-agent adapters; the
+  graceful degradation; the dual-runtime gate-agent adapters; the
   memory-bus mechanism. **Notably kept:** the profile `evidence_sources` /
   `skill_sources` keys and their resolver — audited as mode-independent (in
   imported mode the same binding resolves plain repo-relative paths); only
   their documentation was reworded.
-- **W — workbench-legitimate, kept but scoped to the maintainer context:** the
-  symlink mount procedure, the local *uncommitted* profile-pointer convention
-  (now explicitly labeled a workbench convention wherever it appears), the
-  mounted-demo (relabeled maintainer demo), and local mount state, which never
-  enters the committed tree.
+- **W — formerly workbench-legitimate, now retired by CHARTER A4:** the symlink
+  mount procedure and local uncommitted profile-pointer convention were kept on
+  2026-07-03 only as a maintainer extraction bridge. They are no longer current:
+  BUGate core iteration is pure, and real SUT validation happens in an external
+  or scratch SUT repo that imports BUGate.
 - **C — Mode-B overbuild/residue, corrected:** the root-discovery sentinel
-  coupling (§3); mounted-first wording in the skill, agent protocol, and
+  coupling (§3); host-inverted wording in the skill, agent protocol, and
   profile schema (rewritten to the governed-workspace framing, imported mode
-  first); the whitepaper/slides mounted-as-endstate narrative (dated errata
-  pointing at the charter, no rewrite); and the shared memory-bus service-host
-  residue (§5).
+  first); stale top-level release material (now removed rather than
+  patched forward); and the shared memory-bus service-host residue (§5).
 
 ## 3. Decision 2 — the root-discovery contract (the S2 split)
 
@@ -61,44 +61,44 @@ resolution:
 
 | Root | Meaning | Resolution order |
 |---|---|---|
-| **Workspace root** (`bugate_core.find_root`) | the governed repo: config, profile, artifacts, guarded paths, namespaces | `BUGATE_PROJECT_ROOT` env → nearest `bugate.config.yaml` walking up from CWD (the committed config **is** the workspace marker) → legacy `AGENTS.md`+`.shared/` sentinel as the workbench fallback |
+| **Workspace root** (`bugate_core.find_root`) | the governed repo: config, profile, artifacts, guarded paths, namespaces | `BUGATE_PROJECT_ROOT` env → nearest `bugate.config.yaml` walking up from CWD (the committed config **is** the workspace marker) → legacy `AGENTS.md`+`.shared/` sentinel only for pure-core self-check compatibility |
 | **Engine root** (`bugate_core.find_engine_root`) | the kit's own tree: templates, sibling gate scripts, bin wrappers, the de-SUT scan anchor | `BUGATE_ENGINE_ROOT` env → the engine tree's own location (resolved from the module file, never from CWD) |
 
 Hook contract: runtime hooks **locate the engine** (walk up for
 `scripts/bugate_core.py`, or `${CLAUDE_PLUGIN_ROOT}` in the plugin channel, or
 the known vendor dir written by the installer) and the gate scripts resolve the
 workspace themselves from CWD. A governed repo therefore needs no engine
-sentinel files. Both layouts are CI-enforced by the dual-layout write-guard
-acceptance (`examples/imported-demo/` as the first-class imported layout,
-`examples/mounted-demo/` as the workbench layout).
-
-> *2026-07-04 update:* the committed example trees were removed for
-> imported-mode purity (the upstream repo carries no SUT-shaped directories at
-> all). The same dual-layout acceptance now runs on ephemeral fixtures —
-> `tests/test_write_guard_layouts.py` — plus a `bugate init` scratch-repo e2e
-> with the R4 negative control in CI. The decisions above are unchanged.
+sentinel files. Both layouts are CI-enforced by ephemeral-fixture acceptance in
+`tests/test_write_guard_layouts.py` plus a `bugate init` scratch-repo e2e with
+the R4 negative control.
 
 ## 4. Decision 3 — distribution channels
 
-Shipped now (CHARTER §5.2's two-channel requirement):
+Shipped now (CHARTER §5.2's distribution requirement):
 
 1. **Installer, vendored-dir channel** — `scripts/bugate_init.py <sut-repo>`
    vendors the kit into `<sut-repo>/.bugate/`, links skill discovery, merges
    (never overwrites) the repo's own hook files, scaffolds a **committed**
    config + profile, and prints the acceptance checklist (Codex hook re-trust;
    R4 negative control). Idempotent, self-vendor-safe.
-2. **Claude Code plugin** — `.claude-plugin/` manifest with skills, commands,
-   gate agents, and hooks loading via `${CLAUDE_PLUGIN_ROOT}`; hooks are inert
-   in any repo without a committed `bugate.config.yaml`. The other runtime has
-   no plugin system; the installer covers it.
+2. **Codex + Claude Code plugins** — `.codex-plugin/` and `.claude-plugin/`
+   manifests identify the plugin; plugin-root `skills/`, `commands/`,
+   `agents/`, `hooks/hooks.json`, `scripts/`, and `bin/` carry the reusable
+   runtime surface. Hooks load through the plugin root variables and remain
+   inert in any repo without a committed `bugate.config.yaml`.
+3. **Project-local installer supplement** — even with plugins, `bugate init`
+   remains the acceptance path for a SUT repo because it commits the profile,
+   project hook wiring, CI-friendly vendored scripts, and Codex gate-agent
+   cards that the SUT repo must review and version.
 
 Deferred, direction accepted: the **pip/pipx console-script** (`bugate`) the
 charter leans toward as the end-state — stdlib-only makes packaging near-free,
 hooks would gain a layout-independent entry point, and upgrades become a
-version bump. It is not shipped in this correction because the vendored channel
-already satisfies the §5.2 acceptance and the console-script deserves its own
-packaging/versioning pass. Trigger to revisit: the first adoption where
-per-repo vendoring measurably drifts, or the first multi-repo fleet upgrade.
+version bump. It is not shipped in this correction because the plugin +
+vendored channels already satisfy the §5.2 acceptance and the console-script
+deserves its own packaging/versioning pass. Trigger to revisit: the first
+adoption where per-repo vendoring measurably drifts, or the first multi-repo
+fleet upgrade.
 
 ## 5. Decision 4 — shared memory-bus service hosting (client side)
 
@@ -109,19 +109,17 @@ directory, legacy in-repo state readable as a deprecated fallback, optional
 launch-supervision hardening). What this correction fixes is the
 hosting-direction residue on the client side: a client repo's start wrapper
 must **delegate to the shared host or refuse** — never lazily create an empty
-local database. The origin workspace's starter was fixed accordingly (its
-ensure-fallback used to boot an empty duplicate DB on the shared port after a
-reboot: a split brain). In generic imported use the same rule reads: vendored
-kits are clients by default; self-hosting is an explicit operator decision.
+local database. In generic imported use the same rule reads: vendored kits are
+clients by default; self-hosting is an explicit operator decision.
 
 ## 6. Consequences
 
 - Imported mode is now *practically* the default, not just narratively: a
   fresh SUT repo adopts BUGate by installer or plugin without cloning the core,
   and the R4 negative control is part of the acceptance path.
-- The workbench remains fully supported for the four maintainer activities
-  (CHARTER §2.3) — nothing was de-toothed; the K red-line list survived the
-  sweep intact.
+- BUGate core iteration remains fully supported for the maintainer activities in
+  CHARTER §2.3, but it is pure-core only: no real SUT mount, symlink, nested
+  checkout, copied workspace, or local profile pointer inside the engine repo.
 - Engine upgrades inside a governed repo are a re-run of the installer (or a
   plugin update); the committed config/profile are untouched by refreshes.
 - Documentation now states the split root contract in one voice (README,
@@ -133,9 +131,10 @@ kits are clients by default; self-hosting is an explicit operator decision.
 - **Keep workbench-as-production** — rejected by the charter (§2.4): trust,
   context, CI, and review all bind to the wrong root, and N-SUT collapses into
   per-SUT framework clones.
-- **Delete the workbench** — rejected as over-correction: it is the maintainer
-  form (four legitimate activity classes) and the extraction-era mount tooling
-  remains correct there.
+- **Delete core self-development support** — rejected as over-correction: core
+  smoke, temporary fixture validation, and external/scratch imported-repo e2e
+  remain necessary. CHARTER A4 deletes only the extraction-era SUT mount
+  exception.
 - **Delete the profile evidence/skill source keys** (suspected Mode-B reach) —
   rejected on audit: the binding is declarative and mode-independent; only its
-  wording was mounted-first.
+  wording was host-inverted.

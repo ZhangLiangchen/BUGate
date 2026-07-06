@@ -10,10 +10,10 @@ framework. It separates reusable method from SUT-specific facts.
 
 ## Required Workflow
 
-1. Identify the active SUT profile and the governed automation test
-   workspace — the repo you are working in (imported mode, the default) or a
-   mounted workspace (while developing BUGate itself). If none exists, stay in core mode
-   and do not invent product facts.
+1. Identify the active SUT profile and the governed automation test workspace:
+   the imported SUT test repo you are working in. If you are in BUGate core
+   itself, stay in core mode; do not mount a SUT into this repository and do not
+   invent product facts.
 2. Build or review the business brief before test design.
 3. Decide testability and the cheapest sufficient test layer.
 4. Map inventory, propositions, oracles, evidence, and implementation targets.
@@ -52,7 +52,7 @@ Create them with `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init --f
 
 The shipped templates pass the pre-code gates as-is
 (`python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code`);
-the write-guard acceptance fabricates governed workspaces at run time
+the write-guard acceptance fabricates imported-repo fixtures at run time
 (upstream `tests/test_write_guard_layouts.py` — no example SUT trees ship in
 the kit or the repo).
 
@@ -126,12 +126,13 @@ record / recall / promote protocol.
 
 - No SUT API paths, credentials, product resource IDs, service URLs, or
   environment names belong in this skill.
-- The governed SUT workspace — the host test repo in imported mode, a mounted
-  workspace mounted while developing BUGate itself — means the SUT's automation test
-  framework / test workspace: tests, BUGate artifacts, fixtures, runners,
-  captured evidence, and local test rules. Product source, API dumps, secrets,
-  and live environment details stay outside BUGate core and enter only through
-  profile-controlled evidence/config boundaries.
+- The imported SUT test repo is the host for real SUT work: the SUT's
+  automation test framework / test workspace with tests, BUGate artifacts,
+  fixtures, runners, captured evidence, and local test rules. BUGate core
+  development remains pure and uses templates plus temporary test fixtures only.
+  Product source, API dumps, secrets, and live environment details stay outside
+  BUGate core and enter only through profile-controlled evidence/config
+  boundaries in the imported SUT repo.
 - SUT profiles may add stricter artifact names, guarded paths, commands, and
   evidence rules, but they must not weaken the core invariants.
 - If source code is available, treat it as one possible evidence source, not as

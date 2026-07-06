@@ -17,7 +17,7 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local agent + memory state — SUT-mounted, never part of core
+# Local agent + memory state — machine/local only, never part of core
 .memory_bus/
 .shared/memory/
 .shared/progress/
@@ -40,12 +40,12 @@ id_rsa*
 *_keypair*
 *mnemonic*
 
-# Mounted SUTs live in their own repo/workspace, not in the core repo
+# SUT repos live outside BUGate core; imported repos carry their own profile
 /sut/
 
-# Onboarding workbench is an output dir; only its README belongs in core
-/.shared/skills/bugate/integration/workbench/*
-!/.shared/skills/bugate/integration/workbench/README.md
+# Onboarding scratch output is a local output dir; only its README belongs in core
+/.shared/skills/bugate/integration/scratch-output/*
+!/.shared/skills/bugate/integration/scratch-output/README.md
 
 # Logs / artifacts / temp
 *.log

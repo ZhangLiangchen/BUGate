@@ -13,7 +13,7 @@ Claude adapter for the BUGate methodology onboarding workflow.
    `docs/qa-methodology-integration/`, resolved relative to the governed
    workspace root (the nearest `bugate.config.yaml`) — the SUT repo's own docs
    area in imported mode. Do not write them into
-   `.shared/skills/bugate/integration/workbench/`; that path is an engine
-   (self-)development convenience only, and the vendored kit carries no gitignore
+   `.shared/skills/bugate/integration/scratch-output/`; that path is an engine
+   self-development convenience only, and the vendored kit carries no gitignore
    exemption for it.
 5. Stop after the plan and wait for explicit approval before changing any file.

@@ -20,7 +20,7 @@ generated.
   and Wave 0 scorer report `status: profile_required` (exit 0) when no SUT spec
   is supplied. The memory bus needs a user-installed `mcp-memory-service`; its
   wrappers no-op or print an install hint when it is absent. Nothing in core
-  requires a SUT repository to be mounted.
+  mounts or depends on a SUT repository.
 - **Root discovery is git-free and split.** Gate scripts resolve the governed
   **workspace** root by walking up from CWD to the nearest `bugate.config.yaml`
   (`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel stays
@@ -31,21 +31,22 @@ generated.
 **Where commands run.** The one usage mode is **imported**: the engine, skill,
 hooks, and a **committed** profile live inside the SUT automation test repo,
 and the SUT-facing commands below run from that repo's root against its
-profile. When **developing BUGate itself** (this repo as project root; for
-debugging, a SUT test workspace may be mounted via symlink + a local
-uncommitted profile pointer), the same commands run from this repo's root.
-Normative rules: [`CHARTER.md`](CHARTER.md) §2 + Amendment A3. Per command class:
+profile. When **developing BUGate itself**, this repo stays pure: only core
+template checks, generated scratch fixtures, installer e2e runs against an
+external/scratch SUT repo, and SUT-neutral CI checks run here.
+Normative rules: [`CHARTER.md`](CHARTER.md) §2 + Amendment A4. Per command class:
 
 | Command class | Runs in |
 |---|---|
-| Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation, plan lock, prompt reminder, `wave8-weekly` | The **governed workspace** — the SUT repo (imported, default), or this repo against a mounted workspace (self-development debugging) |
-| Importer (`bugate_init.py`) — vendors the kit, links skills, copies the Codex gate agents into `.codex/agents/` (Codex's agent channel; Claude's is the plugin), merges + refreshes the BUGate hook wiring (never the repo's own hooks), scaffolds committed config + profile, and appends a marked, idempotent ignore block to the SUT repo's root `.gitignore` (default scorer outputs + local agent/memory state; the SUT's own lines and the committed contract stay intact) | The **engine checkout** (this repo, or an already-vendored kit), pointed at a target SUT repo |
+| Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation, plan lock, prompt reminder, `wave8-weekly` | The **imported SUT test repo**; in BUGate core only template checks and ephemeral fixture acceptances run |
+| Importer (`bugate_init.py`) — vendors the kit, links Claude skills plus official Codex `.agents/skills` (with `.codex/skills` kept as a legacy bridge), copies the Codex gate agents into `.codex/agents/`, merges + refreshes the BUGate hook wiring (never the repo's own hooks), scaffolds committed config + profile, and appends a marked, idempotent ignore block to the SUT repo's root `.gitignore` (default scorer outputs + local agent/memory state; the SUT's own lines and the committed contract stay intact) | The **engine checkout** (this repo, or an already-vendored kit), pointed at a target SUT repo |
 | De-SUT guard (`check_no_sut_terms.py`) | The **engine tree** it is part of — scans the kit subtree anywhere; the full upstream surface only in this repo (CI-enforced here) |
 | Memory bus (`memory_bus.py`, `bin/memory-*`) | Either — namespace isolated per project via `memory.namespace` / `MEMORY_BUS_PROJECT_TAG` |
 
-All script invocations below are from the **governed workspace root** — the
-SUT repo in imported mode, this repo when developing BUGate itself — e.g.
-`python3 scripts/<name>.py …`. Bash wrappers live in `bin/`.
+Script invocations below are from the **imported SUT test repo root** when a
+real SUT is involved. In BUGate core, run only SUT-neutral
+template checks, ephemeral fixture tests, and installer dry-runs/e2e against an
+external or scratch repo. Bash wrappers live in `bin/`.
 
 ---
 
@@ -118,7 +119,7 @@ env (`MEMORY_BUS_URL`, `MEMORY_BUS_PROJECT_TAG`, `MCP_API_KEY*`); see profile-sc
 The bus is **machine-level** (ADR-BUGATE-003): one local service instance whose
 data home resolves system-wide (`MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` >
 `~/.bugate/memory-bus`, keys in `<bus-home>/client.env`), shared by every
-governed workspace on the machine. Projects are isolated by namespace tag
+BUGate-enabled repo on the machine. Projects are isolated by namespace tag
 (`project:<name>`), never by per-repo databases; a legacy in-repo
 `.memory_bus/client.env` still works as a deprecated fallback. Initialization
 is **reuse-first**: `memory-bus-ensure`/`memory-bus-start` probe for a healthy

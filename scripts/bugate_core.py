@@ -383,9 +383,9 @@ def skill_roots(
 ) -> list[Path]:
     """Resolved SUT skill-source dirs from the profile `skill_sources` key.
 
-    Lets a flow resolve SUT-specific skills staged in the mounted workspace through
-    the profile, without those skills entering Core. ``existing_only`` filters to
-    dirs that exist on disk.
+    Lets a flow resolve SUT-specific skills staged in the imported SUT repo
+    through the profile, without those skills entering Core. ``existing_only``
+    filters to dirs that exist on disk.
     """
     roots = _source_roots(config, "skill_sources", root)
     return [p for p in roots if p.exists()] if existing_only else roots

@@ -4,8 +4,9 @@
 
 This repository is the reusable **core**. It contains no product tests,
 business data, source snapshots, endpoints, credentials, or environment facts.
-A **SUT profile** connects the core to a SUT's automation test framework or test
-workspace; it does not import the product system into BUGate core.
+A **SUT profile** connects an imported BUGate kit to the SUT automation test
+repo that owns the tests; it does not import the product system into BUGate
+core.
 
 Positioning, the normative usage model (**imported** is the only usage mode;
 opening this repo is just developing BUGate itself), naming, and the
@@ -22,9 +23,9 @@ python3 tests/test_write_guard_layouts.py
 ```
 
 The first line runs the pre-code semantic gates over the shipped artifact
-templates and prints `PASS`. The second fabricates governed workspaces in a
+templates and prints `PASS`. The second fabricates imported-repo fixtures in a
 temp dir and shows the physical write-guard **block, then allow** an edit in
-both layouts (imported + engine-development) — the repo ships no
+both supported layouts (imported repo + pure engine-development fixture) — the repo ships no
 committed example SUT trees. To see exactly what imported mode installs into
 your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 
@@ -37,7 +38,7 @@ your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 ## Usage — one mode: imported. (Opening this repo = developing BUGate itself.)
 
 BUGate has exactly **one usage mode** (normative rules: [`CHARTER.md`](CHARTER.md)
-§2, Amendment A3):
+§2, Amendment A4):
 
 - **Imported mode.** Your agent runtime opens the **SUT automation test repo**
   as the project root, and BUGate is imported into it — skills, hooks, gate
@@ -49,34 +50,34 @@ Opening *this* repository in Claude Code / Codex is **not a usage mode** — it
 is simply **developing BUGate itself** (maintainers): debugging core
 scripts/hooks/skill discovery; evolving the methodology, profile schema, or
 gates; running the template gates and ephemeral-fixture smokes (`tests/`); and
-cross-SUT regression. For debugging against a real SUT, a test workspace can
-be mounted via a symlink and a local, uncommitted `profile:` pointer
-(Quickstart B below) — a development practice, not a way of *using* BUGate.
+cross-SUT regression through imported scratch or external SUT test repos. BUGate
+core development stays pure: do not mount a SUT inside this repository.
 
-> Both imported-mode channels ship in-repo (CHARTER §5.2–§5.3): the
-> **installer** — `python3 scripts/bugate_init.py <sut-repo>` — and the
-> **Claude Code plugin** (manifest + hooks in `.claude-plugin/`;
-> skills/commands resolved from `.shared/` via manifest path fields, gate
-> agents via the top-level `agents` symlink — the plugin runtime loads agents
-> only from that default directory — and hooks calling the engine via
-> `${CLAUDE_PLUGIN_ROOT}`). Hooks from either channel are inert (exit 0)
-> wherever no committed `bugate.config.yaml` marks a workspace root. Codex's
-> own plugin system packages skills/hooks/MCP but not custom agents, so
-> `bugate init` is its channel (and wires the gate agents into `.codex/agents/`).
-> Quickstart A below shows the installer first, then the manual equivalent.
+> The imported-mode channels ship in-repo (CHARTER §5.2–§5.3): the
+> **installer** — `python3 scripts/bugate_init.py <sut-repo>` — plus
+> **Codex** and **Claude Code** plugin packaging. The installer is still the
+> clearest SUT-adoption path because it writes the committed profile,
+> project-local hooks, skill links, CI-friendly scripts, and Codex gate-agent
+> cards into the SUT repo. The plugin shape is symmetric at the repo root:
+> `.codex-plugin/plugin.json` and `.claude-plugin/plugin.json` are manifests;
+> `skills/`, `commands/`, `agents/`, `hooks/hooks.json`, `scripts/`, and `bin/`
+> carry the shared components. Hooks from either channel are inert (exit 0)
+> wherever no committed `bugate.config.yaml` marks a workspace root.
+> Quickstart A below shows the installer first, then the plugin/manual
+> equivalents.
 
-## Core/Profile/Mounted Workspace Model
+## Core/Profile/Imported SUT Test Repo Model
 
-In BUGate terms, "mounting a SUT" means mounting or pointing at the SUT's
-automation test framework / test workspace. The product runtime remains a
-black-box target observed through tests, docs, contracts, logs, captured
-evidence, or other profile-declared sources.
+In BUGate terms, the active project for real SUT work is the **SUT automation
+test repo** that imports BUGate. The product runtime remains a black-box target observed
+through tests, docs, contracts, logs, captured evidence, or other
+profile-declared sources. It is never placed inside BUGate core.
 
 ```mermaid
 flowchart LR
   Core["BUGate Core\nmethod, gates, templates,\nSUT-neutral scripts"]
   Profile["SUT Profile\npaths, commands,\nevidence policy, guards, roles"]
-  Workspace["Mounted Workspace\nSUT automation test framework:\ntests, artifacts, fixtures, evidence, runners"]
+  Workspace["Imported SUT Test Repo\nSUT automation test framework:\ntests, artifacts, fixtures, evidence, runners"]
   Runtime["SUT / Product Runtime\nblack-box APIs, UI, docs,\nenvironments, live behavior"]
 
   Core --> Profile
@@ -89,14 +90,14 @@ flowchart LR
 | Part | What it is | Where it lives |
 |---|---|---|
 | **Core** (this repo) | Methodology + gate engine + templates + agent adapters. Knows nothing about any specific SUT. | here |
-| **SUT Profile** (the bridge) | A small declarative file that binds the core to one SUT test workspace's artifact dirs, guarded test globs, commands, evidence policy, roles, and namespace. | profile package or beside the mounted test workspace |
-| **Mounted Workspace** | Usually the SUT's automation test framework / test workspace: tests, generated BUGate artifacts, fixtures, runners, captured evidence, and local test rules. | its own repo/workspace |
+| **SUT Profile** (the bridge) | A small declarative file that binds the imported kit to one SUT test repo's artifact dirs, guarded test globs, commands, evidence policy, roles, and namespace. | committed in the SUT test repo |
+| **Imported SUT Test Repo** | The SUT's automation test framework / test workspace: tests, generated BUGate artifacts, fixtures, runners, captured evidence, and local test rules. | its own repo/workspace, opened as project root |
 | **SUT / Product Runtime** | The actual product being tested: black-box API/UI/runtime behavior, production docs/contracts/environments, and optional source or API dumps as evidence. | outside BUGate core |
 
-One core can govern **one** mounted test workspace or **many** (N=1 is just the
-degenerate case). The core knows nothing SUT-specific; SUT-aware paths,
-commands, auth rules, resource policies, and evidence sources live in the
-profile or the mounted test workspace. See
+One BUGate core can be imported into **many** SUT test repos. Each imported repo
+owns and versions its own profile and evidence rules. The core knows nothing
+SUT-specific; SUT-aware paths, commands, auth rules, resource policies, and
+evidence sources live in the profile or the imported SUT test repo. See
 [`docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md`](docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md).
 
 ## The gate flow
@@ -121,8 +122,9 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
 python3 scripts/bugate_init.py <sut-repo>    # add --dry-run to preview
 ```
 
-It vendors the kit into `<sut-repo>/.bugate/`, links skill discovery, merges
-the hook blocks into the SUT repo's `.claude/settings.json` +
+It vendors the kit into `<sut-repo>/.bugate/`, links skill discovery through
+`.claude/skills/`, official Codex `.agents/skills/`, and legacy Codex
+`.codex/skills/`, merges the hook blocks into the SUT repo's `.claude/settings.json` +
 `.codex/hooks.json` (existing hooks preserved), scaffolds a **committed**
 `bugate.config.yaml` + `bugate.profile.yaml`, creates `docs/usecases/`, and
 prints the acceptance checklist — including the Codex re-trust caveat and the
@@ -130,10 +132,13 @@ R4 negative control. Idempotent; re-running refreshes the vendored kit and the
 BUGate hook wiring (upgrading an older import's hook shape; the repo's own
 hooks are never rewritten).
 
-**Plugin channel (Claude Code).** Install this repo as a plugin: skills,
-commands, gate agents, and hooks load via `${CLAUDE_PLUGIN_ROOT}`, and the
-hooks are inert in any repo without a committed `bugate.config.yaml`. You still
-commit the config + profile in the SUT repo (steps 3–4).
+**Plugin channels (Codex + Claude Code).** Install this repo as a plugin when
+you want the reusable runtime surface without vendoring first. Codex uses
+`.codex-plugin/plugin.json`; Claude Code uses `.claude-plugin/plugin.json`.
+Both load the same plugin-root `skills/` and `hooks/hooks.json`; Claude also
+loads `commands/` and `agents/` from the same root. You still commit the
+config + profile in the SUT repo (steps 3–4). For Codex project-local gate
+agents, run the installer as well so the reviewed TOMLs land in `.codex/agents/`.
 
 **Manual equivalent** — everything below lands in the **SUT repo** and is
 **committed** there; in imported mode the governance contract is reviewed and
@@ -141,8 +146,9 @@ versioned with the tests it guards:
 
 1. **Vendor the engine and skill** into the SUT test repo (copy or git
    submodule): `scripts/` (the stdlib-only gate engine) and
-   `.shared/skills/bugate/` (the skill tree, discovered via `.claude/skills/` /
-   `.codex/skills/` symlinks).
+   `.shared/skills/bugate/` (the skill tree, discovered via `.claude/skills/`
+   and Codex `.agents/skills/` symlinks; `.codex/skills/` may remain as a
+   compatibility bridge for older Codex clients).
 2. **Wire the hooks**: merge the hook blocks from this repo's
    `.claude/settings.json` and `.codex/hooks.json` into the SUT repo's own
    files. The hooks locate the engine by walking up for
@@ -175,57 +181,27 @@ governs from inside it. The layout is exercised end-to-end in CI on ephemeral
 fixtures: [`tests/test_write_guard_layouts.py`](tests/test_write_guard_layouts.py)
 plus a `bugate init` scratch-repo run with the R4 negative control.
 
-### B) Developing BUGate itself — optionally mount a SUT for debugging (maintainers)
+### B) Developing BUGate itself — pure core iteration (maintainers)
 
-1. Write a profile under a local `sut/` dir and point `bugate.config.yaml` at it (or keep `mode: core` for the unmounted engine). The full key contract lives in [`profile-schema.md`](.shared/skills/bugate/references/profile-schema.md); `scripts/bugate_init.py` scaffolds the same file shape for imported repos.
-
-   ```yaml
-   # bugate.config.yaml
-   profile: sut/my-sut.profile.yaml
-   ```
-
-   > The `profile:` line is a local, per-clone edit — **don't commit it**; BUGate is a generic framework where each clone mounts its own SUT.
-
-2. In the profile, declare the mounted test workspace surfaces:
-
-   ```yaml
-   artifact_dir: docs/usecases             # where BUGate UC artifacts live in the test workspace
-   guarded_path_regex:                     # which test files the write-guard protects
-     - "tests/.*/test_.*[.]py$"
-   required_precode_artifacts:             # override the default 01–05 set if needed
-     - 01_business_brief.md
-     - 02_testability.md
-     - 03_inventory.yaml
-   ```
-
-3. Run a gate:
-
-   ```bash
-   python3 scripts/check_bugate.py <test-file-or-patch>      # physical write guard
-   python3 scripts/check_bugate_inventory_semantics.py <uc-dir>
-   ```
-
-**Self-development physical layout — keep the SUT repo separate, symlink it in.**
-Because the mounted workspace is its **own** git repository, don't nest it
-physically inside BUGate's working tree — nested independent repos confuse
-IDEs, invite an accidental `git add`, and blur the two-repo boundary. Keep the
-SUT in its own directory and symlink it under BUGate:
+Keep this repository SUT-neutral. Do not add a SUT repo, symlink a SUT repo, or
+point this repo's `bugate.config.yaml` at SUT-specific profiles. Core iteration
+uses:
 
 ```bash
-# SUT lives beside BUGate at ../my-sut (its own repo + remote); mount it in:
-ln -s ../my-sut my-sut
-# ignore the symlink LOCALLY — no trailing slash, since a symlink is not a
-# directory to git — so BUGate's committed tree carries no SUT name:
-printf '/my-sut\n' >> .git/info/exclude
+python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
+python3 tests/test_write_guard_layouts.py
+python3 tests/test_init_scaffold.py
+python3 tests/test_hook_surface_parity.py
+python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt
 ```
 
-The symlink is transparent to the gate (`check_bugate.py` matches the textual
-path and reads artifacts through the link), while the two repos keep fully
-independent histories, remotes, and lifecycles.
+When validating real adoption, run `python3 scripts/bugate_init.py <sut-repo>`
+against an external SUT test repo or a scratch repo outside BUGate core, then
+open that SUT repo as the project root. The core checkout remains pure.
 
 The core ships with `guarded_path_regex: []` (write-guard **disabled**) and an
-empty `artifact_dir`; a SUT profile turns these on for a mounted test
-workspace.
+empty `artifact_dir`; an imported SUT profile turns these on in the governed SUT
+test repo.
 
 **Worked verification.** The repo ships **no committed example SUT trees**
 (imported-mode purity): the governed-layout acceptances fabricate their
@@ -238,7 +214,26 @@ python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --
 
 ## Agent runtimes
 
-BUGate runs under **Claude Code** and **Codex** via the skill at `.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this repo while developing BUGate itself, vendored into the SUT repo in imported mode (Quickstart A), or as a **Claude Code plugin** (`.claude-plugin/` carries the manifest + hooks; its path fields point skills/commands at `.shared/`, while the gate agents load through the top-level `agents` symlink — the plugin runtime discovers agents only in that default directory, so that one component keeps a top-level entry). The gate engine is **stdlib-only** (no third-party deps) and resolves roots git-free: the governed workspace via the nearest `bugate.config.yaml` up from CWD (`AGENTS.md` + `.shared/` sentinel as the self-development fallback), engine assets via the engine tree's own location. Note: adding or changing a Codex hook requires re-trusting its hash.
+BUGate runs under **Claude Code** and **Codex** via the shared skill at
+`.shared/skills/bugate/` and the hooks in `.claude/` / `.codex/` — from this
+repo while developing BUGate itself, vendored into the SUT repo in imported
+mode (Quickstart A), or through the dual plugin surface. Codex repo skills use
+`.agents/skills/` as the canonical path; `.codex/skills/` is retained only as a
+legacy bridge. Plugin packaging is root-standard: manifests live under
+`.codex-plugin/` and `.claude-plugin/`; `skills/`, `commands/`, `agents/`,
+`hooks/hooks.json`, `scripts/`, and `bin/` stay at the plugin root. The gate
+engine is **stdlib-only** (no third-party deps) and resolves roots git-free:
+the active project via the nearest `bugate.config.yaml` up from CWD
+(`AGENTS.md` + `.shared/` sentinel as the self-development fallback), engine
+assets via the engine tree's own location. Note: adding or changing a Codex
+hook requires re-trusting its hash, and plugin changes may require
+Claude's `/reload-plugins` or a plugin reinstall/update.
+
+BUGate intentionally ships **no default `.mcp.json`** today: the Memory Bus is
+an optional machine-level `mcp-memory-service` plus stdlib client scripts, not a
+required plugin MCP server. If BUGate later adds a real MCP server contract, the
+file should live at plugin root as `.mcp.json` and be referenced by both runtime
+manifests.
 
 Field-tested setup notes: use the vendor native installers for `codex` and
 `claude`, not stale npm wrappers; keep `~/.local/bin` ahead of older app or
@@ -259,7 +254,14 @@ For a repeatable end-to-end capability audit after setup, invoke the
 bugate.config.yaml          # core config; a SUT profile overrides its values
 AGENTS.md                   # agent behavior protocol (SUT-neutral)
 CHARTER.md                  # charter: positioning, the single usage mode (imported) + self-development rules, evolution plan
-agents -> .shared/…/agents  # gate agents for the plugin runtime (it only loads agents from this default dir)
+.agents/skills/             # official Codex repo-skill discovery symlinks
+.codex-plugin/plugin.json   # Codex plugin manifest
+.claude-plugin/plugin.json  # Claude Code plugin manifest
+skills/                     # plugin-root skill symlinks shared by Codex + Claude
+commands/                   # plugin-root Claude command adapters
+agents -> .shared/…/agents  # plugin-root Claude gate agents
+hooks/hooks.json            # plugin-root lifecycle hooks for Codex + Claude
+.mcp.json                   # absent by default; add only for a real MCP server contract
 scripts/                    # gate engine + SDTD orchestration (stdlib-only)
 .shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
 docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records
@@ -267,25 +269,6 @@ docs/case-studies/          # narrative allowlist: real import/migration stories
 tests/                      # upstream-only ephemeral-fixture acceptances (dual-layout write guard, de-SUT meta-test) + legacy term fixture
 .github/workflows/          # CI: py_compile, semantics gates, de-SUT guard (hygiene/legacy/second-SUT/meta)
 ```
-
-## Provenance
-
-BUGate was not designed in the abstract — it was **extracted**. The gate stack
-grew up embedded in the automation test workspace of
-hypervise, a production multi-chain wallet platform, <!-- bugate: allow-sut-term -->
-where "prove your business understanding before you write test code" was first
-enforced against a live SUT. The methodology, the fail-closed write guard, the
-schema-driven semantic gates, and the falsification waves were all field-tested
-there, then de-SUT'd into this neutral core (ADR-BUGATE-001), migrated by the
-strangler-fig discipline of
-[`TRANSITION_PROTOCOL`](docs/qa-methodology/TRANSITION_PROTOCOL.md), and
-finally re-imported into the origin repo in the default imported mode. The
-full-circle story — including the real committed profile — is
-[`docs/case-studies/origin-sut-import.md`](docs/case-studies/origin-sut-import.md).
-
-The identity mention above is explicitly marked narrative provenance: per
-CHARTER Amendment A1, the de-SUT guard blocks *seepage into the reusable kit*,
-not *mention in the story*.
 
 ## License
 

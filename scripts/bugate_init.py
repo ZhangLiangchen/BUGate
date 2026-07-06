@@ -10,12 +10,13 @@ stays the project root; the engine is vendored into it; the governance contract
 
 What it does, in order:
 
-  1. vendors the kit (``scripts/``, ``bin/``, ``.shared/skills/bugate/``) from
-     this engine tree into ``<sut-repo>/<vendor-dir>/``;
-  2. links runtime skill discovery: ``.claude/skills/bugate`` and
-     ``.codex/skills/bugate`` → the vendored skill tree, and copies the Codex
-     gate-review agents into ``.codex/agents/`` (Codex's agent channel — the
-     Claude equivalents load via the plugin);
+  1. vendors the kit (``scripts/``, ``bin/``, ``.shared/skills/bugate/``, and
+     ``.shared/skills/bugate-full-check/``) from this engine tree into
+     ``<sut-repo>/<vendor-dir>/``;
+  2. links runtime skill discovery: ``.claude/skills/<skill>`` and
+     ``.agents/skills/<skill>`` → the vendored skill trees, keeps
+     ``.codex/skills/<skill>`` as a legacy Codex compatibility bridge, and
+     copies the Codex gate-review agents into ``.codex/agents/``;
   3. merges the BUGate hook blocks into the repo's ``.claude/settings.json``
      and ``.codex/hooks.json`` (the repo's own hooks are preserved; ours are
      appended when absent and refreshed when their wired text has drifted from
@@ -50,14 +51,16 @@ from pathlib import Path
 
 from bugate_core import find_engine_root
 
-KIT_DIRS = ["scripts", "bin", ".shared/skills/bugate"]
+KIT_DIRS = ["scripts", "bin", ".shared/skills/bugate", ".shared/skills/bugate-full-check"]
 IGNORE_NAMES = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
 
-# Codex plugins package skills/hooks/MCP but not custom agents, so the installer
-# is Codex's channel for the gate-review agents (the Claude equivalents load via
-# the plugin). The agent TOMLs travel inside the vendored kit and reference the
-# skill through the .codex/skills/bugate symlink this installer also creates, so
-# one file resolves in the engine repo and in any SUT repo regardless of vendor dir.
+# Codex plugins package the shared skills/hooks/MCP surface. BUGate still wires
+# the Codex gate-review agents through the project-local installer channel so
+# each governed SUT repo can review and commit the exact agent cards that govern
+# its tests. The agent TOMLs travel inside the vendored kit and reference the
+# skill through the official .agents/skills/bugate symlink this installer also
+# creates, so one file resolves in the engine repo and in any SUT repo
+# regardless of vendor dir.
 CODEX_AGENTS_KIT_REL = ".shared/skills/bugate/adapters/codex/agents"
 
 # Hook commands are templated on the vendor dir. ROOT is the governed WORKSPACE
@@ -96,16 +99,17 @@ def hook_blocks(vendor_dir: str, runtime: str) -> dict:
             "hooks": [{"type": "command", "command": c} for c in reminder],
         }],
     }
-    if runtime == "claude":
-        # SUT-repo sessions record under the SUT's own namespace (no --core).
-        blocks["SessionStart"] = [{
-            "hooks": [{"type": "command",
-                       "command": _cmd(vendor_dir, "memory_bus.py", "session-start", "--agent", "agent")}],
-        }]
-        blocks["Stop"] = [{
-            "hooks": [{"type": "command",
-                       "command": _cmd(vendor_dir, "memory_bus.py", "stop", "--agent", "agent")}],
-        }]
+    # SUT-repo sessions record under the SUT's own namespace (no --core) in
+    # both runtimes. Codex supports the same lifecycle events, so memory/liveness
+    # hooks stay symmetric with Claude Code.
+    blocks["SessionStart"] = [{
+        "hooks": [{"type": "command",
+                   "command": _cmd(vendor_dir, "memory_bus.py", "session-start", "--agent", "agent")}],
+    }]
+    blocks["Stop"] = [{
+        "hooks": [{"type": "command",
+                   "command": _cmd(vendor_dir, "memory_bus.py", "stop", "--agent", "agent")}],
+    }]
     return blocks
 
 
@@ -277,32 +281,38 @@ def vendor_kit(engine_root: Path, target: Path, vendor_dir: str, dry: bool) -> l
 
 def link_skills(target: Path, vendor_dir: str, dry: bool, force: bool) -> list[str]:
     notes = []
-    rel_target = Path("..") / ".." / vendor_dir / ".shared" / "skills" / "bugate"
-    for runtime in (".claude", ".codex"):
-        link = target / runtime / "skills" / "bugate"
-        notes.append(f"link {runtime}/skills/bugate -> {rel_target}")
-        if dry:
-            continue
-        link.parent.mkdir(parents=True, exist_ok=True)
-        if link.is_symlink() or link.exists():
-            if not force and link.is_symlink() and link.readlink() == rel_target:
+    skill_names = ("bugate", "bugate-full-check")
+    runtimes = (
+        (".claude", "project skill discovery"),
+        (".agents", "official Codex skill discovery"),
+        (".codex", "legacy Codex compatibility"),
+    )
+    for skill in skill_names:
+        rel_target = Path("..") / ".." / vendor_dir / ".shared" / "skills" / skill
+        for runtime, label in runtimes:
+            link = target / runtime / "skills" / skill
+            notes.append(f"link {runtime}/skills/{skill} -> {rel_target} ({label})")
+            if dry:
                 continue
-            if not force and not link.is_symlink():
-                raise SystemExit(f"{link} exists and is not the expected symlink (use --force)")
-            if link.is_symlink() or link.is_file():
-                link.unlink()
-            else:
-                shutil.rmtree(link)
-        link.symlink_to(rel_target)
+            link.parent.mkdir(parents=True, exist_ok=True)
+            if link.is_symlink() or link.exists():
+                if not force and link.is_symlink() and link.readlink() == rel_target:
+                    continue
+                if not force and not link.is_symlink():
+                    raise SystemExit(f"{link} exists and is not the expected symlink (use --force)")
+                if link.is_symlink() or link.is_file():
+                    link.unlink()
+                else:
+                    shutil.rmtree(link)
+            link.symlink_to(rel_target)
     return notes
 
 
 def install_codex_agents(engine_root: Path, target: Path, vendor_dir: str, dry: bool) -> list[str]:
     """Copy the Codex gate-review agents into the SUT repo's .codex/agents/.
 
-    Codex discovers project-local agents from .codex/agents/, and its plugins
-    cannot bundle agents, so the installer copies our gate agents there as
-    committed files.
+    BUGate discovers project-local gate agents from .codex/agents/ for Codex
+    sessions, so the installer copies our gate agents there as committed files.
     Refresh-ours: our own named TOMLs are (re)written each run so an upgrade
     reaches them; any other agent the SUT owns in that dir is left untouched.
     The kit source is read from the vendored location, so this works whether
@@ -405,14 +415,15 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
   1. Fill bugate.profile.yaml: add `guarded_path_regex` for this repo's test
      layout (keep the (?P<uc>...) capture) — the write guard is inert until then.
   2. COMMIT: bugate.config.yaml, bugate.profile.yaml, {vendor_dir}/,
-     .claude/ + .codex/ hook wiring, .codex/agents/ (the Codex gate agents),
-     docs/usecases/, and the updated .gitignore (a marked block backstops the
+     .claude/ + .codex/ hook wiring, .claude/skills/, .agents/skills/,
+     .codex/skills/ (legacy compatibility), .codex/agents/ (the Codex gate
+     agents), docs/usecases/, and the updated .gitignore (a marked block backstops the
      default scorer outputs + local agent/memory state out of git status) — the
      governance contract reviews and versions with the tests it guards.
   3. Codex only: RE-TRUST the changed hook hash in the Codex hook-management
      UI. Until then Codex hooks are SILENTLY inactive (known behavior). The
-     .codex/agents/ gate agents are picked up on the next Codex session (no
-     re-trust needed — they are agents, not hooks).
+     .agents/skills/ skills and .codex/agents/ gate agents are picked up on the
+     next Codex session (no re-trust needed — they are skills/agents, not hooks).
   4. Acceptance — R4 negative control: pick a guarded test path whose UC has no
      passed pre-code artifacts and confirm the block:
        python3 {vendor_dir}/scripts/check_bugate.py <a-guarded-test>.py </dev/null

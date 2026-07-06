@@ -28,6 +28,26 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" session-start --core --agent agent"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" stop --core --agent agent"
+          }
+        ]
+      }
     ]
   }
 }

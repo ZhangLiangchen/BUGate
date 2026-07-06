@@ -21,8 +21,8 @@ ADR layer split:
 | Layer | Where it lives | What it holds |
 |---|---|---|
 | **Core** | this repository | neutral method, templates, gates, hooks, adapters |
-| **SUT Profile** | the governed SUT workspace / profile package | paths, commands, evidence sources, guarded patterns, resource policy, runtime kind |
-| **SUT** | the product repository | source, API docs, fixtures, tests, secrets, live evidence |
+| **SUT Profile** | the imported SUT test repo | paths, commands, evidence sources, guarded patterns, resource policy, runtime kind |
+| **SUT Product Runtime** | the product-owned runtime/repository | source, API docs, fixtures, tests, secrets, live evidence |
 
 Concretely (AGENTS.md Core Rules 1–2 and 5):
 
@@ -31,7 +31,7 @@ Concretely (AGENTS.md Core Rules 1–2 and 5):
 - Put SUT paths, resource policies, environment names, auth rules, and tool
   commands in a **SUT profile**, not in core.
 - If a change needs SUT-specific facts, stop at the profile boundary and add a
-  profile key (or ask for a governed SUT workspace) instead of inventing product details.
+  profile key in the imported SUT test repo instead of inventing product details.
 
 ### The de-SUT guard (identity-seepage defense)
 
@@ -56,9 +56,9 @@ discipline is three-layered:
 The scan surface anchors on the **engine root's kit subtree** (`scripts/`,
 `bin/`, `.shared/skills/`; plus docs/ and root files when the engine root
 is this upstream repo, detected by the `CHARTER.md` sentinel). A governed
-workspace's own files are never the surface. The origin SUT's vocabulary lives
-only in `tests/fixtures/legacy-sut-terms.txt` (and in that SUT's own profile)
-— never in engine source.
+workspace's own files are never the surface. The legacy SUT vocabulary used for
+upstream regression lives only in `tests/fixtures/legacy-sut-terms.txt` — never
+in engine source.
 
 > Mounting a SUT locally while developing BUGate itself (maintainers)? Keep your
 > `profile:` pointer in this repo's `bugate.config.yaml` uncommitted — it's a
@@ -134,7 +134,7 @@ fastest sanity check that the engine still imports and config still loads.
 | `bin/` | thin wrappers (e.g. memory-bus / promote helpers) |
 | `.shared/skills/bugate/` | the shared skill: `SKILL.md`, `references/`, `templates/`, `adapters/` |
 | `docs/qa-methodology/` | SUT-neutral method, SOP, ADR, protocols |
-| `tests/` | upstream-only ephemeral-fixture acceptances (dual-layout write guard, de-SUT meta-test) + fixtures (`fixtures/legacy-sut-terms.txt` is the one legitimate home of the origin SUT's vocabulary); not part of the vendored kit |
+| `tests/` | upstream-only ephemeral-fixture acceptances (dual-layout write guard, de-SUT meta-test) + fixtures (`fixtures/legacy-sut-terms.txt` is the regression term list); not part of the vendored kit |
 | `docs/case-studies/` | narrative allowlist: real import/migration stories (identity-scan exempt, hygiene enforced) |
 | `bugate.config.yaml` | core default config; ships with **no profile bound** (no guarded paths) |
 
@@ -149,7 +149,7 @@ Rules of thumb:
   commands, evidence fetchers, environments, resources, or auth.
 
 **Adding a script (`scripts/*.py`):** keep imports stdlib-only; resolve the
-governed workspace root via `bugate_core.find_root()` (nearest
+active project root via `bugate_core.find_root()` (nearest
 `bugate.config.yaml` up from CWD, self-development sentinel fallback, no git
 dependency) and engine assets (templates, sibling scripts) via
 `bugate_core.find_engine_root()` — never by assuming a CWD or using git
@@ -162,7 +162,7 @@ the four gates against the templates dir after editing.
 
 **Adding an adapter:** adapters live under
 `.shared/skills/bugate/adapters/` (ADR Implementation Notes). Keep them neutral;
-SUT-specific wiring belongs in the governed workspace, not the adapter.
+SUT-specific wiring belongs in the imported SUT test repo, not the adapter.
 
 **Hooks** (`.claude/`, `.codex/`) must call only SUT-neutral scripts from
 `scripts/` and must not depend on git metadata (AGENTS.md Hook Policy). Note:
