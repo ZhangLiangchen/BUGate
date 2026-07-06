@@ -1,18 +1,27 @@
-# BUGate — Setting up the OPTIONAL external runtimes
+# BUGate — Setting up the external runtimes
 
-The BUGate **core** (the 4-layer gate engine) is zero-dependency stdlib Python —
-see [`INIT.md`](../INIT.md). This document covers the **three OPTIONAL
-mechanisms** that call out to runtimes *you* install. BUGate ships only the
-driver scripts; each capability **degrades gracefully** when its runtime is
-absent, so a clean checkout stays green without any of them.
+The BUGate **gate engine** (the 4-layer gate) is zero-dependency stdlib Python —
+see [`INIT.md`](../INIT.md). This document covers the runtimes that call out
+beyond stdlib. **One is required, two are optional:**
+
+- **Required — the memory bus** (§2). A core BUGate component (long-term memory,
+  dual-agent progress sync + relay, memory promotion). `bugate init` /
+  `bin/memory-bus-*` **auto-install** it once (machine-level) when absent and
+  **self-heal** on an anomaly, so you normally don't run §2 by hand — it is here
+  as the manual/offline reference and as the diagnosis path (set
+  `BUGATE_MEMORY_NO_INSTALL=1` to install manually). Runtime is non-blocking (a
+  transient outage restarts rather than fail-closing edits), but a BUGate setup
+  is incomplete without it.
+- **Optional — the dual-agent CLIs** (§1) and **agent role isolation** (§3):
+  each degrades cleanly when absent (placeholder peer views / role guard off).
 
 Each section follows the same shape: **Install → Wire → Verify → Fallback**.
 
-| Capability | You install | Default if absent |
+| Capability | You install | Status / default if absent |
 |---|---|---|
-| 1. Dual-agent CLIs (multi-view + adversarial) | `codex` + `claude` CLIs | deterministic placeholder views, gate stays green |
-| 2. MCP memory service + ONNX | `mcp-memory-service` + ONNX model | note/search/lint exit 0 non-fatally |
-| 3. Agent role isolation | nothing (env + profile) | default OFF (no-op when role unset) |
+| 1. Dual-agent CLIs (multi-view + adversarial) | `codex` + `claude` CLIs | optional — deterministic placeholder views, gate stays green |
+| 2. MCP memory service + ONNX | auto-installed by init (`mcp-memory-service` + ONNX model) | **required core** — init installs/self-heals; §2 is the manual/offline reference |
+| 3. Agent role isolation | nothing (env + profile) | optional — default OFF (no-op when role unset) |
 
 ---
 

@@ -29,6 +29,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -212,6 +213,35 @@ def warn_unavailable() -> None:
         f"Memory service unavailable at {base_url()}. {START_HINT}",
         file=sys.stderr,
     )
+
+
+def self_heal_service() -> bool:
+    """Best-effort: bring the REQUIRED memory service back up when it is down.
+
+    The memory bus is a core BUGate component, so an outage should self-heal
+    (diagnose + restart) rather than silently degrade. This fires
+    ``bin/memory-bus-ensure`` in the background (which reuses a healthy service,
+    restarts a crashed one, or installs it once on a first run) and returns
+    quickly. Never raises and never blocks the caller — if healing can't run,
+    the caller still degrades gracefully for this turn while the next turn
+    recovers.
+    """
+    ensure = Path(__file__).resolve().parents[1] / "bin" / "memory-bus-ensure"
+    if not ensure.exists():
+        return False
+    try:
+        import subprocess
+
+        subprocess.Popen(
+            [str(ensure)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return True
+    except Exception:
+        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -564,8 +594,17 @@ def cmd_handoff(args: argparse.Namespace) -> int:
 
 def cmd_session_start(args: argparse.Namespace) -> int:
     if not service_available():
+        # Required component down → self-heal (restart in the background), then
+        # give it a moment; still non-blocking so the session never stalls.
         warn_unavailable()
-        return 0
+        if self_heal_service():
+            print("Memory service was down; triggered self-heal (bin/memory-bus-ensure) — recovering in the background.", file=sys.stderr)
+            for _ in range(6):
+                time.sleep(0.5)
+                if service_available():
+                    break
+        if not service_available():
+            return 0
     try:
         targeted = recent_for_agent(args.agent, args.limit)
         confirmed = search_memories(

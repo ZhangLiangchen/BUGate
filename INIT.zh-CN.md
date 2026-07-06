@@ -221,4 +221,4 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
 | Agent 记忆 + 晋级 | `mcp-memory-service` + ONNX 模型 | `memory_bus.py` + `bin/memory-*` | 会 → 安装提示，非致命 |
 | Agent 角色隔离 | 无 | `check_agent_role_paths.py` | —（默认 OFF） |
 
-**结论：** `git clone` → `python3 --version`（3.9+）→ 跑第 2 步冒烟测试 → **核心零安装即就绪**。双 agent 与记忆能力是可选项：装上对应运行时（CLI / `mcp-memory-service`），我们提供的驱动脚本就会用它们，缺席时干净回退。
+**结论：** `git clone` → `python3 --version`（3.9+）→ 跑第 2 步冒烟测试 → **门禁引擎零安装即就绪**（stdlib-only）。**记忆服务是必要核心组件**（长期记忆、双 agent 进展同步/接力、记忆升级）：`bugate init` / `bin/memory-bus-*` 检测到未装则**自动安装**机器级 `mcp-memory-service`、异常则**自愈拉起**（运行时非阻断，临时抖动重启而非锁死编辑）；`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过自动安装。**双 agent CLI（codex/claude）仍为可选**——缺席时干净回退到确定性占位。

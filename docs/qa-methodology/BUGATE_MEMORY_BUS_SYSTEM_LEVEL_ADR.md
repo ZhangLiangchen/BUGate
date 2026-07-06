@@ -9,9 +9,22 @@ authority: ADR-BUGATE-001
 
 # ADR-BUGATE-003: System-Level Memory Bus
 
+> **Update — 2026-07-06 (owner decision):** the memory bus is re-scoped from
+> **optional** to a **REQUIRED core BUGate component**. It carries long-term
+> memory, dual-agent progress sync + relay, and memory promotion — a BUGate
+> setup is incomplete without it. Accordingly `bugate init` / `bin/memory-bus-*`
+> now **auto-install** the machine-level service once when absent and
+> **self-heal** (diagnose + restart) on an anomaly, rather than only probing and
+> hinting. Runtime stays non-blocking (a transient outage restarts, it never
+> fail-closes the user's edits). This dated note supersedes the "optional"
+> wording in the original body below; the body text is preserved as the
+> 2026-07-03 record. The machine-level, one-service, namespace-tag-isolated
+> decision itself is unchanged.
+
 ## Context
 
 BUGate depends on an optional memory service (`mcp-memory-service`) as its
+<!-- 2026-07-06: "optional" superseded — see the dated Update above -->
 long-term truth layer, but the service should not belong to any single
 project. Until this decision the live database physically lived inside ONE
 BUGate checkout's working tree (`<checkout>/.memory_bus/`), while every

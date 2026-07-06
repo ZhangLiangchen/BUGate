@@ -14,13 +14,17 @@ generated.
   used by config and artifacts is a deliberately small subset parsed in
   `scripts/bugate_core.py` (`parse_simple_yaml` / `parse_nested_yaml`), not a
   general YAML library.
-- **CLI / MCP runtimes are optional and degrade gracefully.** The dual-agent peer
-  bridges need the `codex` / `claude` CLIs on `PATH`; if either is missing they
-  write deterministic placeholder views instead of failing. The Wave 8 engines
-  and Wave 0 scorer report `status: profile_required` (exit 0) when no SUT spec
-  is supplied. The memory bus needs a user-installed `mcp-memory-service`; its
-  wrappers no-op or print an install hint when it is absent. Nothing in core
-  mounts or depends on a SUT repository.
+- **The dual-agent CLIs are optional; the memory bus is required.** The
+  dual-agent peer bridges need the `codex` / `claude` CLIs on `PATH`; if either
+  is missing they write deterministic placeholder views instead of failing. The
+  Wave 8 engines and Wave 0 scorer report `status: profile_required` (exit 0)
+  when no SUT spec is supplied. The **memory bus is a required core component**
+  (long-term memory, dual-agent progress sync + relay, memory promotion):
+  `bugate init` and `bin/memory-bus-*` **auto-install** the machine-level
+  `mcp-memory-service` once when absent and **self-heal** (restart) on an
+  anomaly. Runtime stays non-blocking — a transient outage restarts rather than
+  fail-closing edits — but a BUGate setup is incomplete without it. Nothing in
+  core mounts or depends on a SUT repository.
 - **Root discovery is git-free and split.** Gate scripts resolve the governed
   **workspace** root by walking up from CWD to the nearest `bugate.config.yaml`
   (`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel stays
@@ -108,10 +112,11 @@ external or scratch repo. Bash wrappers live in `bin/`.
 | Plan lock — block implementation while `.bugate/plan.lock` exists | gate enforcement | `check_plan_lock.py` | none | n/a | No lock file → returns 0; core never creates the lock itself | `python3 scripts/check_plan_lock.py` |
 | Prompt reminder — nudge toward pre-code gates when a prompt looks like test-implementation work | gate enforcement | `bugate_prompt_reminder.py` | reads prompt payload on stdin | n/a | Emits the reminder only on keyword match; always exits 0 | `echo '{"prompt":"write the e2e test"}' \| python3 scripts/bugate_prompt_reminder.py` |
 
-### Memory bus (optional `mcp-memory-service`) + `bin/` set
+### Memory bus (required core `mcp-memory-service`) + `bin/` set
 
-The memory bus is an **optional** long-term truth layer backed by a user-installed
-`mcp-memory-service`. `scripts/memory_bus.py` is the stdlib HTTP client;
+The memory bus is a **required core** long-term truth layer backed by
+`mcp-memory-service` — `bugate init` / `bin/memory-bus-*` auto-install it once
+(machine-level) when absent and self-heal on an anomaly. `scripts/memory_bus.py` is the stdlib HTTP client;
 `bin/memory-*` are thin wrappers that resolve the root, ensure the service is up,
 and delegate to the matching `memory_bus.py` subcommand. Auth/namespace come from
 env (`MEMORY_BUS_URL`, `MEMORY_BUS_PROJECT_TAG`, `MCP_API_KEY*`); see profile-schema.
@@ -122,9 +127,12 @@ data home resolves system-wide (`MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` >
 BUGate-enabled repo on the machine. Projects are isolated by namespace tag
 (`project:<name>`), never by per-repo databases; a legacy in-repo
 `.memory_bus/client.env` still works as a deprecated fallback. Initialization
-is **reuse-first**: `memory-bus-ensure`/`memory-bus-start` probe for a healthy
-running instance before launching and never spawn a duplicate, and
-`bugate init` only reports the probe result — it scaffolds no per-repo service.
+is **reuse-first, then install/heal**: `memory-bus-ensure`/`memory-bus-start`
+reuse a healthy running instance, restart a crashed one, or — when the `memory`
+binary is absent — install it once into a machine-level venv (`~/.bugate/venv`)
+and pre-fetch the ONNX model. `bugate init` runs that ensure step (never a
+per-repo service); it stays non-fatal — a slow first-time install proceeds in
+the background and self-heals on the next session.
 
 | Command (`bin/…` → `memory_bus.py …`) | Purpose | Key flags |
 |---|---|---|

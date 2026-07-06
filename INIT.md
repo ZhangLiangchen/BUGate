@@ -2,7 +2,7 @@
 
 > **Paste this whole file to your AI coding agent (Claude Code / Codex) right after cloning BUGate**, and it will verify your environment, confirm the gate engine works, and route you to the right path — **imported mode** (the only usage mode: BUGate goes into your SUT test repo) or **developing BUGate itself** (maintainers; pure core iteration only). A human can follow the same steps manually.
 >
-> **Good news first:** the BUGate *core* is **zero-dependency** — pure Python standard library. There is **nothing to `pip install`** to use the gate engine. "Installing dependencies" here means *verifying Python* and *optionally* adding the agent-memory subsystem.
+> **Good news first:** the BUGate *gate engine* is **zero-dependency** — pure Python standard library, **nothing to `pip install`** to run the gates. The **memory bus** (long-term memory + promotion) is a **required core component**, but you don't install it by hand: `bugate init` / `bin/memory-bus-*` auto-install the machine-level service once and self-heal on an anomaly (`BUGATE_MEMORY_NO_INSTALL=1` for offline/locked-down machines). The **dual-agent CLIs** remain optional.
 
 ---
 
@@ -129,7 +129,7 @@ bin/memory-service-note --agent <a> --type finding --msg "..."
 bin/promote-memory ...                                  # promote a finding to status:confirmed
 ```
 
-Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT_TAG` (default `project:bugate`). The service is **machine-level** (ADR-BUGATE-003): one instance per machine with its data home at `~/.bugate/memory-bus/` (override `BUGATE_MEMORY_HOME`; the service's own `MCP_MEMORY_BASE_DIR` wins), shared by every governed repo and isolated per project by the namespace tag — a governed repo only declares its namespace in its profile and does NOT scaffold a local service dir. A legacy in-repo `.memory_bus/` is still read as a deprecated fallback. Optional macOS hardening: `bin/memory-bus-install-launchd` (RunAtLoad + KeepAlive; `--uninstall` to remove). If the service/CLI is absent, the scripts print an install hint and exit non-fatally.
+Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT_TAG` (default `project:bugate`). The service is **machine-level** (ADR-BUGATE-003): one instance per machine with its data home at `~/.bugate/memory-bus/` (override `BUGATE_MEMORY_HOME`; the service's own `MCP_MEMORY_BASE_DIR` wins), shared by every governed repo and isolated per project by the namespace tag — a governed repo only declares its namespace in its profile and does NOT scaffold a local service dir. A legacy in-repo `.memory_bus/` is still read as a deprecated fallback. Optional macOS hardening: `bin/memory-bus-install-launchd` (RunAtLoad + KeepAlive; `--uninstall` to remove). The memory bus is a **required core component**: `bugate init` / `bin/memory-bus-*` **auto-install** the machine-level service once when absent and **self-heal** (restart) on an anomaly; runtime stays non-blocking (a transient outage restarts, never fail-closes edits). Set `BUGATE_MEMORY_NO_INSTALL=1` to skip auto-install on locked-down/offline machines.
 
 ### c) Three-layer agent-role isolation (Wave 7)
 

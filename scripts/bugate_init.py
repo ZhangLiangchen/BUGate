@@ -378,14 +378,17 @@ def scaffold(target: Path, vendor_dir: str, dry: bool) -> list[str]:
     return notes
 
 
-def bus_probe() -> list[str]:
-    """Reuse-first machine-level memory-bus check (ADR-BUGATE-003).
+def bus_ensure(engine_root: Path, dry: bool) -> list[str]:
+    """Ensure the REQUIRED machine-level memory bus is up (ADR-BUGATE-003).
 
-    The bus is ONE service per machine shared by every governed repo
-    (namespace-tag isolation), so init never scaffolds or starts a per-repo
-    service — it only reports whether the shared instance is already running.
-    Non-fatal by design: the memory runtime is optional and its absence must
-    never block an import.
+    The memory bus is a CORE BUGate component (long-term memory, dual-agent
+    progress sync + relay, memory promotion) — a BUGate setup is incomplete
+    without it, so init treats it as a first-class step, not an optional probe.
+    It is ONE service per machine shared by every governed repo (namespace-tag
+    isolation): if it is already running, reuse it; if not, bring it up —
+    ``bin/memory-bus-ensure`` reuses/restarts it, or installs it once
+    (machine-level) on a first run. Still never blocks the import: install/start
+    proceeds in the background and a slow first-time setup is reported, not fatal.
     """
     try:
         import memory_bus  # sibling module; loads client.env system-home-first
@@ -396,17 +399,29 @@ def bus_probe() -> list[str]:
         if memory_bus.service_available():
             return [
                 f"memory-bus: RUNNING at {url} (data home {home}) — reusing the "
-                "machine-level shared instance; this repo only declares "
+                "required machine-level shared instance; this repo only declares "
                 "memory.namespace in its profile"
             ]
+        if dry:
+            return [f"memory-bus: not running at {url} — would install/start the required service via bin/memory-bus-ensure (machine-level, once)"]
+        ensure = engine_root / "bin" / "memory-bus-ensure"
+        if not ensure.exists():
+            return [f"memory-bus: not running and {ensure} missing — engine tree incomplete; install per docs/SETUP-OPTIONAL.md §2"]
+        try:
+            proc = subprocess.run([str(ensure)], capture_output=True, text=True, timeout=120)
+            tail = (proc.stderr or proc.stdout or "").strip().splitlines()
+            detail = tail[-1] if tail else "(no output)"
+        except Exception as exc:  # ensure must never block an import
+            detail = f"{exc.__class__.__name__}: {exc}"
+        if memory_bus.service_available():
+            return [f"memory-bus: brought up the required machine-level service at {url}"]
         return [
-            f"memory-bus: no service detected at {url} — OPTIONAL. One install "
-            "serves every repo on this machine; see the engine repo's "
-            "docs/SETUP-OPTIONAL.md §2, then start with bin/memory-bus-ensure. "
-            "Hooks no-op gracefully until then"
+            "memory-bus: required service not up yet — first-time install/start is "
+            f"running in the background ({detail}). Watch with bin/memory-bus-status; "
+            "it self-heals on the next session. BUGate is incomplete until it is up"
         ]
-    except Exception as exc:  # probe must never block an import
-        return [f"memory-bus: probe skipped ({exc.__class__.__name__}: {exc}) — optional runtime, hooks degrade gracefully"]
+    except Exception as exc:  # never block an import
+        return [f"memory-bus: ensure step had an issue ({exc.__class__.__name__}: {exc}) — required component; run bin/memory-bus-ensure and see docs/SETUP-OPTIONAL.md §2"]
 
 
 NEXT_STEPS = """\
@@ -430,10 +445,15 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
        # expect exit 2 and the missing-artifact list
   5. Per-UC flow from here on:
        python3 {vendor_dir}/scripts/sdtd_orchestrator.py docs/usecases/<UC> --init
-  6. Memory bus (optional, machine-level): this repo REUSES the one shared
-     mcp-memory-service instance per machine under its own profile namespace —
-     check with {vendor_dir}/bin/memory-bus-status (start: …/memory-bus-ensure);
-     install once per machine ONLY if the probe above says none is running.
+  6. Memory bus (REQUIRED, machine-level): a BUGate setup is incomplete without
+     it (long-term memory, dual-agent progress sync + relay, memory promotion).
+     Init already ensured it above — ONE shared mcp-memory-service per machine,
+     auto-installed once if it was absent; this repo just declares its profile
+     namespace. Check with {vendor_dir}/bin/memory-bus-status; if a first-time
+     install is still finishing it self-heals on the next session
+     ({vendor_dir}/bin/memory-bus-ensure re-checks). Offline/locked-down machine:
+     BUGATE_MEMORY_NO_INSTALL=1 skips auto-install (then install manually per
+     docs/SETUP-OPTIONAL.md §2).
 """
 
 
@@ -465,7 +485,7 @@ def main(argv: list[str] | None = None) -> int:
     notes += wire_hooks(target, vendor_dir, args.dry_run)
     notes += scaffold(target, vendor_dir, args.dry_run)
     notes += scaffold_gitignore(target, vendor_dir, args.dry_run)
-    notes += bus_probe()
+    notes += bus_ensure(engine_root, args.dry_run)
 
     prefix = "[dry-run] " if args.dry_run else ""
     for note in notes:

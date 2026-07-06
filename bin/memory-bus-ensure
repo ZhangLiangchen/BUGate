@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Ensure the local memory service is up; start it in the background if not.
+# Ensure the REQUIRED BUGate memory service is up; diagnose + bring it up if not.
+# On a first-ever run memory-bus-start also installs it (machine-level, once),
+# which can take minutes — that install proceeds in the background and this
+# ensure reports it. Non-blocking by design: a transient memory outage must
+# self-heal (restart), never block the user's edits/session.
 # Engine root resolved from this script's own location.
 set -euo pipefail
 
@@ -36,5 +40,12 @@ for _ in $(seq 1 "$MAX_WAIT_SECONDS"); do
   sleep 1
 done
 
-printf 'Memory bus unavailable after ensure attempt; continuing without it. See %s\n' "$LOG_FILE" >&2
+# Not up within the wait window. This is usually the one-time cold install (pip
+# + ONNX model) still running in the background — not a hard failure. Diagnose
+# loudly and let it finish; do NOT block the caller (self-heal, not fail-closed).
+printf 'BUGate memory bus not up yet after %ss.\n' "$MAX_WAIT_SECONDS" >&2
+printf '  - First run? The required memory service is likely still installing/starting in the background.\n' >&2
+printf '  - Diagnose / watch:   tail -f %s\n' "$LOG_FILE" >&2
+printf '  - Re-check shortly:   %s/bin/memory-bus-status\n' "$ROOT" >&2
+printf '  - If it never comes up, run %s/bin/memory-bus-start directly to see the error.\n' "$ROOT" >&2
 exit 0

@@ -32,7 +32,7 @@ your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 - **What is BUGate, and how is it meant to be used?** [`CHARTER.md`](CHARTER.md) — positioning, the single usage mode (imported), the self-development setup, naming, and the evolution plan.
 - **Bootstrapping with an AI agent?** [`INIT.md`](INIT.md) is a runnable init prompt (Python check → zero-install smoke → config load → optional capabilities).
 - **What can it do / every command?** [`CAPABILITIES.md`](CAPABILITIES.md).
-- **Turn on optional runtimes** (AI CLIs, MCP memory service + ONNX, role isolation): [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
+- **The required memory service** (auto-installed by `bugate init`) and the **optional** runtimes (dual-agent AI CLIs, role isolation): [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
 - **The methodology** (why): [`docs/qa-methodology/`](docs/qa-methodology/) — start with its [README](docs/qa-methodology/README.md) (English summary + glossary) then `METHOD.md` / `SOP.md`.
 
 ## Usage — one mode: imported. (Opening this repo = developing BUGate itself.)
@@ -229,9 +229,10 @@ assets via the engine tree's own location. Note: adding or changing a Codex
 hook requires re-trusting its hash, and plugin changes may require
 Claude's `/reload-plugins` or a plugin reinstall/update.
 
-BUGate intentionally ships **no default `.mcp.json`** today: the Memory Bus is
-an optional machine-level `mcp-memory-service` plus stdlib client scripts, not a
-required plugin MCP server. If BUGate later adds a real MCP server contract, the
+BUGate intentionally ships **no default `.mcp.json`** today: the Memory Bus is a
+**required but machine-level** `mcp-memory-service` (auto-installed by `bugate
+init` / `bin/memory-bus-*`) plus stdlib client scripts — required as a component,
+but shared per machine, so it is **not** a per-repo plugin MCP server. If BUGate later adds a real MCP server contract, the
 file should live at plugin root as `.mcp.json` and be referenced by both runtime
 manifests.
 

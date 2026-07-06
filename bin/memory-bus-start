@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Launch the local mcp-memory-service for BUGate.
 #
-# The memory service binary + its ONNX model are installed by the USER. This
-# wrapper only configures the storage dir / API keys and launches it. It is
-# git-free: the engine root is resolved from this script's own location,
-# so it works in plain (non-git) checkouts too.
+# The memory bus is a REQUIRED BUGate component (long-term memory, dual-agent
+# progress sync + relay, memory promotion) — not an optional add-on. This
+# wrapper reuses a healthy machine-level service, or brings one up; if the
+# `memory` binary is absent it INSTALLS it once into a machine-level venv
+# (~/.bugate/venv) and pre-fetches the ONNX model, then launches. Git-free: the
+# engine root is resolved from this script's own location.
+#
+# Escape hatch for locked-down/offline machines: set BUGATE_MEMORY_NO_INSTALL=1
+# to skip the auto-install and only print the manual steps.
 set -euo pipefail
 
 # Engine root: bin/ sits one level below the engine tree root.
@@ -50,30 +55,52 @@ set -a
 . "$MCP_MEMORY_BASE_DIR/client.env"
 set +a
 
-# --- resolve the `memory` binary: project venv OR PATH ----------------------
-MEMORY_BIN=""
-if [ -x "$ROOT/.venv/bin/memory" ]; then
-  MEMORY_BIN="$ROOT/.venv/bin/memory"
-elif command -v memory >/dev/null 2>&1; then
-  MEMORY_BIN="$(command -v memory)"
+# --- resolve the `memory` binary --------------------------------------------
+# Order: engine-local .venv (self-development) > machine-level BUGate venv
+# (shared by every imported repo, one install per machine) > PATH.
+BUGATE_MEMORY_VENV="${BUGATE_MEMORY_VENV:-$HOME/.bugate/venv}"
+
+resolve_memory_bin() {
+  MEMORY_BIN=""
+  for cand in "$ROOT/.venv/bin/memory" "$BUGATE_MEMORY_VENV/bin/memory"; do
+    if [ -x "$cand" ]; then MEMORY_BIN="$cand"; return 0; fi
+  done
+  if command -v memory >/dev/null 2>&1; then MEMORY_BIN="$(command -v memory)"; return 0; fi
+  return 1
+}
+
+resolve_memory_bin || true
+
+# Auto-install once (machine-level) — the memory bus is required, so a missing
+# binary is a setup gap to close, not an optional hint to print.
+if [ -z "$MEMORY_BIN" ] && [ "${BUGATE_MEMORY_NO_INSTALL:-0}" != "1" ]; then
+  echo "memory-bus-start: memory service not installed — installing the required BUGate memory runtime into $BUGATE_MEMORY_VENV (one-time, machine-level)..." >&2
+  if python3 -m venv "$BUGATE_MEMORY_VENV" \
+     && "$BUGATE_MEMORY_VENV/bin/python" -m pip install -q -U pip \
+     && "$BUGATE_MEMORY_VENV/bin/python" -m pip install -q -U mcp-memory-service huggingface_hub numpy onnxruntime tokenizers; then
+    # Pre-fetch the ONNX model with the venv's Hugging Face CLI (best-effort;
+    # the service can also fetch on first use, or run with MCP_MEMORY_USE_ONNX=0).
+    PATH="$BUGATE_MEMORY_VENV/bin:$PATH" "$ROOT/bin/memory-model-fetch" \
+      || echo "memory-bus-start: ONNX model pre-fetch incomplete; the service will fetch on first use (or set MCP_MEMORY_USE_ONNX=0)." >&2
+    resolve_memory_bin || true
+  else
+    echo "memory-bus-start: auto-install of mcp-memory-service failed (see pip output above)." >&2
+  fi
 fi
 
 if [ -z "$MEMORY_BIN" ]; then
-  cat >&2 <<'HINT'
-memory-bus-start: the `memory` binary (mcp-memory-service) was not found.
+  cat >&2 <<HINT
+memory-bus-start: the required memory service (mcp-memory-service) is not available.
 
-Install it (the service + model are user-provided; BUGate only ships the driver):
+Diagnose: confirm python3 + network are reachable, then install it once
+(machine-level) and re-run:
 
-  pip install mcp-memory-service
+  python3 -m venv "$BUGATE_MEMORY_VENV"
+  "$BUGATE_MEMORY_VENV/bin/python" -m pip install -U mcp-memory-service huggingface_hub onnxruntime tokenizers
+  PATH="$BUGATE_MEMORY_VENV/bin:\$PATH" "$ROOT/bin/memory-model-fetch"
 
-Then pre-download the ONNX embedding model once so the service can run offline /
-behind a proxy:
-
-  bin/memory-model-fetch
-  # fetches all-MiniLM-L6-v2 into ~/.cache/mcp_memory/onnx_models
-  # (override BUGATE_ONNX_MODEL / MCP_MEMORY_ONNX_DIR; MCP_MEMORY_USE_ONNX=0 skips ONNX)
-
-It must be importable as `memory` on PATH or installed into <root>/.venv/bin/memory.
+Then: "$ROOT/bin/memory-bus-ensure". BUGate is incomplete without the memory bus
+(no long-term memory, dual-agent sync/relay, or memory promotion).
 HINT
   exit 1
 fi
