@@ -136,8 +136,8 @@ the background and self-heals on the next session.
 
 | Command (`bin/…` → `memory_bus.py …`) | Purpose | Key flags |
 |---|---|---|
-| `memory-bus-ensure` | Health-check the service; start it in the background if down | env `MCP_HTTP_PORT`, `MEMORY_BUS_ENSURE_WAIT_SECONDS`; exits 0 even if it can't start |
-| `memory-bus-start` | Reuse a healthy running `mcp-memory-service`, else launch it (resolves `memory` from `.venv/bin` or PATH; configures ONNX storage) | data home env `MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` (default `~/.bugate/memory-bus`); `MCP_MEMORY_STORAGE_BACKEND`, `MCP_MEMORY_USE_ONNX`, `MCP_HTTP_PORT`; prints install hint if `memory` binary absent |
+| `memory-bus-ensure` | Health-check the service; bring it up (restart / install once) in the background if down; diagnose loudly on failure | env `MCP_HTTP_PORT`, `MEMORY_BUS_ENSURE_WAIT_SECONDS`; non-blocking (exit 0) so a transient outage self-heals rather than fail-closing |
+| `memory-bus-start` | Reuse a healthy running `mcp-memory-service`, restart a crashed one, or **auto-install** it once when absent (`~/.bugate/venv` + `pip install mcp-memory-service …` + ONNX model), then launch (resolves `memory` from engine `.venv` > `~/.bugate/venv` > PATH) | data home env `MCP_MEMORY_BASE_DIR` > `BUGATE_MEMORY_HOME` (default `~/.bugate/memory-bus`); `MCP_MEMORY_STORAGE_BACKEND`, `MCP_MEMORY_USE_ONNX`, `MCP_HTTP_PORT`; `BUGATE_MEMORY_NO_INSTALL=1` skips auto-install |
 | `memory-bus-status` → `status` | Health-check / status | `--json`, `--timeout`, `--no-fail` |
 | `memory-bus-stop` → `stop` | Stop the service | no-op if `memory` binary absent |
 | `memory-bus-install-launchd` | OPTIONAL macOS hardening: user LaunchAgent for the bus (RunAtLoad + KeepAlive) | `--uninstall` removes it; absence changes nothing (`memory-bus-ensure` still starts on demand) |

@@ -2,7 +2,7 @@
 
 > **克隆 BUGate 后，把整份文件粘给你的 AI 编码 agent（Claude Code / Codex）**，它就会验证环境、确认门引擎可用，并把你路由到正确的路径 —— **导入模式**（唯一使用形态：BUGate 装进你的 SUT 测试仓）或**开发 BUGate 本身**（维护者；纯 core 迭代）。人工按同样的步骤手动执行亦可。本文件是英文 [INIT.md](INIT.md) 的对齐翻译，结构逐节一致。
 >
-> **先说好消息：** BUGate *核心*是**零依赖**的 —— 纯 Python 标准库。用门引擎**无需 `pip install` 任何东西**。这里说的「装依赖」，指的是*验证 Python* 以及*可选地*加上 agent 记忆子系统。
+> **先说好消息：** BUGate *门引擎*是**零依赖**的 —— 纯 Python 标准库,**跑门无需 `pip install` 任何东西**。**记忆总线**(长期记忆 + 晋级)是**必要核心组件**,但无需手工装:`bugate init` / `bin/memory-bus-*` 自动安装机器级服务并在异常时自愈(`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过)。**双 agent CLI** 仍为可选。
 
 ---
 
@@ -90,9 +90,9 @@ profile 完整参考：[`.shared/skills/bugate/references/profile-schema.md`](.s
 
 ---
 
-## 可选能力 —— 运行时你自己装，驱动脚本我们提供
+## 核心之外的运行时
 
-零依赖核心覆盖 **4 层门**。另外三套机制以**驱动脚本**形式随核心发布，它们调用你**自行安装**的运行时；运行时缺席时**优雅回退**。
+零依赖核心覆盖 **4 层门**。另外三套机制调用外部运行时。**记忆总线（b）是必要的** —— `bugate init` / `bin/memory-bus-*` 自动安装并自愈,你无需手工操作。**双 agent CLI（a）** 与 **agent 角色隔离（c）** 是**可选**的,缺席时优雅回退。
 
 ### a) 双 agent 视角互审（Wave 1）
 
@@ -108,22 +108,22 @@ python3 scripts/sdtd_multiview_cli_bridge.py run-all <uc-dir>   # 两个 CLI 都
 
 用环境变量调：`SDTD_CODEX_MODEL` / `SDTD_CLAUDE_MODEL` / `SDTD_*_EFFORT`、代理 `SDTD_CLI_*_PROXY`。任一 CLI 缺失会**回退到确定性占位**，产物流照常跑。
 
-### b) Agent 记忆 + 经验晋级
+### b) Agent 记忆 + 经验晋级（必要核心）
 
-跨会话记忆，以及一个把学到的发现「确认/晋级」的闭环。
+跨会话长期记忆、双 agent 进展同步/接力,以及一个把学到的发现「确认/晋级」的闭环 —— 缺了它,BUGate 装配就是不完整的。
 
-- **先探测（复用优先）：** `bin/memory-bus-status` —— 总线是机器级的，本机任一仓已在托管时**无需任何安装**：只要在 profile 里声明 `memory.namespace` 即可。（`bugate init` 会替你跑这个探测并报告结果。）
-- **你装（MCP，仅当全机没有运行中的服务 —— 每台机器装一次）：** `pip install mcp-memory-service`，再把 ONNX 嵌入模型一次性预下载到 `~/.cache/mcp_memory/onnx_models`（一次性；服务内置下载器走不了 SOCKS 代理）。
+- **自动安装 + 自愈：** `bugate init` / `bin/memory-bus-*` 复用运行中的机器级服务、重启崩溃的服务,或在缺席时一次性安装(`~/.bugate/venv` + `mcp-memory-service` + ONNX 模型),异常时自愈拉起。你无需手工操作,在 profile 里声明 `memory.namespace` 即可。
+- **手工/离线路径**（或 `BUGATE_MEMORY_NO_INSTALL=1` 时）：`pip install mcp-memory-service`,再把 ONNX 模型预下载到 `~/.cache/mcp_memory/onnx_models`（服务内置下载器走不了 SOCKS 代理）。
 - **我们提供：** `scripts/memory_bus.py` + `bin/memory-bus-*` + `bin/memory-service-*` + `bin/promote-memory`。
 
 ```bash
-bin/memory-bus-start                                    # 已有健康服务则复用，否则拉起（从 .venv 或 PATH 解析 `memory`）
+bin/memory-bus-start                                    # 复用运行中 / 重启崩溃 / 缺席则一次性安装
 bin/memory-bus-status
 bin/memory-service-note --agent <a> --type finding --msg "..."
 bin/promote-memory ...                                  # 把一条 finding 晋级为 status:confirmed
 ```
 
-命名空间来自 SUT profile（`memory.namespace`）或 `MEMORY_BUS_PROJECT_TAG`（默认 `project:bugate`）。服务是**机器级**的（ADR-BUGATE-003）：全机一个实例，数据家目录 `~/.bugate/memory-bus/`（用 `BUGATE_MEMORY_HOME` 覆盖；服务自身的 `MCP_MEMORY_BASE_DIR` 优先级最高），被本机所有被治理仓共享、项目间靠 namespace tag 隔离 —— 被治理仓只在 profile 里声明其 namespace，**不**脚手架本地服务目录。仓内遗留 `.memory_bus/` 仍作为弃用回退被读取。可选 macOS 加固：`bin/memory-bus-install-launchd`（RunAtLoad + KeepAlive；`--uninstall` 卸载）。服务/CLI 缺席时，脚本打印安装提示并非致命退出。
+命名空间来自 SUT profile（`memory.namespace`）或 `MEMORY_BUS_PROJECT_TAG`（默认 `project:bugate`）。服务是**机器级**的（ADR-BUGATE-003）：全机一个实例，数据家目录 `~/.bugate/memory-bus/`（用 `BUGATE_MEMORY_HOME` 覆盖；服务自身的 `MCP_MEMORY_BASE_DIR` 优先级最高），被本机所有被治理仓共享、项目间靠 namespace tag 隔离 —— 被治理仓只在 profile 里声明其 namespace，**不**脚手架本地服务目录。仓内遗留 `.memory_bus/` 仍作为弃用回退被读取。可选 macOS 加固：`bin/memory-bus-install-launchd`（RunAtLoad + KeepAlive；`--uninstall` 卸载）。记忆总线是**必要核心组件**：`bugate init` / `bin/memory-bus-*` 缺席则**自动安装**机器级服务、异常则**自愈拉起**；运行时非阻断（临时抖动重启而非锁死编辑）。`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过自动安装。
 
 ### c) 三层 agent 角色隔离（Wave 7）
 
@@ -218,7 +218,7 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
 | 在 agent 里跑 | 无 | `.claude` / `.codex` hooks | — |
 | 导入进 SUT 仓 | 无 | `bugate.config.yaml` + profile schema | — |
 | 双 agent 互审 | `codex` + `claude` CLI | `sdtd_multiview*` | 会 → 确定性占位 |
-| Agent 记忆 + 晋级 | `mcp-memory-service` + ONNX 模型 | `memory_bus.py` + `bin/memory-*` | 会 → 安装提示，非致命 |
+| Agent 记忆 + 晋级（**必要核心**） | 无 —— 由 `bugate init` 自动安装 | `memory_bus.py` + `bin/memory-*` | 必要；自动安装 + 自愈（运行时非阻断） |
 | Agent 角色隔离 | 无 | `check_agent_role_paths.py` | —（默认 OFF） |
 
 **结论：** `git clone` → `python3 --version`（3.9+）→ 跑第 2 步冒烟测试 → **门禁引擎零安装即就绪**（stdlib-only）。**记忆服务是必要核心组件**（长期记忆、双 agent 进展同步/接力、记忆升级）：`bugate init` / `bin/memory-bus-*` 检测到未装则**自动安装**机器级 `mcp-memory-service`、异常则**自愈拉起**（运行时非阻断，临时抖动重启而非锁死编辑）；`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过自动安装。**双 agent CLI（codex/claude）仍为可选**——缺席时干净回退到确定性占位。

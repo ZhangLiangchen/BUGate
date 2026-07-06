@@ -96,9 +96,13 @@ The methodology and gate flow: [`README.md`](README.md) and
 
 ---
 
-## Optional capabilities — you install the runtime, we ship the driver scripts
+## Runtimes beyond the stdlib core
 
-The zero-dependency core covers the **4-layer gate**. Three further mechanisms ship as **driver scripts** that call out to runtimes **you install yourself**; each **degrades gracefully** when its runtime is absent.
+The zero-dependency core covers the **4-layer gate**. Three further mechanisms
+call out to external runtimes. **The memory bus (b) is REQUIRED** — `bugate init`
+/ `bin/memory-bus-*` auto-install and self-heal it, you run nothing by hand. The
+**dual-agent CLIs (a)** and **agent-role isolation (c)** are **optional** and
+degrade gracefully when absent.
 
 ### a) Dual-agent multi-view cross-audit (Wave 1)
 
@@ -114,16 +118,20 @@ python3 scripts/sdtd_multiview_cli_bridge.py run-all <uc-dir>   # real peer disp
 
 Tune via env: `SDTD_CODEX_MODEL` / `SDTD_CLAUDE_MODEL` / `SDTD_*_EFFORT`, proxy `SDTD_CLI_*_PROXY`. If either CLI is missing it **falls back to a deterministic placeholder** so the artifact flow still runs.
 
-### b) Agent memory + experience promotion
+### b) Agent memory + experience promotion (REQUIRED core)
 
-Cross-session memory and a confirm/promote loop for learned findings.
+Cross-session long-term memory, dual-agent progress sync + relay, and a
+confirm/promote loop — a BUGate setup is incomplete without it.
 
-- **Check first (reuse-first):** `bin/memory-bus-status` — the bus is machine-level, so if any repo on this machine already hosts it there is NOTHING to install: just declare `memory.namespace` in your profile. (`bugate init` runs this probe for you and reports the result.)
-- **You install (MCP, only if no service is running machine-wide — once per machine):** `pip install mcp-memory-service`, then pre-download the ONNX embedding model into `~/.cache/mcp_memory/onnx_models` (one-time; its in-service downloader cannot traverse a SOCKS proxy).
+- **Auto-installed + self-healing:** `bugate init` / `bin/memory-bus-*` reuse a
+  running machine-level service, restart a crashed one, or — when absent —
+  install it once (`~/.bugate/venv` + `mcp-memory-service` + ONNX model). You run
+  nothing by hand; declare `memory.namespace` in the profile and that's it.
+- **Manual/offline path** (or when `BUGATE_MEMORY_NO_INSTALL=1`): `pip install mcp-memory-service`, then pre-download the ONNX model into `~/.cache/mcp_memory/onnx_models` (its in-service downloader cannot traverse a SOCKS proxy).
 - **We ship:** `scripts/memory_bus.py` + `bin/memory-bus-*` + `bin/memory-service-*` + `bin/promote-memory`.
 
 ```bash
-bin/memory-bus-start                                    # reuses a running service, else launches one (resolves `memory` from .venv or PATH)
+bin/memory-bus-start                                    # reuse running / restart crashed / install once if absent
 bin/memory-bus-status
 bin/memory-service-note --agent <a> --type finding --msg "..."
 bin/promote-memory ...                                  # promote a finding to status:confirmed
@@ -242,7 +250,7 @@ ephemeral fixtures, and optional runtimes are verified.
 | Run under an agent | nothing | `.claude` / `.codex` hooks | — |
 | Import into a SUT repo | nothing | `bugate.config.yaml` + profile schema | — |
 | Dual-agent cross-audit | `codex` + `claude` CLIs | `sdtd_multiview*` | yes → deterministic placeholder |
-| Agent memory + promotion | `mcp-memory-service` + ONNX model | `memory_bus.py` + `bin/memory-*` | yes → install hint, non-fatal |
+| Agent memory + promotion (**required core**) | nothing — auto-installed by `bugate init` | `memory_bus.py` + `bin/memory-*` | required; auto-installs + self-heals (runtime non-blocking) |
 | Agent-role isolation | nothing | `check_agent_role_paths.py` | — (default-OFF) |
 
-**Bottom line:** `git clone` → `python3 --version` (3.9+) → run the Step 2 smoke test → the **core is ready with zero installs**. The dual-agent and memory capabilities are opt-in: install their runtime (the CLIs / `mcp-memory-service`) and the driver scripts we ship will use them, falling back cleanly when they're not present.
+**Bottom line:** `git clone` → `python3 --version` (3.9+) → run the Step 2 smoke test → the **gate engine is ready with zero installs**. The **memory bus is required** and auto-installs / self-heals via `bugate init` / `bin/memory-bus-*` (`BUGATE_MEMORY_NO_INSTALL=1` to opt out on offline hosts). The **dual-agent CLIs** stay opt-in — install them and the driver scripts we ship will use them, falling back cleanly when absent.

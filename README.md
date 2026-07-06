@@ -240,9 +240,11 @@ Field-tested setup notes: use the vendor native installers for `codex` and
 `claude`, not stale npm wrappers; keep `~/.local/bin` ahead of older app or
 Homebrew paths; and treat `check-env` as a binary-resolution check, not an auth
 check. Real peer dispatch still requires Codex and Claude to be logged in (or
-API-key configured). For the memory bus, prefer a project `.venv` and install
-the extra runtime packages listed in [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md);
-`mcp-memory-service` alone may not be enough for ONNX-backed startup.
+API-key configured). The memory bus auto-installs into a machine-level venv
+(`~/.bugate/venv`, with `mcp-memory-service` + the ONNX runtime packages); for a
+manual/offline install or the exact package set, see
+[`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md) (`mcp-memory-service` alone may
+not be enough for ONNX-backed startup).
 
 For a repeatable end-to-end capability audit after setup, invoke the
 `$bugate-full-check` skill. Its fallback prompt is documented in
@@ -263,7 +265,9 @@ commands/                   # plugin-root Claude command adapters
 agents -> .shared/…/agents  # plugin-root Claude gate agents
 hooks/hooks.json            # plugin-root lifecycle hooks for Codex + Claude
 .mcp.json                   # absent by default; add only for a real MCP server contract
+.claude/ .codex/            # per-runtime dev bridges: settings/hooks + skill & gate-agent links
 scripts/                    # gate engine + SDTD orchestration (stdlib-only)
+bin/                        # bash wrappers: memory-bus-* (required, auto-install/self-heal), memory-service-*, wave8-weekly
 .shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
 docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records
 docs/case-studies/          # narrative allowlist: real import/migration stories (identity-scan exempt)
