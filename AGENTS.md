@@ -39,6 +39,13 @@ test analysis and test-case governance framework.
 5. If a rule requires SUT-specific facts, stop at the profile boundary and ask
    for a profile in the imported SUT test repo instead of inventing details.
 
+## Documentation Language Policy
+
+Framework-facing guidance for users or contributors must stay bilingual. When
+updating a primary English document such as `README.md`, `CONTRIBUTING.md`, or
+`INIT.md`, update the matching `*.zh-CN.md` mirror in the same change, and keep
+language-switch links at the top of both files.
+
 ## Startup
 
 For non-trivial BUGate work:

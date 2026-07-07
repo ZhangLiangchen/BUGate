@@ -1,5 +1,7 @@
 # BUGate
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 **BUGate** is a SUT-agnostic methodology and gate engine for AI-driven **black-box test development**. It forces an AI agent to build a *verifiable business understanding* of a system under test (SUT) — propositions, oracles, boundaries, states — and to pass review gates **before** any test code is written.
 
 This repository is the reusable **core**. It contains no product tests,

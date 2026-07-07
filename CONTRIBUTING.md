@@ -1,5 +1,7 @@
 # Contributing to BUGate
 
+[English](CONTRIBUTING.md) | [简体中文](CONTRIBUTING.zh-CN.md)
+
 BUGate core is a **SUT-neutral, zero-dependency** (pure Python standard library)
 black-box test gate engine. Contributions must keep it portable across any
 System Under Test (SUT). This guide covers the de-SUT contract, the exact local
@@ -204,3 +206,6 @@ restatement test, the (recommended) two-SUT corroboration bar, and the mechanics
 - **Keep docs pointing at canonical sources** instead of duplicating them (link
   to the profile schema, the ADR, and the promotion protocol rather than
   restating them).
+- **Keep framework-facing docs bilingual.** When updating primary user or
+  contributor docs such as `README.md`, `CONTRIBUTING.md`, or `INIT.md`, update
+  the matching `*.zh-CN.md` mirror in the same change.
