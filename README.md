@@ -33,6 +33,7 @@ your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 
 - **What is BUGate, and how is it meant to be used?** [`CHARTER.md`](CHARTER.md) — positioning, the single usage mode (imported), the self-development setup, naming, and the evolution plan.
 - **Bootstrapping with an AI agent?** [`INIT.md`](INIT.md) is a runnable init prompt (Python check → zero-install smoke → config load → optional capabilities).
+- **Importing BUGate into a SUT repo with an AI agent?** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) is a runnable import prompt (release download → installer → Claude/Codex wiring → Memory Bus → profile activation).
 - **What can it do / every command?** [`CAPABILITIES.md`](CAPABILITIES.md).
 - **The required memory service** (auto-installed by `bugate init`) and the **optional** runtimes (dual-agent AI CLIs, role isolation): [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
 - **The methodology** (why): [`docs/qa-methodology/`](docs/qa-methodology/) — start with its [README](docs/qa-methodology/README.md) (English summary + glossary) then `METHOD.md` / `SOP.md`.
@@ -117,6 +118,13 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
 ## Quickstart
 
 ### A) Imported mode — govern your SUT test repo (default)
+
+**Agent-assisted import prompt.** Open the SUT automation test repo as the
+project root, then paste [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) into Claude Code
+or Codex. The prompt guides the agent through release download, installer
+dry-run, import, hook/script wiring checks, Memory Bus initialization, profile
+activation, and the Codex re-trust reminder. Chinese mirror:
+[`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md).
 
 **Release tarball path — no BUGate core clone required in the SUT repo.** Download
 the versioned GitHub Release asset, unpack it outside the SUT repo, then run the

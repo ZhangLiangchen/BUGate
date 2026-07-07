@@ -28,10 +28,11 @@ What it does, in order:
      ``.gitignore`` (creating it if absent) so the default scorer outputs and
      local agent/memory state don't litter the SUT repo's ``git status`` — the
      SUT's own lines and the committed governance contract are left untouched;
-  7. probes the MACHINE-LEVEL memory bus (reuse-first, ADR-BUGATE-003): all
+  7. ensures the MACHINE-LEVEL memory bus (reuse-first, ADR-BUGATE-003): all
      governed repos on a machine share one running ``mcp-memory-service``
-     instance, isolated by namespace tag — init never scaffolds or starts a
-     per-repo service, it only reports whether the shared one is already up;
+     instance, isolated by namespace tag — init never scaffolds a per-repo
+     service, but it does reuse/restart/install-once the shared service through
+     ``bin/memory-bus-ensure`` when needed;
   8. prints the acceptance steps — including the Codex re-trust caveat (hooks
      stay silently inactive until the changed hook hash is re-trusted) and the
      R4 negative control.

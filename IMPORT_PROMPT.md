@@ -1,0 +1,169 @@
+# BUGate Import Prompt
+
+[English](IMPORT_PROMPT.md) | [简体中文](IMPORT_PROMPT.zh-CN.md)
+
+> Paste this prompt into Claude Code or Codex while the **SUT automation test
+> repo** is open as the project root. The agent should import BUGate as a kit,
+> wire Claude Code and Codex symmetrically, initialize the machine-level Memory
+> Bus, activate the SUT profile when the test layout is clear, and report the
+> remaining human actions.
+
+## Agent Instructions
+
+You are installing BUGate into a SUT automation test repo. BUGate is a
+SUT-neutral Agentic QA Governance Kernel. Keep the SUT repo as the project root;
+do not clone BUGate core inside the SUT repo, do not mount the SUT inside
+BUGate core, and do not put product secrets or environment facts into BUGate
+core files.
+
+### Inputs
+
+- Target SUT repo: use the current working directory unless the user gives a
+  different path.
+- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.0`.
+- Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
+- If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
+  release, use it. Otherwise download the GitHub Release tarball outside the
+  SUT repo.
+
+### Required Flow
+
+1. **Preflight the SUT repo**
+   - Run `pwd`, `git status --short --branch`, and `python3 --version`.
+   - Confirm Python is >= 3.9.
+   - Inspect the repo's test layout with read-only commands such as
+     `find . -maxdepth 3 -type d | sort` and targeted `rg --files`.
+   - If the current directory is BUGate core itself, stop and ask for the SUT
+     automation test repo path.
+
+2. **Acquire the BUGate kit outside the SUT repo**
+   - If `BUGATE_ENGINE_DIR` is usable, keep it.
+   - Otherwise run the equivalent of:
+
+     ```bash
+     BUGATE_VERSION="${BUGATE_VERSION:-0.3.0}"
+     BUGATE_TMP="$(mktemp -d)"
+     curl -L -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
+       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"
+     tar -xzf "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" -C "$BUGATE_TMP"
+     BUGATE_ENGINE_DIR="$BUGATE_TMP/bugate-${BUGATE_VERSION}"
+     ```
+
+   - Verify the engine exists:
+
+     ```bash
+     test -f "$BUGATE_ENGINE_DIR/scripts/bugate_init.py"
+     test -f "$BUGATE_ENGINE_DIR/.shared/skills/bugate/SKILL.md"
+     ```
+
+3. **Verify the downloaded engine before installing**
+
+   ```bash
+   cd "$BUGATE_ENGINE_DIR"
+   python3 -m py_compile scripts/*.py
+   python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
+   cd -
+   ```
+
+4. **Preview and run the importer**
+
+   ```bash
+   SUT_REPO="$(pwd)"
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   python3 "$BUGATE_ENGINE_DIR/scripts/bugate_init.py" "$SUT_REPO" \
+     --vendor-dir "$BUGATE_VENDOR_DIR" --dry-run
+   python3 "$BUGATE_ENGINE_DIR/scripts/bugate_init.py" "$SUT_REPO" \
+     --vendor-dir "$BUGATE_VENDOR_DIR"
+   ```
+
+   The importer must vendor the kit, wire `.claude/skills/`, `.agents/skills/`,
+   legacy `.codex/skills/`, `.codex/agents/`, `.claude/settings.json`,
+   `.codex/hooks.json`, `bugate.config.yaml`, `bugate.profile.yaml`,
+   `docs/usecases/`, `.gitignore`, and the machine-level Memory Bus.
+
+5. **Activate the SUT profile only from evidence**
+   - Open `bugate.profile.yaml`.
+   - Preserve `memory.namespace`.
+   - If the test layout is obvious, update `guarded_path_regex` with one or
+     more regexes containing a named `(?P<uc>...)` capture.
+   - If the layout is ambiguous, stop and ask the user which test paths BUGate
+     should guard.
+   - Do not invent product endpoints, credentials, accounts, environment names,
+     fixtures, or business facts. Put only SUT test-repo wiring in the profile.
+
+6. **Verify Claude Code and Codex wiring**
+
+   Run from the SUT repo root:
+
+   ```bash
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   python3 -m json.tool .claude/settings.json >/dev/null
+   python3 -m json.tool .codex/hooks.json >/dev/null
+   test -f "$BUGATE_VENDOR_DIR/scripts/check_bugate.py"
+   test -f "$BUGATE_VENDOR_DIR/scripts/bugate_prompt_reminder.py"
+   test -f "$BUGATE_VENDOR_DIR/scripts/memory_bus.py"
+   test -f "$BUGATE_VENDOR_DIR/.shared/skills/bugate/SKILL.md"
+   test -e .claude/skills/bugate/SKILL.md
+   test -e .agents/skills/bugate/SKILL.md
+   test -e .codex/skills/bugate/SKILL.md
+   test -d .codex/agents
+   ```
+
+   Then verify the vendored gate scripts:
+
+   ```bash
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   python3 "$BUGATE_VENDOR_DIR/scripts/check_bugate_v13_semantics.py" \
+     "$BUGATE_VENDOR_DIR/.shared/skills/bugate/templates" --scope pre-code
+   python3 - "$BUGATE_VENDOR_DIR" <<'PY'
+   import sys
+   from pathlib import Path
+   vendor = sys.argv[1] if len(sys.argv) > 1 else ".bugate"
+   sys.path.insert(0, f"{vendor}/scripts")
+   import bugate_core
+   cfg = bugate_core.load_config(root=Path.cwd())
+   print("profile=", cfg.get("profile") or cfg.get("active_profile"))
+   print("guarded_path_regex=", cfg.get("guarded_path_regex"))
+   print("memory.namespace=", cfg.get("namespace") or cfg.get("memory.namespace"))
+   PY
+   ```
+
+7. **Verify Memory Bus initialization**
+
+   ```bash
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   "$BUGATE_VENDOR_DIR/bin/memory-bus-ensure" || true
+   "$BUGATE_VENDOR_DIR/bin/memory-bus-status" --no-fail
+   ```
+
+   A slow first-time install is acceptable if the status says it is still
+   starting. Report that BUGate is incomplete until the machine-level Memory Bus
+   becomes healthy. Do not create a per-repo memory service directory.
+
+8. **Verify the write guard negative control**
+   - If `guarded_path_regex` is still empty, report that BUGate is installed but
+     physically inert until the profile is activated.
+   - If it is active, choose a guarded test path for a UC with no accepted
+     pre-code artifacts and run:
+
+     ```bash
+     BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+     python3 "$BUGATE_VENDOR_DIR/scripts/check_bugate.py" <guarded-test-path> </dev/null
+     ```
+
+   - Expect exit code `2` with a missing-artifact list. If it exits `0`, explain
+     why the guard did not apply and fix the profile or path selection.
+
+9. **Report final status**
+   - List every file or directory changed in the SUT repo.
+   - List the exact files that should be committed:
+     `bugate.config.yaml`, `bugate.profile.yaml`, `$BUGATE_VENDOR_DIR/`,
+     `.claude/settings.json`, `.codex/hooks.json`, `.claude/skills/`,
+     `.agents/skills/`, `.codex/skills/`, `.codex/agents/`, `docs/usecases/`,
+     and the `.gitignore` BUGate block.
+   - State whether `guarded_path_regex` is active.
+   - State Memory Bus status.
+   - State that Codex requires a one-time re-trust of the changed hook hash in
+     Codex Desktop before Codex hooks become active. Claude Code may need a new
+     session or plugin reload depending on how the repo is opened.
+   - Do not stage, commit, or push unless the user explicitly asks.

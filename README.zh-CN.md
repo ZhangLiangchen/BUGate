@@ -25,6 +25,7 @@ python3 scripts/bugate_init.py <sut-repo> --dry-run
 
 - **BUGate 是什么，应该如何使用？** [`CHARTER.md`](CHARTER.md) —— 定位、唯一使用模式（导入）、自开发设置、命名与演进计划。
 - **要用 AI agent 启动？** [`INIT.md`](INIT.md) / [`INIT.zh-CN.md`](INIT.zh-CN.md) 是可直接粘贴给 agent 的初始化 prompt。
+- **要让 AI agent 把 BUGate 导入 SUT 仓？** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) / [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 是可执行导入 prompt（release 下载 → installer → Claude/Codex 接线 → Memory Bus → profile 激活）。
 - **能做什么 / 全部命令？** [`CAPABILITIES.md`](CAPABILITIES.md)。
 - **必要的 Memory Service**（`bugate init` 自动安装）与**可选**运行时（双 agent AI CLI、角色隔离）：[`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md)。
 - **方法论**（为什么这样做）：[`docs/qa-methodology/`](docs/qa-methodology/) —— 先读其中的 [README](docs/qa-methodology/README.md)（英文摘要 + 术语表），再读 `METHOD.md` / `SOP.md`。
@@ -81,6 +82,12 @@ flowchart LR
 ## Quickstart
 
 ### A) 导入模式 —— 治理你的 SUT 测试仓（默认）
+
+**Agent 辅助导入 prompt。** 把 SUT 自动化测试仓作为项目根打开，然后把
+[`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 粘给 Claude Code 或
+Codex。该 prompt 会指导 agent 完成 release 下载、installer dry-run、正式导入、
+hook/script 接线检查、Memory Bus 初始化、profile 激活以及 Codex re-trust
+提醒。英文版见 [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md)。
 
 **Release tarball 路径 —— SUT 仓内无需 clone BUGate core。** 下载版本化 GitHub Release asset，在 SUT 仓外解包，然后把 installer 指向 SUT 自动化测试仓：
 
