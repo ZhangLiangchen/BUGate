@@ -116,7 +116,25 @@ First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md
 
 ### A) Imported mode — govern your SUT test repo (default)
 
-**Fast path — the installer.** From this repo:
+**Release tarball path — no BUGate core clone required in the SUT repo.** Download
+the versioned GitHub Release asset, unpack it outside the SUT repo, then run the
+installer against the SUT automation test repo:
+
+```bash
+BUGATE_VERSION=0.3.0
+curl -L -o bugate-${BUGATE_VERSION}.tar.gz \
+  https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz
+tar -xzf bugate-${BUGATE_VERSION}.tar.gz
+
+python3 bugate-${BUGATE_VERSION}/scripts/bugate_init.py /path/to/sut-test-framework --dry-run
+python3 bugate-${BUGATE_VERSION}/scripts/bugate_init.py /path/to/sut-test-framework
+```
+
+The `.zip` release asset is equivalent for environments where zip archives are
+easier to handle; the `.tar.gz` path is preferred because it preserves symlinks
+most consistently.
+
+**Source checkout path — useful while developing BUGate itself.** From this repo:
 
 ```bash
 python3 scripts/bugate_init.py <sut-repo>    # add --dry-run to preview
@@ -198,6 +216,23 @@ python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-ter
 When validating real adoption, run `python3 scripts/bugate_init.py <sut-repo>`
 against an external SUT test repo or a scratch repo outside BUGate core, then
 open that SUT repo as the project root. The core checkout remains pure.
+
+To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
+
+```bash
+python3 scripts/build_release_archives.py --version 0.3.0
+```
+
+This writes:
+
+```text
+dist/bugate-0.3.0.tar.gz
+dist/bugate-0.3.0.zip
+```
+
+Attach both files to the GitHub Release for tag `v0.3.0`. These archives include
+the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
+bin wrappers as one versioned BUGate kit.
 
 The core ships with `guarded_path_regex: []` (write-guard **disabled**) and an
 empty `artifact_dir`; an imported SUT profile turns these on in the governed SUT

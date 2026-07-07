@@ -44,6 +44,7 @@ Normative rules: [`CHARTER.md`](CHARTER.md) §2 + Amendment A4. Per command clas
 |---|---|
 | Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation, plan lock, prompt reminder, `wave8-weekly` | The **imported SUT test repo**; in BUGate core only template checks and ephemeral fixture acceptances run |
 | Importer (`bugate_init.py`) — vendors the kit, links Claude skills plus official Codex `.agents/skills` (with `.codex/skills` kept as a legacy bridge), copies the Codex gate agents into `.codex/agents/`, merges + refreshes the BUGate hook wiring (never the repo's own hooks), scaffolds committed config + profile, and appends a marked, idempotent ignore block to the SUT repo's root `.gitignore` (default scorer outputs + local agent/memory state; the SUT's own lines and the committed contract stay intact) | The **engine checkout** (this repo, or an already-vendored kit), pointed at a target SUT repo |
+| Release archive builder (`build_release_archives.py`) — creates `dist/bugate-<version>.tar.gz` and `dist/bugate-<version>.zip` for GitHub Releases, including the dual Codex/Claude plugin surfaces and shared kit assets | The **engine checkout** only, from a clean tree for real releases |
 | De-SUT guard (`check_no_sut_terms.py`) | The **engine tree** it is part of — scans the kit subtree anywhere; the full upstream surface only in this repo (CI-enforced here) |
 | Memory bus (`memory_bus.py`, `bin/memory-*`) | Either — namespace isolated per project via `memory.namespace` / `MEMORY_BUS_PROJECT_TAG` |
 
@@ -55,6 +56,12 @@ external or scratch repo. Bash wrappers live in `bin/`.
 ---
 
 ## Capability map
+
+### Distribution and release archives
+
+| Capability | Stage | Script | Key flags | Notes |
+|---|---|---|---|---|
+| Build Phase 1 GitHub Release assets (`bugate-<version>.tar.gz` + `.zip`) | release | `build_release_archives.py` | `--version`, `--out-dir`, `--allow-dirty`, `--include-untracked` | Uses git-tracked files, preserves symlinks, and reads the default version from the Codex/Claude plugin manifests. Real releases should run from a clean tree; `--allow-dirty --include-untracked` is for development preview only. |
 
 ### Pre-code gate engine (the 4-layer gate + physical write guard)
 
@@ -175,8 +182,7 @@ copy-paste example profile — in:
 
 Profiles are merged on top of `bugate.config.yaml` by `load_config` and selected
 via `BUGATE_PROFILE`, the config `profile` field, or its `active_profile` alias.
-In imported mode the governed repo commits its own config + profile; selecting
-via the ENGINE repo's config `profile` field is the self-development convention — a
-local, per-clone edit, never committed. The shipped templates pass the pre-code
-gates as-is; governed-layout acceptances fabricate fixtures at run time
-(upstream `tests/`).
+In imported mode the SUT test repo commits its own config + profile. BUGate core
+development stays pure: do not point this repo's config at a real SUT profile.
+The shipped templates pass the pre-code gates as-is; imported-repo acceptances
+fabricate fixtures at run time (upstream `tests/`).
