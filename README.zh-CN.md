@@ -27,7 +27,9 @@ python3 scripts/bugate_init.py <sut-repo> --dry-run
 - **要用 AI agent 启动？** [`INIT.md`](INIT.md) / [`INIT.zh-CN.md`](INIT.zh-CN.md) 是可直接粘贴给 agent 的初始化 prompt。
 - **要让 AI agent 把 BUGate 导入 SUT 仓？** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) / [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 是可执行导入 prompt（release 下载 → installer → Claude/Codex 接线 → Memory Bus → profile 激活）。
 - **能做什么 / 全部命令？** [`CAPABILITIES.md`](CAPABILITIES.md)。
-- **必要的 Memory Service**（`bugate init` 自动安装）与**可选**运行时（双 agent AI CLI、角色隔离）：[`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md)。
+- **必要的 Memory Service**（由 importer 自动安装；文档里的 `bugate init`
+  shorthand 当前指 `python3 scripts/bugate_init.py`）与**可选**运行时（双 agent
+  AI CLI、角色隔离）：[`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md)。
 - **方法论**（为什么这样做）：[`docs/qa-methodology/`](docs/qa-methodology/) —— 先读其中的 [README](docs/qa-methodology/README.md)（英文摘要 + 术语表），再读 `METHOD.md` / `SOP.md`。
 
 ## 使用方式 —— 只有一种：导入模式。（打开本仓 = 开发 BUGate 本身。）
@@ -92,7 +94,7 @@ hook/script 接线检查、Memory Bus 初始化、profile 激活以及 Codex re-
 **Release tarball 路径 —— SUT 仓内无需 clone BUGate core。** 下载版本化 GitHub Release asset，在 SUT 仓外解包，然后把 installer 指向 SUT 自动化测试仓：
 
 ```bash
-BUGATE_VERSION=0.3.0
+BUGATE_VERSION=0.3.1
 curl -L -o bugate-${BUGATE_VERSION}.tar.gz \
   https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz
 tar -xzf bugate-${BUGATE_VERSION}.tar.gz
@@ -152,17 +154,17 @@ python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-ter
 从干净 BUGate checkout 构建 Phase 1 GitHub Release archive assets：
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.3.0
+python3 scripts/build_release_archives.py --version 0.3.1
 ```
 
 输出：
 
 ```text
-dist/bugate-0.3.0.tar.gz
-dist/bugate-0.3.0.zip
+dist/bugate-0.3.1.tar.gz
+dist/bugate-0.3.1.zip
 ```
 
-把两个文件都附到 tag `v0.3.0` 的 GitHub Release。这些归档以一个版本化 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、hooks、scripts 与 bin wrappers。
+把两个文件都附到 tag `v0.3.1` 的 GitHub Release。这些归档以一个版本化 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、hooks、scripts 与 bin wrappers。
 
 core 默认带 `guarded_path_regex: []`（写守卫**关闭**）和空 `artifact_dir`；导入后的 SUT profile 会在被治理 SUT 测试仓中开启它们。
 

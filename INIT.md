@@ -1,8 +1,13 @@
 # BUGate — Init Prompt
 
+[English](INIT.md) | [简体中文](INIT.zh-CN.md)
+
 > **Paste this whole file to your AI coding agent (Claude Code / Codex) right after cloning BUGate**, and it will verify your environment, confirm the gate engine works, and route you to the right path — **imported mode** (the only usage mode: BUGate goes into your SUT test repo) or **developing BUGate itself** (maintainers; pure core iteration only). A human can follow the same steps manually.
 >
 > **Good news first:** the BUGate *gate engine* is **zero-dependency** — pure Python standard library, **nothing to `pip install`** to run the gates. The **memory bus** (long-term memory + promotion) is a **required core component**, but you don't install it by hand: `bugate init` / `bin/memory-bus-*` auto-install the machine-level service once and self-heal on an anomaly (`BUGATE_MEMORY_NO_INSTALL=1` for offline/locked-down machines). The **dual-agent CLIs** remain optional.
+>
+> Until BUGate ships a packaged console-script, prose shorthand `bugate init`
+> means `python3 scripts/bugate_init.py`.
 
 ---
 
@@ -15,12 +20,14 @@ You are bootstrapping a freshly cloned **BUGate** repository — a SUT-agnostic,
 BUGate has one usage mode — imported (normative rules: `CHARTER.md` §2 + Amendment A4). Ask which path applies:
 
 - **User path — imported mode (default).** They are adopting BUGate to govern a
-  SUT automation test repo. Run Steps 1–3 below to verify the core, then run
-  the installer — `python3 scripts/bugate_init.py <sut-repo>` — or follow
-  README **"Quickstart A) Imported mode"** manually: vendor the engine + skill
-  into the SUT repo, wire the hooks there, and **commit** `bugate.config.yaml`
-  + profile in that repo. Daily agent sessions then open the **SUT repo**, not
-  this one.
+  SUT automation test repo. Run Steps 1–3 below to verify the core, then use
+  [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) for the release-tarball adoption path,
+  or run the installer from this checkout —
+  `python3 scripts/bugate_init.py <sut-repo>` — if you are intentionally using
+  a source checkout. In either path, BUGate vendors the engine + skill into the
+  SUT repo, wires the hooks there, and creates `bugate.config.yaml` + profile
+  to be **committed in that repo**. Daily agent sessions then open the **SUT
+  repo**, not this one.
 - **Maintainer path — developing BUGate itself (not a usage mode).** They are working on the tool
   (core scripts/hooks, methodology, profile schema, gates, cross-SUT
   regression). Continue with the core verification steps below. Real-SUT

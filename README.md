@@ -35,7 +35,10 @@ your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 - **Bootstrapping with an AI agent?** [`INIT.md`](INIT.md) is a runnable init prompt (Python check → zero-install smoke → config load → optional capabilities).
 - **Importing BUGate into a SUT repo with an AI agent?** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) is a runnable import prompt (release download → installer → Claude/Codex wiring → Memory Bus → profile activation).
 - **What can it do / every command?** [`CAPABILITIES.md`](CAPABILITIES.md).
-- **The required memory service** (auto-installed by `bugate init`) and the **optional** runtimes (dual-agent AI CLIs, role isolation): [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
+- **The required memory service** (auto-installed by the importer; prose
+  shorthand `bugate init` currently means `python3 scripts/bugate_init.py`) and
+  the **optional** runtimes (dual-agent AI CLIs, role isolation):
+  [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
 - **The methodology** (why): [`docs/qa-methodology/`](docs/qa-methodology/) — start with its [README](docs/qa-methodology/README.md) (English summary + glossary) then `METHOD.md` / `SOP.md`.
 
 ## Usage — one mode: imported. (Opening this repo = developing BUGate itself.)
@@ -131,7 +134,7 @@ the versioned GitHub Release asset, unpack it outside the SUT repo, then run the
 installer against the SUT automation test repo:
 
 ```bash
-BUGATE_VERSION=0.3.0
+BUGATE_VERSION=0.3.1
 curl -L -o bugate-${BUGATE_VERSION}.tar.gz \
   https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz
 tar -xzf bugate-${BUGATE_VERSION}.tar.gz
@@ -230,17 +233,17 @@ open that SUT repo as the project root. The core checkout remains pure.
 To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.3.0
+python3 scripts/build_release_archives.py --version 0.3.1
 ```
 
 This writes:
 
 ```text
-dist/bugate-0.3.0.tar.gz
-dist/bugate-0.3.0.zip
+dist/bugate-0.3.1.tar.gz
+dist/bugate-0.3.1.zip
 ```
 
-Attach both files to the GitHub Release for tag `v0.3.0`. These archives include
+Attach both files to the GitHub Release for tag `v0.3.1`. These archives include
 the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
 bin wrappers as one versioned BUGate kit.
 

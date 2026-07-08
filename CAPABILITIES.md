@@ -9,6 +9,9 @@ generated.
 
 **Runtime contract**
 
+- **Importer command name.** Until a packaged console-script is added, prose
+  shorthand `bugate init` means running `python3 scripts/bugate_init.py` from an
+  engine checkout or unpacked release.
 - **Core is standard-library only.** Every script under `scripts/` and `bin/`
   runs on a bare Python 3 / bash install — no third-party deps. The BUGate YAML
   used by config and artifacts is a deliberately small subset parsed in

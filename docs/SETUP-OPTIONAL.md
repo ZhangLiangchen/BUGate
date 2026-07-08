@@ -1,5 +1,12 @@
 # BUGate — Setting up the external runtimes
 
+This file keeps its historical name, but it covers both the **required** machine
+memory bus and optional external runtimes. The memory bus section is the
+manual/offline reference for the component that `bugate_init.py` and
+`bin/memory-bus-*` normally install or heal automatically. Until BUGate ships a
+packaged console-script, prose shorthand `bugate init` means
+`python3 scripts/bugate_init.py`.
+
 The BUGate **gate engine** (the 4-layer gate) is zero-dependency stdlib Python —
 see [`INIT.md`](../INIT.md). This document covers the runtimes that call out
 beyond stdlib. **One is required, two are optional:**

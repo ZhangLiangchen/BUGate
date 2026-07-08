@@ -17,7 +17,7 @@ BUGate core 文件。
 ### 输入
 
 - 目标 SUT 仓：除非用户给出其他路径，否则使用当前工作目录。
-- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.0`。
+- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.1`。
 - Vendor 目录：若设置了 `BUGATE_VENDOR_DIR` 就使用它，否则使用 `.bugate`。
 - 若 `BUGATE_ENGINE_DIR` 指向已有 BUGate checkout 或已解包 release，就使用它。
   否则在 SUT 仓外下载 GitHub Release tarball。
@@ -36,11 +36,18 @@ BUGate core 文件。
    - 否则执行等价步骤：
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.0}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.3.1}"
      BUGATE_TMP="$(mktemp -d)"
-     curl -L -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
-       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"
-     tar -xzf "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" -C "$BUGATE_TMP"
+     if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
+       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then
+       tar -xzf "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" -C "$BUGATE_TMP"
+     elif curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" \
+       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.zip"; then
+       unzip -q "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" -d "$BUGATE_TMP"
+     else
+       echo "BUGate release v${BUGATE_VERSION} 无法下载；请向用户索取 BUGATE_ENGINE_DIR 或有效版本。" >&2
+       exit 2
+     fi
      BUGATE_ENGINE_DIR="$BUGATE_TMP/bugate-${BUGATE_VERSION}"
      ```
 

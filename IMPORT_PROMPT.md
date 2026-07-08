@@ -20,7 +20,7 @@ core files.
 
 - Target SUT repo: use the current working directory unless the user gives a
   different path.
-- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.0`.
+- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.1`.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
 - If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
   release, use it. Otherwise download the GitHub Release tarball outside the
@@ -41,11 +41,18 @@ core files.
    - Otherwise run the equivalent of:
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.0}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.3.1}"
      BUGATE_TMP="$(mktemp -d)"
-     curl -L -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
-       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"
-     tar -xzf "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" -C "$BUGATE_TMP"
+     if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
+       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then
+       tar -xzf "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" -C "$BUGATE_TMP"
+     elif curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" \
+       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.zip"; then
+       unzip -q "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" -d "$BUGATE_TMP"
+     else
+       echo "BUGate release v${BUGATE_VERSION} was not downloadable; ask the user for BUGATE_ENGINE_DIR or a valid version." >&2
+       exit 2
+     fi
      BUGATE_ENGINE_DIR="$BUGATE_TMP/bugate-${BUGATE_VERSION}"
      ```
 

@@ -1,8 +1,13 @@
 # BUGate —— Init Prompt（中文）
 
+[English](INIT.md) | [简体中文](INIT.zh-CN.md)
+
 > **克隆 BUGate 后，把整份文件粘给你的 AI 编码 agent（Claude Code / Codex）**，它就会验证环境、确认门引擎可用，并把你路由到正确的路径 —— **导入模式**（唯一使用形态：BUGate 装进你的 SUT 测试仓）或**开发 BUGate 本身**（维护者；纯 core 迭代）。人工按同样的步骤手动执行亦可。本文件是英文 [INIT.md](INIT.md) 的对齐翻译，结构逐节一致。
 >
 > **先说好消息：** BUGate *门引擎*是**零依赖**的 —— 纯 Python 标准库,**跑门无需 `pip install` 任何东西**。**记忆总线**(长期记忆 + 晋级)是**必要核心组件**,但无需手工装:`bugate init` / `bin/memory-bus-*` 自动安装机器级服务并在异常时自愈(`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过)。**双 agent CLI** 仍为可选。
+>
+> 在 BUGate 发布 packaged console-script 前，文档里的 `bugate init` shorthand
+> 指 `python3 scripts/bugate_init.py`。
 
 ---
 
@@ -15,11 +20,13 @@
 BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 + 修正案 A4）。先问清楚适用哪条路径：
 
 - **使用者路径 —— 导入模式（默认）。** 他们在采用 BUGate 来治理某个 SUT
-  自动化测试仓。先跑下面第 1–3 步验证核心，然后运行安装器 ——
-  `python3 scripts/bugate_init.py <sut-repo>` —— 或按 README **「Quickstart
-  A) Imported mode」**手工操作：把引擎 + skill 装进 SUT 仓、在那边接线
-  hooks、并把 `bugate.config.yaml` + profile **提交进那个仓**。日常 agent
-  会话随后打开的是 **SUT 仓**，不是本仓。
+  自动化测试仓。先跑下面第 1–3 步验证核心，然后用
+  [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 走 release-tarball 接入路径；
+  如果你明确要从当前源码 checkout 接入，也可以运行安装器 ——
+  `python3 scripts/bugate_init.py <sut-repo>`。无论哪条路径，BUGate 都会把
+  engine + skill vendor 进 SUT 仓、在那边接线 hooks，并创建需要**提交进那个仓**
+  的 `bugate.config.yaml` + profile。日常 agent 会话随后打开的是 **SUT 仓**，
+  不是本仓。
 - **维护者路径 —— 开发 BUGate 本身（非使用形态）。** 他们在完善这个工具（core
   脚本/hooks、方法论、profile schema、语义门、跨 SUT 回归）。继续走完下面
   core 验证步骤。真实 SUT 验收应通过把 BUGate 导入外部 SUT 测试仓或 BUGate

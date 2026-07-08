@@ -17,6 +17,9 @@ The agent TOMLs reference the skill through the `.agents/skills/bugate` symlink,
 so one file resolves both here and in any imported SUT repo, whatever its vendor
 dir. The `.codex/skills` symlinks are kept only as a migration bridge.
 
+Changing `.codex/hooks.json` requires a one-time re-trust of the changed hook
+hash in Codex Desktop before Codex hooks become active.
+
 The shared skill tree also carries Codex **command-equivalent** adapters (the
 multi-view and adversarial dual-CLI procedures) under
 `.shared/skills/bugate/adapters/codex/`.
