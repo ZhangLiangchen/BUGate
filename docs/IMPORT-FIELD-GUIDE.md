@@ -1,10 +1,10 @@
 # Imported-Mode Field Guide
 
-Lessons from the first full end-to-end imported-mode cycle on a real SUT test
-repo (import → three `--auto` rounds → live Layer-4 execution and closure),
-distilled SUT-neutrally. Read this AFTER `IMPORT_PROMPT.md`; it covers what the
-protocol itself cannot tell you. Known v0.3.1 kit gaps found in the field are
-listed at the end.
+Lessons from imported-mode field rounds on real SUT test repos (import → three
+`--auto` rounds → live Layer-4 execution and closure; later: a full live-SUT
+regression round with a verdict flip), distilled SUT-neutrally. Read this AFTER
+`IMPORT_PROMPT.md`; it covers what the protocol itself cannot tell you. Known
+v0.3.1 kit gaps found in the field are listed at the end.
 
 ## 1. Dual-agent CLI dispatch: diagnose before you degrade
 
@@ -112,7 +112,58 @@ listed at the end.
 - Append `</dev/null` to `check_bugate.py` invocations in CI to avoid stdin
   hangs.
 
-## 7. Known v0.3.1 kit gaps (found in the field, fix upstream — do not patch vendored copies)
+## 7. Live-SUT regression & verdict-flip field notes
+
+Distilled from a full regression round against a shared live SUT after a
+dev-claimed fix, ending in a release-verdict flip (blocked → released).
+
+- **Deployment fingerprint is the master gate — judge nothing before it.**
+  "MR merged / issue closed ≠ deployed": observed a fix merged at T whose
+  container only started at T+2h; the window in between still ran the old
+  build. When the app exposes no build info (empty `/actuator/info`), derive
+  artifact identity from tag encoding (here the image tag embedded the merge
+  commit's short SHA) and cross-check it against the tracker's
+  `merge_commit_sha` — two independent sources, one conclusion.
+- **Dev-claimed fixes get three-level verification, in order**: (1) live
+  probes recording BOTH transport status AND body error code — a correct code
+  under the wrong HTTP status is still a fail; (2) the targeted suite for that
+  contract; (3) the full regression, with EVERY result delta vs the previous
+  round individually attributed (deploy regression / oracle drift / new
+  defect). Only all three levels flip the verdict.
+- **Collateral FAILs convert to XFAIL, not PASS.** A test that fails in its
+  *precondition* because of an unrelated defect never reached its own
+  assertion. Fix the root cause and the real assertion runs for the first
+  time — often landing on its own issue-bound xfail. Label each FAIL
+  root-vs-collateral at triage time and write the post-fix expectation
+  accordingly; otherwise correct behavior reads as "fix didn't work", or the
+  new XFAIL reads as a new bug.
+- **Two directions, two meanings, in xfail-gated suites**: FAIL→PASS is a
+  regression guard closing; XFAIL→XPASS is a follow-up capability shipping.
+  Report per-test deltas with direction and attribution, never totals alone —
+  identical totals can hide churn.
+- **Xfail reasons must not assert deployment state.** A canned reason like
+  "deployed build has no read-retry" rots silently the day read-retry ships —
+  the test still xfails, nobody notices the lie. Bind reasons to tracker
+  issues (ownership) instead of deployment claims (state), and re-grep reason
+  strings at the end of every deployment-verification round.
+- **Environment-restore probes can self-match.** `pgrep -f` / `ps | grep` run
+  over ssh matches the remote shell carrying the pattern itself (a phantom
+  count of 1). Use the `[b]racket` idiom. Corollary for the credential sweep:
+  the handover document is an *expected* hit; your own outputs (logs, docs,
+  draft comments) must be zero-hit.
+- **Tracker-note discipline**: declare intended tracker writes in the
+  deliverable before posting; comment, don't transition state (closure belongs
+  to the owner); fix the evidence format (artifact tag + contract table with
+  HTTP+code + suite tally deltas); on a failed POST, query for the note before
+  retrying — a response parse error does not mean the write failed.
+- **Verdict-flip checklist**: update the SSOT document first and fan out;
+  recompute every aggregate it feeds (bucket totals, closed/open counts);
+  keep history as "was X → now Y" evidence lines instead of narrative; append
+  same-day reruns as new sections rather than overwriting the old record; and
+  refuse fuzzy verdicts — if residual items don't block, the verdict is
+  "released + tracked debt", not "conditionally released".
+
+## 8. Known v0.3.1 kit gaps (found in the field, fix upstream — do not patch vendored copies)
 
 > **Status update:** gaps 1–3 are FIXED in v0.3.2 (layout-aware
 > run_full_check.py with graceful `memory`-console degrade; workspace-aware
