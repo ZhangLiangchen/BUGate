@@ -114,6 +114,14 @@ listed at the end.
 
 ## 7. Known v0.3.1 kit gaps (found in the field, fix upstream — do not patch vendored copies)
 
+> **Status update:** gaps 1–3 are FIXED in v0.3.2 (layout-aware
+> run_full_check.py with graceful `memory`-console degrade; workspace-aware
+> wave8-weekly; split Read|Edit|Write matcher for the Wave-7 role guard in
+> bugate_init.py), and the doc gaps of item 5 are folded into IMPORT_PROMPT
+> (full-check step + Wave 7/8 activation appendix). Item 4 (stale
+> `cli_bridge_failures/` counting as degraded) remains open — keep the copy
+> hygiene rule from §2. The list below is preserved as found for the record.
+
 1. **`run_full_check.py` cannot run in imported mode**: root detection expects
    `AGENTS.md` + `.shared/` (core layout) and aborts in a governed SUT repo.
 2. **`run_full_check.py` invokes a nonexistent `memory` CLI** (`["memory",
