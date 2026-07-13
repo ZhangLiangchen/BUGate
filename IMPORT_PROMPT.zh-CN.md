@@ -17,7 +17,7 @@ BUGate core 文件。
 ### 输入
 
 - 目标 SUT 仓：除非用户给出其他路径，否则使用当前工作目录。
-- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.1`。
+- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.2`。
 - Vendor 目录：若设置了 `BUGATE_VENDOR_DIR` 就使用它，否则使用 `.bugate`。
 - 若 `BUGATE_ENGINE_DIR` 指向已有 BUGate checkout 或已解包 release，就使用它。
   否则在 SUT 仓外下载 GitHub Release tarball。
@@ -36,7 +36,7 @@ BUGate core 文件。
    - 否则执行等价步骤：
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.1}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.3.2}"
      BUGATE_TMP="$(mktemp -d)"
      if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
        "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then
