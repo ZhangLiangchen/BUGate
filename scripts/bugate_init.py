@@ -54,6 +54,11 @@ from pathlib import Path
 from bugate_core import find_engine_root
 
 KIT_DIRS = ["scripts", "bin", ".shared/skills/bugate", ".shared/skills/bugate-full-check"]
+# Single files vendored alongside the kit subtrees: the imported-mode field
+# guide is the post-import operator manual (lessons + activation recipes) and
+# must live INSIDE the governed repo so later sessions can read it without the
+# engine checkout.
+KIT_FILES = ["docs/IMPORT-FIELD-GUIDE.md"]
 IGNORE_NAMES = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
 
 # Codex plugins package the shared skills/hooks/MCP surface. BUGate still wires
@@ -222,6 +227,25 @@ required_precode_artifacts:
 # sut_identity_terms:
 #   - "\bmy-product-name\b"
 
+# --- Optional waves (dormant until configured; recipes: IMPORT_PROMPT
+# --- appendix and {vendor_dir}/docs/IMPORT-FIELD-GUIDE.md) ---------------
+# Wave 7 role isolation: uncomment and adapt, then run with
+# BUGATE_AGENT_ROLE=<role>. Bare list = forbidden for read AND write;
+# read:/write: sub-lists scope each side. Role names lowercase.
+# agent_roles:
+#   implementer:
+#     - "^docs/raw/source_code/.*"
+#   designer:
+#     write:
+#       - "^tests/.*"
+# Wave 8 oracle falsification: point at a real spec once captured evidence
+# exists (evidence paths inside the spec resolve relative to the spec file).
+# falsification_spec: <path/to/falsification_spec.yaml>
+# falsification_threshold: 0.7
+# wave8_evidence_glob: <workspace-relative glob>
+# wave8_reports_dir: <workspace-relative dir, prefer gitignored>
+# wave8_artifact_root: <inventory scan root>
+
 # Memory-bus namespace on the MACHINE-LEVEL shared service (ADR-BUGATE-003):
 # every governed repo on this machine shares one mcp-memory-service instance
 # (data home ~/.bugate/memory-bus), isolated by this tag. Declaring the
@@ -305,6 +329,19 @@ def vendor_kit(engine_root: Path, target: Path, vendor_dir: str, dry: bool) -> l
         if dst.exists():
             shutil.rmtree(dst)
         shutil.copytree(src, dst, ignore=IGNORE_NAMES, symlinks=False)
+    for rel in KIT_FILES:
+        src = engine_root / rel
+        dst = target / vendor_dir / rel
+        if not src.is_file():
+            raise SystemExit(f"engine tree incomplete: missing {src}")
+        if dst.exists() and dst.resolve() == src.resolve():
+            notes.append(f"vendor {rel} — already in place (running from the vendored kit)")
+            continue
+        notes.append(f"vendor {rel} -> {vendor_dir}/{rel}")
+        if dry:
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
     return notes
 
 
@@ -483,6 +520,12 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
      ({vendor_dir}/bin/memory-bus-ensure re-checks). Offline/locked-down machine:
      BUGATE_MEMORY_NO_INSTALL=1 skips auto-install (then install manually per
      docs/SETUP-OPTIONAL.md §2).
+  7. Read the vendored field guide — {vendor_dir}/docs/IMPORT-FIELD-GUIDE.md —
+     before operating the orchestrator: it carries the real-SUT lessons
+     (dual-agent dispatch diagnosis/proxy surface, --auto 03b overwrite
+     semantics, post-run 04/05 clobber SOP, copy hygiene) and the Wave 7/8
+     activation recipes. Optional one-shot self-check from the repo root:
+       python3 {vendor_dir}/.shared/skills/bugate-full-check/scripts/run_full_check.py --mode smoke
 """
 
 

@@ -189,8 +189,15 @@ core files.
 
 ### Appendix: activating the optional waves (Wave 7 / Wave 8)
 
+> The importer (v0.3.2+) vendors the field-tested operator manual to
+> `$BUGATE_VENDOR_DIR/docs/IMPORT-FIELD-GUIDE.md` — read it right after
+> import: the dual-agent dispatch diagnosis ladder and proxy surface, the
+> `--auto` 03b overwrite semantics, the post-run 04/05 clobber SOP, UC copy
+> hygiene, and the full activation recipes for both waves below live there.
+
 Both waves are dormant by default — configuration switches, not defects.
-Enable them in the SUT profile once the evidence is ready.
+Enable them in the SUT profile once the evidence is ready (the profile
+scaffold now carries commented example blocks).
 
 - **Wave 7 role isolation**: add a top-level `agent_roles:` block to the
   profile (role names lowercase; a bare list forbids both read and write,

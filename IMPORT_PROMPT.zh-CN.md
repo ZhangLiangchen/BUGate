@@ -177,7 +177,13 @@ BUGate core 文件。
 
 ### 附录：按需激活可选波次（Wave 7 / Wave 8）
 
-这两个波次默认休眠，是配置开关而非缺陷；证据就绪后在 SUT profile 里开启。
+> importer（v0.3.2+）会把实战运维手册 vendor 到
+> `$BUGATE_VENDOR_DIR/docs/IMPORT-FIELD-GUIDE.md` —— 导入完成后先读它：
+> 双端调度诊断阶梯与代理注入、`--auto` 的 03b 覆写语义、post-run 04/05
+> 覆写 SOP、UC 复制卫生、以及下述两个波次的完整激活配方都在里面。
+
+这两个波次默认休眠，是配置开关而非缺陷；证据就绪后在 SUT profile 里开启
+（profile 脚手架里已含注释掉的示例块）。
 
 - **Wave 7 角色隔离**：在 profile 顶层加 `agent_roles:`（角色名小写；裸列表 =
   读写皆禁，`read:`/`write:` 子列表分别限定），并在运行时设
