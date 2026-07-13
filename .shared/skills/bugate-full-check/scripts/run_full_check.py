@@ -27,11 +27,34 @@ class Check:
     detail: str
 
 
-def find_root(start: Path) -> Path:
+def find_roots(start: Path) -> tuple[Path, Path, str]:
+    """Resolve (workspace_root, engine_root, layout).
+
+    Two supported layouts:
+    - core: the BUGate checkout itself (AGENTS.md + .shared at root); the
+      engine is the checkout.
+    - imported: a governed SUT test repo (bugate.config.yaml at root) with the
+      kit vendored under BUGATE_VENDOR_DIR (default .bugate).
+    BUGATE_ENGINE_ROOT overrides engine resolution in both layouts.
+    """
+    engine_env = os.environ.get("BUGATE_ENGINE_ROOT")
     for candidate in (start, *start.parents):
         if (candidate / "AGENTS.md").exists() and (candidate / ".shared").exists():
-            return candidate
-    raise SystemExit("BUGate root not found (expected AGENTS.md and .shared).")
+            engine = Path(engine_env) if engine_env else candidate
+            return candidate, engine, "core"
+        if (candidate / "bugate.config.yaml").exists():
+            vendor = os.environ.get("BUGATE_VENDOR_DIR", ".bugate")
+            engine = Path(engine_env) if engine_env else candidate / vendor
+            if (engine / "scripts" / "bugate_core.py").exists():
+                return candidate, engine, "imported"
+            raise SystemExit(
+                f"Found governed workspace {candidate} (bugate.config.yaml) but no vendored kit at "
+                f"{engine}; set BUGATE_VENDOR_DIR or BUGATE_ENGINE_ROOT."
+            )
+    raise SystemExit(
+        "BUGate root not found: expected a core checkout (AGENTS.md + .shared) "
+        "or an imported governed repo (bugate.config.yaml + vendored kit)."
+    )
 
 
 def run(
@@ -114,19 +137,23 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=int, default=240)
     args = parser.parse_args()
 
-    root = find_root(Path.cwd().resolve())
+    root, engine, layout = find_roots(Path.cwd().resolve())
     checks: list[Check] = []
 
+    def eng(rel: str) -> str:
+        """Engine-relative path as string (works from any cwd in both layouts)."""
+        return str(engine / rel)
+
     # Core gate.
-    py_files = sorted(str(p.relative_to(root)) for p in (root / "scripts").glob("*.py"))
+    py_files = sorted(str(p) for p in (engine / "scripts").glob("*.py"))
     result = run(["python3", "-m", "py_compile", *py_files], root, timeout=60)
     add(checks, "Python compile", result.returncode == 0, result.stdout or "scripts compiled")
 
     result = run(
         [
             "python3",
-            "scripts/check_bugate_v13_semantics.py",
-            ".shared/skills/bugate/templates",
+            eng("scripts/check_bugate_v13_semantics.py"),
+            eng(".shared/skills/bugate/templates"),
             "--scope",
             "pre-code",
         ],
@@ -163,9 +190,9 @@ def main() -> int:
         add(checks, "Claude auth/model call", result.returncode == 0 and "ok" in result.stdout.lower(), result.stdout)
 
     # Bridge environment.
-    result = run(["python3", "scripts/sdtd_multiview_cli_bridge.py", "check-env"], root, timeout=60)
+    result = run(["python3", eng("scripts/sdtd_multiview_cli_bridge.py"), "check-env"], root, timeout=60)
     add(checks, "Multi-view check-env", result.returncode == 0 and "real_peer_dispatch" in result.stdout, result.stdout)
-    result = run(["python3", "scripts/sdtd_adversarial_cli_bridge.py", "check-env"], root, timeout=60)
+    result = run(["python3", eng("scripts/sdtd_adversarial_cli_bridge.py"), "check-env"], root, timeout=60)
     add(checks, "Adversarial check-env", result.returncode == 0 and "real_peer_dispatch" in result.stdout, result.stdout)
 
     if args.mode == "full":
@@ -173,7 +200,7 @@ def main() -> int:
             tmp_root = Path(tmp)
             uc_dir = tmp_root / "peer-uc"
             result = run(
-                ["python3", "scripts/sdtd_orchestrator.py", str(uc_dir), "--init"],
+                ["python3", eng("scripts/sdtd_orchestrator.py"), str(uc_dir), "--init"],
                 root,
                 timeout=60,
             )
@@ -181,7 +208,7 @@ def main() -> int:
             peer_env = {"SDTD_CLI_TIMEOUT_SECONDS": str(args.timeout_seconds)}
 
             result = run(
-                ["python3", "scripts/sdtd_multiview_cli_bridge.py", "run-all", str(uc_dir)],
+                ["python3", eng("scripts/sdtd_multiview_cli_bridge.py"), "run-all", str(uc_dir)],
                 root,
                 env=peer_env,
                 timeout=args.timeout_seconds * 2,
@@ -193,7 +220,7 @@ def main() -> int:
             add(checks, "Real multi-view dispatch", mv_ok, result.stdout)
 
             result = run(
-                ["python3", "scripts/sdtd_adversarial_cli_bridge.py", "run-all", str(uc_dir)],
+                ["python3", eng("scripts/sdtd_adversarial_cli_bridge.py"), "run-all", str(uc_dir)],
                 root,
                 env=peer_env,
                 timeout=args.timeout_seconds * 2,
@@ -207,18 +234,18 @@ def main() -> int:
         checks.append(Check("Real peer dispatch", "WARN", "Skipped in smoke mode; rerun with --mode full."))
 
     # Memory bus and ONNX.
-    result = run(["bash", "bin/memory-bus-status"], root, timeout=30)
+    result = run(["bash", eng("bin/memory-bus-status")], root, timeout=30)
     add(checks, "Memory-bus status", result.returncode == 0 and "OK" in result.stdout, result.stdout)
 
     smoke = f"memory smoke {os.getpid()}"
     result = run(
-        ["bash", "bin/memory-service-note", "--agent", "agent", "--type", "finding", "--msg", smoke, "--tag", "full-check-smoke"],
+        ["bash", eng("bin/memory-service-note"), "--agent", "agent", "--type", "finding", "--msg", smoke, "--tag", "full-check-smoke"],
         root,
         timeout=30,
     )
     add(checks, "Memory-bus note", result.returncode == 0, result.stdout)
     result = run(
-        ["bash", "bin/memory-service-search", "--query", smoke, "--tag", "full-check-smoke", "--limit", "1"],
+        ["bash", eng("bin/memory-service-search"), "--query", smoke, "--tag", "full-check-smoke", "--limit", "1"],
         root,
         timeout=30,
     )
@@ -239,35 +266,66 @@ def main() -> int:
         "MCP_MEMORY_BASE_DIR": bus_home,
         "MCP_MEMORY_STORAGE_BACKEND": "sqlite_vec",
         "MCP_MEMORY_USE_ONNX": "1",
-        "PATH": f"{root / '.venv/bin'}:{os.environ.get('PATH', '')}",
+        "PATH": f"{engine / '.venv/bin'}:{os.environ.get('PATH', '')}",
     }
-    result = run(["memory", "status"], root, env=memory_env, timeout=60)
-    add(checks, "ONNX memory status", result.returncode == 0 and "healthy" in result.stdout.lower(), result.stdout)
+    # Deep ONNX probe via the mcp-memory-service `memory` console. It is an
+    # OPTIONAL deepening of the HTTP status above: the console is only present
+    # where mcp-memory-service is pip-installed (engine .venv on a dev
+    # checkout, or the machine-level bus home venv). Missing console => WARN,
+    # not FAIL — release tarballs and imported repos don't ship it.
+    memory_cli = next(
+        (
+            str(cand)
+            for cand in (
+                engine / ".venv/bin/memory",
+                Path(bus_home) / ".venv/bin/memory",
+            )
+            if cand.exists()
+        ),
+        None,
+    ) or shutil.which("memory")
+    if memory_cli:
+        result = run([memory_cli, "status"], root, env=memory_env, timeout=60)
+        add(checks, "ONNX memory status", result.returncode == 0 and "healthy" in result.stdout.lower(), result.stdout)
+    else:
+        add(
+            checks,
+            "ONNX memory status",
+            False,
+            "mcp-memory-service `memory` console not found (engine .venv / bus-home venv / PATH); "
+            "HTTP Memory-bus status above is the primary health signal.",
+            warn=True,
+        )
 
     # Wave 0 / Wave 8 — no committed demo specs: the capability probe is the
     # graceful-degradation contract (engine wired, reports profile_required,
     # exit 0 until a SUT profile supplies a real spec).
-    result = run(["python3", "scripts/check_prd_health.py", "--gate"], root, timeout=60)
+    # In an imported repo whose profile supplies a real spec, these engines run
+    # for real: exit 0 without "profile_required" means the configured gate
+    # actually passed, which is at least as strong as the degrade contract.
+    result = run(["python3", eng("scripts/check_prd_health.py"), "--gate"], root, timeout=60)
+    w0_configured = result.returncode == 0 and "profile_required" not in result.stdout
     add(
         checks,
-        "Wave 0 engine (profile_required degrade)",
-        result.returncode == 0 and "profile_required" in result.stdout,
+        "Wave 0 engine" + (" (configured gate passed)" if w0_configured else " (profile_required degrade)"),
+        result.returncode == 0,
         result.stdout,
     )
-    result = run(["python3", "scripts/oracle_falsification.py", "--gate"], root, timeout=60)
+    result = run(["python3", eng("scripts/oracle_falsification.py"), "--gate"], root, timeout=60)
+    w8_configured = result.returncode == 0 and "profile_required" not in result.stdout
     add(
         checks,
-        "Wave 8 engine (profile_required degrade)",
-        result.returncode == 0 and "profile_required" in result.stdout,
+        "Wave 8 engine" + (" (configured gate passed)" if w8_configured else " (profile_required degrade)"),
+        result.returncode == 0,
         result.stdout,
     )
-    result = run(["python3", "scripts/generate_assertion_coverage_matrix.py", "--help"], root, timeout=30)
+    result = run(["python3", eng("scripts/generate_assertion_coverage_matrix.py"), "--help"], root, timeout=30)
     add(checks, "Wave 8 coverage-matrix CLI present", result.returncode == 0, "argparse help ok")
 
     # Write guard and role isolation — fabricated governed workspace.
     with tempfile.TemporaryDirectory(prefix="bugate-guard.") as tmp:
         ws = build_guard_workspace(Path(tmp))
-        guard = str(root / "scripts" / "check_bugate.py")
+        guard = eng("scripts/check_bugate.py")
         neutral_env = {"BUGATE_PROFILE": ""}
         result = run([sys.executable, guard, "tests/ok/test_x.py"],
                      root, cwd=ws, input_text="", env=neutral_env, timeout=30)
@@ -281,11 +339,11 @@ def main() -> int:
             "BUGATE_AGENT_ROLE": "implementer",
         }
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "mirror/spec.md"}})
-        result = run(["python3", "scripts/check_agent_role_paths.py"],
+        result = run(["python3", eng("scripts/check_agent_role_paths.py")],
                      root, input_text=payload, env=role_env, timeout=30)
         add(checks, "Role guard blocks forbidden path", result.returncode == 2, result.stdout)
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "tests/ok/test_x.py"}})
-        result = run(["python3", "scripts/check_agent_role_paths.py"],
+        result = run(["python3", eng("scripts/check_agent_role_paths.py")],
                      root, input_text=payload, env=role_env, timeout=30)
         add(checks, "Role guard allows permitted path", result.returncode == 0, result.stdout or "allowed")
 
@@ -293,7 +351,7 @@ def main() -> int:
     # REJECTED once the profile demands the Wave-1 multiview report.
     with tempfile.TemporaryDirectory(prefix="bugate-harden.") as tmp:
         uc = Path(tmp) / "uc"
-        result = run(["python3", "scripts/sdtd_orchestrator.py", str(uc), "--init"], root, timeout=60)
+        result = run(["python3", eng("scripts/sdtd_orchestrator.py"), str(uc), "--init"], root, timeout=60)
         init_ok = result.returncode == 0
         prof = Path(tmp) / "harden.profile.yaml"
         prof.write_text(
@@ -301,7 +359,7 @@ def main() -> int:
             encoding="utf-8",
         )
         result = run(
-            ["python3", "scripts/check_bugate_v13_semantics.py", str(uc), "--scope", "pre-code"],
+            ["python3", eng("scripts/check_bugate_v13_semantics.py"), str(uc), "--scope", "pre-code"],
             root,
             env={"BUGATE_PROFILE": str(prof)},
             timeout=60,
@@ -323,13 +381,13 @@ def main() -> int:
             encoding="utf-8",
         )
         result = run(
-            ["python3", "scripts/check_bugate_brief_semantics.py", str(uc),
+            ["python3", eng("scripts/check_bugate_brief_semantics.py"), str(uc),
              "--require-passed", "--schema", "original-gate"],
             root, timeout=60,
         )
         alt_ok = result.returncode == 0
         result = run(
-            ["python3", "scripts/check_bugate_brief_semantics.py", str(uc),
+            ["python3", eng("scripts/check_bugate_brief_semantics.py"), str(uc),
              "--require-passed", "--schema", "v1.3"],
             root, timeout=60,
         )
@@ -346,26 +404,31 @@ def main() -> int:
         [
             "python3",
             "-c",
-            "import sys; sys.path.insert(0,'scripts'); import bugate_core; print(bugate_core.load_config())",
+            f"import sys; sys.path.insert(0, {str(engine / 'scripts')!r}); "
+            "import bugate_core; print(bugate_core.load_config())",
         ],
         root,
         timeout=30,
     )
-    core_mode = "'mode': 'core'" in result.stdout and "'guarded_path_regex': []" in result.stdout
+    guards_inactive = "'guarded_path_regex': []" in result.stdout
     checks.append(
         Check(
             "Activation boundary",
-            "WARN" if core_mode else "PASS",
-            "Core mode with no guarded paths; real SUT gates require an imported SUT profile."
-            if core_mode
-            else compact(result.stdout),
+            "WARN" if guards_inactive else "PASS",
+            (
+                "No guarded paths configured; real SUT gates require an (activated) imported SUT profile."
+                if guards_inactive
+                else f"Guarded SUT profile active ({layout} layout): " + compact(result.stdout)
+            ),
         )
     )
 
     print("# BUGate Full Check")
     print()
     print(f"- Mode: `{args.mode}`")
-    print(f"- Repo: `{root}`")
+    print(f"- Layout: `{layout}`")
+    print(f"- Workspace: `{root}`")
+    print(f"- Engine: `{engine}`")
     print()
     print("| Check | Status | Detail |")
     print("|---|---|---|")

@@ -160,6 +160,18 @@ core files.
 
    - Expect exit code `2` with a missing-artifact list. If it exits `0`, explain
      why the guard did not apply and fix the profile or path selection.
+   - Optional one-shot self-check (v0.3.2+, layout-aware, run from the SUT repo
+     root):
+
+     ```bash
+     python3 "$BUGATE_VENDOR_DIR/.shared/skills/bugate-full-check/scripts/run_full_check.py" --mode smoke
+     ```
+
+     Smoke mode skips real dual-peer model dispatch; `--mode full` dispatches
+     codex+claude for real. If this machine's direct egress to the model APIs
+     is blocked, pass a proxy through the kit's own injection surface (reaches
+     only the spawned peer CLIs, never gate scripts or git):
+     `SDTD_CLI_HTTPS_PROXY` / `SDTD_CLI_HTTP_PROXY` / `SDTD_CLI_ALL_PROXY`.
 
 9. **Report final status**
    - List every file or directory changed in the SUT repo.
@@ -174,3 +186,47 @@ core files.
      Codex Desktop before Codex hooks become active. Claude Code may need a new
      session or plugin reload depending on how the repo is opened.
    - Do not stage, commit, or push unless the user explicitly asks.
+
+### Appendix: activating the optional waves (Wave 7 / Wave 8)
+
+Both waves are dormant by default — configuration switches, not defects.
+Enable them in the SUT profile once the evidence is ready.
+
+- **Wave 7 role isolation**: add a top-level `agent_roles:` block to the
+  profile (role names lowercase; a bare list forbids both read and write,
+  `read:`/`write:` sub-lists scope each side), and set
+  `BUGATE_AGENT_ROLE=<role>` at runtime. Example:
+
+  ```yaml
+  agent_roles:
+    implementer:            # test writers must not see business source/API dumps
+      - "^docs/raw/source_code/.*"
+    designer:
+      write:
+        - "^tests/.*"       # designers must not write test code directly
+  ```
+
+  Read-isolation only covers tools the hook sees (importer v0.3.2+ wires the
+  role guard on its own `Read|Edit|Write` matcher; the write-shaped
+  `check_bugate` must NEVER be matched on Read — it does not inspect the
+  action and would block reads of guarded tests). Shell-level reads
+  (cat/grep) stay review discipline, not physical enforcement.
+- **Wave 8 mutation / oracle falsification**: write a falsification spec for
+  real captured evidence JSON (declarative oracles + per-field mutations;
+  `evidence` paths resolve relative to the spec file's directory), then
+  declare in the profile:
+
+  ```yaml
+  falsification_spec: <path/to/falsification_spec.yaml>
+  falsification_threshold: 0.7
+  wave8_evidence_glob: <workspace-relative glob>   # consumed by wave8-weekly
+  wave8_reports_dir: <workspace-relative dir>      # prefer a gitignored home
+  wave8_artifact_root: <inventory scan root, e.g. docs/usecases>
+  ```
+
+  Verify with `python3 $BUGATE_VENDOR_DIR/scripts/oracle_falsification.py
+  --gate` (a real score, no longer `profile_required`); schedule with
+  `$BUGATE_VENDOR_DIR/bin/wave8-weekly` (layout-aware in v0.3.2+, reports land
+  in the workspace). Hold off on the coverage-matrix gate
+  (`require_assertion_coverage`) until the spec covers most inventory-referenced
+  oracles, or `missing_implementation` noise turns it red.

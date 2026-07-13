@@ -151,6 +151,16 @@ BUGate core 文件。
      ```
 
    - 期望退出码 `2`，并输出缺失 artifact 列表。如果退出 `0`，解释 guard 为什么没有命中，并修正 profile 或路径选择。
+   - 可选的一键自检（v0.3.2+，布局自适应，从 SUT 仓根直接跑）：
+
+     ```bash
+     python3 "$BUGATE_VENDOR_DIR/.shared/skills/bugate-full-check/scripts/run_full_check.py" --mode smoke
+     ```
+
+     smoke 模式不做真实双端模型调度；`--mode full` 会真实调度 codex+claude。
+     若本机直连模型 API 被网络阻断，用 kit 自带的注入面传代理（只作用于对端
+     CLI 子进程，不影响 gate 脚本与 git）：`SDTD_CLI_HTTPS_PROXY` /
+     `SDTD_CLI_HTTP_PROXY` / `SDTD_CLI_ALL_PROXY`。
 
 9. **报告最终状态**
    - 列出 SUT 仓中所有变更文件/目录。
@@ -164,3 +174,42 @@ BUGate core 文件。
    - 说明 Codex 需要在 Codex Desktop 中对变更后的 hook hash 做一次 re-trust，
      Codex hooks 才会生效。Claude Code 是否需要新 session 或 plugin reload 取决于打开方式。
    - 除非用户明确要求，不要 stage、commit 或 push。
+
+### 附录：按需激活可选波次（Wave 7 / Wave 8）
+
+这两个波次默认休眠，是配置开关而非缺陷；证据就绪后在 SUT profile 里开启。
+
+- **Wave 7 角色隔离**：在 profile 顶层加 `agent_roles:`（角色名小写；裸列表 =
+  读写皆禁，`read:`/`write:` 子列表分别限定），并在运行时设
+  `BUGATE_AGENT_ROLE=<role>`。示例：
+
+  ```yaml
+  agent_roles:
+    implementer:            # 写测试的角色不许接触业务源码/接口 dump
+      - "^docs/raw/source_code/.*"
+    designer:
+      write:
+        - "^tests/.*"       # 设计角色不许直接写测试代码
+  ```
+
+  注意：读隔离只对 hook 能看到的 `Read` 工具生效（importer v0.3.2+ 已把角色
+  守卫单独接到 `Read|Edit|Write` matcher；写形守卫 `check_bugate` 绝不能挂到
+  `Read`，它不辨别 action、会把读也拦下）。shell 级读取（cat/grep）不在物理
+  守卫范围内，属评审纪律。
+- **Wave 8 突变/证伪**：为真实捕获的证据 JSON 写一份 falsification spec
+  （声明式 oracle + 每字段突变；`evidence` 路径相对 spec 文件所在目录），然后
+  在 profile 里声明：
+
+  ```yaml
+  falsification_spec: <path/to/falsification_spec.yaml>
+  falsification_threshold: 0.7
+  wave8_evidence_glob: <workspace-relative glob>   # 供 wave8-weekly 使用
+  wave8_reports_dir: <workspace-relative dir>      # 建议放 gitignored 目录
+  wave8_artifact_root: <inventory 扫描根，如 docs/usecases>
+  ```
+
+  验证：`python3 $BUGATE_VENDOR_DIR/scripts/oracle_falsification.py --gate`
+  应真实评分（不再 `profile_required`）；周期化用
+  `$BUGATE_VENDOR_DIR/bin/wave8-weekly`（v0.3.2+ 布局自适应，报告落
+  workspace）。覆盖矩阵门（`require_assertion_coverage`）建议等 spec 覆盖到
+  库存引用的多数 oracle 后再开，避免 `missing_implementation` 噪声红。

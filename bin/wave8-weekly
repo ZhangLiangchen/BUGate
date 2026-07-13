@@ -15,12 +15,20 @@
 #
 # Optional overrides:
 #   WAVE8_FALSIFICATION_SPEC  Spec path (default: profile `falsification_spec`).
-#   WAVE8_REPORTS_DIR         Output directory (default: profile `wave8_reports_dir`, else <ROOT>/reports).
-#   WAVE8_ARTIFACT_ROOT       Root scanned for 03_inventory.yaml (default: profile `wave8_artifact_root`, else <ROOT>).
-#   BUGATE_PROFILE            Profile path passed through to the falsifier and matrix.
+#   WAVE8_REPORTS_DIR         Output directory (default: profile `wave8_reports_dir`, else <WORKSPACE>/reports).
+#   WAVE8_ARTIFACT_ROOT       Root scanned for 03_inventory.yaml (default: profile `wave8_artifact_root`, else <WORKSPACE>).
+#   BUGATE_PROFILE            Profile path honored for config lookup and passed to both tools.
+#   BUGATE_PROJECT_ROOT       Workspace override (else nearest ancestor with bugate.config.yaml, else the engine).
+#
+# Layout-aware: the ENGINE is where this script lives (core checkout, or the
+# vendored kit inside a governed repo); the WORKSPACE is the governed repo root
+# (bugate.config.yaml). All relative globs/paths/outputs resolve against the
+# WORKSPACE so an imported repo's `docs/.../probes/*.json` glob and reports land
+# in the SUT repo, never inside the vendored kit tree.
 #
 # Enable weekly automation with EITHER:
-#   crontab:  0 9 * * 1  cd /path/to/bugate && WAVE8_EVIDENCE_GLOB='...' bin/wave8-weekly >> reports/wave8_weekly.log 2>&1
+#   crontab (imported): 0 9 * * 1  cd <sut-repo> && .bugate/bin/wave8-weekly >> artifacts/wave8_weekly.log 2>&1
+#   crontab (core):     0 9 * * 1  cd <bugate-checkout> && WAVE8_EVIDENCE_GLOB='...' bin/wave8-weekly >> reports/wave8_weekly.log 2>&1
 #   launchd:  a LaunchAgent invoking this script with StartCalendarInterval (Weekday=1, Hour=9),
 #             with WAVE8_EVIDENCE_GLOB set in the LaunchAgent's EnvironmentVariables.
 #
@@ -28,20 +36,32 @@
 # successive reports.
 set -euo pipefail
 
-# Engine root resolved from this script's own location.
 # Engine root: bin/ sits one level below the engine tree root.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+ENGINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Workspace root: env override, else walk up from cwd to bugate.config.yaml,
+# else fall back to the engine itself (standalone core checkout).
+WORKSPACE="${BUGATE_PROJECT_ROOT:-}"
+if [ -z "$WORKSPACE" ]; then
+  probe="$(pwd)"
+  while [ "$probe" != "/" ]; do
+    if [ -f "$probe/bugate.config.yaml" ]; then WORKSPACE="$probe"; break; fi
+    probe="$(dirname "$probe")"
+  done
+fi
+WORKSPACE="${WORKSPACE:-$ENGINE}"
+cd "$WORKSPACE"
 
-# Resolve SUT-owned Wave 8 config: env vars win, else active profile/config.
+# Resolve SUT-owned Wave 8 config: env vars win, else active profile/config
+# (BUGATE_PROFILE honored, same precedence as the Python CLIs).
 read_profile_value() {
   local key="$1"
-  python3 - "$ROOT" "$key" <<'PY'
+  python3 - "$ENGINE" "$key" <<'PY'
+import os
 import sys
 sys.path.insert(0, sys.argv[1] + "/scripts")
 try:
     from bugate_core import load_config
-    cfg = load_config()
+    cfg = load_config(profile=os.environ.get("BUGATE_PROFILE") or None)
 except Exception:
     cfg = {}
 print(cfg.get(sys.argv[2]) or "")
@@ -80,13 +100,13 @@ REPORTS_DIR="${WAVE8_REPORTS_DIR:-}"
 if [ -z "$REPORTS_DIR" ]; then
   REPORTS_DIR="$(read_profile_value wave8_reports_dir)"
 fi
-REPORTS_DIR="${REPORTS_DIR:-$ROOT/reports}"
+REPORTS_DIR="${REPORTS_DIR:-$WORKSPACE/reports}"
 
 ARTIFACT_ROOT="${WAVE8_ARTIFACT_ROOT:-}"
 if [ -z "$ARTIFACT_ROOT" ]; then
   ARTIFACT_ROOT="$(read_profile_value wave8_artifact_root)"
 fi
-ARTIFACT_ROOT="${ARTIFACT_ROOT:-$ROOT}"
+ARTIFACT_ROOT="${ARTIFACT_ROOT:-$WORKSPACE}"
 mkdir -p "$REPORTS_DIR"
 
 ORACLE_JSON="$REPORTS_DIR/oracle_falsification_result.json"
@@ -102,7 +122,7 @@ fi
 if [ -n "${BUGATE_PROFILE:-}" ]; then
   oracle_args+=(--profile "$BUGATE_PROFILE")
 fi
-python3 "$ROOT/scripts/oracle_falsification.py" "${oracle_args[@]}"
+python3 "$ENGINE/scripts/oracle_falsification.py" "${oracle_args[@]}"
 
 matrix_args=(
   --mutation-result "$ORACLE_JSON" \
@@ -115,7 +135,7 @@ fi
 if [ -n "${BUGATE_PROFILE:-}" ]; then
   matrix_args+=(--profile "$BUGATE_PROFILE")
 fi
-python3 "$ROOT/scripts/generate_assertion_coverage_matrix.py" "${matrix_args[@]}"
+python3 "$ENGINE/scripts/generate_assertion_coverage_matrix.py" "${matrix_args[@]}"
 
 echo "[wave8-weekly] done. Review survived falsifications and bare/missing assertions:"
 echo "  $ORACLE_MD"

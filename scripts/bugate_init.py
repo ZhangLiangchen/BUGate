@@ -85,18 +85,45 @@ def _cmd(vendor_dir: str, script: str, *args: str) -> str:
 
 
 def hook_blocks(vendor_dir: str, runtime: str) -> dict:
-    """The BUGate hook wiring for one runtime ('claude' or 'codex')."""
-    guard_cmds = [
+    """The BUGate hook wiring for one runtime ('claude' or 'codex').
+
+    The write-shaped guards (check_bugate, check_plan_lock) must see ONLY
+    write tools: check_bugate does not inspect tool_name and fail-closes on
+    any payload naming a guarded path, so matching it on Read would block
+    reading guarded tests. The Wave-7 role guard (check_agent_role_paths)
+    distinguishes read/write buckets itself and needs Read in its matcher or
+    profile `agent_roles` read-isolation is silently unenforced.
+    """
+    write_guard_cmds = [
         _cmd(vendor_dir, "check_bugate.py"),
         _cmd(vendor_dir, "check_plan_lock.py"),
+    ]
+    role_guard_cmds = [
         _cmd(vendor_dir, "check_agent_role_paths.py"),
     ]
     reminder = [_cmd(vendor_dir, "bugate_prompt_reminder.py")]
+    if runtime == "claude":
+        pre_tool_use = [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [{"type": "command", "command": c} for c in write_guard_cmds],
+            },
+            {
+                "matcher": "Read|Edit|Write",
+                "hooks": [{"type": "command", "command": c} for c in role_guard_cmds],
+            },
+        ]
+    else:
+        # Codex has no hookable Read tool; apply_patch carries all writes.
+        pre_tool_use = [{
+            "matcher": "apply_patch",
+            "hooks": [
+                {"type": "command", "command": c}
+                for c in write_guard_cmds + role_guard_cmds
+            ],
+        }]
     blocks = {
-        "PreToolUse": [{
-            "matcher": "Edit|Write" if runtime == "claude" else "apply_patch",
-            "hooks": [{"type": "command", "command": c} for c in guard_cmds],
-        }],
+        "PreToolUse": pre_tool_use,
         "UserPromptSubmit": [{
             "hooks": [{"type": "command", "command": c} for c in reminder],
         }],
