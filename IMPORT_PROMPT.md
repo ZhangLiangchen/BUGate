@@ -20,7 +20,7 @@ core files.
 
 - Target SUT repo: use the current working directory unless the user gives a
   different path.
-- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.2`.
+- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.3`.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
 - If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
   release, use it. Otherwise download the GitHub Release tarball outside the
@@ -41,7 +41,7 @@ core files.
    - Otherwise run the equivalent of:
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.2}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.3.3}"
      BUGATE_TMP="$(mktemp -d)"
      if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
        "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then

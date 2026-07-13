@@ -94,7 +94,7 @@ hook/script 接线检查、Memory Bus 初始化、profile 激活以及 Codex re-
 **Release tarball 路径 —— SUT 仓内无需 clone BUGate core。** 下载版本化 GitHub Release asset，在 SUT 仓外解包，然后把 installer 指向 SUT 自动化测试仓：
 
 ```bash
-BUGATE_VERSION=0.3.2
+BUGATE_VERSION=0.3.3
 curl -L -o bugate-${BUGATE_VERSION}.tar.gz \
   https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz
 tar -xzf bugate-${BUGATE_VERSION}.tar.gz
@@ -154,17 +154,17 @@ python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-ter
 从干净 BUGate checkout 构建 Phase 1 GitHub Release archive assets：
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.3.2
+python3 scripts/build_release_archives.py --version 0.3.3
 ```
 
 输出：
 
 ```text
-dist/bugate-0.3.2.tar.gz
-dist/bugate-0.3.2.zip
+dist/bugate-0.3.3.tar.gz
+dist/bugate-0.3.3.zip
 ```
 
-把两个文件都附到 tag `v0.3.2` 的 GitHub Release。这些归档以一个版本化 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、hooks、scripts 与 bin wrappers。
+把两个文件都附到 tag `v0.3.3` 的 GitHub Release。这些归档以一个版本化 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、hooks、scripts 与 bin wrappers。
 
 core 默认带 `guarded_path_regex: []`（写守卫**关闭**）和空 `artifact_dir`；导入后的 SUT profile 会在被治理 SUT 测试仓中开启它们。
 
