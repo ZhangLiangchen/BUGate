@@ -65,7 +65,11 @@ KIT_DIRS = [
 # guide is the post-import operator manual (lessons + activation recipes) and
 # must live INSIDE the governed repo so later sessions can read it without the
 # engine checkout.
-KIT_FILES = ["docs/IMPORT-FIELD-GUIDE.md"]
+KIT_FILES = [
+    "docs/IMPORT-FIELD-GUIDE.md",
+    "docs/USING-BUGATE.md",
+    "docs/USING-BUGATE.zh-CN.md",
+]
 IGNORE_NAMES = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
 
 # Codex plugins package the shared skills/hooks/MCP surface. BUGate still wires
@@ -581,11 +585,16 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
      ({vendor_dir}/bin/memory-bus-ensure re-checks). Offline/locked-down machine:
      BUGATE_MEMORY_NO_INSTALL=1 skips auto-install (then install manually per
      docs/SETUP-OPTIONAL.md §2).
-  7. Read the vendored field guide — {vendor_dir}/docs/IMPORT-FIELD-GUIDE.md —
-     before operating the orchestrator: it carries the real-SUT lessons
-     (dual-agent dispatch diagnosis/proxy surface, --auto 03b overwrite
-     semantics, post-run 04/05 clobber SOP, copy hygiene) and the Wave 7/8
-     activation recipes. Optional one-shot self-check from the repo root:
+  7. Hand the user the vendored USAGE guide — {vendor_dir}/docs/USING-BUGATE.md
+     (中文: USING-BUGATE.zh-CN.md) — it is the day-to-day operator manual:
+     open THIS repo as the agent session's project root, then start a new
+     requirement with the orchestrator working loop (author pre-code artifacts
+     -> `sdtd_orchestrator.py docs/usecases/<UC> --auto` -> human accepts 03b
+     -> guard admits Layer-4 test code -> post-run closure). For operations
+     and diagnosis read {vendor_dir}/docs/IMPORT-FIELD-GUIDE.md (dual-agent
+     dispatch diagnosis/proxy surface, --auto 03b overwrite semantics,
+     post-run 04/05 clobber SOP, copy hygiene, Wave 7/8 activation recipes).
+     Optional one-shot self-check from the repo root:
        python3 {vendor_dir}/.shared/skills/bugate-full-check/scripts/run_full_check.py --mode smoke
 """
 

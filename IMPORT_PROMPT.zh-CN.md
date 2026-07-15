@@ -192,6 +192,10 @@ BUGate core 文件。
    - 说明 Memory Bus 状态。
    - 说明 Codex 需要在 Codex Desktop 中对变更后的 hook hash 做一次 re-trust，
      Codex hooks 才会生效。Claude Code 是否需要新 session 或 plugin reload 取决于打开方式。
+   - 把 vendored 使用指导交给用户作为日常手册：
+     `$BUGATE_VENDOR_DIR/docs/USING-BUGATE.zh-CN.md`（English: `USING-BUGATE.md`）
+     ——以本仓为会话项目根打开，然后按 orchestrator 工作循环推进新需求
+     （`--auto` → 人工放行 03b → 守卫放行测试代码 → post-run 闭环）。
    - 除非用户明确要求，不要 stage、commit 或 push。
 
 ### 附录：按需激活可选波次（Wave 7 / Wave 8）

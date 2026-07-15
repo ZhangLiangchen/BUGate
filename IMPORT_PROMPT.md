@@ -207,6 +207,11 @@ core files.
    - State that Codex requires a one-time re-trust of the changed hook hash in
      Codex Desktop before Codex hooks become active. Claude Code may need a new
      session or plugin reload depending on how the repo is opened.
+   - Point the user at the vendored usage guide for day-to-day work:
+     `$BUGATE_VENDOR_DIR/docs/USING-BUGATE.md` (中文: `USING-BUGATE.zh-CN.md`)
+     — open this repo as the session's project root, then drive new
+     requirements through the orchestrator working loop (`--auto` → human
+     accepts 03b → guard admits test code → post-run closure).
    - Do not stage, commit, or push unless the user explicitly asks.
 
 ### Appendix: activating the optional waves (Wave 7 / Wave 8)

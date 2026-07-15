@@ -10,6 +10,11 @@ BUGate 的定位、唯一规范使用方式（**导入模式**；打开本仓只
 
 ## 前 5 分钟（从这里开始）
 
+已经把 BUGate 导入 SUT 仓、想知道日常怎么**用**？看
+[docs/USING-BUGATE.zh-CN.md](docs/USING-BUGATE.zh-CN.md)
+（English: [USING-BUGATE.md](docs/USING-BUGATE.md)）——它也会随 vendored kit
+进入每个受治理仓的 `<vendor>/docs/`。
+
 零安装（Python 3.9+，只用标准库；推荐 3.10+）。在仓库根目录执行：
 
 ```bash

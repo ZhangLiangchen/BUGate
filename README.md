@@ -17,6 +17,11 @@ evolution plan are chartered in
 
 ## First 5 minutes (start here)
 
+Already imported BUGate into a SUT repo and wondering how to USE it day to
+day? That guide is [docs/USING-BUGATE.md](docs/USING-BUGATE.md)
+(中文: [USING-BUGATE.zh-CN.md](docs/USING-BUGATE.zh-CN.md)) — it also ships
+vendored inside every governed repo at `<vendor>/docs/`.
+
 Zero install (Python 3.9+, standard library only; 3.10+ recommended). From the repo root:
 
 ```bash
