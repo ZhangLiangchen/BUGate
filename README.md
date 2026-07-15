@@ -260,6 +260,21 @@ shipped artifact templates pass the pre-code gates as-is:
 python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
 ```
 
+## Support envelope
+
+- **Verified platform: macOS.** Other OSes are not yet validated; adapting the
+  kit there (bash wrappers, hook command strings, path handling) is currently
+  the adopter's responsibility. Broader OS support is roadmap, not a defect.
+- **Agent runtimes: Claude Code and Codex, by design.** The orchestrator, hook
+  wiring, and dual-peer bridges target exactly these two; other agents/editors
+  get no physical gate wiring today and are future evolution items.
+- **Host runtime vs SUT language:** the kit itself needs `python3 >= 3.9` on
+  the machine (stdlib-only). Your test framework does **not** have to be
+  Python — the write guard, artifact gates, and orchestrator are
+  language-agnostic (validated on pytest, TypeScript/Playwright specs,
+  Java/JUnit CamelCase tests, and Cucumber `.feature` trees). Layer-4
+  post-run log classification is currently tuned for pytest-shaped output.
+
 ## Agent runtimes
 
 BUGate runs under **Claude Code** and **Codex** via the shared skill at

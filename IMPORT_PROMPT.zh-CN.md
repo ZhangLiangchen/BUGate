@@ -14,6 +14,13 @@ Agentic QA Governance Kernel。保持 SUT 仓作为项目根；不要在 SUT 仓
 BUGate core，不要把 SUT 挂进 BUGate core，也不要把产品 secret 或环境事实写进
 BUGate core 文件。
 
+### 支持范围（遇到不匹配先读这里再决定是否中止）
+
+- 已在 macOS 验证；其他操作系统未经验证，适配由使用方负责。
+- 物理门接线按设计只面向 Claude Code + Codex。
+- `python3 >= 3.9` 是 **kit 的宿主运行时**——SUT 的测试框架可以是任何语言
+  （守卫/门与语言无关）；不要因为 SUT 仓里没有 Python 就中止导入。
+
 ### 输入
 
 - 目标 SUT 仓：除非用户给出其他路径，否则使用当前工作目录。
@@ -140,6 +147,10 @@ BUGate core 文件。
    首次安装较慢是可以接受的，只要 status 说明仍在启动。报告时要说明：机器级
    Memory Bus 健康之前，BUGate 安装仍不完整。不要创建 per-repo memory service
    目录。
+   - 在线 `pip` 安装是**优先路径**。仅当机器无网络时：设
+     `BUGATE_MEMORY_NO_INSTALL=1` 跳过自动安装，按 engine 的
+     `docs/SETUP-OPTIONAL.md` §2 手动/离线安装——这是兜底而非推荐路线；
+     bus 装好前按「治理已激活、memory 待就绪」口径报告导入结果。
 
 8. **验证写守卫 negative control**
    - 如果 `guarded_path_regex` 仍为空，报告 BUGate 已安装，但在 profile 激活前物理写守卫是 inert。

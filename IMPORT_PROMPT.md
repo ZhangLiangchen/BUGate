@@ -16,6 +16,14 @@ do not clone BUGate core inside the SUT repo, do not mount the SUT inside
 BUGate core, and do not put product secrets or environment facts into BUGate
 core files.
 
+### Support envelope (read before aborting on a mismatch)
+
+- Verified on macOS; other OSes are unvalidated and adapter-owned.
+- Physical gate wiring targets Claude Code + Codex by design.
+- `python3 >= 3.9` is the KIT's host runtime — the SUT's test framework can be
+  any language (the guard/gates are language-agnostic); do not abort the import
+  just because the SUT repo contains no Python.
+
 ### Inputs
 
 - Target SUT repo: use the current working directory unless the user gives a
@@ -146,6 +154,11 @@ core files.
    A slow first-time install is acceptable if the status says it is still
    starting. Report that BUGate is incomplete until the machine-level Memory Bus
    becomes healthy. Do not create a per-repo memory service directory.
+   - Online `pip` install is the PREFERRED path. Only when the machine has no
+     network: set `BUGATE_MEMORY_NO_INSTALL=1` to skip auto-install and follow
+     the manual/offline steps in the engine's `docs/SETUP-OPTIONAL.md` §2 —
+     this is a fallback, not the recommended route; report the import as
+     "governance active, memory pending" until the bus is installed.
 
 8. **Verify the write guard negative control**
    - If `guarded_path_regex` is still empty, report that BUGate is installed but

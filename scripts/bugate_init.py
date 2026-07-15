@@ -45,6 +45,7 @@ again) while config, profile, the repo's own hooks, and the repo's own
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -420,12 +421,64 @@ def wire_hooks(target: Path, vendor_dir: str, dry: bool) -> list[str]:
     return notes
 
 
+NAMESPACE_REGISTRY = Path.home() / ".bugate" / "namespaces.tsv"
+
+
+def _read_namespace_registry() -> dict[str, str]:
+    entries: dict[str, str] = {}
+    if NAMESPACE_REGISTRY.exists():
+        for line in NAMESPACE_REGISTRY.read_text(encoding="utf-8").splitlines():
+            if "\t" in line:
+                ns, path = line.split("\t", 1)
+                entries[ns.strip()] = path.strip()
+    return entries
+
+
+def _memory_namespace(target: Path) -> tuple[str, bool]:
+    """Collision-guarded default namespace for the machine-level shared bus.
+
+    The bus is ONE service per machine isolated only by namespace tags, so two
+    governed repos whose directories share a basename (e.g. two checkouts both
+    named `backend`) would silently share `project:backend` and cross-pollute
+    each other's memory. A tiny machine-local registry maps namespace -> repo
+    path: the first repo keeps the plain name; a DIFFERENT repo hitting a taken
+    name gets a short path-hash suffix. Deterministic and offline; re-running
+    init on the same repo is idempotent. Returns (namespace, was_suffixed).
+    """
+    me = str(target.resolve())
+    base = f"project:{target.resolve().name}"
+    entries = _read_namespace_registry()
+    if entries.get(base) in (None, me):
+        return base, False
+    suffix = hashlib.sha1(me.encode("utf-8")).hexdigest()[:4]
+    return f"{base}-{suffix}", True
+
+
+def _register_namespace(namespace: str, target: Path) -> None:
+    entries = _read_namespace_registry()
+    me = str(target.resolve())
+    if entries.get(namespace) == me:
+        return
+    entries[namespace] = me
+    NAMESPACE_REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    NAMESPACE_REGISTRY.write_text(
+        "".join(f"{ns}\t{path}\n" for ns, path in sorted(entries.items())),
+        encoding="utf-8",
+    )
+
+
 def scaffold(target: Path, vendor_dir: str, dry: bool) -> list[str]:
     notes = []
+    namespace, suffixed = _memory_namespace(target)
+    if suffixed:
+        notes.append(
+            f"memory.namespace: `{namespace}` (basename already claimed by another repo "
+            f"in {NAMESPACE_REGISTRY} — path-hash suffix added to prevent cross-repo "
+            "memory pollution; edit the profile if you prefer another tag)")
     files = {
         target / "bugate.config.yaml": CONFIG_SCAFFOLD.format(vendor_dir=vendor_dir),
         target / "bugate.profile.yaml": PROFILE_SCAFFOLD.format(
-            vendor_dir=vendor_dir, name=target.resolve().name),
+            vendor_dir=vendor_dir, name=namespace.removeprefix("project:")),
     }
     for path, body in files.items():
         if path.exists():
@@ -434,6 +487,8 @@ def scaffold(target: Path, vendor_dir: str, dry: bool) -> list[str]:
         notes.append(f"scaffold {path.name}")
         if not dry:
             path.write_text(body, encoding="utf-8")
+            if path.name == "bugate.profile.yaml":
+                _register_namespace(namespace, target)
     skeleton = target / "docs" / "usecases"
     notes.append("mkdir docs/usecases/")
     if not dry:

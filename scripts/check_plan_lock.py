@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Optional BUGate plan lock.
 
-If `.bugate/plan.lock` exists, implementation writes are blocked until the lock
-is removed by the workflow owner. Core BUGate does not create the lock itself.
+If `plan.lock` exists at the ENGINE root — the directory holding this script's
+parent, i.e. the vendored kit dir in imported mode (any --vendor-dir name) or
+the core checkout root — implementation writes are blocked until the lock is
+removed by the workflow owner. Core BUGate does not create the lock itself.
+Resolving via the script's own location (not a hardcoded `.bugate/`) keeps the
+lock working under custom vendor dirs.
 """
 
 from __future__ import annotations
@@ -14,8 +18,8 @@ from bugate_core import find_root
 
 
 def main() -> int:
-    root = find_root(Path.cwd().resolve())
-    lock = root / ".bugate" / "plan.lock"
+    find_root(Path.cwd().resolve())  # fail loud outside a governed workspace
+    lock = Path(__file__).resolve().parent.parent / "plan.lock"
     if not lock.exists():
         return 0
     sys.stderr.write(f"BUGate plan lock is active: {lock}\n")

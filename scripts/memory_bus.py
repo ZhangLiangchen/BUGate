@@ -202,10 +202,14 @@ def request_json(
 
 def service_available() -> bool:
     try:
-        request_json("GET", "/api/health", timeout=1.5)
-        return True
+        data = request_json("GET", "/api/health", timeout=1.5)
     except MemoryBusError:
         return False
+    # Service-signature check: port 8000 is heavily squatted in dev
+    # environments; a foreign app answering 200 with arbitrary JSON must not
+    # masquerade as the memory bus. mcp-memory-service /api/health always
+    # carries a "status" field.
+    return isinstance(data, dict) and "status" in data
 
 
 def warn_unavailable() -> None:

@@ -174,6 +174,17 @@ core 默认带 `guarded_path_regex: []`（写守卫**关闭**）和空 `artifact
 python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
 ```
 
+## 支持范围（Support envelope）
+
+- **已验证平台：macOS。** 其他操作系统未经验证,兼容适配(bash 包装脚本、hook
+  命令串、路径处理)目前由使用方自行负责;更广的 OS 支持属于后续演进,不视为缺陷。
+- **Agent 运行时:Claude Code 与 Codex,设计如此。** orchestrator、hook 接线与
+  双端评审桥只面向这两家;其他 agent/编辑器目前没有物理门接线,属于未来演进项。
+- **宿主运行时 ≠ SUT 语言:** kit 本身需要机器上有 `python3 >= 3.9`(纯标准库),
+  但你的测试框架**不必**是 Python——写守卫、工件门与 orchestrator 均与语言无关
+  (已在 pytest、TypeScript/Playwright、Java/JUnit 驼峰命名、Cucumber `.feature`
+  资产树上实证)。Layer-4 post-run 日志分类目前面向 pytest 形态输出调校。
+
 ## Agent runtimes
 
 BUGate 通过 `.shared/skills/bugate/` 的共享 skill 与 `.claude/` / `.codex/` 中的 hooks 运行在 **Claude Code** 与 **Codex** 下：开发 BUGate 本身时来自本仓；导入模式下 vendor 到 SUT 仓（Quickstart A）；也可通过双 plugin surface 使用。Codex repo skills 使用 `.agents/skills/` 作为 canonical 路径；`.codex/skills/` 只保留为 legacy bridge。Plugin packaging 遵循 root-standard：manifest 位于 `.codex-plugin/` 与 `.claude-plugin/`；`skills/`、`commands/`、`agents/`、`hooks/hooks.json`、`scripts/` 与 `bin/` 保持在 plugin root。gate engine **只使用标准库**，并且不依赖 git 来解析 root：active project 通过从 CWD 向上寻找最近的 `bugate.config.yaml` 定位（`AGENTS.md` + `.shared/` sentinel 只作为自开发 fallback），engine assets 通过 engine tree 自身位置定位。注意：新增或修改 Codex hook 需要重新信任其 hash；plugin 改动可能需要 Claude `/reload-plugins` 或重新安装/更新 plugin。

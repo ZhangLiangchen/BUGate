@@ -180,7 +180,17 @@ The bus is **machine-level by design** (ADR-BUGATE-003): ONE service instance
 per machine, shared by every BUGate-enabled repo; projects are isolated
 by namespace tag (`project:<name>` from each workspace's profile), never by
 per-repo databases — so a restart triggered from any repo resolves to the same
-database by construction (no split brain). Clients load `client.env` from the
+database by construction (no split brain).
+
+Collision guards (v0.3.4+): the port is configurable via `MCP_HTTP_PORT`
+(default 8000 — a heavily squatted dev port; move the bus if something else
+owns it). The health probe verifies the mcp-memory-service response signature,
+so a foreign app answering 200 on `/api/health` is not mistaken for the bus.
+The importer keeps a machine-local registry `~/.bugate/namespaces.tsv`
+(namespace → repo path): when a second repo's basename would collide with an
+already-claimed `project:<name>` tag, the scaffolded namespace gets a short
+path-hash suffix instead of silently sharing memory — namespace isolation is
+cooperative (one shared client token), so keep the tags unique. Clients load `client.env` from the
 system home first; a legacy in-repo `.memory_bus/client.env` still works but
 prints a deprecation hint. The service itself takes daily `.db` backups into
 `<bus-home>/backups/` (tune with `MCP_BACKUP_*` env vars).
