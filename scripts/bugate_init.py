@@ -65,10 +65,12 @@ KIT_DIRS = [
 # guide is the post-import operator manual (lessons + activation recipes) and
 # must live INSIDE the governed repo so later sessions can read it without the
 # engine checkout.
+# Post-import guidance is consolidated under .shared/skills/bugate-import/
+# (vendored via KIT_DIRS, agent-discoverable via skill links). The only doc
+# vendored separately is the machine-runtime setup manual — a different
+# concern (peer CLIs / memory service on the HOST) than framework adaptation.
 KIT_FILES = [
-    "docs/IMPORT-FIELD-GUIDE.md",
-    "docs/USING-BUGATE.md",
-    "docs/USING-BUGATE.zh-CN.md",
+    "docs/SETUP-OPTIONAL.md",
 ]
 IGNORE_NAMES = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
 
@@ -219,8 +221,12 @@ PROFILE_SCAFFOLD = r"""# BUGate SUT profile — COMMIT this file beside the test
 artifact_dir_template: docs/usecases/{{uc}}/
 
 # INERT until filled: add regexes (with a (?P<uc>...) capture) matching this
-# repo's test layout to turn the physical write guard on. Example:
-#   - "(^|/)tests/(?P<uc>[^/]+)/[^/]+[.]py$"
+# repo's test layout to turn the physical write guard on. The layout is YOURS,
+# not BUGate's — derive the binding with the vendored bugate-import skill
+# ({vendor_dir}/.shared/skills/bugate-import/SKILL.md: matching rules, worked
+# bindings for pytest / TS specs / Java CamelCase / Gherkin, verification
+# protocol). Framework-neutral shape:
+#   - "(^|/)<test-tree>/(?P<uc>uc[-_][a-z0-9_-]+)[.]<ext>$"
 guarded_path_regex: []
 
 required_precode_artifacts:
@@ -239,7 +245,7 @@ required_precode_artifacts:
 #   - "\bmy-product-name\b"
 
 # --- Optional waves (dormant until configured; recipes: IMPORT_PROMPT
-# --- appendix and {vendor_dir}/docs/IMPORT-FIELD-GUIDE.md) ---------------
+# --- appendix and {vendor_dir}/.shared/skills/bugate-import/references/field-guide.md) ---
 # Wave 7 role isolation: uncomment and adapt, then run with
 # BUGATE_AGENT_ROLE=<role>. Bare list = forbidden for read AND write;
 # read:/write: sub-lists scope each side. Role names lowercase.
@@ -572,8 +578,8 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
      next Codex session (no re-trust needed — they are skills/agents, not hooks).
   4. Acceptance — R4 negative control: pick a guarded test path whose UC has no
      passed pre-code artifacts and confirm the block:
-       python3 {vendor_dir}/scripts/check_bugate.py <a-guarded-test>.py </dev/null
-       # expect exit 2 and the missing-artifact list
+       python3 {vendor_dir}/scripts/check_bugate.py <a-guarded-test-file> </dev/null
+       # expect exit 2 and the missing-artifact list (any language/extension)
   5. Per-UC flow from here on:
        python3 {vendor_dir}/scripts/sdtd_orchestrator.py docs/usecases/<UC> --init
   6. Memory bus (REQUIRED, machine-level): a BUGate setup is incomplete without
@@ -585,16 +591,16 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
      ({vendor_dir}/bin/memory-bus-ensure re-checks). Offline/locked-down machine:
      BUGATE_MEMORY_NO_INSTALL=1 skips auto-install (then install manually per
      docs/SETUP-OPTIONAL.md §2).
-  7. Hand the user the vendored USAGE guide — {vendor_dir}/docs/USING-BUGATE.md
-     (中文: USING-BUGATE.zh-CN.md) — it is the day-to-day operator manual:
-     open THIS repo as the agent session's project root, then start a new
-     requirement with the orchestrator working loop (author pre-code artifacts
-     -> `sdtd_orchestrator.py docs/usecases/<UC> --auto` -> human accepts 03b
-     -> guard admits Layer-4 test code -> post-run closure). For operations
-     and diagnosis read {vendor_dir}/docs/IMPORT-FIELD-GUIDE.md (dual-agent
-     dispatch diagnosis/proxy surface, --auto 03b overwrite semantics,
-     post-run 04/05 clobber SOP, copy hygiene, Wave 7/8 activation recipes).
-     Optional one-shot self-check from the repo root:
+  7. ALL post-import guidance lives under ONE vendored skill —
+     {vendor_dir}/.shared/skills/bugate-import/ (also linked into
+     .claude/.agents/.codex skills):
+       SKILL.md                          adaptation principle + layout wiring
+       references/using-bugate.md        day-to-day operator manual (中文:
+                                         using-bugate.zh-CN.md) — HAND THIS
+                                         TO THE USER
+       references/field-guide.md         operations & diagnosis
+     Machine runtime setup (peer CLIs / memory service / offline fallback):
+     {vendor_dir}/docs/SETUP-OPTIONAL.md. Optional one-shot self-check:
        python3 {vendor_dir}/.shared/skills/bugate-full-check/scripts/run_full_check.py --mode smoke
 """
 

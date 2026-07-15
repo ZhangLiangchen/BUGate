@@ -165,7 +165,7 @@ core files.
    becomes healthy. Do not create a per-repo memory service directory.
    - Online `pip` install is the PREFERRED path. Only when the machine has no
      network: set `BUGATE_MEMORY_NO_INSTALL=1` to skip auto-install and follow
-     the manual/offline steps in the engine's `docs/SETUP-OPTIONAL.md` §2 —
+     the manual/offline steps in the vendored `$BUGATE_VENDOR_DIR/docs/SETUP-OPTIONAL.md` §2 —
      this is a fallback, not the recommended route; report the import as
      "governance active, memory pending" until the bus is installed.
 
@@ -208,17 +208,20 @@ core files.
      Codex Desktop before Codex hooks become active. Claude Code may need a new
      session or plugin reload depending on how the repo is opened.
    - Point the user at the vendored usage guide for day-to-day work:
-     `$BUGATE_VENDOR_DIR/docs/USING-BUGATE.md` (中文: `USING-BUGATE.zh-CN.md`)
-     — open this repo as the session's project root, then drive new
-     requirements through the orchestrator working loop (`--auto` → human
-     accepts 03b → guard admits test code → post-run closure).
+     `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/using-bugate.md`
+     (中文: `using-bugate.zh-CN.md` beside it) — open this repo as the
+     session's project root, then drive new requirements through the
+     orchestrator working loop (`--auto` → human accepts 03b → guard admits
+     test code → post-run closure). ALL post-import guidance is consolidated
+     under that one skill.
    - Do not stage, commit, or push unless the user explicitly asks.
 
 ### Appendix: activating the optional waves (Wave 7 / Wave 8)
 
-> The importer (v0.3.2+) vendors the field-tested operator manual to
-> `$BUGATE_VENDOR_DIR/docs/IMPORT-FIELD-GUIDE.md` — read it right after
-> import: the dual-agent dispatch diagnosis ladder and proxy surface, the
+> The importer vendors the field-tested operator manual inside the
+> bugate-import skill —
+> `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/field-guide.md`
+> — read it right after import: the dual-agent dispatch diagnosis ladder and proxy surface, the
 > `--auto` 03b overwrite semantics, the post-run 04/05 clobber SOP, UC copy
 > hygiene, and the full activation recipes for both waves below live there.
 

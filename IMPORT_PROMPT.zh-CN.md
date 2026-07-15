@@ -156,8 +156,8 @@ BUGate core 文件。
    Memory Bus 健康之前，BUGate 安装仍不完整。不要创建 per-repo memory service
    目录。
    - 在线 `pip` 安装是**优先路径**。仅当机器无网络时：设
-     `BUGATE_MEMORY_NO_INSTALL=1` 跳过自动安装，按 engine 的
-     `docs/SETUP-OPTIONAL.md` §2 手动/离线安装——这是兜底而非推荐路线；
+     `BUGATE_MEMORY_NO_INSTALL=1` 跳过自动安装，按 vendored 的
+     `$BUGATE_VENDOR_DIR/docs/SETUP-OPTIONAL.md` §2 手动/离线安装——这是兜底而非推荐路线；
      bus 装好前按「治理已激活、memory 待就绪」口径报告导入结果。
 
 8. **验证写守卫 negative control**
@@ -193,15 +193,17 @@ BUGate core 文件。
    - 说明 Codex 需要在 Codex Desktop 中对变更后的 hook hash 做一次 re-trust，
      Codex hooks 才会生效。Claude Code 是否需要新 session 或 plugin reload 取决于打开方式。
    - 把 vendored 使用指导交给用户作为日常手册：
-     `$BUGATE_VENDOR_DIR/docs/USING-BUGATE.zh-CN.md`（English: `USING-BUGATE.md`）
-     ——以本仓为会话项目根打开，然后按 orchestrator 工作循环推进新需求
-     （`--auto` → 人工放行 03b → 守卫放行测试代码 → post-run 闭环）。
+     `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/using-bugate.zh-CN.md`
+     （English: 同目录 `using-bugate.md`）——以本仓为会话项目根打开，然后按
+     orchestrator 工作循环推进新需求（`--auto` → 人工放行 03b → 守卫放行
+     测试代码 → post-run 闭环）。导入后的全部指导都整合在这一个技能之下。
    - 除非用户明确要求，不要 stage、commit 或 push。
 
 ### 附录：按需激活可选波次（Wave 7 / Wave 8）
 
-> importer（v0.3.2+）会把实战运维手册 vendor 到
-> `$BUGATE_VENDOR_DIR/docs/IMPORT-FIELD-GUIDE.md` —— 导入完成后先读它：
+> importer 会把实战运维手册 vendor 到 bugate-import 技能内——
+> `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/field-guide.md`
+> —— 导入完成后先读它：
 > 双端调度诊断阶梯与代理注入、`--auto` 的 03b 覆写语义、post-run 04/05
 > 覆写 SOP、UC 复制卫生、以及下述两个波次的完整激活配方都在里面。
 

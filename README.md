@@ -18,9 +18,14 @@ evolution plan are chartered in
 ## First 5 minutes (start here)
 
 Already imported BUGate into a SUT repo and wondering how to USE it day to
-day? That guide is [docs/USING-BUGATE.md](docs/USING-BUGATE.md)
-(中文: [USING-BUGATE.zh-CN.md](docs/USING-BUGATE.zh-CN.md)) — it also ships
-vendored inside every governed repo at `<vendor>/docs/`.
+day? All post-import guidance is consolidated under one vendored skill:
+[.shared/skills/bugate-import/](.shared/skills/bugate-import/SKILL.md) —
+adaptation principle + layout wiring in SKILL.md, the operator manual at
+[references/using-bugate.md](.shared/skills/bugate-import/references/using-bugate.md)
+(中文: [using-bugate.zh-CN.md](.shared/skills/bugate-import/references/using-bugate.zh-CN.md)),
+operations lore at
+[references/field-guide.md](.shared/skills/bugate-import/references/field-guide.md).
+It ships inside every governed repo and is agent-discoverable via skill links.
 
 Zero install (Python 3.9+, standard library only; 3.10+ recommended). From the repo root:
 

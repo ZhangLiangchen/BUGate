@@ -10,10 +10,14 @@ BUGate 的定位、唯一规范使用方式（**导入模式**；打开本仓只
 
 ## 前 5 分钟（从这里开始）
 
-已经把 BUGate 导入 SUT 仓、想知道日常怎么**用**？看
-[docs/USING-BUGATE.zh-CN.md](docs/USING-BUGATE.zh-CN.md)
-（English: [USING-BUGATE.md](docs/USING-BUGATE.md)）——它也会随 vendored kit
-进入每个受治理仓的 `<vendor>/docs/`。
+已经把 BUGate 导入 SUT 仓、想知道日常怎么**用**？导入后的全部指导整合在
+**一个 vendored 技能**之下：
+[.shared/skills/bugate-import/](.shared/skills/bugate-import/SKILL.md)——
+SKILL.md 是适配原则 + 布局接线,操作者手册在
+[references/using-bugate.zh-CN.md](.shared/skills/bugate-import/references/using-bugate.zh-CN.md)
+（English: 同目录 using-bugate.md）,运维经验在
+[references/field-guide.md](.shared/skills/bugate-import/references/field-guide.md)。
+它随 kit 进入每个受治理仓,并通过 skill 链接被 agent 自动发现。
 
 零安装（Python 3.9+，只用标准库；推荐 3.10+）。在仓库根目录执行：
 

@@ -1,14 +1,34 @@
 # BUGate Import Adapter
 
+## Principle (read first)
+
+**BUGate does not know what the imported test framework looks like — and must
+never assume it.** The kit ships mechanisms (gates, guard, orchestrator,
+memory) and THIS skill family; all adaptation and wiring decisions are made by
+the importing agent (Claude Code / Codex) from two inputs only: the guidance
+inside the kit, and the actual shape of the framework it finds in the repo.
+When something doesn't fit, the answer is an adaptation decision recorded in
+the SUT profile — never a kit patch, never an invented product fact.
+
+## The adapter's map (single entry point — everything lives under this skill)
+
+| You need | Read |
+|---|---|
+| Wire the write guard to THIS repo's layout (regex/binding/verification) | this file, below |
+| Day-to-day usage after import (working loop, human checkpoints, commands) | `references/using-bugate.md` · 中文 `references/using-bugate.zh-CN.md` |
+| Operations & diagnosis (peer-dispatch failures, `--auto` overwrite semantics, post-run SOP, copy hygiene, Wave 7/8 recipes, CI carrier pattern) | `references/field-guide.md` |
+| Gate criteria and artifact contracts (what the gates actually judge) | sibling skill `../bugate/` (SKILL.md + references/) |
+| One-shot capability self-check | sibling skill `../bugate-full-check/` |
+| Machine runtime setup (peer CLIs, memory service, offline fallback) | `<vendor>/docs/SETUP-OPTIONAL.md` (vendored beside the kit) |
+
 ## Purpose
 
 Use this skill when wiring BUGate into a SUT test repo whose framework or
 layout does not match the scaffold's example — it turns "activate the profile
 from evidence" (IMPORT_PROMPT step 5) into a deterministic adaptation
-procedure. BUGate cannot assume any particular directory convention; this
-skill is how an agent derives the binding for whatever convention it finds.
-Validated end-to-end on four framework shapes: Python/pytest, TypeScript
-spec files, Java CamelCase test classes, and Gherkin `.feature` trees.
+procedure. Validated end-to-end on four framework shapes: Python/pytest,
+TypeScript spec files, Java CamelCase test classes, and Gherkin `.feature`
+trees.
 
 ## What "wiring" means here
 
@@ -108,3 +128,6 @@ warning seriously — either open sessions at the target, or export
 After adaptation, report: the regex(es) shipped, the binding mode chosen and
 why, the exit codes observed for negative/positive/ambiguity probes, and any
 layout limitation accepted (single-dir mode, renaming convention adopted).
+Then hand the operator `references/using-bugate.md` (中文:
+`references/using-bugate.zh-CN.md`) — the day-to-day working loop starts
+there.
