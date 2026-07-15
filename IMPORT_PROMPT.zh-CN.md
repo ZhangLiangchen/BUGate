@@ -23,7 +23,10 @@ BUGate core 文件。
 
 ### 输入
 
-- 目标 SUT 仓：除非用户给出其他路径，否则使用当前工作目录。
+- 目标 SUT 仓：除非用户给出其他路径，否则使用当前工作目录。目标必须是
+  **测试框架的家目录**,且之后的 agent 会话必须以**该目录**为项目根打开——
+  hook 从会话工作区加载,开在父目录(monorepo 根)的会话不会加载任何守卫。
+  importer 在目标不是 git 顶层时会发出警告;把该警告转达给用户。
 - BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.3`。
 - Vendor 目录：若设置了 `BUGATE_VENDOR_DIR` 就使用它，否则使用 `.bugate`。
 - 若 `BUGATE_ENGINE_DIR` 指向已有 BUGate checkout 或已解包 release，就使用它。
@@ -95,6 +98,11 @@ BUGate core 文件。
    - 保留 `memory.namespace`。
    - 如果测试布局清晰，用一个或多个带命名捕获 `(?P<uc>...)` 的 regex 更新
      `guarded_path_regex`。
+   - 如果布局与 scaffold 示例不符（不同语言、命名约定或 per-UC 单元），读
+     vendored 适配技能——
+     `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/SKILL.md`——并按其
+     适配流程执行（匹配规则、四种框架形态的实证绑定样例、强制的负向/正向
+     验证）。
    - 如果布局有歧义，停止并询问用户 BUGate 应该守护哪些测试路径。
    - 不要编造产品 endpoint、credential、账号、环境名、fixture 或业务事实。profile
      只写 SUT 测试仓接线信息。

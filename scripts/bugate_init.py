@@ -54,7 +54,13 @@ from pathlib import Path
 
 from bugate_core import find_engine_root
 
-KIT_DIRS = ["scripts", "bin", ".shared/skills/bugate", ".shared/skills/bugate-full-check"]
+KIT_DIRS = [
+    "scripts",
+    "bin",
+    ".shared/skills/bugate",
+    ".shared/skills/bugate-full-check",
+    ".shared/skills/bugate-import",
+]
 # Single files vendored alongside the kit subtrees: the imported-mode field
 # guide is the post-import operator manual (lessons + activation recipes) and
 # must live INSIDE the governed repo so later sessions can read it without the
@@ -348,7 +354,7 @@ def vendor_kit(engine_root: Path, target: Path, vendor_dir: str, dry: bool) -> l
 
 def link_skills(target: Path, vendor_dir: str, dry: bool, force: bool) -> list[str]:
     notes = []
-    skill_names = ("bugate", "bugate-full-check")
+    skill_names = ("bugate", "bugate-full-check", "bugate-import")
     runtimes = (
         (".claude", "project skill discovery"),
         (".agents", "official Codex skill discovery"),
@@ -584,6 +590,37 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
 """
 
 
+def session_alignment_note(target: Path) -> list[str]:
+    """Warn when the import target is not the git toplevel (monorepo subdir).
+
+    Hook wiring loads from the workspace an agent SESSION is rooted at. If the
+    target sits below a larger repo's root, a session opened at that root never
+    loads the target's .claude/settings.json / .codex/hooks.json and the
+    physical guard is silently absent. Detect the misalignment at install time
+    and tell the operator loudly; git-less targets are fine (no signal).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(target), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if result.returncode != 0:
+        return []  # not a git repo: alignment is the operator's call, no signal
+    toplevel = Path(result.stdout.strip()).resolve()
+    if toplevel == target.resolve():
+        return []
+    return [
+        "!! SESSION ALIGNMENT WARNING: import target is a SUBDIRECTORY of a larger "
+        f"git repo (target={target}, git root={toplevel}). Agent sessions MUST open "
+        f"{target} as their project root, or the hook wiring installed here is never "
+        "loaded and the physical write guard is SILENTLY ABSENT. Alternatives: open "
+        f"sessions at {target}, or export BUGATE_PROJECT_ROOT={target} in the agent's "
+        "environment. See the vendored bugate-import skill, 'Session/workspace alignment'.",
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -606,6 +643,7 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"invalid --vendor-dir: {args.vendor_dir!r}")
 
     notes = []
+    notes += session_alignment_note(target)
     notes += vendor_kit(engine_root, target, vendor_dir, args.dry_run)
     notes += link_skills(target, vendor_dir, args.dry_run, args.force)
     notes += install_codex_agents(engine_root, target, vendor_dir, args.dry_run)

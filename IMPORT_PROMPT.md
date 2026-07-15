@@ -27,7 +27,11 @@ core files.
 ### Inputs
 
 - Target SUT repo: use the current working directory unless the user gives a
-  different path.
+  different path. The target must be the **test-framework home directory**,
+  and later agent sessions must open THAT directory as their project root —
+  hooks load from the session's workspace, so a session rooted at a parent
+  (monorepo) directory silently loads no guard. The importer warns when the
+  target is not the git toplevel; relay that warning to the user.
 - BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.3`.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
 - If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
@@ -101,6 +105,11 @@ core files.
    - Preserve `memory.namespace`.
    - If the test layout is obvious, update `guarded_path_regex` with one or
      more regexes containing a named `(?P<uc>...)` capture.
+   - If the layout does not match the scaffold's example (different language,
+     naming convention, or per-UC unit), read the vendored adapter skill —
+     `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/SKILL.md` — and follow
+     its adaptation procedure (matching rules, worked bindings for four
+     framework shapes, and the mandatory negative/positive verification).
    - If the layout is ambiguous, stop and ask the user which test paths BUGate
      should guard.
    - Do not invent product endpoints, credentials, accounts, environment names,

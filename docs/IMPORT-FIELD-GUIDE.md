@@ -79,6 +79,14 @@ v0.3.1 kit gaps found in the field are listed at the end.
 
 ## 4. Write-guard field notes
 
+- **Import target = the test-framework home; sessions must open there.** Hook
+  wiring loads from the agent session's workspace root. When BUGate is
+  imported into a subdirectory of a larger repo, a session opened at the repo
+  root loads none of the target's hooks and the guard is silently absent
+  (verified live). `bugate_init` warns at install time when target ≠ git
+  toplevel; mitigations: open sessions at the target, or export
+  `BUGATE_PROJECT_ROOT=<target>` for the agent's environment.
+
 - The normalized-glob resolver is fail-closed on zero AND ambiguous matches:
   test filenames must normalize (case, `-`/`_`) to exactly one UC directory.
   A mismatched slug blocks with "cannot bind to a UC artifact dir" — that's the
