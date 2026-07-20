@@ -5,9 +5,24 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 from pathlib import Path
 
 from bugate_core import dump_json, read_text, write_text
+from role_governance import preflight
+
+
+def _postrun_writes_allowed(artifact_dirs: list[Path]) -> bool:
+    for artifact_dir in artifact_dirs:
+        result = preflight(artifact_dir, "post_run", require_acceptance=True)
+        for warning in result.warnings:
+            print(f"BUGate role-governance WARNING: {warning}", file=sys.stderr)
+        if not result.allowed:
+            print("BUGate role governance BLOCKED (post_run):", file=sys.stderr)
+            for error in result.errors or ["role preflight failed"]:
+                print(f"  - {error}", file=sys.stderr)
+            return False
+    return True
 
 
 PATTERNS = [
@@ -110,12 +125,31 @@ def render_md(result: dict) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--artifact-dir",
+        type=Path,
+        help="UC artifact directory; inferred from output parents when omitted.",
+    )
     parser.add_argument("--pytest-log", required=True)
     parser.add_argument("--json-output", required=True)
     parser.add_argument("--md-output", required=True)
     parser.add_argument("--repair-plan-output", required=True)
     parser.add_argument("--exit-code", type=int, default=None)
     args = parser.parse_args()
+    outputs = [
+        Path(args.json_output),
+        Path(args.md_output),
+        Path(args.repair_plan_output),
+    ]
+    artifact_dirs = sorted(
+        {
+            *(path.parent for path in outputs),
+            *([args.artifact_dir] if args.artifact_dir is not None else []),
+        },
+        key=lambda path: path.as_posix(),
+    )
+    if not _postrun_writes_allowed(artifact_dirs):
+        return 2
     log_path = Path(args.pytest_log)
     log = read_text(log_path) if log_path.exists() else ""
     result = classify(log, args.exit_code)

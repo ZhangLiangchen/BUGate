@@ -8,10 +8,10 @@
 #
 # The Wave 8 evidence glob is SUT-specific and is NOT hardcoded here. Supply it
 # via the WAVE8_EVIDENCE_GLOB env var, or via the active BUGate profile/config
-# key `wave8_evidence_glob` (the simple BUGate YAML parser flattens nested keys,
-# so an indented `wave8:\n  evidence_glob: ...` block is read as `evidence_glob`
-# or `wave8_evidence_glob`). If neither is set, this script prints a hint and
-# exits non-zero rather than guessing a SUT path.
+# key `wave8_evidence_glob`. The legacy documented nested form
+# `wave8:\n  evidence_glob: ...` remains supported through a dotted lookup. If
+# neither is set, this script prints a hint and exits non-zero rather than
+# guessing a SUT path.
 #
 # Optional overrides:
 #   WAVE8_FALSIFICATION_SPEC  Spec path (default: profile `falsification_spec`).
@@ -61,16 +61,24 @@ import sys
 sys.path.insert(0, sys.argv[1] + "/scripts")
 try:
     from bugate_core import load_config
-    cfg = load_config(profile=os.environ.get("BUGATE_PROFILE") or None)
+    value = load_config(profile=os.environ.get("BUGATE_PROFILE") or None)
+    for component in sys.argv[2].split("."):
+        if not isinstance(value, dict):
+            value = ""
+            break
+        value = value.get(component, "")
 except Exception:
-    cfg = {}
-print(cfg.get(sys.argv[2]) or "")
+    value = ""
+print(value or "")
 PY
 }
 
 EVIDENCE_GLOB="${WAVE8_EVIDENCE_GLOB:-}"
 if [ -z "$EVIDENCE_GLOB" ]; then
   EVIDENCE_GLOB="$(read_profile_value wave8_evidence_glob)"
+fi
+if [ -z "$EVIDENCE_GLOB" ]; then
+  EVIDENCE_GLOB="$(read_profile_value wave8.evidence_glob)"
 fi
 if [ -z "$EVIDENCE_GLOB" ]; then
   EVIDENCE_GLOB="$(read_profile_value evidence_glob)"
@@ -83,7 +91,7 @@ if [ -z "$EVIDENCE_GLOB" ]; then
 Set one of:
   * env var:  WAVE8_EVIDENCE_GLOB='<path/glob to real captured evidence JSON>'
   * config:   add `wave8_evidence_glob: '<glob>'` to bugate.config.yaml or your
-              active SUT profile (the BUGate YAML parser also accepts a
+              active SUT profile (the nested config loader also accepts a
               `wave8:` block with an indented `evidence_glob:` line).
 
 The Wave 8 evidence glob is SUT-specific and is intentionally not hardcoded.

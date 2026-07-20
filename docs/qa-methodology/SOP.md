@@ -4,13 +4,13 @@ subtitle: "基于业务理解约束层方法论的工程化操作指南"
 version: 1.0
 date: 2026-05-11
 companion: METHOD.md
-scope: Wave 0 - Wave 3（最小可行闭环）
+scope: Wave 0 - Wave 3（业务理解闭环）+ Wave 7（已发布可审计执行 SOP）
 ---
 
 # 新人 QA 执行手册：Wave 0 - Wave 3
 
 > *本文档是 METHOD.md 的配套执行手册。METHOD 解释"为什么"，本文档告诉"明天做什么"。*
-> *本期覆盖 Wave 0-3（业务理解审计层最小闭环）。Wave 4-8 在后续版本提供。*
+> *本期详细覆盖 Wave 0-3，并提供 BUGate v0.4.0 已发布的 Wave 7 可审计角色执行 SOP；Wave 4-6/8 的方法论操作细则仍在后续版本。*
 
 ---
 
@@ -771,6 +771,94 @@ known_unknowns:
 - [ ] `.ai/validated-model/unresolved.yaml` 中每条标注 why_unresolved 与 suggested_next_step
 - [ ] unresolved 比例 ≤ 30%
 - [ ] 访谈录音/逐字记录已归档（路径写入 record.yaml）
+
+---
+
+## Wave 7：可审计角色生命周期 SOP
+
+> 适用条件：imported repo 显式启用 `role_governance.mode: required`。
+> Wave 1 peer review 是 designer 阶段内的独立互审，不是 Wave 7 actor。
+
+### A. 一次性激活与负控制
+
+1. 用 `bugate_init.py` 重跑导入器，刷新 vendored scripts/hooks，并确认 SUT 自有 hook 仍在。
+2. 将 profile 中唯一的 `role_governance` 从 `mode: off` 替换为
+   `profile-schema.md` 的完整 required 块；`agent_roles` 保持为独立路径策略。
+3. Codex Desktop 对新 hook hash 执行 re-trust。未 re-trust 时只能宣布文件/re-vendor 验收通过，不能宣布 Wave 7 runtime 已激活。
+4. 在临时 UC 上验证：角色 unset 和 wrong role 都拒绝；直接改
+   `00_role_evidence/**` 拒绝；Memory 不可用时 strict transition 非零且无本地 receipt。
+
+### B. 三个独立会话
+
+```bash
+bin/bugate-role run --role designer -- <agent-command>
+bin/bugate-role run --role implementer -- <agent-command>
+bin/bugate-role run --role reviewer -- <agent-command>
+```
+
+`run` 为子进程设置 `BUGATE_AGENT_ROLE`，并在未显式给出时生成新
+`BUGATE_SESSION_ID`。Hook 子进程不能向父进程 export 身份；Desktop 必须从带身份的环境启动并重开会话。
+
+### C. Designer：pre-code 与人工门
+
+```bash
+python3 scripts/sdtd_orchestrator.py <artifact-dir> --init
+python3 scripts/sdtd_orchestrator.py <artifact-dir> --auto
+```
+
+`--init --auto` 会被拒绝；必须分开执行。`--auto` 结束后读取明确状态，
+通常先到 `READY_FOR_HUMAN_ACCEPTANCE`。Peer bridge 可生成 pending 03B，
+但 agent 不得把它自行改成 passed。
+
+真实人类审阅并接受 03B 后，designer 只记录已发生的决定：
+
+```bash
+bin/bugate-role approve <artifact-dir> --approved-by <human-id>
+bin/bugate-role handoff <artifact-dir> --phase pre_code --to implementer
+```
+
+`approve` 不修改 03B，`approved_by` 不是密码学身份认证。已有 human-acceptance receipt 后不再跑 pre-code `--auto`，直接 handoff。保存输出 receipt 里的精确 Memory ID。
+
+### D. Implementer：exact-ID 接单与 Layer 4
+
+```bash
+bin/bugate-role accept <artifact-dir> \
+  --phase implementation --handoff-id <exact-memory-id>
+```
+
+必须使用不同 session；同角色或同 session 接单会拒绝。只有
+`check_bugate.py` 和 `check_role_evidence.py` 都通过后才实现测试。完成后交付至少一个具体 guarded 文件：
+
+```bash
+bin/bugate-role handoff <artifact-dir> --phase implementation --to reviewer \
+  --implementation-file <guarded-test-file>
+```
+
+### E. Reviewer：post-run 与 completion
+
+```bash
+bin/bugate-role accept <artifact-dir> \
+  --phase post_run --handoff-id <exact-memory-id>
+python3 scripts/sdtd_orchestrator.py <artifact-dir> --auto --scope post-run \
+  --pytest-log <run.log> --command "<exact command>" --env <env> --exit-code <rc>
+bin/bugate-role complete <artifact-dir> --phase post_run \
+  --run-command "<exact command>" --exit-code <rc> \
+  --evidence-file <run.log> --gate-status <passed|failed>
+```
+
+Passed completion 要求 exit code 0 且 04/05 均 passed。Failed completion 保持
+`post_run_active`，不制造假绿。
+
+### F. Drift 恢复和安全边界
+
+- profile/pre-code drift：重做 human acceptance + designer handoff + implementer acceptance。
+- implementation drift：重做 implementer handoff + reviewer acceptance。
+- 恢复只追加 superseding generation，不删除 evidence reset。
+- 普通编辑只查本地 receipt/hash；Memory 故障只在下一个转换边界 fail-closed。
+- 环境变量、hook、本地文件只提供可审计声明，不提供不可抵赖身份。
+- Hook 不拦截任意 shell 重定向或外部编辑器；强隔离需要 OS 账号、容器、managed runner 或按角色凭据。
+
+完整契约见 [`ROLE_GOVERNANCE_PROTOCOL.zh-CN.md`](ROLE_GOVERNANCE_PROTOCOL.zh-CN.md)。
 
 ---
 

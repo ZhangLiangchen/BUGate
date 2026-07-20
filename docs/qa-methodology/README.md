@@ -11,6 +11,7 @@ profile or the imported SUT test repo. On any conflict,
 |---|---|
 | [METHOD.md](METHOD.md) | The "why": full AI-assisted black-box test methodology, the nine-Wave flow, theory mapping, and rationale. |
 | [SOP.md](SOP.md) | The "what to do next": step-by-step execution handbook for the Wave 0–3 minimum viable loop. |
+| [ROLE_GOVERNANCE_PROTOCOL.md](ROLE_GOVERNANCE_PROTOCOL.md) | The normative Wave 7 lifecycle contract: distinct designer / implementer / reviewer sessions, human acceptance, strict Memory-anchored handoffs, hash-linked receipts, drift recovery, and enforcement limits. |
 | [AGENTIC_QA_PLATFORM_GUIDE.md](AGENTIC_QA_PLATFORM_GUIDE.md) | Working guide for evolving BUGate from an Agentic QA Governance Kernel into an enterprise Agentic QA Platform with a self-hosted agent control center and multi-role SOP orchestration. |
 | [EXPERIENCE_PROMOTION_PROTOCOL.md](EXPERIENCE_PROMOTION_PROTOCOL.md) | How a SUT-local lesson is decided to either stay local or be promoted into SUT-neutral BUGate Core. |
 | [BUGATE_PLATFORM_DECOUPLING_ADR.md](BUGATE_PLATFORM_DECOUPLING_ADR.md) | ADR-BUGATE-001: the accepted BUGate Core / SUT Profile / Governed SUT Test Repo / SUT Product Runtime architecture and its promotion rule. |
@@ -23,10 +24,11 @@ profile or the imported SUT test repo. On any conflict,
 
 1. `METHOD.md` — understand the method and its reasoning first.
 2. `SOP.md` — then learn how to execute it day to day.
-3. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
-4. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
-5. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
-6. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
+3. `ROLE_GOVERNANCE_PROTOCOL.md` — the auditable Wave 7 lifecycle and receipt contract.
+4. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
+5. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
+6. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
+7. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
 
 ## Method summary (English)
 
@@ -46,11 +48,17 @@ propositions (Wave 1), the QA does citation traceback and routes the divergences
 system (Wave 4) — producing a high-confidence business model. The second layer,
 **defect-discovery generation (Waves 5–8)**, forces the AI out of happy-path
 thinking: structured test design over boundaries / illegal state transitions /
-risk weighting (Wave 5), adversarial red-team augmentation (Wave 6), three-role
-agent isolation so the implementer never reads business source (Wave 7), and a
-mutation / oracle-falsification quality gate (Wave 8). **Wave 9** is the
+risk weighting (Wave 5), adversarial red-team augmentation (Wave 6), auditable
+lifecycle separation across designer / implementer / reviewer sessions with
+Memory-anchored handoffs and hash-linked receipts (Wave 7), and a mutation /
+oracle-falsification quality gate (Wave 8). **Wave 9** is the
 change-driven regeneration mechanism: `source_hashes` detect staleness so only
 the affected scope is re-run.
+
+Wave 1 and Wave 7 are deliberately different. Wave 1 peers independently review
+one design phase; they are not lifecycle actors. Wave 7 governs who may advance
+from pre-code to implementation to post-run. The legacy-compatible
+`agent_roles` read/write path policy remains a complementary control.
 
 These Waves are *analysis-time middleware* (kept under a working dir such as
 `.ai/`) that **converge onto the shipped 01–05 gate stack**: propositions and
@@ -95,9 +103,14 @@ separate:
   Optional: `02a_test_dimension_matrix.yaml`.
 - **Layer 3** — `03_inventory.yaml` (case + proposition + oracle coverage);
   `03a_test_cases.md` (human-readable cases); `03b_adversarial_cases.yaml`.
-- **Layer 4** — implementation (SUT-profile-owned test code; the gate blocks
-  this until the pre-code artifacts are accepted).
-- Post-execution: `04_execution_report.md`, `05_knowledge_update.md`.
+- **Layer 4** — implementation (SUT-profile-owned test code). The structural
+  gate always requires accepted pre-code artifacts; when the imported profile
+  enables required role governance, Layer 4 additionally requires a current
+  human-acceptance receipt, designer handoff, and implementer acceptance; the
+  sessions must differ when `require_distinct_sessions` is enabled (the default).
+- Post-execution: `04_execution_report.md`, `05_knowledge_update.md`; required
+  role governance additionally requires the implementer handoff and reviewer
+  acceptance before these reviewer-owned outputs may be written.
 
 **The nine Waves, one line each:**
 
@@ -108,7 +121,8 @@ separate:
 - **Wave 4** — behavioral-oracle replay against the live system (optional).
 - **Wave 5** — structured test design (boundaries, illegal transitions, risk).
 - **Wave 6** — adversarial red-team scenario augmentation.
-- **Wave 7** — three-role agent isolation (builder / designer / implementer).
+- **Wave 7** — auditable designer → implementer → reviewer lifecycle
+  governance with strict handoffs, local receipts, and drift re-locking.
 - **Wave 8** — mutation / oracle-falsification quality gate.
 - **Wave 9** — change-driven regeneration (re-run only the stale scope).
 

@@ -1,7 +1,9 @@
 # BUGate SUT Profile Schema
 
 BUGate core reads a deliberately small profile surface. A profile is a YAML file
-whose keys are merged on top of `bugate.config.yaml` by `load_config`. In
+whose keys are merged on top of `bugate.config.yaml` by `load_config`. Config
+documents use the strict nested subset implemented by `parse_nested_yaml()`;
+legacy artifact/frontmatter reads continue to use `parse_simple_yaml()`. In
 imported mode (the default and only usage mode, CHARTER §2.2) the profile lives
 **in the governed SUT test repo and is committed there**, beside the tests it
 guards. It is selected through `BUGATE_PROFILE=/path/profile.yaml`, the
@@ -27,14 +29,22 @@ These keys are read from the core config and may be overridden by a profile.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `profile` | path | none (falls back to `active_profile`, then no profile loaded) | Relative or absolute path to a SUT profile YAML whose keys are merged on top of `bugate.config.yaml` by `load_config`; also re-resolved in `check_agent_role_paths.py`. |
+| `bugate.mode` | str | `core` | Engine-hosting mode. `load_config()` also exposes the v0.3.x-compatible top-level alias `mode`; this is unrelated to `role_governance.mode`. |
+| `bugate.version` | str | `0.1` | Config-schema version, not the BUGate release version. `load_config()` also exposes the legacy top-level alias `version`. |
+| `profile` | path | none (falls back to `active_profile`, then no profile loaded) | Relative or absolute path to a SUT profile YAML whose keys are merged on top of `bugate.config.yaml` by `load_config`; all guards consume that single merged mapping. In required role-governance mode a selected profile that does not exist fails closed. |
 | `active_profile` | path | none | Alternate key for the profile path; used only if `profile` is absent (`load_config` tries `profile` then `active_profile`). |
 | `memory.namespace` | str | `project:bugate` (`DEFAULT_PROJECT_TAG`, after `MEMORY_BUS_PROJECT_TAG` env) | Project namespace/tag used for all Memory Service reads/writes. In imported mode this is the ONLY memory scaffolding a governed repo declares: all repos share the machine-level bus (one DB under `~/.bugate/memory-bus`), isolated by this tag — do not scaffold a per-repo service dir (ADR-BUGATE-003). |
-| `namespace` | str | `project:bugate` | Flattened form of `memory.namespace` surfaced by `parse_simple_yaml` (nested `memory:` → `namespace:` collapses to a top-level `namespace` key); same project-tag fallback. |
+| `namespace` | str | `project:bugate` | Legacy alias for `memory.namespace`. Each base/profile document is canonicalized before merge, and the merged result exposes both access forms. If both forms conflict in one document, the nested form wins. |
+| `role_governance` | mapping | `{mode: off}` | Wave 7 auditable lifecycle policy. Core stays inert by default; an imported profile may select `advisory` or `required`. Full contract below. |
 
-> `memory.namespace` is read both as the nested key and, because the simple YAML
-> parser collapses nested keys, as a flattened top-level `namespace` key. Either
-> form sets the Memory Service project tag; both fall back to `project:bugate`.
+`load_config()` deep-merges deterministically: mappings merge recursively,
+profile scalars replace base scalars, and profile lists replace base lists
+wholesale. Adjacent nested keys are never generically flattened or silently
+discarded. Two targeted v0.3.x compatibility surfaces are canonicalized in each
+document before merge: `memory.namespace` ↔ `namespace`, and
+`bugate.mode/version` ↔ top-level `mode/version`. Nested values win a conflict
+within one document; `role_governance.mode` remains isolated from core
+`bugate.mode`.
 
 ## SUT-profile keys
 
@@ -67,6 +77,85 @@ automation workspace.
 > defined in the mapping. A bare list under a role applies its regexes to both
 > read and write actions; splitting into `read:` and `write:` sub-lists scopes
 > each side independently.
+
+### Wave 7 auditable lifecycle: `role_governance`
+
+`role_governance` governs **phase ownership, sessions, handoffs, acceptance,
+and evidence state**. It does not replace `agent_roles`, which remains the
+independent forbidden-path policy. Wave 1 peer workers are also separate: they
+cross-review inside the designer phase and are not lifecycle actors.
+
+Core and every unmigrated v0.3.x profile remain inert:
+
+```yaml
+role_governance:
+  mode: off
+```
+
+An imported profile opts into the complete contract explicitly:
+
+```yaml
+role_governance:
+  mode: required
+  memory_mode: required
+  evidence_dir: 00_role_evidence
+  session_id_required: true
+  require_distinct_sessions: true
+  human_acceptance_artifacts:
+    - 03b_adversarial_cases.yaml
+  phases:
+    pre_code:
+      allowed_roles:
+        - designer
+    implementation:
+      allowed_roles:
+        - implementer
+      requires_handoff_from:
+        - designer
+    post_run:
+      allowed_roles:
+        - reviewer
+      requires_handoff_from:
+        - implementer
+```
+
+| Field | Type | Default | Contract |
+|---|---|---|---|
+| `mode` | enum: `off` \| `advisory` \| `required` | `off` | `off` preserves v0.3.x behavior. `advisory` reports ordinary violations without blocking, but evidence-chain files still reject direct agent-tool edits. `required` fails closed on malformed config, missing/wrong identity, missing/invalid receipt, or drift. |
+| `memory_mode` | enum: `best_effort` \| `required` | `best_effort` | Controls role-transition anchors. `required` demands strict POST/exact-GET/bind/exact-GET success before a local receipt or chain advancement is published. It does not make ordinary recall, notes, Stop heartbeats, or per-edit checks strict. |
+| `evidence_dir` | relative path | `00_role_evidence` | Per-UC append-only receipt directory. Absolute paths, `..`, and `.` are invalid. Direct agent-tool edits are forbidden; only `bugate-role` may publish atomically. Do not use legacy `00_orchestration/`. |
+| `session_id_required` | bool | `true` | Requires `BUGATE_SESSION_ID` for governed lifecycle actions. Values must be actual YAML booleans. |
+| `require_distinct_sessions` | bool | `true` | Rejects acceptance in the same session that produced its handoff. Same-role self-acceptance is always rejected. |
+| `human_acceptance_artifacts` | list[relative path] | `[03b_adversarial_cases.yaml]` | Artifacts whose already-made human acceptance must be recorded. `approve` requires their current `gate_status: passed`, records their hash, and never edits them. |
+| `phases` | mapping | canonical three-phase mapping shown above | Maps each lifecycle phase to non-empty `allowed_roles` and, where applicable, `requires_handoff_from`. Unknown phases/keys and invalid relations are rejected. |
+
+Lifecycle `allowed_roles` and `requires_handoff_from` accept only
+`designer`, `implementer`, and `reviewer`; runtime/model names such as `codex`
+or `claude` are invalid role tokens. `agent_roles` remains profile-defined and
+may retain legacy/custom tokens such as `builder` because it expresses a
+different policy.
+
+The canonical lifecycle is:
+
+```text
+human_acceptance -> designer_handoff -> implementer_acceptance
+  -> implementer_handoff -> reviewer_acceptance -> reviewer_completion
+```
+
+Receipts under `<artifact-dir>/<evidence_dir>/receipts/` are append-only and
+hash-linked; `chain.json` holds only schema/state/sequence/head and latest-event
+paths. A designer handoff snapshots the profile, required pre-code artifacts,
+formal multiview output when present, dispatch provenance, and human acceptance.
+An implementer handoff adds at least one workspace-contained guarded
+implementation file for the same UC. Reviewer completion adds 04/05, execution
+command/exit code, and log/evidence hashes. Profile or pre-code drift re-locks
+from designer acceptance/handoff; implementation drift re-locks from
+implementer handoff/reviewer acceptance. Recovery appends a new generation;
+deleting evidence is not a reset.
+
+The normative state, receipt, Memory ordering, compatibility, and threat-model
+contract is
+[`docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md`](../../../../docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md).
 
 ### Evidence- and skill-source keys
 
@@ -155,7 +244,11 @@ profile.
 | Variable | Type | Default | Meaning |
 |---|---|---|---|
 | `BUGATE_PROFILE` | path | unset (`None` → `load_config` uses the config-declared profile) | Env override for which SUT profile `load_config` merges; passed in `check_bugate.py` and `check_agent_role_paths.py`. |
-| `BUGATE_AGENT_ROLE` | role name (lowercased) | `''` (empty/unset → agent-role isolation guard returns `0`, allow all) | Active agent role; when set and the profile defines `agent_roles` for it, matching paths are denied for the current Read/Edit/Write/patch action. |
+| `BUGATE_AGENT_ROLE` | role name (lowercased) | `''` | Active role. For `agent_roles`, empty means that path-policy guard is a no-op. For `role_governance.mode: required`, empty or a role not allowed in the current phase blocks. Start lifecycle sessions with `bin/bugate-role run`; do not use model names. |
+| `BUGATE_SESSION_ID` | opaque session token | unset | Session identity recorded in role receipts. Required when `session_id_required: true`; `bugate-role run` generates a fresh UUID unless `--session-id` is supplied. A hook subprocess cannot export it back into its parent. |
+| `BUGATE_AGENT_RUNTIME` | `codex` \| `claude` \| `unknown` | `unknown` | Declared runtime metadata for receipts, set automatically by `bugate-role run` from the child command. It is not a role and not identity authentication. |
+| `BUGATE_PROJECT_ROOT` | path | unset | Explicit governed workspace root override when the agent is not launched with the imported SUT test repo as CWD/project root. It does not activate Desktop hooks by itself. |
+| `BUGATE_ENGINE_ROOT` | path | unset | Explicit BUGate kit/engine root override for relocated plugin/vendor layouts. |
 
 ### Memory Service
 
@@ -169,9 +262,20 @@ profile.
 | `MCP_API_KEY` | token | unset | Last-resort Memory Service auth token, used if both `MCP_API_KEY_AGENT` and `MCP_API_KEY_HUMAN` are unset. |
 | `MEMORY_BUS_STOP_WRITE` | `'0'` to disable | unset (enabled; heartbeat written) | Set to `'0'` to skip the stop-hook hourly heartbeat memory write in `cmd_stop`. |
 
+Ordinary `session-start`, `stop`, note, search, and recent operations are
+best-effort. Role transitions under `memory_mode: required` use strict exact-ID
+operations and fail before local publication when the service is unavailable,
+times out, rejects a write, cannot return the exact ID, or returns mismatched
+namespace/role/UC/phase/transition/receipt metadata. Per-edit hook checks never
+contact Memory.
+
 ### SDTD multi-view CLI bridge
 
 These drive the Codex/Claude peer CLI dispatch in `sdtd_multiview_cli_bridge.py`.
+Peer subprocess environments explicitly remove `BUGATE_AGENT_ROLE`,
+`BUGATE_SESSION_ID`, and lifecycle receipt/session identity variables while
+preserving these model, effort, proxy, profile, and root settings. A Wave 1
+peer is therefore not allowed to inherit the designer's Wave 7 identity.
 
 | Variable | Type | Default | Meaning |
 |---|---|---|---|
@@ -236,6 +340,25 @@ agent_roles:
       - "^sut/example/internal/.*$"
     write:
       - "^sut/example/tests/.*[.]py$"
+
+# Wave 7 auditable lifecycle. This is independent from agent_roles above.
+role_governance:
+  mode: required
+  memory_mode: required
+  evidence_dir: 00_role_evidence
+  session_id_required: true
+  require_distinct_sessions: true
+  human_acceptance_artifacts:
+    - 03b_adversarial_cases.yaml
+  phases:
+    pre_code:
+      allowed_roles: [designer]
+    implementation:
+      allowed_roles: [implementer]
+      requires_handoff_from: [designer]
+    post_run:
+      allowed_roles: [reviewer]
+      requires_handoff_from: [implementer]
 
 # Wave 8 oracle falsification: declarative oracle/mutation spec + score gate (0-1).
 falsification_spec: sut/example/falsification_spec.yaml

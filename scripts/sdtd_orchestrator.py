@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -12,11 +13,23 @@ from pathlib import Path
 from bugate_core import (
     ALL_ARTIFACTS,
     OPTIONAL_PRECODE_ARTIFACTS,
+    PRECODE_ARTIFACTS,
     find_engine_root,
     find_root,
+    gate_status,
     inventory_sha256,
+    load_config,
     read_text,
+    required_precode_artifacts,
     write_text,
+)
+from role_governance import (
+    GovernanceResult,
+    RoleGovernanceError,
+    load_context,
+    preflight,
+    status_data,
+    verify_chain,
 )
 
 
@@ -27,6 +40,91 @@ TEMPLATE_DIR = ENGINE_ROOT / ".shared" / "skills" / "bugate" / "templates"
 
 def _artifacts(full_sdtd: bool) -> list[str]:
     return [*ALL_ARTIFACTS, *OPTIONAL_PRECODE_ARTIFACTS] if full_sdtd else list(ALL_ARTIFACTS)
+
+
+def _init_artifacts(full_sdtd: bool, governance_mode: str) -> list[str]:
+    """Required governance initializes only the active pre-code phase.
+
+    Legacy/off and advisory profiles retain the v0.3.x 01--05 scaffold.  The
+    advisory path warns through preflight but deliberately remains compatible.
+    """
+
+    names = list(PRECODE_ARTIFACTS) if governance_mode == "required" else list(ALL_ARTIFACTS)
+    if full_sdtd:
+        names.extend(OPTIONAL_PRECODE_ARTIFACTS)
+    return names
+
+
+def _role_preflight(
+    artifact_dir: Path,
+    phase: str,
+    *,
+    require_acceptance: bool,
+) -> GovernanceResult:
+    result = preflight(
+        artifact_dir,
+        phase,
+        require_acceptance=require_acceptance,
+    )
+    for warning in result.warnings:
+        print(f"BUGate role-governance WARNING: {warning}", file=sys.stderr)
+    if not result.allowed:
+        print(f"BUGate role governance BLOCKED ({phase}):", file=sys.stderr)
+        for error in result.errors or ["role preflight failed"]:
+            print(f"  - {error}", file=sys.stderr)
+    return result
+
+
+def _has_human_acceptance(artifact_dir: Path) -> bool:
+    """Return true only for a locally valid human-acceptance receipt chain."""
+
+    try:
+        ctx = load_context(artifact_dir)
+        if ctx.mode == "off":
+            return False
+        return any(item.get("event") == "human_acceptance" for item in verify_chain(ctx))
+    except (RoleGovernanceError, OSError, ValueError, SystemExit):
+        # Required mode was already rejected by the entry preflight.  Advisory
+        # mode reports the malformed chain as a warning and keeps legacy flow.
+        return False
+
+
+_STATE_LABELS = {
+    "awaiting_human_acceptance": "READY_FOR_HUMAN_ACCEPTANCE",
+    "ready_for_designer_handoff": "READY_FOR_DESIGNER_HANDOFF",
+    "awaiting_implementer_acceptance": "BLOCKED",
+    "implementation_unlocked": "IMPLEMENTATION_UNLOCKED",
+    "awaiting_reviewer_acceptance": "READY_FOR_REVIEWER_HANDOFF",
+    "post_run_active": "POST_RUN_ACTIVE",
+    "closed": "CLOSED",
+}
+
+
+def _legacy_auto_state(artifact_dir: Path, scope: str) -> str:
+    if scope == "post-run":
+        return "POST_RUN_ACTIVE"
+    try:
+        config = load_config(ROOT, os.environ.get("BUGATE_PROFILE"))
+        names = required_precode_artifacts(config)
+        if names and all(gate_status(artifact_dir / name) == "passed" for name in names):
+            return "IMPLEMENTATION_UNLOCKED"
+    except Exception:
+        return "BLOCKED"
+    return "READY_FOR_HUMAN_ACCEPTANCE"
+
+
+def print_auto_state(artifact_dir: Path, scope: str, rc: int) -> None:
+    label = "BLOCKED"
+    if rc == 0:
+        try:
+            data = status_data(artifact_dir)
+            if data.get("mode") == "off":
+                label = _legacy_auto_state(artifact_dir, scope)
+            elif data.get("ok"):
+                label = _STATE_LABELS.get(str(data.get("state") or ""), "BLOCKED")
+        except Exception:
+            label = "BLOCKED"
+    print(f"BUGate lifecycle status: {label}")
 
 
 def copy_template(artifact_dir: Path, name: str) -> bool:
@@ -41,8 +139,19 @@ def copy_template(artifact_dir: Path, name: str) -> bool:
 
 
 def init(artifact_dir: Path, full_sdtd: bool = False) -> int:
+    role = _role_preflight(
+        artifact_dir,
+        "pre_code",
+        require_acceptance=False,
+    )
+    if not role.allowed:
+        return 2
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    created = [name for name in _artifacts(full_sdtd) if copy_template(artifact_dir, name)]
+    created = [
+        name
+        for name in _init_artifacts(full_sdtd, role.mode)
+        if copy_template(artifact_dir, name)
+    ]
     for name in created:
         print(f"created {name}")
     if not created:
@@ -137,7 +246,27 @@ def auto_precode(artifact_dir: Path, peer_review: bool = True, allow_degraded: b
     --allow-degraded-peer-review is given. This makes the review impossible to
     skip or simplify by omission.
     """
-    init(artifact_dir)
+    role = _role_preflight(
+        artifact_dir,
+        "pre_code",
+        require_acceptance=False,
+    )
+    if not role.allowed:
+        return 2
+    if _has_human_acceptance(artifact_dir):
+        message = (
+            "03B already has a human-acceptance receipt; --auto will not rewrite "
+            "accepted pre-code evidence. Continue with `bin/bugate-role handoff "
+            f"{artifact_dir} --phase pre_code --to implementer`."
+        )
+        if role.mode == "required":
+            print(f"BUGate role governance BLOCKED: {message}", file=sys.stderr)
+            return 2
+        print(f"BUGate role-governance WARNING: {message}", file=sys.stderr)
+        return 0
+    init_rc = init(artifact_dir)
+    if init_rc:
+        return init_rc
     rc = 0
     if peer_review:
         rc = rc or run_script("sdtd_multiview_cli_bridge.py", "run-all", str(artifact_dir))
@@ -170,8 +299,17 @@ def auto_precode(artifact_dir: Path, peer_review: bool = True, allow_degraded: b
 
 
 def auto_postrun(artifact_dir: Path, args: argparse.Namespace) -> int:
+    role = _role_preflight(
+        artifact_dir,
+        "post_run",
+        require_acceptance=True,
+    )
+    if not role.allowed:
+        return 2
     rc = run_script(
         "self_healing_mvp.py",
+        "--artifact-dir",
+        str(artifact_dir),
         "--pytest-log",
         args.pytest_log,
         "--json-output",
@@ -223,19 +361,28 @@ def main() -> int:
     parser.add_argument("--env", default="profile-owned")
     parser.add_argument("--exit-code", type=int, default=0)
     args = parser.parse_args()
+    if args.init and args.auto:
+        print("--init and --auto are separate operations; run them as separate commands")
+        print_auto_state(args.artifact_dir, args.scope, 2)
+        return 2
     if args.init:
         return init(args.artifact_dir, args.full_sdtd)
     if args.auto:
         if args.scope == "pre-code":
-            return auto_precode(
+            rc = auto_precode(
                 args.artifact_dir,
                 peer_review=not args.skip_peer_review,
                 allow_degraded=args.allow_degraded_peer_review,
             )
+            print_auto_state(args.artifact_dir, args.scope, rc)
+            return rc
         if not args.pytest_log or not args.command:
             print("--scope post-run requires --pytest-log and --command")
+            print_auto_state(args.artifact_dir, args.scope, 2)
             return 2
-        return auto_postrun(args.artifact_dir, args)
+        rc = auto_postrun(args.artifact_dir, args)
+        print_auto_state(args.artifact_dir, args.scope, rc)
+        return rc
     return status(args.artifact_dir, args.full_sdtd)
 
 

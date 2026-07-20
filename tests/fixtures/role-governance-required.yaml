@@ -1,0 +1,23 @@
+# Canonical SUT-neutral Wave 7 configuration used by contract and integration tests.
+role_governance:
+  mode: required
+  memory_mode: required
+  evidence_dir: 00_role_evidence
+  session_id_required: true
+  require_distinct_sessions: true
+  human_acceptance_artifacts:
+    - 03b_adversarial_cases.yaml
+  phases:
+    pre_code:
+      allowed_roles:
+        - designer
+    implementation:
+      allowed_roles:
+        - implementer
+      requires_handoff_from:
+        - designer
+    post_run:
+      allowed_roles:
+        - reviewer
+      requires_handoff_from:
+        - implementer

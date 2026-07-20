@@ -102,19 +102,28 @@ def _cmd(vendor_dir: str, script: str, *args: str) -> str:
     return _ROOT_SNIPPET + f'/usr/bin/env python3 "$ROOT/{vendor_dir}/scripts/{script}"{tail}'
 
 
+def _bin_cmd(vendor_dir: str, command: str, *args: str) -> str:
+    """Build a hook command for an executable vendored under ``bin/``."""
+
+    tail = (" " + " ".join(args)) if args else ""
+    return _ROOT_SNIPPET + f'"$ROOT/{vendor_dir}/bin/{command}"{tail}'
+
+
 def hook_blocks(vendor_dir: str, runtime: str) -> dict:
     """The BUGate hook wiring for one runtime ('claude' or 'codex').
 
-    The write-shaped guards (check_bugate, check_plan_lock) must see ONLY
-    write tools: check_bugate does not inspect tool_name and fail-closes on
-    any payload naming a guarded path, so matching it on Read would block
-    reading guarded tests. The Wave-7 role guard (check_agent_role_paths)
-    distinguishes read/write buckets itself and needs Read in its matcher or
-    profile `agent_roles` read-isolation is silently unenforced.
+    The write-shaped guards (check_bugate, check_plan_lock, and
+    check_role_evidence) must see ONLY write tools: check_bugate does not
+    inspect tool_name and fail-closes on any payload naming a guarded path, so
+    matching it on Read would block reading guarded tests. The path-isolation
+    guard (check_agent_role_paths) distinguishes read/write buckets itself and
+    needs Read in its Claude matcher or profile ``agent_roles`` read isolation
+    is silently unenforced.
     """
     write_guard_cmds = [
         _cmd(vendor_dir, "check_bugate.py"),
         _cmd(vendor_dir, "check_plan_lock.py"),
+        _cmd(vendor_dir, "check_role_evidence.py"),
     ]
     role_guard_cmds = [
         _cmd(vendor_dir, "check_agent_role_paths.py"),
@@ -133,11 +142,17 @@ def hook_blocks(vendor_dir: str, runtime: str) -> dict:
         ]
     else:
         # Codex has no hookable Read tool; apply_patch carries all writes.
+        codex_guard_cmds = [
+            write_guard_cmds[0],
+            write_guard_cmds[1],
+            role_guard_cmds[0],
+            write_guard_cmds[2],
+        ]
         pre_tool_use = [{
             "matcher": "apply_patch",
             "hooks": [
                 {"type": "command", "command": c}
-                for c in write_guard_cmds + role_guard_cmds
+                for c in codex_guard_cmds
             ],
         }]
     blocks = {
@@ -150,12 +165,22 @@ def hook_blocks(vendor_dir: str, runtime: str) -> dict:
     # both runtimes. Codex supports the same lifecycle events, so memory/liveness
     # hooks stay symmetric with Claude Code.
     blocks["SessionStart"] = [{
-        "hooks": [{"type": "command",
-                   "command": _cmd(vendor_dir, "memory_bus.py", "session-start", "--agent", "agent")}],
+        "hooks": [
+            {"type": "command",
+             "command": _cmd(vendor_dir, "memory_bus.py", "session-start", "--agent", "agent")},
+            {"type": "command",
+             "command": _bin_cmd(vendor_dir, "bugate-role", "session-start")},
+        ],
     }]
     blocks["Stop"] = [{
         "hooks": [{"type": "command",
-                   "command": _cmd(vendor_dir, "memory_bus.py", "stop", "--agent", "agent")}],
+                   "command": _cmd(
+                       vendor_dir,
+                       "memory_bus.py",
+                       "stop",
+                       "--agent",
+                       '"${BUGATE_AGENT_ROLE:-agent}"',
+                   )}],
     }]
     return blocks
 
@@ -164,33 +189,33 @@ def merge_hooks(existing: dict, blocks: dict, vendor_dir: str) -> tuple[dict, li
     """Merge the BUGate hook entries into an existing hooks file.
 
     Refresh ours, never theirs. Ownership is decided per entry by the vendor
-    marker: an entry is OURS when every command in it calls a script under the
-    vendor dir. The repo's own entries are never rewritten. Our entries are
-    appended when absent and REWRITTEN in place when their text has drifted
-    from the current template — the upgrade path: re-running init brings an
+    markers: an entry is OURS when every command in it calls a script or bin
+    entrypoint under the vendor dir. The repo's own entries are never
+    rewritten. Our entries are appended when absent and REWRITTEN in place
+    when their text has drifted from the current template — the upgrade path:
+    re-running init brings an
     older import's wiring (e.g. a pre-lazy-guard hook shape) up to the current
     contract. An entry that mixes a vendor call into the repo's own hooks is
-    treated as wired-but-theirs and left untouched.
+    treated as theirs and left byte-for-byte untouched, but it never counts as
+    BUGate's owned wiring: an independent canonical entry is also installed.
     """
     added: list[str] = []
     hooks = existing.setdefault("hooks", {})
-    marker = f"{vendor_dir}/scripts/"
+    markers = (f"{vendor_dir}/scripts/", f"{vendor_dir}/bin/")
 
     def commands(entry: dict) -> list[str]:
         return [h.get("command") or "" for h in (entry.get("hooks") or [])]
 
+    def is_owned_command(command: str) -> bool:
+        return any(marker in command for marker in markers)
+
     def is_ours(entry: dict) -> bool:
         cmds = commands(entry)
-        return bool(cmds) and all(marker in c for c in cmds)
-
-    def is_marked(entry: dict) -> bool:
-        return any(marker in c for c in commands(entry))
+        return bool(cmds) and all(is_owned_command(command) for command in cmds)
 
     for event, entries in blocks.items():
         current = hooks.setdefault(event, [])
         ours = [e for e in current if is_ours(e)]
-        if any(is_marked(e) and not is_ours(e) for e in current) and not ours:
-            continue  # wired through the repo's own mixed entry — not ours to touch
         if ours:
             if ours == entries:
                 continue  # already wired at the current contract
@@ -236,6 +261,11 @@ required_precode_artifacts:
   - 03a_test_cases.md
   - 03b_adversarial_cases.yaml
 
+# Backward-compatible default: existing v0.3.x profiles remain unlocked unless
+# this block is deliberately migrated to `mode: required` (example below).
+role_governance:
+  mode: off
+
 # De-SUT identity defense (CHARTER A1): list THIS SUT's identity terms
 # (product / internal-system / account names, as case-insensitive regexes) so
 # the guard keeps them from seeping into the reusable vendored kit at
@@ -255,6 +285,35 @@ required_precode_artifacts:
 #   designer:
 #     write:
 #       - "^tests/.*"
+#
+# Wave 7 auditable lifecycle governance is separate from `agent_roles` path
+# isolation. To migrate, replace the active `role_governance` block above with
+# this shape. Existing passed UCs are NOT grandfathered: after a real human
+# accepts 03B, create fresh handoff/acceptance receipts in three distinct role
+# sessions. `memory_mode: required` makes each transition require an exact
+# Memory handoff ID; ordinary edits verify the local hash-linked receipts only.
+# role_governance:
+#   mode: required
+#   memory_mode: required
+#   evidence_dir: 00_role_evidence
+#   session_id_required: true
+#   require_distinct_sessions: true
+#   human_acceptance_artifacts:
+#     - 03b_adversarial_cases.yaml
+#   phases:
+#     pre_code:
+#       allowed_roles:
+#         - designer
+#     implementation:
+#       allowed_roles:
+#         - implementer
+#       requires_handoff_from:
+#         - designer
+#     post_run:
+#       allowed_roles:
+#         - reviewer
+#       requires_handoff_from:
+#         - implementer
 # Wave 8 oracle falsification: point at a real spec once captured evidence
 # exists (evidence paths inside the spec resolve relative to the spec file).
 # falsification_spec: <path/to/falsification_spec.yaml>
@@ -565,7 +624,10 @@ NEXT_STEPS = """\
 Imported-mode setup written. Next steps (CHARTER §2.2):
 
   1. Fill bugate.profile.yaml: add `guarded_path_regex` for this repo's test
-     layout (keep the (?P<uc>...) capture) — the write guard is inert until then.
+     layout (keep the (?P<uc>...) capture). The scaffold has exactly one active
+     guard key and keeps `role_governance.mode: off` for v0.3.x compatibility.
+     To opt in, replace that block with the commented `mode: required` example;
+     do not keep two active role_governance blocks.
   2. COMMIT: bugate.config.yaml, bugate.profile.yaml, {vendor_dir}/,
      .claude/ + .codex/ hook wiring, .claude/skills/, .agents/skills/,
      .codex/skills/ (legacy compatibility), .codex/agents/ (the Codex gate
@@ -573,16 +635,42 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
      default scorer outputs + local agent/memory state out of git status) — the
      governance contract reviews and versions with the tests it guards.
   3. Codex only: RE-TRUST the changed hook hash in the Codex hook-management
-     UI. Until then Codex hooks are SILENTLY inactive (known behavior). The
+     UI after init OR every re-run that refreshes hooks. Until then Codex hooks
+     are SILENTLY inactive (known behavior); do not claim Wave 7 is active. The
      .agents/skills/ skills and .codex/agents/ gate agents are picked up on the
      next Codex session (no re-trust needed — they are skills/agents, not hooks).
   4. Acceptance — R4 negative control: pick a guarded test path whose UC has no
      passed pre-code artifacts and confirm the block:
        python3 {vendor_dir}/scripts/check_bugate.py <a-guarded-test-file> </dev/null
        # expect exit 2 and the missing-artifact list (any language/extension)
-  5. Per-UC flow from here on:
+  5. Per-UC setup from here on (do not combine --init and --auto; --init exits
+     after scaffolding):
        python3 {vendor_dir}/scripts/sdtd_orchestrator.py docs/usecases/<UC> --init
-  6. Memory bus (REQUIRED, machine-level): a BUGate setup is incomplete without
+  6. Required mode uses THREE independent role sessions. Start each from a
+     clean terminal/Desktop launch environment; a hook subprocess cannot
+     export identity back into its parent:
+       {vendor_dir}/bin/bugate-role run --role designer -- <claude-or-codex-command>
+       {vendor_dir}/bin/bugate-role run --role implementer -- <claude-or-codex-command>
+       {vendor_dir}/bin/bugate-role run --role reviewer -- <claude-or-codex-command>
+     The designer runs pre-code `--auto` only after `--init` has completed.
+     The peer bridge may leave 03B pending; an agent MUST NOT approve it or
+     impersonate a human. After a real human explicitly reviews and accepts
+     03B, the designer records that already-made decision with the human's
+     identifier (the CLI does not edit 03B), then hands off. Run these INSIDE
+     the designer session:
+       {vendor_dir}/bin/bugate-role approve docs/usecases/<UC> --approved-by <human-id>
+       {vendor_dir}/bin/bugate-role handoff docs/usecases/<UC> --phase pre_code --to implementer
+     Do NOT re-run `--auto` after human acceptance because it may overwrite
+     03B; finalize/handoff directly.
+     In a NEW implementer session, accept with the exact Memory ID printed by
+     the handoff before Layer 4. After implementation, hand off the concrete
+     guarded files:
+       {vendor_dir}/bin/bugate-role accept docs/usecases/<UC> --phase implementation --handoff-id <exact-memory-id>
+       {vendor_dir}/bin/bugate-role handoff docs/usecases/<UC> --phase implementation --to reviewer --implementation-file <guarded-test-file>
+     In a NEW reviewer session, accept the second exact Memory ID before
+     post-run / 04 / 05 and reviewer completion:
+       {vendor_dir}/bin/bugate-role accept docs/usecases/<UC> --phase post_run --handoff-id <exact-memory-id>
+  7. Memory bus (REQUIRED, machine-level): a BUGate setup is incomplete without
      it (long-term memory, dual-agent progress sync + relay, memory promotion).
      Init already ensured it above — ONE shared mcp-memory-service per machine,
      auto-installed once if it was absent; this repo just declares its profile
@@ -591,7 +679,11 @@ Imported-mode setup written. Next steps (CHARTER §2.2):
      ({vendor_dir}/bin/memory-bus-ensure re-checks). Offline/locked-down machine:
      BUGATE_MEMORY_NO_INSTALL=1 skips auto-install (then install manually per
      docs/SETUP-OPTIONAL.md §2).
-  7. ALL post-import guidance lives under ONE vendored skill —
+     With `memory_mode: required`, Memory failure blocks the next lifecycle
+     transition before any local unlock receipt is published. SessionStart
+     recall and Stop heartbeat remain best-effort, and ordinary edits validate
+     local receipts without a live Memory request.
+  8. ALL post-import guidance lives under ONE vendored skill —
      {vendor_dir}/.shared/skills/bugate-import/ (also linked into
      .claude/.agents/.codex skills):
        SKILL.md                          adaptation principle + layout wiring

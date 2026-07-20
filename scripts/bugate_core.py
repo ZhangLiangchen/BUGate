@@ -12,6 +12,8 @@ import json
 import os
 import re
 import sys
+from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -108,7 +110,60 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def governed_write_preflight(path: Path) -> None:
+    """Apply the shared role preflight before a Core helper writes ``path``.
+
+    This is the second enforcement layer behind mutator entry preflights.  It
+    prevents a generic ``--output`` option from being pointed at a canonical UC
+    governance artifact.  The import is deliberately lazy: role_governance and
+    the hook classifier both consume this module, while role receipts use their
+    own private atomic writer and therefore never need an environment bypass.
+    """
+
+    candidate = path if path.is_absolute() else (Path.cwd() / path)
+    try:
+        root = find_root(candidate.parent)
+    except SystemExit:
+        return  # an ordinary output outside every governed workspace
+    try:
+        config = load_config(root, os.environ.get("BUGATE_PROFILE"))
+        raw_policy = config.get("role_governance")
+        if raw_policy is None or (
+            isinstance(raw_policy, dict)
+            and str(raw_policy.get("mode") or "off").strip() == "off"
+        ):
+            return
+        from check_role_evidence import check_paths
+        from role_governance import governance_policy
+
+        policy = governance_policy(config)
+        failures, warnings = check_paths(
+            {candidate.resolve().as_posix()}, root=root, config=config, policy=policy
+        )
+        for warning in warnings:
+            print(f"BUGate governed-write WARNING: {warning}", file=sys.stderr)
+        if failures:
+            raise PermissionError(
+                "BUGate governed-write blocked: " + "; ".join(failures)
+            )
+    except PermissionError:
+        raise
+    except Exception as exc:
+        mode = (
+            str(raw_policy.get("mode") or "off").strip()
+            if isinstance(raw_policy, dict)
+            else "required"
+        )
+        if mode == "advisory":
+            print(f"BUGate governed-write WARNING: {exc}", file=sys.stderr)
+            return
+        raise PermissionError(
+            f"BUGate governed-write fail-closed: {exc}"
+        ) from exc
+
+
 def write_text(path: Path, body: str) -> None:
+    governed_write_preflight(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body, encoding="utf-8")
 
@@ -189,35 +244,62 @@ def strip_inline_comment(line: str) -> str:
     return "".join(out).rstrip()
 
 
-def parse_nested_yaml(text: str) -> Any:
+def parse_nested_yaml(
+    text: str,
+    *,
+    strict: bool = False,
+    source: str = "<yaml>",
+) -> Any:
     """Parse the indented YAML subset used by nested BUGate artifacts.
 
     Supports nested mappings, lists of scalars, lists of mappings (including a
     first key on the dash line), inline ``[a, b]`` lists, and scalars. It is not
     a general YAML parser, by design; BUGate core stays standard-library only.
+
+    ``strict=True`` is intended for configuration documents. It rejects syntax
+    that the permissive artifact parser would otherwise skip (for example a
+    missing colon or an unconsumed, over-indented line), so a malformed
+    ``role_governance`` block cannot silently disappear and fall back to
+    ``mode: off``.
     """
 
-    rows: list[tuple[int, str]] = []
-    for raw in text.splitlines():
+    rows: list[tuple[int, int, str]] = []
+    for line_number, raw in enumerate(text.splitlines(), start=1):
         content = strip_inline_comment(raw)
         if not content.strip():
             continue
+        if content == content.lstrip(" \t") and content.strip() in {"---", "..."}:
+            # Legacy config accepted ordinary YAML document markers because the
+            # simple parser ignored non-key lines. Keep that compatibility.
+            continue
+        leading = content[: len(content) - len(content.lstrip(" \t"))]
+        if strict and "\t" in leading:
+            raise ValueError(f"{source}:{line_number}: tabs are not allowed for indentation")
         indent = len(content) - len(content.lstrip(" "))
-        rows.append((indent, content.strip()))
+        rows.append((indent, line_number, content.strip()))
     idx = [0]
+
+    def error(message: str, row_index: int | None = None) -> ValueError:
+        at = idx[0] if row_index is None else row_index
+        line_number = rows[at][1] if at < len(rows) else (rows[-1][1] if rows else 1)
+        return ValueError(f"{source}:{line_number}: {message}")
 
     def parse_map(indent: int) -> dict[str, Any]:
         node: dict[str, Any] = {}
         while idx[0] < len(rows):
-            cur_indent, line = rows[idx[0]]
+            cur_indent, _, line = rows[idx[0]]
             if cur_indent != indent or line.startswith("- "):
                 break
             if ":" not in line:
+                if strict:
+                    raise error("expected 'key: value' mapping entry")
                 idx[0] += 1
                 continue
             key, _, value = line.partition(":")
             key = key.strip()
             value = value.strip()
+            if strict and not key:
+                raise error("mapping key must not be empty")
             idx[0] += 1
             node[key] = parse_scalar(value) if value else parse_child(indent)
         return node
@@ -225,7 +307,7 @@ def parse_nested_yaml(text: str) -> Any:
     def parse_child(parent_indent: int) -> Any:
         if idx[0] >= len(rows):
             return None
-        cur_indent, line = rows[idx[0]]
+        cur_indent, _, line = rows[idx[0]]
         if cur_indent <= parent_indent:
             return None
         return parse_list(cur_indent) if line.startswith("- ") else parse_map(cur_indent)
@@ -233,30 +315,41 @@ def parse_nested_yaml(text: str) -> Any:
     def parse_list(indent: int) -> list[Any]:
         items: list[Any] = []
         while idx[0] < len(rows):
-            cur_indent, line = rows[idx[0]]
+            cur_indent, _, line = rows[idx[0]]
             if cur_indent != indent or not line.startswith("- "):
                 break
             rest = line[2:].strip()
             idx[0] += 1
             if not rest:
                 items.append(parse_child(indent))
-            elif ":" in rest and rest[0] not in {"[", '"', "'"}:
+            elif (
+                rest[0] not in {"[", '"', "'"}
+                and re.match(r"^[^:]+:(?:\s|$)", rest)
+            ):
                 key, _, value = rest.partition(":")
-                item: dict[str, Any] = {key.strip(): parse_scalar(value.strip()) if value.strip() else None}
+                key = key.strip()
+                if strict and not key:
+                    raise error("list mapping key must not be empty", idx[0] - 1)
+                item: dict[str, Any] = {key: parse_scalar(value.strip()) if value.strip() else None}
                 while idx[0] < len(rows):
-                    sub_indent, sub_line = rows[idx[0]]
+                    sub_indent, _, sub_line = rows[idx[0]]
                     if sub_indent <= indent or sub_line.startswith("- "):
                         break
-                    item.update(parse_map(sub_indent))
+                    continuation = parse_map(sub_indent)
+                    item.update(continuation)
                     break
                 items.append(item)
             else:
                 items.append(parse_scalar(rest))
         return items
 
-    if idx[0] < len(rows) and rows[0][1].startswith("- "):
-        return parse_list(rows[0][0])
-    return parse_map(0)
+    if idx[0] < len(rows) and rows[0][2].startswith("- "):
+        result = parse_list(rows[0][0])
+    else:
+        result = parse_map(0)
+    if strict and idx[0] != len(rows):
+        raise error("unexpected indentation or malformed nested structure")
+    return result
 
 
 def split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
@@ -305,18 +398,120 @@ def inventory_sha256(artifact_dir: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else ""
 
 
+def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a deterministic recursive merge without mutating either input.
+
+    Mappings merge recursively. Every non-mapping profile value, including a
+    list, replaces the base value wholesale. A mapping also replaces a base
+    scalar/list, and vice versa.
+    """
+
+    merged = deepcopy(dict(base))
+    for key, value in override.items():
+        current = merged.get(key)
+        if isinstance(current, Mapping) and isinstance(value, Mapping):
+            merged[key] = deep_merge(current, value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
+
+
+def _canonicalize_memory_namespace(
+    document: Mapping[str, Any],
+    *,
+    source: str,
+) -> dict[str, Any]:
+    """Mirror new/legacy Memory namespace forms within one config document.
+
+    Canonicalization happens before documents are merged. Therefore a legacy
+    top-level ``namespace`` in a profile also becomes
+    ``memory.namespace`` and can override a nested value in the base config.
+    When both forms occur in the *same* document and conflict, the new nested
+    form wins deterministically and is mirrored back to the legacy key.
+    """
+
+    data = deepcopy(dict(document))
+    legacy_present = "namespace" in data
+    memory_present = "memory" in data
+    memory = data.get("memory")
+    if memory_present and memory is not None and not isinstance(memory, Mapping):
+        raise ValueError(f"{source}: config key 'memory' must be a mapping or null")
+
+    if isinstance(memory, Mapping) and "namespace" in memory:
+        nested_value = deepcopy(memory.get("namespace"))
+        data["memory"] = deepcopy(dict(memory))
+        data["namespace"] = nested_value
+    elif legacy_present:
+        nested = deepcopy(dict(memory)) if isinstance(memory, Mapping) else {}
+        nested["namespace"] = deepcopy(data.get("namespace"))
+        data["memory"] = nested
+    return data
+
+
+def _canonicalize_bugate_aliases(
+    document: Mapping[str, Any],
+    *,
+    source: str,
+) -> dict[str, Any]:
+    """Mirror the legacy flattened ``bugate.mode/version`` aliases.
+
+    The v0.3.x simple config parser exposed the children of the top-level
+    ``bugate`` mapping as top-level ``mode`` and ``version`` keys. Preserve
+    those two observable aliases without restoring generic flattening. As with
+    Memory namespace canonicalization, the nested form wins a same-document
+    conflict and canonicalization happens before base/profile deep merge.
+    """
+
+    data = deepcopy(dict(document))
+    nested_present = "bugate" in data
+    nested = data.get("bugate")
+    if nested_present and nested is not None and not isinstance(nested, Mapping):
+        raise ValueError(f"{source}: config key 'bugate' must be a mapping or null")
+
+    canonical = deepcopy(dict(nested)) if isinstance(nested, Mapping) else {}
+    for key in ("mode", "version"):
+        if key in canonical:
+            data[key] = deepcopy(canonical[key])
+        elif key in data:
+            canonical[key] = deepcopy(data[key])
+    if canonical or nested_present:
+        data["bugate"] = canonical
+    return data
+
+
+def _canonicalize_config_document(
+    document: Mapping[str, Any],
+    *,
+    source: str,
+) -> dict[str, Any]:
+    data = _canonicalize_bugate_aliases(document, source=source)
+    return _canonicalize_memory_namespace(data, source=source)
+
+
+def _load_config_document(path: Path) -> dict[str, Any]:
+    try:
+        parsed = parse_nested_yaml(read_text(path), strict=True, source=str(path))
+    except ValueError as exc:
+        raise ValueError(f"BUGate config parse error: {exc}") from exc
+    if not isinstance(parsed, Mapping):
+        raise ValueError(f"BUGate config parse error: {path}: document root must be a mapping")
+    return _canonicalize_config_document(parsed, source=str(path))
+
+
 def load_config(root: Path | None = None, profile: str | None = None) -> dict[str, Any]:
+    """Load nested base/profile config with deterministic compatibility merge."""
+
     root = root or find_root()
     data: dict[str, Any] = {}
     base = root / "bugate.config.yaml"
     if base.exists():
-        data.update(parse_simple_yaml(read_text(base)))
+        data = _load_config_document(base)
     profile_path = profile or data.get("profile") or data.get("active_profile")
     if profile_path:
         path = resolve_path(str(profile_path), root)
         if path.exists():
-            data.update(parse_simple_yaml(read_text(path)))
-    return data
+            data = deep_merge(data, _load_config_document(path))
+    return _canonicalize_config_document(data, source="merged BUGate config")
 
 
 def as_bool(value: Any) -> bool:

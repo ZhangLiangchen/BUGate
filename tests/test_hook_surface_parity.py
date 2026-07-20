@@ -12,7 +12,7 @@ surface but not the others):
     engine-root dialect; ``SessionStart``/``Stop`` carry the ``--core``
     memory flag.
   * ``hooks/hooks.json``           — plugin channel for both runtimes;
-    ``Edit|Write`` and ``apply_patch`` matchers; workspace-root dialect
+    both Claude matchers plus the Codex ``apply_patch`` matcher; workspace-root dialect
     (``bugate.config.yaml`` + ``CLAUDE_PLUGIN_ROOT``).
 
 For every hook command that invokes a BUGate python script, BOTH hardening
@@ -39,13 +39,15 @@ REPO = Path(__file__).resolve().parents[1]
 EMPTY_DEFAULT = ', ""))'
 LAZY_GUARD = '[ -n "$ROOT" ] || exit 0'
 
-# Script basenames the wiring is expected to invoke somewhere across the surface.
+# Script/executable basenames expected somewhere across the surface.
 EXPECTED_SCRIPTS = (
     "check_bugate.py",
     "check_plan_lock.py",
     "check_agent_role_paths.py",
+    "check_role_evidence.py",
     "bugate_prompt_reminder.py",
     "memory_bus.py",
+    "bugate-role",
 )
 
 FAILURES: list[str] = []
@@ -67,8 +69,30 @@ def commands(surface: dict) -> list[str]:
     ]
 
 
-def matchers(surface: dict) -> list[str]:
-    return [e.get("matcher") for e in surface.get("hooks", {}).get("PreToolUse", [])]
+def event_commands(surface: dict, event: str) -> list[str]:
+    return [
+        h["command"]
+        for entry in surface.get("hooks", {}).get(event, [])
+        for h in entry["hooks"]
+    ]
+
+
+def invoked_names(entry: dict) -> list[str]:
+    """Return the expected BUGate target basename from each hook command."""
+
+    names: list[str] = []
+    for hook in entry.get("hooks", []):
+        command = hook["command"]
+        matches = [name for name in EXPECTED_SCRIPTS if name in command]
+        names.append(matches[-1] if matches else "<unknown>")
+    return names
+
+
+def pretool_contract(surface: dict) -> list[tuple[str | None, list[str]]]:
+    return [
+        (entry.get("matcher"), invoked_names(entry))
+        for entry in surface.get("hooks", {}).get("PreToolUse", [])
+    ]
 
 
 def scenario_files_parse() -> dict[str, dict]:
@@ -166,51 +190,93 @@ def scenario_plugin_dialect(parsed: dict[str, dict]) -> None:
 
 
 def scenario_matchers_and_core(parsed: dict[str, dict]) -> None:
-    print("S5 per-surface specifics: matchers and the --core memory flag")
+    print("S5 exact per-surface/matcher gate and lifecycle contracts")
     claude = parsed.get(".claude/settings.json")
     if claude is not None:
         check(
-            ".claude/settings.json: PreToolUse matcher is Edit|Write",
-            matchers(claude) == ["Edit|Write"],
-            str(matchers(claude)),
+            ".claude/settings.json: exact Claude gate groups",
+            pretool_contract(claude) == [
+                ("Edit|Write", [
+                    "check_bugate.py",
+                    "check_plan_lock.py",
+                    "check_role_evidence.py",
+                ]),
+                ("Read|Edit|Write", ["check_agent_role_paths.py"]),
+            ],
+            str(pretool_contract(claude)),
         )
-        # SessionStart/Stop carry the --core flag (engine repo governs core memory).
-        for event in ("SessionStart", "Stop"):
-            cmds = [
-                h["command"]
-                for entry in claude["hooks"].get(event, [])
-                for h in entry["hooks"]
-            ]
-            check(
-                f".claude/settings.json: {event} carries the --core flag",
-                cmds and all("--core" in c for c in cmds),
-                f"{event} commands: {cmds}",
-            )
+        _check_lifecycle(".claude/settings.json", claude, core=True)
     codex = parsed.get(".codex/hooks.json")
     if codex is not None:
         check(
-            ".codex/hooks.json: PreToolUse matcher is apply_patch",
-            matchers(codex) == ["apply_patch"],
-            str(matchers(codex)),
+            ".codex/hooks.json: exact Codex apply_patch gates",
+            pretool_contract(codex) == [("apply_patch", [
+                "check_bugate.py",
+                "check_plan_lock.py",
+                "check_agent_role_paths.py",
+                "check_role_evidence.py",
+            ])],
+            str(pretool_contract(codex)),
         )
-        for event in ("SessionStart", "Stop"):
-            cmds = [
-                h["command"]
-                for entry in codex["hooks"].get(event, [])
-                for h in entry["hooks"]
-            ]
-            check(
-                f".codex/hooks.json: {event} carries the --core flag",
-                cmds and all("--core" in c for c in cmds),
-                f"{event} commands: {cmds}",
-            )
+        _check_lifecycle(".codex/hooks.json", codex, core=True)
     plugin = parsed.get("hooks/hooks.json")
     if plugin is not None:
         check(
-            "hooks/hooks.json: PreToolUse matchers cover Claude and Codex",
-            matchers(plugin) == ["Edit|Write", "apply_patch"],
-            str(matchers(plugin)),
+            "hooks/hooks.json: exact Claude + Codex plugin gate groups",
+            pretool_contract(plugin) == [
+                ("Edit|Write", [
+                    "check_bugate.py",
+                    "check_plan_lock.py",
+                    "check_role_evidence.py",
+                ]),
+                ("Read|Edit|Write", ["check_agent_role_paths.py"]),
+                ("apply_patch", [
+                    "check_bugate.py",
+                    "check_plan_lock.py",
+                    "check_agent_role_paths.py",
+                    "check_role_evidence.py",
+                ]),
+            ],
+            str(pretool_contract(plugin)),
         )
+        _check_lifecycle("hooks/hooks.json", plugin, core=False)
+
+
+def _check_lifecycle(rel: str, surface: dict, *, core: bool) -> None:
+    start = event_commands(surface, "SessionStart")
+    stop = event_commands(surface, "Stop")
+    reminder = event_commands(surface, "UserPromptSubmit")
+    check(
+        f"{rel}: SessionStart orders best-effort recall before role status",
+        len(start) == 2
+        and "memory_bus.py" in start[0]
+        and " session-start " in start[0]
+        and "bugate-role" in start[1]
+        and start[1].endswith(" session-start"),
+        str(start),
+    )
+    check(
+        f"{rel}: SessionStart memory namespace is {'core' if core else 'imported'}",
+        len(start) == 2
+        and (("--core" in start[0]) is core)
+        and "--core" not in start[1],
+        str(start),
+    )
+    check(
+        f"{rel}: Stop is heartbeat-only and role-aware",
+        len(stop) == 1
+        and "memory_bus.py" in stop[0]
+        and " stop " in stop[0]
+        and '"${BUGATE_AGENT_ROLE:-agent}"' in stop[0]
+        and (("--core" in stop[0]) is core)
+        and all(token not in stop[0] for token in ("handoff", "accept", "complete")),
+        str(stop),
+    )
+    check(
+        f"{rel}: prompt reminder remains a single independent hook",
+        len(reminder) == 1 and "bugate_prompt_reminder.py" in reminder[0],
+        str(reminder),
+    )
 
 
 def scenario_expected_scripts(parsed: dict[str, dict]) -> None:

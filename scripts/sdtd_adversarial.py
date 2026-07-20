@@ -5,9 +5,24 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 from bugate_core import as_bool, load_config, read_text, write_text
+from role_governance import GovernanceResult, preflight
+
+
+def precode_preflight(artifact_dir: Path) -> GovernanceResult:
+    """Run the shared local role check before this mutator creates anything."""
+
+    result = preflight(artifact_dir, "pre_code", require_acceptance=False)
+    for warning in result.warnings:
+        print(f"BUGate role-governance WARNING: {warning}", file=sys.stderr)
+    if not result.allowed:
+        print("BUGate role governance BLOCKED (pre_code):", file=sys.stderr)
+        for error in result.errors or ["role preflight failed"]:
+            print(f"  - {error}", file=sys.stderr)
+    return result
 
 
 def out_dir(artifact_dir: Path) -> Path:
@@ -25,7 +40,9 @@ def bridge_failures(out: Path) -> int:
     return 1 if failures else 0
 
 
-def init(artifact_dir: Path, focus: str) -> None:
+def init(artifact_dir: Path, focus: str) -> int:
+    if not precode_preflight(artifact_dir).allowed:
+        return 2
     out = out_dir(artifact_dir)
     out.mkdir(parents=True, exist_ok=True)
     write_text(
@@ -35,6 +52,7 @@ def init(artifact_dir: Path, focus: str) -> None:
         "- Attack weak oracles, missing negative paths, ambiguous wording, and fake-green risk.\n",
     )
     print(f"initialized {out}")
+    return 0
 
 
 def check(artifact_dir: Path) -> int:
@@ -65,8 +83,7 @@ def main() -> int:
     p_check.add_argument("artifact_dir", type=Path)
     args = parser.parse_args()
     if args.cmd == "init":
-        init(args.artifact_dir, args.focus)
-        return 0
+        return init(args.artifact_dir, args.focus)
     return check(args.artifact_dir)
 
 

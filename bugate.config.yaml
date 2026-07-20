@@ -2,15 +2,20 @@ bugate:
   version: 0.1
   mode: core
 
-# Memory-bus namespace/tag. The simple BUGate YAML parser flattens nested keys,
-# so `namespace` is read at the top level here. Override per project with the
-# env var MEMORY_BUS_PROJECT_TAG or by changing this value.
+# Memory-bus namespace/tag. Config documents are parsed as nested mappings and
+# deep-merged; `memory.namespace` is canonical. Legacy profiles that still use a
+# top-level `namespace` remain compatible. MEMORY_BUS_PROJECT_TAG overrides both.
 memory:
   namespace: project:bugate
 
 # SUT profiles should override these values outside the BUGate core.
 artifact_dir:
 guarded_path_regex: []
+
+# Auditable Wave 7 lifecycle governance is opt-in. Imported SUT profiles may
+# select advisory/required and provide the full phase contract; Core stays inert.
+role_governance:
+  mode: off
 
 # Wave 8 oracle falsification (default unmounted → oracle_falsification.py reports
 # profile_required). A SUT profile points at a declarative oracle/mutation spec and

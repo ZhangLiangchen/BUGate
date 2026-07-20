@@ -4,9 +4,23 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from bugate_core import load_json, read_text, write_text
+from role_governance import preflight
+
+
+def _postrun_write_allowed(artifact_dir: Path) -> bool:
+    result = preflight(artifact_dir, "post_run", require_acceptance=True)
+    for warning in result.warnings:
+        print(f"BUGate role-governance WARNING: {warning}", file=sys.stderr)
+    if result.allowed:
+        return True
+    print("BUGate role governance BLOCKED (post_run):", file=sys.stderr)
+    for error in result.errors or ["role preflight failed"]:
+        print(f"  - {error}", file=sys.stderr)
+    return False
 
 
 def summarize_log(path: Path) -> str:
@@ -30,6 +44,8 @@ def main() -> int:
     parser.add_argument("--self-healing-json")
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
+    if args.write and not _postrun_write_allowed(args.artifact_dir):
+        return 2
     log_path = Path(args.pytest_log)
     status = summarize_log(log_path)
     healing = {}

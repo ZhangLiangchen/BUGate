@@ -3,6 +3,7 @@ title: "BUGate Agentic QA Platform 工作指引"
 subtitle: "从 Agentic QA Governance Kernel 到企业内闭环质量平台"
 version: 0.1
 date: 2026-07-06
+updated_at: 2026-07-20
 status: working-guide
 scope: SUT-neutral
 companion:
@@ -10,6 +11,7 @@ companion:
   - ../../CAPABILITIES.md
   - METHOD.md
   - SOP.md
+  - ROLE_GOVERNANCE_PROTOCOL.md
 ---
 
 # BUGate Agentic QA Platform 工作指引
@@ -18,6 +20,12 @@ companion:
 它不替代 `CHARTER.md`、`METHOD.md`、`SOP.md`；它定义的是下一阶段平台化
 建设方向：**BUGate 保持 Agentic QA Governance Kernel，外接自托管 Agent 控制中心
 和多角色 SOP 编排层，最终形成企业内闭环 Agentic QA Platform。**
+
+> **2026-07-20 能力校准：** BUGate Core 已实现 Wave 7 的
+> `designer → implementer → reviewer` 生命周期状态机、人工接受、strict Memory
+> handoff/acceptance、hash-linked 本地 receipt、drift 重锁、orchestrator/hook preflight
+> 与角色会话启动器。这是可在 imported repo 启用的治理内核，不等于本指引规划的企业级
+> Workflow Runner、任务队列、sandbox、RBAC 或强身份系统；后者仍待平台层建设。
 
 ---
 
@@ -41,7 +49,8 @@ companion:
 - 用例生成约束
 - adversarial review
 - 物理写门禁
-- role isolation
+- `agent_roles` 角色路径隔离
+- Wave 7 可审计生命周期治理与 receipt chain
 - execution report
 - Memory Service 沉淀
 - Claude Code / Codex 双端协作经验
@@ -121,8 +130,8 @@ flowchart LR
 
 | 层 | 归属 | 职责 | 当前状态 |
 |---|---|---|---|
-| Governance Kernel | BUGate | 方法论、门禁、证据链、Memory、role isolation、报告 | 已有核心能力 |
-| SOP Orchestrator | 新增 | 多角色流程、阶段状态机、Agent 分工、人工审核点 | 待建设 |
+| Governance Kernel | BUGate | 方法论、门禁、hash-linked receipt、strict Memory transition、角色路径隔离、生命周期治理、报告 | 已有核心能力；required 模式由 imported profile 显式启用 |
+| SOP Orchestrator | 新增 | 企业级多角色流程、任务调度、Agent 分工、人工审核队列 | Core 已提供三阶段 lifecycle contract；通用 Workflow Runner 仍待建设 |
 | Agent Control Center | OpenHands 优先 / 自研薄层 | 任务队列、worker 管理、沙箱、运行轨迹、权限审计 | 待建设 |
 | Agent Workers | Claude Code / Codex / OpenCode / OpenHands / Cursor / Windsurf | 读代码、生成用例、跑测试、分析日志 | 部分已有 |
 | QA Platform Integrations | CI / GitLab / Jenkins / Logs / Defect / Metrics | 企业闭环、度量、审计、报告 | 待建设 |
@@ -138,7 +147,9 @@ BUGate 是平台的治理核，不是执行后端。
 - 测试设计是否有 proposition / oracle / evidence 映射
 - readable cases 是否经过 review
 - adversarial cases 是否被吸收
-- Layer 4 test code 是否允许写入
+- 当前 phase、角色、session 与 handoff/acceptance receipt 是否允许状态前进
+- Layer 4 test code 是否同时满足 pre-code gate 与 required role-governance 解锁条件
+- post-run 是否已有 implementer handoff 与 reviewer acceptance
 - 失败归因是否有证据
 - 哪些经验可以进入 Memory / skills / profile
 
@@ -188,6 +199,12 @@ BUGate 是平台的治理核，不是执行后端。
 ---
 
 ## 4. 多角色 SOP 编排
+
+本节的 `*Agent` 是未来平台的任务角色，不是 Core
+`role_governance.phases` 可直接填写的 lifecycle token。平台适配器必须把 pre-code
+工作映射到 `designer`、实现映射到 `implementer`、post-run 映射到 `reviewer`，并让
+相邻 lifecycle actor 使用不同 session。Wave 1 的 Codex/Claude peers 只是同一设计阶段
+中的独立只读 reviewer，也不能冒充 lifecycle actor。
 
 ### 4.1 角色表
 
@@ -245,7 +262,7 @@ stages:
 
   - id: implementation
     role: TestCodeAgent
-    precondition: precode_gates_passed
+    precondition: precode_gates_and_designer_handoff_accepted
 
   - id: execution
     role: ExecutionAgent
@@ -260,10 +277,16 @@ stages:
 
   - id: report
     role: ReportAgent
+    precondition: implementer_handoff_and_reviewer_acceptance
     output:
       - 04_execution_report.md
       - 05_knowledge_update.md
 ```
+
+Core 当前提供的 lifecycle 状态链为：03B 人工接受 → designer handoff →
+不同 session 的 implementer acceptance → implementation unlocked → implementer
+handoff → 不同 session 的 reviewer acceptance → post-run active → reviewer
+completion。上面的企业 SOP 可以细分更多工作角色，但不得跳过或弱化这条 Core 链。
 
 ### 4.3 标准状态
 
@@ -376,7 +399,13 @@ permissions:
 所有角色权限必须能被平台和 BUGate 双重约束：
 
 - 平台层：sandbox / RBAC / command allowlist / secret broker
-- BUGate 层：physical write guard / role isolation / semantic gates
+- BUGate 层：semantic/physical write gates、`agent_roles` path isolation、
+  `role_governance` phase/receipt validation、strict Memory transition
+
+Core 的环境角色声明、session 区分、hash 链接与 Memory 锚点提供可审计性和篡改/
+漂移检测，但不提供不可抵赖身份。Hooks 也无法拦截任意 shell 重定向或外部编辑器。
+平台若要声称强身份与完整文件系统隔离，必须补独立 OS 账号、container/managed runner、
+按角色发放的服务端凭据和底层文件权限；不能把 Core receipt 当成 SSO/RBAC 的替代品。
 
 ---
 
@@ -397,8 +426,11 @@ permissions:
 | Adversarial | `scripts/sdtd_adversarial_cli_bridge.py` |
 | Reports | `scripts/generate_sdtd_reports.py` |
 | Failure classification | `scripts/self_healing_mvp.py` |
-| Memory | `scripts/memory_bus.py` / `bin/memory-*` |
-| Role isolation | `scripts/check_agent_role_paths.py` |
+| Memory recall / durable notes | `scripts/memory_bus.py` / `bin/memory-*` |
+| Strict role-transition Memory anchor | `scripts/memory_bus.py get/handoff/accept-handoff/verify-handoff --strict` |
+| Role path isolation | `scripts/check_agent_role_paths.py` |
+| Wave 7 lifecycle state machine and receipts | `scripts/role_governance.py` / `bin/bugate-role` |
+| Role-evidence hook enforcement | `scripts/check_role_evidence.py` |
 | Quality gate | `scripts/oracle_falsification.py` / `generate_assertion_coverage_matrix.py` |
 
 ### 6.2 需要补的工程接口
@@ -412,7 +444,8 @@ permissions:
    - `artifact_paths`
    - `next_action`
 
-2. `sdtd_orchestrator.py` 支持输出 stage graph：
+2. `sdtd_orchestrator.py` 已执行 role-governance preflight 并输出 Core lifecycle
+   状态；平台仍需把它封装为稳定 JSON stage graph：
    - 当前 stage
    - 已完成 stage
    - blocked stage
@@ -621,7 +654,8 @@ recommended_action: ...
   - OpenCode
   - OpenHands
 - human review queue
-- role isolation 默认启用
+- managed runner 对选定 workspace 显式启用 `role_governance.mode: required`
+  （Core 默认继续为 `off`，保证 v0.3.x profile 兼容）
 
 验收：
 
@@ -704,7 +738,8 @@ recommended_action: ...
 - [ ] Metrics dashboard
 - [ ] Cost tracking
 - [ ] Secret broker
-- [ ] Role isolation default-on policy
+- [ ] Managed-platform `role_governance.mode: required` default-on policy
+      （不改变 Core/default profile 的兼容性默认值）
 - [ ] Database profile pack
 - [ ] Weekly quality report automation
 - [ ] Memory-to-skill promotion workflow

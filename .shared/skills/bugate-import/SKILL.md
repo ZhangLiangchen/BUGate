@@ -15,8 +15,8 @@ the SUT profile — never a kit patch, never an invented product fact.
 | You need | Read |
 |---|---|
 | Wire the write guard to THIS repo's layout (regex/binding/verification) | this file, below |
-| Day-to-day usage after import (working loop, human checkpoints, commands) | `references/using-bugate.md` · 中文 `references/using-bugate.zh-CN.md` |
-| Operations & diagnosis (peer-dispatch failures, `--auto` overwrite semantics, post-run SOP, copy hygiene, Wave 7/8 recipes, CI carrier pattern) | `references/field-guide.md` |
+| Day-to-day usage after import (three role sessions, human checkpoint, handoff/acceptance, post-run) | `references/using-bugate.md` · 中文 `references/using-bugate.zh-CN.md` |
+| Operations & diagnosis (peer dispatch, role drift/recovery, Memory boundaries, hooks/re-trust, copy hygiene, Wave 7/8, CI) | `references/field-guide.md` |
 | Gate criteria and artifact contracts (what the gates actually judge) | sibling skill `../bugate/` (SKILL.md + references/) |
 | One-shot capability self-check | sibling skill `../bugate-full-check/` |
 | Machine runtime setup (peer CLIs, memory service, offline fallback) | `<vendor>/docs/SETUP-OPTIONAL.md` (vendored beside the kit) |
@@ -32,9 +32,10 @@ trees.
 
 ## What "wiring" means here
 
-The write guard needs one thing from the profile: a way to map **a guarded
-test file path** to **one UC artifact directory** whose pre-code artifacts
-gate it. Two profile keys express it:
+The physical write guard and auditable role guard need one common binding: a
+way to map **a guarded test file path** to **one UC artifact directory** whose
+pre-code artifacts and `00_role_evidence/` chain gate it. Two profile keys
+express the path-to-UC binding:
 
 ```yaml
 guarded_path_regex:
@@ -111,6 +112,16 @@ dir name byte-for-byte.
    expect exit 0 for that UC and exit 2 for every other UC (per-UC isolation).
 6. **Ambiguity probe** (once): temporarily add a second dir folding to the
    same canon, confirm exit 2, remove it.
+7. **Choose lifecycle mode explicitly.** Keep `role_governance.mode: off` for
+   exact v0.3.x compatibility, or replace it with the canonical `required`
+   block from `../bugate/references/profile-schema.md`. Do not keep duplicate
+   active blocks. `agent_roles` remains a separate deny-path policy.
+8. **If required, verify identity controls before claiming activation:** start
+   fresh designer/implementer/reviewer processes with `bin/bugate-role run`,
+   confirm unset/wrong role is rejected, and run `check_role_evidence.py` in
+   both Claude/Codex payload shapes. Re-running the importer refreshes BUGate
+   hooks while preserving SUT-owned hooks, but changed Codex hooks remain
+   inactive until the operator re-trusts their hash.
 
 ## Session/workspace alignment (do this check first)
 
@@ -123,11 +134,20 @@ silently absent. `bugate_init` warns when target ≠ git toplevel; take the
 warning seriously — either open sessions at the target, or export
 `BUGATE_PROJECT_ROOT=<target>` in the environment the agent runs under.
 
+Role identity has the same process boundary. SessionStart can report role,
+session, available phase, and chain state, but a hook child cannot export
+`BUGATE_AGENT_ROLE` or `BUGATE_SESSION_ID` into the parent agent. Launch each
+role through `bin/bugate-role run --role ... -- <command>` (or launch Desktop
+from an equivalent environment) and open a new session. Shell redirection and
+external editors are outside hook interception; managed filesystem isolation
+is required for that stronger boundary.
+
 ## Report contract
 
 After adaptation, report: the regex(es) shipped, the binding mode chosen and
-why, the exit codes observed for negative/positive/ambiguity probes, and any
-layout limitation accepted (single-dir mode, renaming convention adopted).
+why, the lifecycle mode, the exit codes observed for negative/positive/
+ambiguity and unset/wrong-role probes, Codex re-trust state, and any layout
+limitation accepted (single-dir mode, renaming convention adopted).
 Then hand the operator `references/using-bugate.md` (中文:
 `references/using-bugate.zh-CN.md`) — the day-to-day working loop starts
 there.

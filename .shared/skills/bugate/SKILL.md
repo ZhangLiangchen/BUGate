@@ -35,6 +35,12 @@ framework. It separates reusable method from SUT-specific facts.
 | 5 | `04_execution_report.md` | Execution result, failures, and classification. |
 | 6 | `05_knowledge_update.md` | Reusable learnings and promotion candidates. |
 
+When an imported profile enables Wave 7 role governance, each UC also owns
+`00_role_evidence/`: an append-only lifecycle receipt chain. It is governance
+evidence, not a new artifact layer and not the retired `00_orchestration/`
+directory. Agents must never edit it directly; only `bin/bugate-role` publishes
+its atomic receipts.
+
 ### Optional Full-SDTD modeling stages
 
 For complex use cases you may opt into three extra pre-Layer-3 modeling artifacts.
@@ -66,6 +72,20 @@ blocked. Claude triggers it through the matched `file_path`; Codex triggers it
 through the `apply_patch` header. With no SUT profile active
 (`guarded_path_regex: []`) nothing is guarded, so the core stays usable.
 
+An imported profile may additionally enable `role_governance.mode: required`.
+Then `scripts/check_role_evidence.py` is a second independent guard: pre-code
+writes require the configured designer role/session; implementation requires a
+current designer handoff accepted by an implementer in a distinct session; and
+post-run/04/05 require an implementer handoff accepted by a reviewer. Both
+`check_bugate.py` and `check_role_evidence.py` must pass. Profile, artifact,
+implementation, receipt, or chain drift re-locks the affected phase.
+
+Wave 1 and Wave 7 are different. Wave 1 Codex/Claude peers independently
+cross-review inside the designer phase. They are read-only analysis workers and
+their child environments strip lifecycle identity. Wave 7 is the auditable
+`designer` → `implementer` → `reviewer` lifecycle. The profile's separate
+`agent_roles` mapping remains the read/write path-isolation policy.
+
 **Code-first requests.** If the user asks to skip straight to test
 implementation (Stage 4 / Layer 4), do not produce code. First build or confirm
 the configured pre-code artifacts (business brief, testability, inventory, and
@@ -92,6 +112,9 @@ guarded writes until then, jumping to code is rejected rather than helpful.
 - Multi-view core bridge: `python3 scripts/sdtd_multiview_cli_bridge.py run-all <artifact_dir>`
 - Adversarial core bridge: `python3 scripts/sdtd_adversarial_cli_bridge.py run-all <artifact_dir>`
 - Post-run reports: `python3 scripts/self_healing_mvp.py ...` then `python3 scripts/generate_sdtd_reports.py <artifact_dir> ... --write`
+- Role status/local verification: `bin/bugate-role status <artifact_dir>` and `bin/bugate-role verify <artifact_dir> --phase <pre_code|implementation|post_run>`
+- Independent lifecycle session: `bin/bugate-role run --role <designer|implementer|reviewer> -- <codex-or-claude-command>`
+- Human-decision record and handoff chain: `bin/bugate-role approve ...`, `handoff ...`, `accept ...`, and `complete ...` (see the imported-mode guide; required Memory accepts the exact handoff Memory ID only)
 - Wave 8 quality: `python3 scripts/oracle_falsification.py --spec <spec.yaml> --gate` then `python3 scripts/generate_assertion_coverage_matrix.py --artifact-root <dir> --spec <spec.yaml> --mutation-result <result.json>` — declarative oracle falsification scoring + 5-state coverage matrix; reports `profile_required` without a spec.
 
 SUT profiles may wrap these commands with product-specific paths, peer runtime
@@ -119,6 +142,13 @@ OWN governance memory records under the core namespace via `--core`.
 - The Stop hook writes only an hourly liveness heartbeat — bookkeeping, **not** a
   substitute for recording real progress with `note`.
 
+Ordinary recall, notes, search, and Stop heartbeat are best-effort. Under
+`role_governance.memory_mode: required`, lifecycle transitions use strict
+Memory writes and exact-ID verification. Unavailability or any namespace,
+role, UC, phase, transition, or receipt mismatch blocks the transition before a
+local unlock receipt is published. Normal edits perform local receipt/hash
+verification only and never call Memory Service.
+
 See `docs/qa-methodology/EXPERIENCE_PROMOTION_PROTOCOL.md` for the full
 record / recall / promote protocol.
 
@@ -135,5 +165,13 @@ record / recall / promote protocol.
   boundaries in the imported SUT repo.
 - SUT profiles may add stricter artifact names, guarded paths, commands, and
   evidence rules, but they must not weaken the core invariants.
+- `bugate-role approve` records a human decision that already occurred and
+  requires the configured 03B artifact to be `gate_status: passed`; it does not
+  edit 03B, make the decision, or authenticate the human. Do not re-run
+  pre-code `--auto` after a human-acceptance receipt; proceed to handoff.
+- Role declarations, session separation, hashes, hooks, and Memory anchors are
+  auditable controls, not non-repudiable identity. Strong identity needs OS or
+  container isolation, managed runners, or role-scoped server credentials.
+  Hooks also cannot intercept arbitrary shell redirection or external editors.
 - If source code is available, treat it as one possible evidence source, not as
   the only truth for black-box behavior.

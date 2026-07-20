@@ -27,6 +27,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import sdtd_multiview
@@ -39,6 +40,18 @@ from bugate_core import (
     semantic_schema,
     write_text,
 )
+from role_governance import GovernanceResult, preflight
+
+
+def _role_preflight(artifact_dir: Path) -> GovernanceResult:
+    result = preflight(artifact_dir, "pre_code", require_acceptance=False)
+    for warning in result.warnings:
+        print(f"BUGate role-governance WARNING: {warning}", file=sys.stderr)
+    if not result.allowed:
+        print("BUGate role governance BLOCKED (pre_code):", file=sys.stderr)
+        for error in result.errors or ["role preflight failed"]:
+            print(f"  - {error}", file=sys.stderr)
+    return result
 
 
 def proposition_pattern_for(artifact_dir: Path) -> str | None:
@@ -84,10 +97,31 @@ _PROXY_VARS = {
     "all_proxy": os.environ.get("SDTD_CLI_ALL_PROXY", ""),
 }
 
+# Peer CLIs are read-only analysis workers inside the current design phase;
+# they are not lifecycle actors.  Never let a controller's role receipt/session
+# identity leak into a spawned Codex or Claude process.  Project/profile and
+# SDTD runtime tuning (proxy/model/effort) deliberately remain available.
+_LIFECYCLE_IDENTITY_KEYS = {"BUGATE_AGENT_ROLE", "BUGATE_SESSION_ID"}
+_LIFECYCLE_IDENTITY_PREFIXES = (
+    "BUGATE_ROLE_",
+    "BUGATE_RECEIPT_",
+    "BUGATE_HANDOFF_",
+    "BUGATE_SESSION_",
+)
+
+
+def _strip_lifecycle_identity(env: dict[str, str]) -> None:
+    for key in list(env):
+        if key in _LIFECYCLE_IDENTITY_KEYS or key.startswith(
+            _LIFECYCLE_IDENTITY_PREFIXES
+        ):
+            env.pop(key, None)
+
 
 def cli_env() -> dict[str, str]:
-    """Child-process env with optional proxy injection (only if vars are set)."""
+    """Return a peer env with lifecycle identity removed and proxy tuning kept."""
     env = os.environ.copy()
+    _strip_lifecycle_identity(env)
     if os.environ.get("SDTD_CLI_PROXY", "1") == "0":
         return env
     for lower_key, value in _PROXY_VARS.items():
@@ -486,8 +520,12 @@ def check_env() -> int:
 
 
 def run_all(artifact_dir: Path) -> int:
+    if not _role_preflight(artifact_dir).allowed:
+        return 2
     # Reuse the shared init/check helper and its 00_multiview/ layout.
-    sdtd_multiview.init(artifact_dir, "multiview peer dispatch")
+    init_rc = sdtd_multiview.init(artifact_dir, "multiview peer dispatch")
+    if init_rc:
+        return init_rc
     out = artifact_dir / "00_multiview"
 
     pattern = proposition_pattern_for(artifact_dir)
@@ -568,6 +606,8 @@ def run_all(artifact_dir: Path) -> int:
 
 def run_divergence(artifact_dir: Path, force: bool = False) -> int:
     """Re-synthesize divergence_report.md from the two existing peer views."""
+    if not _role_preflight(artifact_dir).allowed:
+        return 2
     out = artifact_dir / "00_multiview"
     codex_path = out / "codex_view.md"
     claude_path = out / "claude_view.md"

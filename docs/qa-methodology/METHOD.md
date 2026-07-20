@@ -3,7 +3,7 @@ title: "零领域知识 QA 的 AI 辅助自动化测试方法论"
 subtitle: "业务理解审计与缺陷发现的双层流程"
 version: 1.1
 date: 2026-05-11
-last_updated: 2026-06-15
+last_updated: 2026-07-20
 applicability: SUT-无关（适用于满足最小输入条件的任意被测系统）
 companion: SOP.md
 changelog:
@@ -18,6 +18,9 @@ changelog:
     - 明确"棕地系统适配"为 v2 范围，本版本不解决
   2026-06-15 (additive, 非版本号变更):
     - 新增 §2.4 理论基础与相关工作：把 9 个 Wave 逐条映射到所基于的经典测试方法论与奠基文献/标准（oracle 问题、边界值/状态迁移/风险测试、变异测试、可追溯性、IV&V 等），明确"原创=对既有方法论的编排与综合"而非全新发明。开源诚信归因用。
+  2026-07-20 (additive, 对齐 BUGate v0.4.0):
+    - Wave 7 从可选路径隔离升级为 designer / implementer / reviewer 可审计生命周期，并明确区分 Wave 1 peer review
+    - 新增 strict Memory 锚定、hash-linked receipt、独立 session、drift 重新上锁与安全边界
 ---
 
 # 零领域知识 QA 的 AI 辅助自动化测试方法论
@@ -39,7 +42,7 @@ changelog:
 - **Wave 1-4（业务理解审计层）** —— 引用回溯审计、多 AI 分歧路由、结构化访谈、行为 oracle
 - **Wave 5-8（缺陷发现生成层）** —— 边界提取、状态机非法转换、对抗式红队、变异测试质量门
 
-本版本（v1.1）补齐了 v1.0 的几个关键缺口：Wave 0 防止"对烂 PRD 做精确审计"、三层 agent 隔离平衡业务隔离与工程可执行、测试分层策略避免 E2E 成本爆炸、度量指标让过程可观测、变更机制处理 PRD 演进。
+本版本（v1.1）补齐了 v1.0 的几个关键缺口：Wave 0 防止"对烂 PRD 做精确审计"、Wave 7 职责隔离平衡业务独立性与工程可执行、测试分层策略避免 E2E 成本爆炸、度量指标让过程可观测、变更机制处理 PRD 演进。BUGate v0.4.0 进一步把 Wave 7 实现为可审计生命周期，而不再只是路径黑名单。
 
 本方法论**不解决**棕地系统（已有数千条存量测试用例的 5 年以上代码库）的迁移问题——该场景列为 v2 范围。
 
@@ -86,7 +89,7 @@ changelog:
 3. 提出"**多 AI 分歧 = 不确定性所在**"的分歧路由模式，将 QA 工作从全局判断者转为分歧识别者
 4. 提出"**AI 出题、QA 传话、开发答题**"的结构化访谈协议，将隐性知识低成本档案化
 5. 提出五项缺陷发现机制 + 测试分层策略，强制 AI 跳出 happy path 思维定势同时控制 E2E 成本
-6. 提出**三层 agent 隔离**架构，平衡业务隔离与工程可执行性
+6. 提出**可审计生命周期职责隔离**架构，用独立会话、交接、receipt 与路径策略平衡业务独立性与工程可执行性
 7. 给出项目无关、SUT 无关的落地模板与度量指标体系
 
 ---
@@ -161,7 +164,7 @@ Wave 5: 结构化测试设计（边界、状态机、风险加权）
 Wave 6: 对抗式红队增强
               │
               ▼
-Wave 7: 测试代码生成（三层 agent 隔离）
+Wave 7: 可审计职责隔离 + 测试代码生成
               │
               ▼
 Wave 8: 变异测试质量门
@@ -183,7 +186,7 @@ Wave 8: 变异测试质量门
 | Wave 4 行为 oracle 验证 | 用系统行为校准业务模型 | **测试预言问题(the test oracle problem)** | Weyuker, E.J.《On Testing Non-testable Programs》(The Computer Journal, 1982);Barr 等《The Oracle Problem in Software Testing: A Survey》(IEEE TSE, 2015) |
 | Wave 5 结构化测试设计 | 边界 + 状态机非法转换 + 风险加权 | **边界值分析、状态迁移测试、风险驱动测试** | Myers, G.J.《The Art of Software Testing》(1979);Beizer, B.《Software Testing Techniques》(2nd ed., 1990);ISO/IEC/IEEE 29119 风险驱动测试 |
 | Wave 6 对抗式红队 | 主动构造异常 / 边角输入找 bug | 负向测试、模糊测试(fuzzing)、基于性质的测试(property-based testing) | Miller 等《An Empirical Study of the Reliability of UNIX Utilities》(CACM, 1990,fuzzing 起源);Claessen & Hughes《QuickCheck》(ICFP, 2000) |
-| Wave 7 三层 agent 隔离 | builder / designer / implementer 路径隔离 | **独立验证与确认(IV&V)** 的独立性原则 | IEEE 1012(系统、软件、硬件验证与确认标准) |
+| Wave 7 可审计职责隔离 | designer / implementer / reviewer 独立 session + 交接证据链；`agent_roles` 补充路径隔离 | **独立验证与确认(IV&V)** 的独立性原则 | IEEE 1012(系统、软件、硬件验证与确认标准) |
 | Wave 8 质量门 | 变异 / oracle falsification | **变异测试(mutation testing)** | DeMillo, Lipton & Sayward《Hints on Test Data Selection: Help for the Practicing Programmer》(IEEE Computer, 1978) |
 
 **如何读这张表**:7/9 个 Wave(2、4、5、6、7、8 以及 0)有明确的标准或奠基论文支撑;Wave 1、Wave 3 是把经典评审与需求获取实践编排进 AI 流水线的新组合。换言之,本方法论的"地基"是公认的,"楼"是原创的。
@@ -425,21 +428,40 @@ QA 拿清单访谈开发：
 - "未处理" → 这就是 bug，进入缺陷登记
 - "不在范围" → 记录决策原因，进入未来风险档案
 
-### 5.3 Wave 7：测试代码生成（三层 agent 隔离）
+### 5.3 Wave 7：测试生命周期的可审计职责隔离
 
-**v1.1 关键修正**：v1.0 中"测试生成 agent 不可读源码"过于一刀切——测试代码确实需要读 Page Object、API client、fixture、selector map 等测试适配层。v1.1 改为三层隔离：
+Wave 7 与 Wave 1 不是同一种"多 agent"：
 
-| Agent | 可读 | 禁止 |
+- **Wave 1** 是同一 pre-code 设计阶段内的独立 Codex/Claude peer review，目标是暴露理解分歧；peer 是只读分析 worker，不是生命周期 actor。
+- **Wave 7** 是 `designer` → `implementer` → `reviewer` 的跨阶段职责隔离，目标是证明谁在哪个 session 接受了哪份当时的证据快照。
+
+BUGate v0.4.0 把 Wave 7 实现为以下状态链：
+
+```text
+designer pre-code --auto
+  → 01/02/03/03A/03B 过门
+  → 人类显式接受 03B
+  → designer 记录人工决定并 strict-Memory handoff
+  → 不同 session 的 implementer exact-ID accept
+  → Layer 4 解锁
+  → implementer 携实现文件 hash handoff
+  → 不同 session 的 reviewer exact-ID accept
+  → post-run / 04 / 05
+  → reviewer completion
+```
+
+每个 UC 的 `00_role_evidence/` 保存 append-only receipt 与最小 `chain.json`。Receipt 链接前序 hash，并快照 profile、pre-code 工件、实现文件与 post-run 证据。角色转换边界通过 Memory Service 的 exact content hash 严格验证；每次普通编辑只在本地验 receipt/hash，不请求 Memory Service。Profile、pre-code 工件或实现文件发生 drift 后会自动重新上锁，必须追加新 generation，禁止删除 evidence 来 reset。
+
+Wave 7 还保留一个独立的路径策略 `agent_roles`：
+
+| 机制 | 解决什么 | 配置 |
 |---|---|---|
-| `business-model-builder` | PRD、访谈记录、行为 oracle 结果 | 源码、测试代码 |
-| `test-case-designer` | validated-model、boundary/state/adversarial/risk 产物 | 源码、API spec、SDK 实现 |
-| `test-code-implementer` | 测试框架文档、Page Object、selector map、fixture、测试 helper | 产品源码、domain 逻辑、service 实现、**直接 API spec** |
+| `role_governance` | phase、session、handoff/acceptance、receipt 与 drift | 只接受 `designer` / `implementer` / `reviewer` 生命周期 token |
+| `agent_roles` | 某角色的禁读/禁写路径 | profile 可定义业务所需的角色名与 bare-list / `read` / `write` 正则 |
 
-**关键约束**：
+两者互补，不能合并成一个含义模糊的配置块。例如 implementer 可读 Page Object、fixture 与测试 helper，而 profile 可通过 `agent_roles.implementer.read` 禁止它从业务实现重新派生 oracle。SUT 契约与允许读取的适配层必须由 imported repo 自己的 profile 声明，Core 不猜测路径。
 
-- `test-code-implementer` 可以读"测试适配层"，但不能读"业务实现层"
-- **API endpoint 路径、参数结构、SDK 调用方式不能开放读取**——这些是产品契约的一部分，读了会让测试退化为"复刻现有实现"
-- 正确做法：validated-model 派生"期望契约"，实际 API spec 作为**被验证对象**，契约不一致本身就是缺陷
+03B 是不可代理的人工门：peer bridge 可以生成 `gate_status: pending`，但 agent 不得自行改为 passed、不得冒充 `approved_by`。`bugate-role approve` 只记录**已经发生**的人工接受，不修改 03B，也不构成密码学身份认证。
 
 ### 5.4 Wave 8：变异测试质量门
 
@@ -517,7 +539,7 @@ Wave 5   结构化测试设计                      → boundary-catalog, state-
                   │
 Wave 6   对抗式红队增强                      → adversarial-scenarios/
                   │
-Wave 7   测试代码生成（三层 agent 隔离）      → tests/e2e/, tests/api/, ...
+Wave 7   可审计职责隔离 + 测试实现       → 00_role_evidence/ + tests/...
                   │
 Wave 8   变异测试质量门                      → mutation-test-reports/
                   │
@@ -658,6 +680,7 @@ imported-sut-test-repo/
 ├── bugate.profile.yaml                # 提交在 SUT 仓；声明 artifact_dir / guards / memory namespace
 ├── .bugate/                           # vendored BUGate kit（默认 installer 形态）
 ├── docs/usecases/<UC>/
+│   ├── 00_role_evidence/              # 启用 Wave 7 后的 append-only 证据链
 │   ├── 01_business_brief.md           # 每个用例一套 gate 产物
 │   ├── 02_testability.md
 │   ├── 03_inventory.yaml
@@ -670,20 +693,23 @@ imported-sut-test-repo/
     └── scripts/                       # 方法论示意工具（如确定性合并）；核心未发布同名脚本
 ```
 
-### 10.2 agent 角色路径隔离的 hook（已发布机制）
+### 10.2 Wave 7 角色治理与路径隔离（已发布机制）
 
-已发布的隔离机制是 `scripts/check_agent_role_paths.py`，**默认关闭**：
+Core 默认 `role_governance.mode: off`，因此不挂 SUT profile 的自开发不会被锁死。Imported repo 显式选择 `required` 后，由两类 hook 共同执行：
 
-- 当前角色来自环境变量 `BUGATE_AGENT_ROLE`（未设置即放行一切）。
-- 角色与其禁读/禁写路径模式由**活动 SUT profile** 通过 `agent_roles:` 映射提供；核心不内置任何角色名或路径。
-- 接线：**写动作**的角色隔离已默认接到 Claude 的 `PreToolUse`（matcher `Edit|Write`）与 Codex 的 `apply_patch`——`BUGATE_AGENT_ROLE` 未设时是 no-op，设了即按 profile 的 `agent_roles` 生效。要**同时**启用**读隔离**，把 Claude 的 matcher 扩到 `Read|Edit|Write`（核心默认不接 `Read`，以免每次读文件都触发守卫）。
+- `check_bugate.py` 证明 pre-code 工件已过门；
+- `check_role_evidence.py` 证明当前 phase 角色/session 和本地 receipt 链有效。
 
-profile 里配置三层隔离（builder / designer / implementer）示例：
+Layer 4 只在 designer handoff 已被不同 session 的 implementer 接受后解锁；04/05 只在 implementer handoff 已被 reviewer 接受后开放。`check_role_evidence.py` 对每次受治理编辑只做本地 hash/chain/drift 验证，strict Memory 请求只发生在 `approve` / `handoff` / `accept` / `complete` 转换边界。对 `00_role_evidence/**` 的直接 agent-tool 编辑一律拒绝。
+
+`scripts/check_agent_role_paths.py` 仍是独立的**路径访问策略**：当前角色来自 `BUGATE_AGENT_ROLE`，禁读/禁写正则由 active profile 的 `agent_roles` 提供，Core 不内置 SUT 路径。Claude 保持两组 matcher：`Edit|Write` 调用写门，`Read|Edit|Write` 单独调用路径隔离；Codex `apply_patch` 上的四个 guard 都必须通过。
+
+profile 里的路径隔离示例：
 
 ```yaml
 # bugate.config.yaml 或被引用的 profile
 agent_roles:
-  builder:                      # 业务模型构建者：不读实现/测试码
+  builder:                      # 方法论工作角色：不读实现/测试码
     - "^src/.*"
     - "^tests/.*"
   designer:                     # 用例设计者：不读实现与 API spec
@@ -696,16 +722,20 @@ agent_roles:
       - "^docs/business/.*"
 ```
 
+`agent_roles` 的自定义 token 不会自动成为生命周期 actor；`role_governance.phases` 仅接受 `designer` / `implementer` / `reviewer`。完整配置、状态与恢复契约见 [`ROLE_GOVERNANCE_PROTOCOL.zh-CN.md`](ROLE_GOVERNANCE_PROTOCOL.zh-CN.md)。
+
 ### 10.3 项目初始化清单（已发布引擎）
 
 1. 接入 BUGate 引擎（导入模式：通过 `scripts/bugate_init.py <sut-repo>`、plugin 或 vendor / 子模块进入 SUT 测试仓）。真实 SUT 的工作区根 = 自 CWD 向上最近的 `bugate.config.yaml`；BUGate core 本身保持纯净，只运行模板门、临时构造 fixture 与 installer 对外部/scratch 仓的验收。
-2. 写一个 SUT profile（键契约见 `references/profile-schema.md`；`scripts/bugate_init.py` 会为导入仓脚手架同形状文件），设置 `artifact_dir`、`guarded_path_regex`、`agent_roles`、命令等。
-3. `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init`（复杂用例加 `--full-sdtd` 一并生成 01a/01b/02a）。
-4. 逐层跑门：`check_bugate_brief_semantics.py` / `check_bugate_layer2_semantics.py` / `check_bugate_inventory_semantics.py`，再 `check_bugate_v13_semantics.py <artifact_dir> --scope pre-code`。
-5. 需要双 agent 互审时跑 `sdtd_multiview_cli_bridge.py` / `sdtd_adversarial_cli_bridge.py`（检测到 CLI runtime 才真派发，否则确定性回退）。
-6. 执行后跑 `self_healing_mvp.py` + `generate_sdtd_reports.py` 产出 04/05。
-7. 把物理写门接到 runtime 的 `PreToolUse`（`scripts/check_bugate.py`）；需要角色隔离时再启用 `check_agent_role_paths.py`（`BUGATE_AGENT_ROLE` + profile `agent_roles`）。
-8. （可选）把 §1–§9 的 9-Wave 方法论工作产物放在 `.ai/` 下作为分析中间件，最终收敛到 01–05 gate 产物栈。
+2. 写一个 SUT profile（键契约见 `references/profile-schema.md`；`scripts/bugate_init.py` 会为导入仓脚手架同形状文件），设置 `artifact_dir`/`artifact_dir_template`、`guarded_path_regex`、Memory namespace，并显式选择 `role_governance.mode`。`agent_roles` 只在需要路径隔离时配置。
+3. 启用 required 治理时，分别通过 `bin/bugate-role run --role designer|implementer|reviewer -- <agent-command>` 启动三个独立会话。Hook 子进程无法把环境变量 export 回父进程；Desktop 必须从带角色环境的进程启动或重开会话。
+4. 先单独运行 `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init`（复杂用例加 `--full-sdtd` 一并生成 01a/01b/02a），再单独运行 `... <artifact_dir> --auto`。`--init --auto` 不是合法的日常入口。
+5. 逐层跑门：`check_bugate_brief_semantics.py` / `check_bugate_layer2_semantics.py` / `check_bugate_inventory_semantics.py`，再 `check_bugate_v13_semantics.py <artifact_dir> --scope pre-code`。
+6. 需要双 agent 互审时跑 `sdtd_multiview_cli_bridge.py` / `sdtd_adversarial_cli_bridge.py`。Peer 子进程会清除父会话的角色/session/receipt 身份，不会被当成 Wave 7 actor。
+7. 03B 经真实人工接受后，designer 使用 `bugate-role approve` 记录决定，再 handoff；implementer 和 reviewer 各自在新 session 用 exact Memory ID accept。已记录 human-acceptance receipt 后不要重跑会重生成 03B 的 `--auto`。
+8. reviewer acceptance 后跑 `self_healing_mvp.py` + `generate_sdtd_reports.py` 或 orchestrator post-run 产出 04/05，最后用 `bugate-role complete` 记录命令、exit code 与 evidence hash。
+9. 保持 runtime hook 表面一致：`check_bugate.py` 和 `check_role_evidence.py` 共同保护写入，`check_agent_role_paths.py` 单独保护路径读写。Codex hook hash 变化后必须 re-trust，未 re-trust 时不得声称 Wave 7 已激活。
+10. （可选）把 §1–§9 的 9-Wave 方法论工作产物放在 `.ai/` 下作为分析中间件，最终收敛到 01–05 gate 产物栈。
 
 ---
 

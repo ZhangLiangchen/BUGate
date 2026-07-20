@@ -14,8 +14,8 @@ Regressions pinned by the 2026-07 import-readiness review:
      traceback (`next()` needs its default, plus the ``[ -n "$ROOT" ]`` guard).
   3. **Wiring upgrade** — re-running init against a repo wired by an older
      engine must refresh OUR stale hook entries to the current template while
-     never rewriting the repo's own hooks (mixed entries stay theirs), and a
-     second pass must be a no-op.
+     never rewriting the repo's own hooks. Mixed entries stay theirs and gain
+     a separate canonical BUGate entry; a second pass must be a no-op.
 
 Stdlib-only, self-contained: run ``python3 tests/test_init_scaffold.py``.
 """
@@ -42,7 +42,7 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 def scenario_scaffold_hygiene() -> None:
-    print("S1 scaffold bodies: no control characters, identity-term example survives literally")
+    print("S1 scaffold bodies: hygienic, backward-compatible, one active guard contract")
     profile = bugate_init.PROFILE_SCAFFOLD.format(vendor_dir=".bugate", name="probe")
     config = bugate_init.CONFIG_SCAFFOLD.format(vendor_dir=".bugate")
     for label, body in (("profile", profile), ("config", config)):
@@ -53,10 +53,33 @@ def scenario_scaffold_hygiene() -> None:
         "\\bmy-product-name\\b" in profile,
         "expected raw \\b...\\b in the sut_identity_terms comment",
     )
+    check(
+        "profile has exactly one active guarded_path_regex key",
+        profile.count("\nguarded_path_regex:") == 1,
+        str(profile.count("\nguarded_path_regex:")),
+    )
+    check(
+        "profile explicitly defaults role governance off",
+        profile.count("\nrole_governance:") == 1
+        and "\nrole_governance:\n  mode: off\n" in profile,
+        "expected exactly one active mode: off block",
+    )
+    check(
+        "profile carries a complete commented required-mode migration example",
+        all(token in profile for token in (
+            "#   mode: required",
+            "#   memory_mode: required",
+            "#   evidence_dir: 00_role_evidence",
+            "#   require_distinct_sessions: true",
+            "#         - designer",
+            "#         - implementer",
+        )),
+        "required-mode example is incomplete",
+    )
 
 
 def scenario_root_snippet_contract() -> None:
-    print("S2 hook ROOT snippet: next() default + lazy guard (plugin-channel parity)")
+    print("S2 generated hooks: exact Claude/Codex gates and lifecycle order")
     snippet = bugate_init._ROOT_SNIPPET
     check("next() carries an empty-string default", ', ""))' in snippet, snippet)
     check('lazy guard [ -n "$ROOT" ] || exit 0 present', '[ -n "$ROOT" ] || exit 0;' in snippet, snippet)
@@ -67,6 +90,55 @@ def scenario_root_snippet_contract() -> None:
             f"every {runtime} hook command is lazy-guarded",
             cmds and all('[ -n "$ROOT" ] || exit 0;' in c for c in cmds),
             f"{len(cmds)} commands",
+        )
+        contract = [
+            (entry.get("matcher"), [
+                next((name for name in (
+                    "check_bugate.py",
+                    "check_plan_lock.py",
+                    "check_agent_role_paths.py",
+                    "check_role_evidence.py",
+                ) if name in hook["command"]), "<unknown>")
+                for hook in entry["hooks"]
+            ])
+            for entry in blocks["PreToolUse"]
+        ]
+        expected = (
+            [
+                ("Edit|Write", [
+                    "check_bugate.py",
+                    "check_plan_lock.py",
+                    "check_role_evidence.py",
+                ]),
+                ("Read|Edit|Write", ["check_agent_role_paths.py"]),
+            ]
+            if runtime == "claude"
+            else [("apply_patch", [
+                "check_bugate.py",
+                "check_plan_lock.py",
+                "check_agent_role_paths.py",
+                "check_role_evidence.py",
+            ])]
+        )
+        check(f"{runtime} exact matcher/gate contract", contract == expected, str(contract))
+        start = [h["command"] for entry in blocks["SessionStart"] for h in entry["hooks"]]
+        stop = [h["command"] for entry in blocks["Stop"] for h in entry["hooks"]]
+        check(
+            f"{runtime} SessionStart recalls Memory then reports role state",
+            len(start) == 2
+            and "memory_bus.py" in start[0]
+            and "bugate-role" in start[1]
+            and all("--core" not in command for command in start),
+            str(start),
+        )
+        check(
+            f"{runtime} Stop is one imported heartbeat using the active role",
+            len(stop) == 1
+            and "memory_bus.py" in stop[0]
+            and " stop " in stop[0]
+            and '"${BUGATE_AGENT_ROLE:-agent}"' in stop[0]
+            and "--core" not in stop[0],
+            str(stop),
         )
 
 
@@ -83,6 +155,33 @@ def scenario_wired_hook_inert_without_config() -> None:
         check("bugate init succeeds", cp.returncode == 0, cp.stderr[-300:])
         settings = json.loads((sut / ".claude" / "settings.json").read_text(encoding="utf-8"))
         pre = [e for e in settings["hooks"]["PreToolUse"] if e.get("matcher") == "Edit|Write"]
+        role_paths = [e for e in settings["hooks"]["PreToolUse"] if e.get("matcher") == "Read|Edit|Write"]
+        check(
+            "fresh Claude wiring has the two independent canonical matchers",
+            len(pre) == 1
+            and len(role_paths) == 1
+            and [
+                next((name for name in (
+                    "check_bugate.py",
+                    "check_plan_lock.py",
+                    "check_role_evidence.py",
+                ) if name in hook["command"]), "<unknown>")
+                for hook in pre[0]["hooks"]
+            ] == ["check_bugate.py", "check_plan_lock.py", "check_role_evidence.py"]
+            and len(role_paths[0]["hooks"]) == 1
+            and "check_agent_role_paths.py" in role_paths[0]["hooks"][0]["command"],
+            str(settings["hooks"]["PreToolUse"]),
+        )
+        start = [
+            hook["command"]
+            for entry in settings["hooks"]["SessionStart"]
+            for hook in entry["hooks"]
+        ]
+        check(
+            "fresh SessionStart wires Memory recall before bugate-role",
+            len(start) == 2 and "memory_bus.py" in start[0] and "bugate-role" in start[1],
+            str(start),
+        )
         command = pre[0]["hooks"][0]["command"]
         scaffold = (sut / "bugate.profile.yaml").read_bytes()
         check("written profile carries no 0x08 byte", b"\x08" not in scaffold)
@@ -114,7 +213,7 @@ def scenario_wired_hook_inert_without_config() -> None:
 
 
 def scenario_merge_refreshes_stale_wiring() -> None:
-    print("S4 upgrade: stale BUGate wiring is refreshed; the repo's own hooks never are")
+    print("S4 upgrade: stale owned wiring refreshes; SUT and mixed entries are preserved")
     legacy_cmd = 'ROOT="$(legacy-resolver)"; /usr/bin/env python3 "$ROOT/.bugate/scripts/check_bugate.py"'
     own = {"matcher": "Bash", "hooks": [{"type": "command", "command": "echo repo-own >/dev/null"}]}
     stale = {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": legacy_cmd}]}
@@ -136,10 +235,56 @@ def scenario_merge_refreshes_stale_wiring() -> None:
         {"type": "command", "command": legacy_cmd},
     ]}
     merged3, added3 = bugate_init.merge_hooks({"hooks": {"PreToolUse": [mixed]}}, blocks, ".bugate")
+    pre3 = merged3["hooks"]["PreToolUse"]
     check(
-        "mixed entry is wired-but-theirs: never rewritten, never doubled",
-        merged3["hooks"]["PreToolUse"] == [mixed] and not any(a.startswith("PreToolUse") for a in added3),
+        "mixed entry remains byte-for-byte first-party SUT wiring",
+        pre3[0] == mixed,
+        str(pre3[0]),
+    )
+    check(
+        "mixed entry never substitutes for independent canonical wiring",
+        pre3[1:] == blocks["PreToolUse"]
+        and any(a == "PreToolUse" for a in added3),
         str(added3),
+    )
+    snapshot = json.dumps(merged3, sort_keys=True)
+    merged4, added4 = bugate_init.merge_hooks(merged3, blocks, ".bugate")
+    check(
+        "mixed upgrade is idempotent on the second pass",
+        not added4 and json.dumps(merged4, sort_keys=True) == snapshot,
+        str(added4),
+    )
+    codex_blocks = bugate_init.hook_blocks(".bugate", "codex")
+    codex_own = {
+        "matcher": "apply_patch",
+        "hooks": [{"type": "command", "command": "echo sut-codex-hook >/dev/null"}],
+    }
+    codex_stale = {
+        "matcher": "apply_patch",
+        "hooks": [{"type": "command", "command": legacy_cmd}],
+    }
+    codex_merged, codex_added = bugate_init.merge_hooks(
+        {"hooks": {"PreToolUse": [codex_own, codex_stale]}},
+        codex_blocks,
+        ".bugate",
+    )
+    codex_pre = codex_merged["hooks"]["PreToolUse"]
+    check("SUT Codex hook is preserved on upgrade", codex_pre[0] == codex_own, str(codex_pre))
+    check(
+        "stale Codex owned hook upgrades to all four guards",
+        codex_pre[1:] == codex_blocks["PreToolUse"]
+        and any(item.startswith("PreToolUse") for item in codex_added),
+        str(codex_pre),
+    )
+    codex_snapshot = json.dumps(codex_merged, sort_keys=True)
+    codex_again, codex_added_again = bugate_init.merge_hooks(
+        codex_merged, codex_blocks, ".bugate"
+    )
+    check(
+        "Codex hook upgrade is idempotent",
+        not codex_added_again
+        and json.dumps(codex_again, sort_keys=True) == codex_snapshot,
+        str(codex_added_again),
     )
 
 
@@ -214,7 +359,7 @@ def scenario_gitignore_backstop() -> None:
 
 
 def scenario_codex_agents_installed() -> None:
-    print("S6 codex agents/skills: official .agents skill path, compat bridge, refresh-ours")
+    print("S6 vendor contents + Codex agents/skills: new role runtime, links, refresh-ours")
     names = {"brief-gate.toml", "testability-gate.toml", "inventory-gate.toml"}
     with tempfile.TemporaryDirectory() as td:
         sut = Path(td) / "sut"
@@ -248,6 +393,24 @@ def scenario_codex_agents_installed() -> None:
             all((sut / runtime / "skills" / "bugate-full-check" / "SKILL.md").exists()
                 for runtime in (".claude", ".agents", ".codex")),
         )
+        check(
+            "role-governance scripts are vendored",
+            all((sut / ".bugate" / "scripts" / name).is_file() for name in (
+                "role_governance.py",
+                "check_role_evidence.py",
+            )),
+        )
+        role_bin = sut / ".bugate" / "bin" / "bugate-role"
+        check(
+            "bugate-role bin is vendored and executable",
+            role_bin.is_file() and os.access(role_bin, os.X_OK),
+            str(role_bin),
+        )
+        check(
+            "all three shipped skills are vendored",
+            all((sut / ".bugate" / ".shared" / "skills" / skill / "SKILL.md").is_file()
+                for skill in ("bugate", "bugate-full-check", "bugate-import")),
+        )
         # refresh-ours: a SUT-owned agent survives a re-run; ours are refreshed, not duplicated.
         (agents_dir / "sut-own.toml").write_text('name = "sut-own"\n', encoding="utf-8")
         cp2 = subprocess.run(
@@ -258,6 +421,10 @@ def scenario_codex_agents_installed() -> None:
         after = {p.name for p in agents_dir.glob("*.toml")}
         check("SUT's own agent is preserved on re-run", "sut-own.toml" in after, str(after))
         check("our agents are not duplicated", after == names | {"sut-own.toml"}, str(after))
+        check(
+            "re-run leaves one canonical SessionStart entry with both owned commands",
+            len(json.loads((sut / ".codex" / "hooks.json").read_text(encoding="utf-8"))["hooks"]["SessionStart"]) == 1,
+        )
         # dry-run writes nothing.
         dry = Path(td) / "dry"
         dry.mkdir()

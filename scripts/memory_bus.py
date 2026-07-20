@@ -17,15 +17,18 @@ Design rules:
   active imported SUT profile) or ``--namespace X`` (an explicit tag). One DB,
   tag-partitioned, so BUGate-core memory and SUT memory never cross-pollute.
 - Standard library only (urllib, json, os, argparse, pathlib, datetime).
-- Degrade gracefully: if the service is unreachable, print a clear hint to run
-  ``bin/memory-bus-start`` and exit non-fatally (0) so hooks never block work.
+- Degrade gracefully for ordinary recall/bookkeeping commands.  Explicit
+  ``--strict`` role-transition boundaries fail non-zero so an unavailable or
+  unverifiable Memory service can never unlock a local lifecycle receipt.
 
-Subcommands: session-start, stop, status, note, search, recent, handoff,
-archive, lint.
+Subcommands: session-start, stop, status, note, search, recent, get, handoff,
+accept-handoff, verify-handoff, archive, lint.
 """
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
 import json
 import os
 import sys
@@ -48,6 +51,20 @@ START_HINT = "Start it with bin/memory-bus-start (or bin/memory-bus-ensure)."
 VALID_AGENTS = ("builder", "designer", "implementer", "reviewer", "human", "agent")
 VALID_TYPES = ("progress", "finding", "blocker", "decision", "handoff")
 VALID_STATUS = ("draft", "confirmed", "obsolete")
+
+ROLE_TRANSITION_SCHEMA = "bugate.role-transition/v1"
+MEMORY_TRANSITION_SCHEMA = "bugate.memory-role-transition/v1"
+ACCEPTANCE_HANDOFFS = {
+    "implementer_acceptance": ("designer_handoff", "pre_code", "implementation"),
+    "reviewer_acceptance": ("implementer_handoff", "implementation", "post_run"),
+}
+
+# prepare_role_transition() and finalize_role_transition() run in the same role
+# command.  Retaining the exact record verified by prepare lets finalize perform
+# the required POST -> exact GET -> PUT -> exact GET sequence without inserting
+# an unverified read between the two transaction halves.  The key includes the
+# service URL so independent local services cannot collide.
+_PREPARED_ROLE_TRANSITIONS: dict[tuple[str, str], dict[str, Any]] = {}
 
 
 class MemoryBusError(RuntimeError):
@@ -82,8 +99,8 @@ def project_tag() -> str:
         value = str(memory.get("namespace") or "").strip()
         if value:
             return value
-    # The simple BUGate YAML parser flattens nested keys, so a `memory:` block
-    # with a `namespace:` child surfaces as a top-level `namespace` key.
+    # load_config canonicalizes the legacy top-level alias alongside the nested
+    # memory.namespace value, so old profiles remain readable here.
     value = str(config.get("namespace") or "").strip()
     if value:
         return value
@@ -100,7 +117,15 @@ def core_project_tag() -> str:
     falling back to DEFAULT_PROJECT_TAG. Selected via the ``--core`` flag.
     """
     try:
-        base = bugate_core.parse_simple_yaml((root() / "bugate.config.yaml").read_text(encoding="utf-8"))
+        base = bugate_core.parse_nested_yaml(
+            (root() / "bugate.config.yaml").read_text(encoding="utf-8")
+        )
+        memory = base.get("memory")
+        if isinstance(memory, dict):
+            value = str(memory.get("namespace") or "").strip()
+            if value:
+                return value
+        # Legacy v0.3.x configs exposed namespace as a top-level scalar.
         value = str(base.get("namespace") or "").strip()
         if value:
             return value
@@ -461,6 +486,467 @@ def build_tags(
 
 
 # --------------------------------------------------------------------------- #
+# Exact role-transition boundary                                                #
+# --------------------------------------------------------------------------- #
+
+def _canonical_json(value: Any) -> bytes:
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise MemoryBusError(f"role transition is not canonical JSON: {exc}") from exc
+
+
+def _sha256(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _require_success(data: Any, operation: str) -> dict[str, Any]:
+    """Require the service's explicit mutation acknowledgement.
+
+    The Memory service deliberately uses HTTP 200 with ``success: false`` for
+    some storage failures.  A strict boundary must treat that as a failed
+    mutation rather than trusting the status code alone.
+    """
+
+    if not isinstance(data, dict):
+        raise MemoryBusError(f"{operation} returned a non-object response")
+    if data.get("success") is not True:
+        message = str(data.get("message") or data.get("error") or "success was not true")
+        raise MemoryBusError(f"{operation} failed: {message}")
+    return data
+
+
+def get_memory_exact(
+    exact_id: str,
+    *,
+    agent: str | None = None,
+    timeout: float = 3.0,
+) -> dict[str, Any]:
+    """Read one record by exact content hash and verify the returned identity."""
+
+    exact_id = str(exact_id or "").strip()
+    if not exact_id or exact_id == "<unknown>":
+        raise MemoryBusError("exact Memory GET requires a non-empty content hash")
+    encoded = urllib.parse.quote(exact_id, safe="")
+    data = request_json("GET", f"/api/memories/{encoded}", agent=agent, timeout=timeout)
+    if isinstance(data, dict) and data.get("success") is False:
+        message = str(data.get("message") or data.get("error") or "success was false")
+        raise MemoryBusError(f"exact Memory GET failed: {message}")
+    if not isinstance(data, dict):
+        raise MemoryBusError("exact Memory GET returned a non-object response")
+    record = _unwrap(data)
+    if not isinstance(record, dict):
+        raise MemoryBusError("exact Memory GET did not return a memory object")
+    actual_id = memory_id(record)
+    if actual_id == "<unknown>":
+        raise MemoryBusError("exact Memory GET response is missing content hash")
+    if actual_id != exact_id:
+        raise MemoryBusError(
+            f"exact Memory GET identity mismatch: expected {exact_id}, got {actual_id}"
+        )
+    return record
+
+
+def update_memory_metadata_exact(
+    exact_id: str,
+    updates: dict[str, Any],
+    *,
+    agent: str | None = None,
+    timeout: float = 3.0,
+) -> dict[str, Any]:
+    """Merge metadata, require PUT success, then exact-GET the stored result.
+
+    Some Memory Service/storage versions merge the supplied ``metadata`` map;
+    others replace it.  Reading and sending the complete merged map preserves
+    the transition contract under both semantics.
+    """
+
+    if not isinstance(updates, dict) or not updates:
+        raise MemoryBusError("exact Memory update requires non-empty metadata")
+    exact_id = str(exact_id or "").strip()
+    if not exact_id:
+        raise MemoryBusError("exact Memory update requires a content hash")
+    current = get_memory_exact(exact_id, agent=agent, timeout=timeout)
+    merged_metadata = copy.deepcopy(memory_metadata(current))
+    merged_metadata.update(copy.deepcopy(updates))
+    encoded = urllib.parse.quote(exact_id, safe="")
+    data = request_json(
+        "PUT",
+        f"/api/memories/{encoded}",
+        {"metadata": merged_metadata},
+        agent=agent,
+        timeout=timeout,
+    )
+    response = _require_success(data, "exact Memory metadata update")
+    response_id = memory_id(response)
+    if response_id == "<unknown>" or not response_id:
+        raise MemoryBusError("exact Memory metadata update response is missing content hash")
+    if response_id != exact_id:
+        raise MemoryBusError(
+            f"exact Memory update identity mismatch: expected {exact_id}, got {response_id}"
+        )
+    stored = get_memory_exact(exact_id, agent=agent, timeout=timeout)
+    actual_metadata = memory_metadata(stored)
+    for key, wanted in merged_metadata.items():
+        if actual_metadata.get(key) != wanted:
+            raise MemoryBusError(
+                f"exact Memory update did not persist metadata field {key}"
+            )
+    return stored
+
+
+def _transition_hash(payload: dict[str, Any]) -> str:
+    value = copy.deepcopy(payload)
+    value.pop("transition_sha256", None)
+    return _sha256(_canonical_json(value))
+
+
+def _validate_transition_payload(payload: dict[str, Any]) -> None:
+    if not isinstance(payload, dict):
+        raise MemoryBusError("role transition payload must be an object")
+    if payload.get("schema") != ROLE_TRANSITION_SCHEMA:
+        raise MemoryBusError(
+            f"role transition schema must be {ROLE_TRANSITION_SCHEMA}"
+        )
+    for key in ("event", "uc", "phase"):
+        if not isinstance(payload.get(key), str) or not str(payload[key]).strip():
+            raise MemoryBusError(f"role transition is missing non-empty {key}")
+    for key in ("from_role", "to_role"):
+        if not isinstance(payload.get(key), str):
+            raise MemoryBusError(f"role transition {key} must be a string")
+    supplied = str(payload.get("transition_sha256") or "")
+    computed = _transition_hash(payload)
+    if supplied != computed:
+        raise MemoryBusError(
+            f"transition hash mismatch: expected {computed}, got {supplied or '<missing>'}"
+        )
+
+
+def _transition_agent(payload: dict[str, Any]) -> str:
+    actor = payload.get("actor")
+    actor_role = str(actor.get("role") or "") if isinstance(actor, dict) else ""
+    candidate = actor_role or str(payload.get("from_role") or "")
+    return candidate if candidate in VALID_AGENTS else "agent"
+
+
+def _role_memory_content(namespace: str, payload: dict[str, Any]) -> str:
+    return (
+        "BUGate auditable role transition\n"
+        f"namespace={namespace}\n"
+        f"event={payload['event']}\n"
+        f"transition_sha256={payload['transition_sha256']}"
+    )
+
+
+def _role_memory_tags(namespace: str, payload: dict[str, Any]) -> list[str]:
+    agent = _transition_agent(payload)
+    to_role = str(payload.get("to_role") or "")
+    # UC, phase, hashes, sessions, and artifact paths are intentionally kept in
+    # metadata: they are high-cardinality values and must not explode the tag
+    # vocabulary.
+    return build_tags(
+        agent,
+        "handoff",
+        "confirmed",
+        scope="role-transition",
+        to=to_role or None,
+        broadcast=not bool(to_role),
+    )
+
+
+def _role_memory_metadata(
+    namespace: str,
+    payload: dict[str, Any],
+    *,
+    verified_at: str,
+) -> dict[str, Any]:
+    return {
+        "schema": MEMORY_TRANSITION_SCHEMA,
+        "namespace": namespace,
+        "event": payload["event"],
+        "uc": payload["uc"],
+        "phase": payload["phase"],
+        "from_role": payload["from_role"],
+        "to_role": payload["to_role"],
+        "transition_sha256": payload["transition_sha256"],
+        "role_transition": copy.deepcopy(payload),
+        "receipt_sha256": "",
+        "verified_at": verified_at,
+    }
+
+
+def _stored_transition(record: dict[str, Any]) -> dict[str, Any]:
+    transition = memory_metadata(record).get("role_transition")
+    if not isinstance(transition, dict):
+        raise MemoryBusError("Memory record is missing role_transition metadata")
+    return transition
+
+
+def _validate_role_memory(
+    record: dict[str, Any],
+    expected: dict[str, Any],
+    *,
+    exact_id: str,
+    receipt_sha256: str | None = None,
+) -> dict[str, Any]:
+    _validate_transition_payload(expected)
+    namespace = project_tag()
+    actual_id = memory_id(record)
+    if actual_id != exact_id:
+        raise MemoryBusError(
+            f"role transition Memory ID mismatch: expected {exact_id}, got {actual_id}"
+        )
+    metadata = memory_metadata(record)
+    if metadata.get("schema") != MEMORY_TRANSITION_SCHEMA:
+        raise MemoryBusError("role transition Memory schema mismatch")
+    checks = {
+        "namespace": namespace,
+        "event": expected["event"],
+        "uc": expected["uc"],
+        "phase": expected["phase"],
+        "from_role": expected["from_role"],
+        "to_role": expected["to_role"],
+        "transition_sha256": expected["transition_sha256"],
+    }
+    for key, wanted in checks.items():
+        if metadata.get(key) != wanted:
+            raise MemoryBusError(
+                f"role transition metadata mismatch for {key}: "
+                f"expected {wanted!r}, got {metadata.get(key)!r}"
+            )
+    stored = _stored_transition(record)
+    _validate_transition_payload(stored)
+    if _canonical_json(stored) != _canonical_json(expected):
+        raise MemoryBusError("stored role transition payload does not exactly match expected")
+    required_tags = set(_role_memory_tags(namespace, expected))
+    missing_tags = sorted(required_tags - set(memory_tags(record)))
+    if missing_tags:
+        raise MemoryBusError(
+            "role transition Memory tags mismatch; missing: " + ", ".join(missing_tags)
+        )
+    expected_content = _role_memory_content(namespace, expected)
+    if memory_content(record) != expected_content:
+        raise MemoryBusError("role transition Memory content mismatch")
+    verified_at = str(metadata.get("verified_at") or "")
+    if not verified_at:
+        raise MemoryBusError("role transition Memory metadata is missing verified_at")
+    if receipt_sha256 is not None and metadata.get("receipt_sha256") != receipt_sha256:
+        raise MemoryBusError(
+            "role transition receipt hash mismatch: "
+            f"expected {receipt_sha256}, got {metadata.get('receipt_sha256')!r}"
+        )
+    return {
+        "namespace": namespace,
+        "memory_id": exact_id,
+        "verified_at": verified_at,
+    }
+
+
+def _validate_acceptance_handoff(payload: dict[str, Any]) -> dict[str, Any] | None:
+    contract = ACCEPTANCE_HANDOFFS.get(str(payload.get("event") or ""))
+    if contract is None:
+        return None
+    expected_event, expected_source_phase, expected_target_phase = contract
+    if payload.get("phase") != expected_target_phase:
+        raise MemoryBusError(
+            f"{payload['event']} phase must be {expected_target_phase}"
+        )
+    handoff_id = str(payload.get("handoff_memory_id") or "").strip()
+    receipt_hash = str(payload.get("handoff_receipt_sha256") or "").strip()
+    if not handoff_id:
+        raise MemoryBusError("acceptance transition is missing handoff_memory_id")
+    if not receipt_hash:
+        raise MemoryBusError("acceptance transition is missing handoff_receipt_sha256")
+    record = get_memory_exact(handoff_id, agent=_transition_agent(payload))
+    transition = _stored_transition(record)
+    if transition.get("event") != expected_event:
+        raise MemoryBusError(
+            f"acceptance handoff event mismatch: expected {expected_event}, "
+            f"got {transition.get('event')!r}"
+        )
+    comparisons = {
+        "namespace": project_tag(),
+        "uc": payload["uc"],
+        "phase": expected_source_phase,
+        "from_role": payload["from_role"],
+        "to_role": payload["to_role"],
+    }
+    metadata = memory_metadata(record)
+    for key, wanted in comparisons.items():
+        actual = metadata.get(key)
+        if actual != wanted:
+            raise MemoryBusError(
+                f"acceptance handoff mismatch for {key}: expected {wanted!r}, got {actual!r}"
+            )
+    # This validates namespace, structural tags, the full stored transition,
+    # and the transition hash before checking the local-receipt anchor.
+    return _validate_role_memory(
+        record,
+        transition,
+        exact_id=handoff_id,
+        receipt_sha256=receipt_hash,
+    )
+
+
+def prepare_role_transition(payload: dict[str, Any], strict: bool) -> dict[str, Any]:
+    """POST a stable transition and prove it with an exact GET.
+
+    Acceptance events first exact-GET and verify the referenced handoff.  The
+    ``strict`` flag is part of the public adapter contract; validation errors
+    always raise so the role-governance caller can either fail closed
+    (required) or mark the transition explicitly unanchored (best effort).
+    """
+
+    del strict  # failure policy is owned by the caller; this adapter never lies.
+    _validate_transition_payload(payload)
+    _validate_acceptance_handoff(payload)
+    namespace = project_tag()
+    verified_at = _utc_now()
+    metadata = _role_memory_metadata(namespace, payload, verified_at=verified_at)
+    content = _role_memory_content(namespace, payload)
+    tags = _role_memory_tags(namespace, payload)
+    agent = _transition_agent(payload)
+    response = _require_success(
+        request_json(
+            "POST",
+            "/api/memories",
+            {
+                "content": content,
+                "tags": tags,
+                "memory_type": "communication",
+                "conversation_id": (
+                    f"bugate-role-transition-{namespace}-{payload['transition_sha256']}"
+                ),
+                "metadata": metadata,
+            },
+            agent=agent,
+        ),
+        "role transition POST",
+    )
+    exact_id = memory_id(response)
+    if exact_id == "<unknown>" or not exact_id:
+        raise MemoryBusError("role transition POST response is missing content hash")
+    record = get_memory_exact(exact_id, agent=agent)
+    result = _validate_role_memory(record, payload, exact_id=exact_id)
+    _PREPARED_ROLE_TRANSITIONS[(base_url(), exact_id)] = copy.deepcopy(record)
+    return result
+
+
+def finalize_role_transition(
+    memory_id: str,
+    receipt_sha256: str,
+    expected: dict[str, Any],
+    strict: bool,
+) -> dict[str, Any]:
+    """Bind the local receipt hash with PUT, then prove it by exact GET."""
+
+    del strict
+    _validate_transition_payload(expected)
+    exact_id = str(memory_id or "").strip()
+    receipt_hash = str(receipt_sha256 or "").strip()
+    if len(receipt_hash) != 64 or any(ch not in "0123456789abcdef" for ch in receipt_hash):
+        raise MemoryBusError("receipt_sha256 must be a lowercase 64-character SHA-256")
+    agent = _transition_agent(expected)
+    cache_key = (base_url(), exact_id)
+    record = _PREPARED_ROLE_TRANSITIONS.get(cache_key)
+    if record is None:
+        # Public callers should prepare first.  The fallback remains fail-safe
+        # for recovery tooling that has restarted between the two halves.
+        record = get_memory_exact(exact_id, agent=agent)
+    stable = _validate_role_memory(record, expected, exact_id=exact_id)
+    existing = str(memory_metadata(record).get("receipt_sha256") or "")
+    if existing and existing != receipt_hash:
+        raise MemoryBusError(
+            "role transition already has a different receipt hash; refusing overwrite"
+        )
+    if existing == receipt_hash:
+        _PREPARED_ROLE_TRANSITIONS.pop(cache_key, None)
+        return {
+            **stable,
+            "receipt_sha256": receipt_hash,
+            "status": "verified",
+        }
+    updated = update_memory_metadata_exact(
+        exact_id,
+        {"receipt_sha256": receipt_hash, "receipt_bound_at": _utc_now()},
+        agent=agent,
+    )
+    result = _validate_role_memory(
+        updated,
+        expected,
+        exact_id=exact_id,
+        receipt_sha256=receipt_hash,
+    )
+    _PREPARED_ROLE_TRANSITIONS.pop(cache_key, None)
+    return {
+        **result,
+        "receipt_sha256": receipt_hash,
+        "status": "verified",
+    }
+
+
+def verify_role_transition(receipt: dict[str, Any], strict: bool) -> dict[str, Any]:
+    """Verify the local receipt and its bidirectional exact Memory anchor."""
+
+    del strict
+    if not isinstance(receipt, dict):
+        raise MemoryBusError("role receipt must be an object")
+    supplied_receipt_hash = str(receipt.get("receipt_sha256") or "")
+    receipt_value = copy.deepcopy(receipt)
+    receipt_value.pop("receipt_sha256", None)
+    computed_receipt_hash = _sha256(_canonical_json(receipt_value))
+    if supplied_receipt_hash != computed_receipt_hash:
+        raise MemoryBusError(
+            "local role receipt hash mismatch: "
+            f"expected {computed_receipt_hash}, got {supplied_receipt_hash or '<missing>'}"
+        )
+    anchor = receipt.get("memory")
+    if not isinstance(anchor, dict):
+        raise MemoryBusError("role receipt is missing Memory anchor")
+    exact_id = str(anchor.get("memory_id") or "").strip()
+    if not exact_id:
+        raise MemoryBusError("role receipt Memory anchor is missing memory_id")
+    if anchor.get("namespace") != project_tag():
+        raise MemoryBusError(
+            "role receipt Memory namespace mismatch: "
+            f"expected {project_tag()!r}, got {anchor.get('namespace')!r}"
+        )
+    record = get_memory_exact(exact_id, agent=_transition_agent(receipt))
+    transition = _stored_transition(record)
+    _validate_transition_payload(transition)
+    for key, wanted in transition.items():
+        if key == "schema":
+            continue
+        if receipt.get(key) != wanted:
+            raise MemoryBusError(
+                f"local receipt does not match Memory transition field {key}"
+            )
+    result = _validate_role_memory(
+        record,
+        transition,
+        exact_id=exact_id,
+        receipt_sha256=supplied_receipt_hash,
+    )
+    if anchor.get("verified_at") != result["verified_at"]:
+        raise MemoryBusError("role receipt verified_at does not match exact Memory record")
+    _validate_acceptance_handoff(transition)
+    return {
+        **result,
+        "receipt_sha256": supplied_receipt_hash,
+        "status": "verified",
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Formatting                                                                    #
 # --------------------------------------------------------------------------- #
 
@@ -553,6 +1039,23 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_get(args: argparse.Namespace) -> int:
+    """Read one exact content hash; optionally make failure gate-significant."""
+
+    try:
+        record = get_memory_exact(args.id, timeout=args.timeout)
+    except MemoryBusError as exc:
+        print(f"Exact Memory read failed: {exc}", file=sys.stderr)
+        if not args.strict:
+            print(START_HINT, file=sys.stderr)
+        return 1 if args.strict else 0
+    if args.json:
+        print(json.dumps(record, ensure_ascii=False, indent=2))
+    else:
+        print(format_memories([record], 1))
+    return 0
+
+
 def cmd_recent(args: argparse.Namespace) -> int:
     if not service_available():
         warn_unavailable()
@@ -573,7 +1076,77 @@ def cmd_recent(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cli_transition(
+    args: argparse.Namespace,
+    *,
+    event: str,
+    handoff_id: str = "",
+    handoff_receipt_sha256: str = "",
+) -> dict[str, Any]:
+    missing = [name for name in ("uc", "phase") if not str(getattr(args, name, "") or "").strip()]
+    if missing:
+        raise MemoryBusError(
+            "strict role transition requires " + ", ".join(f"--{name}" for name in missing)
+        )
+    from_role = str(getattr(args, "from_agent", "") or "").strip()
+    to_role = str(getattr(args, "to", "") or "").strip()
+    payload: dict[str, Any] = {
+        "schema": ROLE_TRANSITION_SCHEMA,
+        "event": event,
+        "uc": str(args.uc).strip(),
+        "artifact_dir": str(getattr(args, "artifact_dir", "") or ""),
+        "phase": str(args.phase).strip(),
+        "from_role": from_role,
+        "to_role": to_role,
+        "actor": {
+            "role": to_role if event.endswith("_acceptance") else from_role,
+            "runtime": str(getattr(args, "runtime", "unknown") or "unknown"),
+            "session_id": str(getattr(args, "session_id", "") or ""),
+        },
+        "message": str(getattr(args, "msg", "") or ""),
+    }
+    scope = str(getattr(args, "scope", "") or "")
+    task = str(getattr(args, "task", "") or "")
+    artifacts = list(getattr(args, "artifact", None) or [])
+    if scope:
+        payload["scope"] = scope
+    if task:
+        payload["task"] = task
+    if artifacts:
+        payload["artifact_paths"] = artifacts
+    if handoff_id:
+        payload["handoff_memory_id"] = handoff_id
+        payload["handoff_receipt_sha256"] = handoff_receipt_sha256
+    supplied = str(getattr(args, "transition_sha256", "") or "").strip()
+    payload["transition_sha256"] = supplied or _transition_hash(payload)
+    return payload
+
+
+def _print_transition_result(args: argparse.Namespace, result: dict[str, Any], label: str) -> None:
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"{label} verified as `{result['memory_id']}` [{result['namespace']}]")
+
+
 def cmd_handoff(args: argparse.Namespace) -> int:
+    if getattr(args, "strict", False):
+        try:
+            event = str(args.event or f"{args.from_agent}_handoff")
+            payload = _cli_transition(args, event=event)
+            result = prepare_role_transition(payload=payload, strict=True)
+            if args.receipt_sha256:
+                result = finalize_role_transition(
+                    memory_id=result["memory_id"],
+                    receipt_sha256=args.receipt_sha256,
+                    expected=payload,
+                    strict=True,
+                )
+        except MemoryBusError as exc:
+            print(f"Strict handoff failed: {exc}", file=sys.stderr)
+            return 1
+        _print_transition_result(args, result, f"Strict handoff {args.from_agent} -> {args.to}")
+        return 0
     if not service_available():
         warn_unavailable()
         return 0
@@ -593,6 +1166,86 @@ def cmd_handoff(args: argparse.Namespace) -> int:
         print(json.dumps(resp, ensure_ascii=False, indent=2))
     else:
         print(f"Handoff {args.from_agent} -> {args.to} recorded as `{memory_id(resp)}`")
+    return 0
+
+
+def cmd_accept_handoff(args: argparse.Namespace) -> int:
+    try:
+        event = str(args.event or f"{args.to}_acceptance")
+        payload = _cli_transition(
+            args,
+            event=event,
+            handoff_id=args.handoff_id,
+            handoff_receipt_sha256=args.handoff_receipt_sha256,
+        )
+        result = prepare_role_transition(payload=payload, strict=args.strict)
+        if args.receipt_sha256:
+            result = finalize_role_transition(
+                memory_id=result["memory_id"],
+                receipt_sha256=args.receipt_sha256,
+                expected=payload,
+                strict=args.strict,
+            )
+    except MemoryBusError as exc:
+        print(f"Accept-handoff Memory operation failed: {exc}", file=sys.stderr)
+        return 1 if args.strict else 0
+    _print_transition_result(args, result, f"Acceptance {args.from_agent} -> {args.to}")
+    return 0
+
+
+def cmd_verify_handoff(args: argparse.Namespace) -> int:
+    try:
+        if args.receipt_file:
+            receipt_path = Path(args.receipt_file).expanduser()
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, dict):
+                raise MemoryBusError("--receipt-file must contain one JSON object")
+            anchor = receipt.get("memory")
+            anchor_id = str(anchor.get("memory_id") or "") if isinstance(anchor, dict) else ""
+            if anchor_id != args.id:
+                raise MemoryBusError(
+                    f"receipt Memory ID mismatch: expected {args.id}, got {anchor_id or '<missing>'}"
+                )
+            result = verify_role_transition(receipt=receipt, strict=args.strict)
+        else:
+            if args.strict and not args.receipt_sha256:
+                raise MemoryBusError(
+                    "strict verify-handoff requires --receipt-sha256 or --receipt-file"
+                )
+            record = get_memory_exact(args.id, timeout=args.timeout)
+            transition = _stored_transition(record)
+            _validate_transition_payload(transition)
+            expected_values = {
+                "event": args.event,
+                "uc": args.uc,
+                "phase": args.phase,
+                "from_role": args.from_agent,
+                "to_role": args.to,
+                "transition_sha256": args.transition_sha256,
+            }
+            metadata = memory_metadata(record)
+            for key, wanted in expected_values.items():
+                if wanted is not None and metadata.get(key) != wanted:
+                    raise MemoryBusError(
+                        f"verify-handoff mismatch for {key}: "
+                        f"expected {wanted!r}, got {metadata.get(key)!r}"
+                    )
+            result = _validate_role_memory(
+                record,
+                transition,
+                exact_id=args.id,
+                receipt_sha256=args.receipt_sha256 or None,
+            )
+            _validate_acceptance_handoff(transition)
+            result = {
+                **result,
+                "receipt_sha256": str(metadata.get("receipt_sha256") or ""),
+                "status": "verified",
+            }
+    except (MemoryBusError, OSError, json.JSONDecodeError) as exc:
+        print(f"Verify-handoff failed: {exc}", file=sys.stderr)
+        return 1 if args.strict else 0
+    _print_transition_result(args, result, "Handoff")
     return 0
 
 
@@ -913,6 +1566,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_search)
 
+    p = sub.add_parser("get", help="read one memory by exact content hash")
+    p.add_argument("--id", required=True, help="exact memory content hash")
+    p.add_argument("--timeout", type=float, default=3.0)
+    p.add_argument("--strict", action="store_true", help="return non-zero on any read or identity failure")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_get)
+
     p = sub.add_parser("recent", help="newest agent-visible memories (broadcast or addressed)")
     p.add_argument("--agent", required=True)
     p.add_argument("--limit", type=int, default=10)
@@ -929,8 +1589,53 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--task")
     p.add_argument("--tag", action="append")
     p.add_argument("--artifact", action="append")
+    p.add_argument("--strict", action="store_true", help="use POST/exact-GET strict role-transition storage")
+    p.add_argument("--event", help="strict transition event (default: <from>_handoff)")
+    p.add_argument("--uc", help="strict transition UC identifier (stored in metadata)")
+    p.add_argument("--phase", help="strict transition source phase")
+    p.add_argument("--artifact-dir", help="strict transition artifact directory")
+    p.add_argument("--runtime", default="unknown", help="declared actor runtime")
+    p.add_argument("--session-id", help="declared actor session ID")
+    p.add_argument("--transition-sha256", help="precomputed transition hash (otherwise computed)")
+    p.add_argument("--receipt-sha256", help="bind and exact-verify a local receipt hash")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_handoff)
+
+    p = sub.add_parser("accept-handoff", help="exact-verify a handoff and record its acceptance")
+    p.add_argument("--handoff-id", required=True, help="exact handoff Memory content hash")
+    p.add_argument("--handoff-receipt-sha256", required=True, help="local handoff receipt hash already bound in Memory")
+    p.add_argument("--from", dest="from_agent", required=True)
+    p.add_argument("--to", required=True)
+    p.add_argument("--uc", required=True)
+    p.add_argument("--phase", required=True, choices=("implementation", "post_run"))
+    p.add_argument("--msg", required=True)
+    p.add_argument("--event", help="acceptance event (default: <to>_acceptance)")
+    p.add_argument("--artifact-dir")
+    p.add_argument("--scope", default="global")
+    p.add_argument("--task")
+    p.add_argument("--artifact", action="append")
+    p.add_argument("--runtime", default="unknown")
+    p.add_argument("--session-id")
+    p.add_argument("--transition-sha256", help="precomputed acceptance transition hash")
+    p.add_argument("--receipt-sha256", help="bind and exact-verify the acceptance receipt hash")
+    p.add_argument("--strict", action="store_true", help="return non-zero on any unavailable/write/exact-match failure")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_accept_handoff)
+
+    p = sub.add_parser("verify-handoff", help="exact-verify a role-transition Memory anchor")
+    p.add_argument("--id", required=True, help="exact Memory content hash")
+    p.add_argument("--receipt-file", help="local role receipt JSON to verify bidirectionally")
+    p.add_argument("--receipt-sha256", help="expected bound receipt hash")
+    p.add_argument("--event")
+    p.add_argument("--from", dest="from_agent")
+    p.add_argument("--to")
+    p.add_argument("--uc")
+    p.add_argument("--phase")
+    p.add_argument("--transition-sha256")
+    p.add_argument("--timeout", type=float, default=3.0)
+    p.add_argument("--strict", action="store_true", help="return non-zero on any mismatch or service failure")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_verify_handoff)
 
     p = sub.add_parser("session-start", help="print recent context for an agent")
     p.add_argument("--agent", required=True)

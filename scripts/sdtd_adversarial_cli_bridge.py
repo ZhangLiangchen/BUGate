@@ -39,10 +39,39 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import sdtd_adversarial
 from bugate_core import parse_inventory_cases, read_text, write_text
+from role_governance import (
+    GovernanceResult,
+    RoleGovernanceError,
+    load_context,
+    preflight,
+    verify_chain,
+)
+
+
+def _role_preflight(artifact_dir: Path) -> GovernanceResult:
+    result = preflight(artifact_dir, "pre_code", require_acceptance=False)
+    for warning in result.warnings:
+        print(f"BUGate role-governance WARNING: {warning}", file=sys.stderr)
+    if not result.allowed:
+        print("BUGate role governance BLOCKED (pre_code):", file=sys.stderr)
+        for error in result.errors or ["role preflight failed"]:
+            print(f"  - {error}", file=sys.stderr)
+    return result
+
+
+def _has_human_acceptance(artifact_dir: Path) -> bool:
+    try:
+        ctx = load_context(artifact_dir)
+        if ctx.mode == "off":
+            return False
+        return any(item.get("event") == "human_acceptance" for item in verify_chain(ctx))
+    except (RoleGovernanceError, OSError, ValueError, SystemExit):
+        return False
 
 # ---------------------------------------------------------------------------
 # DE-SUT configuration: env-driven with neutral defaults, all overridable.
@@ -73,10 +102,31 @@ _PROXY_VARS = {
     "all_proxy": os.environ.get("SDTD_CLI_ALL_PROXY", ""),
 }
 
+# Peer CLIs participate only as read-only analysis workers in the current
+# designer phase.  A controller's lifecycle role/session/receipt identity must
+# never be inherited by a spawned Codex or Claude process.  Profile/project and
+# SDTD proxy/model/effort settings are intentionally retained.
+_LIFECYCLE_IDENTITY_KEYS = {"BUGATE_AGENT_ROLE", "BUGATE_SESSION_ID"}
+_LIFECYCLE_IDENTITY_PREFIXES = (
+    "BUGATE_ROLE_",
+    "BUGATE_RECEIPT_",
+    "BUGATE_HANDOFF_",
+    "BUGATE_SESSION_",
+)
+
+
+def _strip_lifecycle_identity(env: dict[str, str]) -> None:
+    for key in list(env):
+        if key in _LIFECYCLE_IDENTITY_KEYS or key.startswith(
+            _LIFECYCLE_IDENTITY_PREFIXES
+        ):
+            env.pop(key, None)
+
 
 def cli_env() -> dict[str, str]:
-    """Child-process env with optional proxy injection (only if vars are set)."""
+    """Return a peer env with lifecycle identity removed and proxy tuning kept."""
     env = os.environ.copy()
+    _strip_lifecycle_identity(env)
     if os.environ.get("SDTD_CLI_PROXY", "1") == "0":
         return env
     for lower_key, value in _PROXY_VARS.items():
@@ -363,7 +413,7 @@ def synthesize_cases(
     *,
     mode: str,
     note: str = "",
-) -> None:
+) -> bool:
     """Write 03b_adversarial_cases.yaml from the two adversarial views.
 
     The synthesized file stays machine-first (YAML). It is a deterministic
@@ -371,6 +421,18 @@ def synthesize_cases(
     surface, and is left `gate_status: pending` for human review — matching the
     BUGate discipline that 03B must be reviewed before it can gate Layer 4.
     """
+    # Keep this lower-level mutator governed even when called directly rather
+    # than through ``run-all``.  In particular, an accepted 03B generation is
+    # immutable to automatic synthesis; a human must deliberately create a new
+    # generation before another acceptance can be recorded.
+    if not _role_preflight(artifact_dir).allowed:
+        return False
+    if _has_human_acceptance(artifact_dir):
+        print(
+            "BUGate role governance BLOCKED: refusing to rewrite a human-accepted 03B.",
+            file=sys.stderr,
+        )
+        return False
     first = cases[0]["id"] if cases else "CASE-001"
     related = ", ".join(c.get("id", "") for c in cases if c.get("id")) or first
     lines = [
@@ -401,6 +463,7 @@ def synthesize_cases(
         "residual_risks: []",
     ]
     write_text(artifact_dir / "03b_adversarial_cases.yaml", "\n".join(lines) + "\n")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -437,8 +500,19 @@ def check_env() -> int:
 
 
 def run_all(artifact_dir: Path) -> int:
+    if not _role_preflight(artifact_dir).allowed:
+        return 2
+    if _has_human_acceptance(artifact_dir):
+        print(
+            "BUGate role governance BLOCKED: 03B already has a human-acceptance "
+            "receipt; adversarial dispatch must not rewrite the accepted artifact.",
+            file=sys.stderr,
+        )
+        return 2
     # Reuse the shared init helper and its 00_adversarial/ layout.
-    sdtd_adversarial.init(artifact_dir, "adversarial peer dispatch")
+    init_rc = sdtd_adversarial.init(artifact_dir, "adversarial peer dispatch")
+    if init_rc:
+        return init_rc
     out = artifact_dir / "00_adversarial"
 
     inventory_path = artifact_dir / "03_inventory.yaml"
@@ -459,12 +533,14 @@ def run_all(artifact_dir: Path) -> int:
         print(f"fallback: {reason}; writing deterministic placeholder views")
         for peer in ("codex", "claude"):
             write_placeholder_view(out, peer, len(cases), reason)
-        synthesize_cases(
+        written = synthesize_cases(
             artifact_dir,
             cases,
             mode="fallback_placeholder",
             note=f"real peer dispatch was SKIPPED because {reason}",
         )
+        if not written:
+            return 2
         print(f"written {artifact_dir / '03b_adversarial_cases.yaml'} (fallback mode)")
         return 0
 
@@ -509,7 +585,8 @@ def run_all(artifact_dir: Path) -> int:
     note = ""
     if placeholder_count:
         note = f"{placeholder_count} of 2 peer view(s) degraded to placeholder"
-    synthesize_cases(artifact_dir, cases, mode=mode, note=note)
+    if not synthesize_cases(artifact_dir, cases, mode=mode, note=note):
+        return 2
     print(f"written {artifact_dir / '03b_adversarial_cases.yaml'} ({mode})")
     return 0
 

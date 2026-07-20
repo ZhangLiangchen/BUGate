@@ -59,10 +59,11 @@ import json
 import os
 import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from bugate_core import find_root, load_config, rel, read_text, strip_inline_comment
+from bugate_core import find_root, load_config, rel
 
 
 WRITE_ACTIONS = {"Edit", "Write", "apply_patch", "MultiEdit"}
@@ -74,138 +75,63 @@ APPLY_PATCH_PATH_RE = re.compile(
 )
 
 
-def _config_text(root: Path, profile: str | None) -> str:
-    """Concatenate the base config and the referenced profile file text.
-
-    ``bugate_core.parse_simple_yaml`` only understands top-level scalars and
-    lists, so it cannot represent the nested ``agent_roles:`` mapping. We read
-    the raw text ourselves and parse just that block.
-    """
-
-    chunks: list[str] = []
-    base = root / "bugate.config.yaml"
-    if base.exists():
-        chunks.append(read_text(base))
-    # Resolve the configured profile path the same way load_config does.
-    cfg = load_config(root, profile)
-    profile_path = profile or cfg.get("profile") or cfg.get("active_profile")
-    if profile_path:
-        path = Path(str(profile_path))
-        if not path.is_absolute():
-            path = root / path
-        if path.exists():
-            chunks.append(read_text(path))
-    return "\n".join(chunks)
-
-
-def _parse_agent_roles(text: str) -> dict[str, dict[str, list[str]]]:
-    """Parse the ``agent_roles:`` block into ``{role: {read: [...], write: [...]}}``.
-
-    Supports both a bare list under a role (applies to read+write) and explicit
-    ``read:`` / ``write:`` sub-lists. Stdlib-only, intentionally a small subset.
-    """
-
-    roles: dict[str, dict[str, list[str]]] = {}
-    lines = text.splitlines()
-    i = 0
-    n = len(lines)
-
-    def indent_of(line: str) -> int:
-        return len(line) - len(line.lstrip(" "))
-
-    def strip_quotes(value: str) -> str:
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-            return value[1:-1]
-        return value
-
-    # Find the top-level `agent_roles:` key.
-    while i < n:
-        raw = lines[i]
-        stripped = raw.strip()
-        if indent_of(raw) == 0 and stripped.split("#", 1)[0].strip() == "agent_roles:":
-            i += 1
-            break
-        i += 1
-    else:
-        return roles
-
-    role_indent: int | None = None
-    current_role: str | None = None
-    current_bucket: str | None = None  # "read", "write", or None (bare list = both)
-    bucket_indent: int | None = None
-
-    while i < n:
-        # Strip trailing inline `# ...` comments (quote-aware), matching the main
-        # config parser, so a comment on a role/sub-list/pattern line can't be
-        # baked into the regex.
-        raw = strip_inline_comment(lines[i])
-        stripped = raw.strip()
-        # Blank or comment lines do not terminate the block.
-        if not stripped or stripped.startswith("#"):
-            i += 1
-            continue
-        ind = indent_of(raw)
-        # A new top-level (indent 0) key ends the agent_roles block.
-        if ind == 0:
-            break
-
-        if role_indent is None:
-            role_indent = ind
-
-        # Role header: `  implementer:` (possibly with an inline value, ignored).
-        if ind == role_indent and stripped.endswith(":") and not stripped.startswith("- "):
-            current_role = stripped[:-1].strip()
-            roles.setdefault(current_role, {"read": [], "write": []})
-            current_bucket = None
-            bucket_indent = None
-            i += 1
-            continue
-
-        if current_role is None:
-            i += 1
-            continue
-
-        # read:/write: sub-headers under a role.
-        if ind > role_indent and stripped in {"read:", "write:"}:
-            current_bucket = stripped[:-1]
-            bucket_indent = ind
-            i += 1
-            continue
-
-        # List item.
-        if stripped.startswith("- "):
-            pattern = strip_quotes(stripped[2:])
-            if not pattern:
-                i += 1
-                continue
-            if current_bucket in {"read", "write"} and bucket_indent is not None and ind > bucket_indent:
-                roles[current_role][current_bucket].append(pattern)
-            else:
-                # Bare list directly under the role -> applies to both.
-                current_bucket = None
-                roles[current_role]["read"].append(pattern)
-                roles[current_role]["write"].append(pattern)
-            i += 1
-            continue
-
-        i += 1
-
-    # Drop roles that ended up empty.
-    return {r: b for r, b in roles.items() if b["read"] or b["write"]}
-
-
-def forbidden_patterns(text: str, role: str, action: str) -> list[str]:
-    roles = _parse_agent_roles(text)
-    bucket = roles.get(role)
-    if not bucket:
+def _pattern_list(value: Any, *, label: str) -> list[str]:
+    if value is None:
         return []
+    if not isinstance(value, list):
+        raise ValueError(f"{label} must be a list of regex strings")
+    patterns: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"{label} entries must be non-empty regex strings")
+        patterns.append(item)
+    return patterns
+
+
+def forbidden_patterns(config: Mapping[str, Any], role: str, action: str) -> list[str]:
+    """Return active-role patterns from ``load_config``'s merged mapping.
+
+    A bare role list applies to reads and writes. A mapping may scope patterns
+    through ``read`` and ``write``. Role names remain profile-defined; lookup is
+    case-insensitive because the environment role token is normalized.
+    """
+
+    roles = config.get("agent_roles")
+    if roles is None:
+        return []
+    if not isinstance(roles, Mapping):
+        raise ValueError("agent_roles must be a mapping of role names to path rules")
+
+    normalized_role = role.strip().lower()
+    matches = [value for key, value in roles.items() if str(key).strip().lower() == normalized_role]
+    if not matches:
+        return []
+    if len(matches) > 1:
+        raise ValueError(f"agent_roles contains duplicate normalized role {normalized_role!r}")
+
+    rule = matches[0]
+    if isinstance(rule, list):
+        read_patterns = write_patterns = _pattern_list(
+            rule, label=f"agent_roles[{normalized_role}]"
+        )
+    elif isinstance(rule, Mapping):
+        read_patterns = _pattern_list(
+            rule.get("read"), label=f"agent_roles[{normalized_role}].read"
+        )
+        write_patterns = _pattern_list(
+            rule.get("write"), label=f"agent_roles[{normalized_role}].write"
+        )
+    else:
+        raise ValueError(
+            f"agent_roles[{normalized_role}] must be a bare list or read/write mapping"
+        )
+
     if action in READ_ACTIONS:
-        return bucket["read"]
+        return read_patterns
     if action in WRITE_ACTIONS:
-        return bucket["write"]
+        return write_patterns
     # Unknown action -> be conservative and check the union.
-    return sorted(set(bucket["read"]) | set(bucket["write"]))
+    return sorted(set(read_patterns) | set(write_patterns))
 
 
 def extract_targets(payload: Any) -> tuple[str, list[str]]:
@@ -250,7 +176,11 @@ def main() -> int:
         return 0  # agent-role isolation not enabled for this session
 
     root = find_root(Path.cwd().resolve())
-    config_text = _config_text(root, os.environ.get("BUGATE_PROFILE"))
+    try:
+        config = load_config(root, os.environ.get("BUGATE_PROFILE"))
+    except (OSError, ValueError) as exc:
+        sys.stderr.write(f"BUGate agent-role guard: config error: {exc}\n")
+        return 2
 
     raw = ""
     try:
@@ -266,7 +196,11 @@ def main() -> int:
         return 0
 
     action, targets = extract_targets(payload)
-    patterns = forbidden_patterns(config_text, role, action)
+    try:
+        patterns = forbidden_patterns(config, role, action)
+    except ValueError as exc:
+        sys.stderr.write(f"BUGate agent-role guard: invalid agent_roles config: {exc}\n")
+        return 2
     if not patterns:
         return 0  # active profile defines no rules for this role/action
 

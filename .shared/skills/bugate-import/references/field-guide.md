@@ -41,12 +41,12 @@ v0.3.1 kit gaps found in the field are listed at the end.
 
 - **Steps short-circuit** (`rc = rc or step()`): everything after the first
   failing gate is skipped. Absence of later output is not success.
-- **Peer review overwrites 03b unconditionally** — a curated, human-accepted
-  `03b_adversarial_cases.yaml` is re-skeletoned to `gate_status: pending` by
-  design ("this repo re-reviews"). The UC drops out of declared-passed and the
-  write guard re-locks its tests until a human re-accepts. Only
-  `--skip-peer-review` preserves an imported 03b (loudly logged review debt).
-  Decide which you want BEFORE running.
+- **Before a role receipt exists, peer review rewrites 03b** to
+  `gate_status: pending` by design. In legacy/off mode, `--skip-peer-review`
+  preserves a curated 03b with loudly logged review debt. In required mode,
+  once `bugate-role approve` has recorded a real human acceptance, pre-code
+  `--auto` is blocked so accepted evidence cannot be silently regenerated;
+  proceed directly to designer handoff.
 - **Dialect must live in the profile.** The orchestrator does not forward
   `--schema`; set `semantic_schema: original-gate` in the profile when
   importing a pre-canonical artifact corpus (v1.3 stays the target for new
@@ -60,6 +60,10 @@ v0.3.1 kit gaps found in the field are listed at the end.
 
 ## 3. Layer-4 post-run closure
 
+- **Required mode needs reviewer acceptance before post-run.** An implementer
+  handoff must name at least one guarded implementation file; a reviewer in a
+  distinct session accepts its exact Memory ID before the orchestrator may
+  write 04/05.
 - **`--scope post-run` `--write` clobbers 04/05 without reading them.** The
   generated drafts are skeletons, not reports of record. SOP: back up 04/05 →
   run post-run → hand-merge the preserved history (incident narrative,
@@ -91,10 +95,10 @@ v0.3.1 kit gaps found in the field are listed at the end.
   test filenames must normalize (case, `-`/`_`) to exactly one UC directory.
   A mismatched slug blocks with "cannot bind to a UC artifact dir" — that's the
   guard working, not a bug.
-- The full lifecycle observed in the field: passed artifacts admit a file →
-  `--auto` re-review demotes 03b to pending → guard re-locks the same path →
-  human re-accepts → guard re-admits. Expect and plan for this cycle when
-  importing UCs plus their tests.
+- Legacy/off mode still admits a file from passed artifacts alone. Required
+  mode additionally demands a current designer handoff and implementer
+  acceptance; profile/pre-code drift re-locks that acceptance, and
+  implementation drift re-locks reviewer acceptance.
 - Verify both invocation forms during acceptance: direct path argument, and
   the hook-shaped stdin JSON payload — they exercise different parsing paths.
 
@@ -107,6 +111,35 @@ v0.3.1 kit gaps found in the field are listed at the end.
 - Namespace isolation is tag-based on one shared machine-level service:
   verify writability + isolation during acceptance by writing a probe note and
   searching it from a sibling namespace.
+- Ordinary recall/note/search/Stop remains best-effort. Required role
+  transitions are different: POST + exact GET + receipt binding + exact GET
+  must all validate namespace, roles, UC, phase, transition, and receipt hash.
+  Any failure returns non-zero and publishes no local unlock receipt.
+- Every governed edit verifies the local chain only. Do not add live Memory
+  calls to a per-edit hook; `bugate-role verify --strict-memory` is an explicit
+  audit/recovery operation.
+
+## 5A. Wave 7 lifecycle, migration, and recovery
+
+- Wave 1 peers expose interpretation divergence inside the designer phase;
+  Wave 7 actors are `designer`, `implementer`, and `reviewer` across distinct
+  sessions. Peer child environments must not inherit lifecycle identity.
+- A v0.3.x profile stays unchanged until `role_governance` is enabled. Existing
+  passed UCs are not grandfathered into required mode: record current human
+  acceptance, designer handoff, and implementer acceptance.
+- Use `bin/bugate-role run --role ... -- <command>` to create each role process.
+  SessionStart can report identity, but a hook child cannot export variables to
+  its parent. Desktop needs a fresh launch/session with the intended env.
+- Re-running the importer upgrades BUGate-owned scripts/hooks and preserves
+  SUT-owned hooks. Re-trust the changed Codex hook hash; before re-trust, report
+  file/re-vendor acceptance only, not active runtime enforcement.
+- Never edit `00_role_evidence/**` directly or delete it to reset. Profile or
+  pre-code drift restarts from designer acceptance/handoff; implementation
+  drift restarts from implementer handoff/reviewer acceptance. Append a
+  superseding generation.
+- Role env, session IDs, hashes, and Memory anchors are audit controls, not
+  non-repudiable identity. Hooks do not cover arbitrary shell redirection or
+  external editors; managed runners/OS isolation own that stronger boundary.
 
 ## 6. CI carrier pattern (GitLab)
 

@@ -14,6 +14,15 @@
           },
           {
             "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"$ROOT/scripts/check_role_evidence.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
             "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"$ROOT/scripts/check_agent_role_paths.py\""
           }
         ]
@@ -35,6 +44,10 @@
           {
             "type": "command",
             "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" session-start --core --agent agent"
+          },
+          {
+            "type": "command",
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; \"$ROOT/bin/bugate-role\" session-start"
           }
         ]
       }
@@ -44,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" stop --core --agent agent"
+            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_ENGINE_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"scripts\"/\"bugate_core.py\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"$ROOT/scripts/memory_bus.py\" stop --core --agent \"${BUGATE_AGENT_ROLE:-agent}\""
           }
         ]
       }
