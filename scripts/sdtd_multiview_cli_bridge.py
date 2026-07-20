@@ -16,7 +16,9 @@ This module is SUT-neutral and stdlib-only. Model names, reasoning effort, and
 proxy settings are read from environment variables with neutral defaults and are
 fully overridable; nothing here is tied to a specific vendor's internal naming or
 to any single SUT/project. Proxy injection is OFF unless the relevant env vars
-are explicitly set.
+are explicitly set. `SDTD_CODEX_SKIP_GIT_REPO_CHECK=1` is an explicit automation
+opt-in for a SUT-neutral, non-git fixture CWD; ordinary project dispatch keeps
+Codex's repository check.
 """
 
 from __future__ import annotations
@@ -85,6 +87,9 @@ CODEX_MODEL = os.environ.get("SDTD_CODEX_MODEL", "").strip()
 CLAUDE_MODEL = os.environ.get("SDTD_CLAUDE_MODEL", "").strip()
 CODEX_REASONING_EFFORT = os.environ.get("SDTD_CODEX_REASONING_EFFORT", "").strip()
 CLAUDE_EFFORT = os.environ.get("SDTD_CLAUDE_EFFORT", "").strip()
+CODEX_SKIP_GIT_REPO_CHECK = (
+    os.environ.get("SDTD_CODEX_SKIP_GIT_REPO_CHECK", "0").strip() == "1"
+)
 
 # Per-peer subprocess timeout (seconds).
 TIMEOUT_SECONDS = int(os.environ.get("SDTD_CLI_TIMEOUT_SECONDS", "1800"))
@@ -188,6 +193,8 @@ def build_command(peer: str) -> list[str]:
         cmd = [CODEX_BIN, "exec"]
         if codex_supports_ask_for_approval():
             cmd += ["--ask-for-approval", "never"]
+        if CODEX_SKIP_GIT_REPO_CHECK:
+            cmd += ["--skip-git-repo-check"]
         cmd += ["--sandbox", "read-only"]
         if CODEX_MODEL:
             cmd += ["--model", CODEX_MODEL]

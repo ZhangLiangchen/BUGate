@@ -37,7 +37,8 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode smoke
 ```
 
 Smoke mode still runs the complete required-mode Wave 7 chain against a
-temporary SUT-neutral imported workspace and the real Memory service: unset and
+temporary SUT-neutral imported workspace and the real Memory service under the
+dedicated `project:bugate-full-check` namespace: unset and
 wrong-role negatives, synthetic human-acceptance record, strict handoffs,
 exact-ID acceptances in distinct sessions, Layer 4 hook controls, guarded
 implementation handoff, reviewer acceptance, post-run, completion, and strict
@@ -50,6 +51,10 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
 ```
 
 Use `--timeout-seconds <n>` if peer dispatch needs a longer per-command window.
+The real-peer fixture runs from a temporary SUT-neutral CWD with its own
+mode-off profile and Memory namespace. For that non-git CWD only, full-check
+sets the bridges' explicit `SDTD_CODEX_SKIP_GIT_REPO_CHECK=1` automation opt-in;
+ordinary imported dispatch keeps Codex's repository check.
 
 ## Interpretation Rules
 
@@ -64,6 +69,10 @@ Use `--timeout-seconds <n>` if peer dispatch needs a longer per-command window.
 - Wave 1 real Codex/Claude peer dispatch is exercised only in full mode. Those
   peers are not Wave 7 lifecycle actors and must not inherit parent role/session
   identity.
+- Synthetic template, guard, hardening, dialect, role-flow, and real-peer
+  fixtures must not inherit an imported SUT profile, project CWD, or Memory
+  namespace. The active imported profile is consulted only by checks that
+  explicitly report its activated Wave 0/8 and activation-boundary state.
 - The role-flow probe resolves every command from the selected engine root, so
   a SUT-owned `scripts/` tree cannot shadow a vendored engine. Treat imported
   and core root-resolution regressions as failures.

@@ -36,6 +36,7 @@ PRESERVED = {
     "SDTD_CODEX_REASONING_EFFORT": "high",
     "SDTD_CLAUDE_EFFORT": "high",
     "SDTD_CLI_TIMEOUT_SECONDS": "321",
+    "SDTD_CODEX_SKIP_GIT_REPO_CHECK": "1",
 }
 
 
@@ -121,6 +122,25 @@ class PeerRoleEnvironmentTests(unittest.TestCase):
                         rc, stdout, stderr = module.run_peer_cli("claude", "prompt")
                     self.assertEqual((0, "peer output", ""), (rc, stdout, stderr))
                     self._assert_sanitized(captured)
+
+    def test_codex_skip_git_repo_check_is_explicit_opt_in(self) -> None:
+        for enabled in (False, True):
+            for original in (multiview, adversarial):
+                with self.subTest(
+                    bridge=original.__name__, enabled=enabled
+                ), bridge_environment(proxy_enabled=False):
+                    os.environ["SDTD_CODEX_SKIP_GIT_REPO_CHECK"] = (
+                        "1" if enabled else "0"
+                    )
+                    module = self._reload(original)
+                    with mock.patch.object(
+                        module, "codex_supports_ask_for_approval", return_value=False
+                    ):
+                        command = module.build_command("codex")
+                    self.assertEqual(
+                        enabled,
+                        "--skip-git-repo-check" in command,
+                    )
 
 
 if __name__ == "__main__":

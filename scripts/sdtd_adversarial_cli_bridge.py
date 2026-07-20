@@ -24,6 +24,8 @@ Environment contract (identical to the multi-view bridge):
   SDTD_CODEX_MODEL / SDTD_CLAUDE_MODEL            Optional model override; empty
                                                  => let the CLI pick its default.
   SDTD_CODEX_REASONING_EFFORT / SDTD_CLAUDE_EFFORT Optional reasoning effort.
+  SDTD_CODEX_SKIP_GIT_REPO_CHECK=1                 Explicit non-git automation
+                                                 opt-in; default keeps the check.
   SDTD_CLI_TIMEOUT_SECONDS                        Per-peer subprocess timeout.
   SDTD_CLI_HTTPS_PROXY / SDTD_CLI_HTTP_PROXY /
   SDTD_CLI_ALL_PROXY                              Optional proxy values (unset =>
@@ -90,6 +92,9 @@ CODEX_MODEL = os.environ.get("SDTD_CODEX_MODEL", "").strip()
 CLAUDE_MODEL = os.environ.get("SDTD_CLAUDE_MODEL", "").strip()
 CODEX_REASONING_EFFORT = os.environ.get("SDTD_CODEX_REASONING_EFFORT", "").strip()
 CLAUDE_EFFORT = os.environ.get("SDTD_CLAUDE_EFFORT", "").strip()
+CODEX_SKIP_GIT_REPO_CHECK = (
+    os.environ.get("SDTD_CODEX_SKIP_GIT_REPO_CHECK", "0").strip() == "1"
+)
 
 # Per-peer subprocess timeout (seconds).
 TIMEOUT_SECONDS = int(os.environ.get("SDTD_CLI_TIMEOUT_SECONDS", "1800"))
@@ -190,6 +195,8 @@ def build_command(peer: str) -> list[str]:
         cmd = [CODEX_BIN, "exec"]
         if codex_supports_ask_for_approval():
             cmd += ["--ask-for-approval", "never"]
+        if CODEX_SKIP_GIT_REPO_CHECK:
+            cmd += ["--skip-git-repo-check"]
         cmd += ["--sandbox", "read-only"]
         if CODEX_MODEL:
             cmd += ["--model", CODEX_MODEL]

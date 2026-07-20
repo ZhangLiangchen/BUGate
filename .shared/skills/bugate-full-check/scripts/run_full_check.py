@@ -215,6 +215,38 @@ def outcome_matches(
     return result.returncode == returncode and (marker is None or marker in result.stdout)
 
 
+def build_probe_profile(
+    base: Path,
+    name: str,
+    *,
+    require_multiview: bool = False,
+) -> tuple[Path, dict[str, str]]:
+    """Create a SUT-neutral profile for a synthetic full-check fixture.
+
+    Full-check can run from an imported workspace whose active profile enables
+    required role governance and SUT-specific hardening. Synthetic fixtures
+    must not inherit that contract: they live under a system temporary
+    directory and test Core capability, not the imported SUT. Every command
+    that consumes the fixture receives this same explicit profile.
+    """
+
+    profile = base / f"{name}.profile.yaml"
+    lines = [
+        f"artifact_dir_template: {base.as_posix()}/{{uc}}/",
+        "memory:",
+        f"  namespace: {ROLE_FLOW_NAMESPACE}",
+    ]
+    if require_multiview:
+        lines.append("require_multiview: true")
+    lines.extend(["role_governance:", "  mode: off", ""])
+    profile.write_text("\n".join(lines), encoding="utf-8")
+    return profile, {
+        "BUGATE_PROFILE": str(profile),
+        "BUGATE_PROJECT_ROOT": str(base),
+        "MEMORY_BUS_PROJECT_TAG": ROLE_FLOW_NAMESPACE,
+    }
+
+
 PRECODE_NAMES = [
     "01_business_brief.md",
     "02_testability.md",
@@ -246,6 +278,195 @@ def build_guard_workspace(base: Path) -> Path:
         encoding="utf-8",
     )
     return ws
+
+
+def run_hardening_multiview_probe(
+    checks: list[Check],
+    root: Path,
+    engine: Path,
+) -> None:
+    """Prove require_multiview fails closed without inheriting a SUT profile."""
+
+    with tempfile.TemporaryDirectory(prefix="bugate-harden.") as tmp:
+        base = Path(tmp)
+        uc = base / "uc"
+        _, baseline_env = build_probe_profile(base, "baseline")
+        _, probe_env = build_probe_profile(
+            base,
+            "harden",
+            require_multiview=True,
+        )
+        init_result = run(
+            [
+                "python3",
+                str(engine / "scripts/sdtd_orchestrator.py"),
+                str(uc),
+                "--init",
+            ],
+            root,
+            env=probe_env,
+            timeout=60,
+        )
+        init_marker = "created 01_business_brief.md"
+        initialized_files = all((uc / name).is_file() for name in PRECODE_NAMES)
+        init_ok = (
+            outcome_matches(init_result, 0, init_marker)
+            and initialized_files
+        )
+        baseline_result = run(
+            [
+                "python3",
+                str(engine / "scripts/check_bugate_v13_semantics.py"),
+                str(uc),
+                "--scope",
+                "pre-code",
+            ],
+            root,
+            env=baseline_env,
+            timeout=60,
+        )
+        baseline_ok = outcome_matches(baseline_result, 0, "PASS")
+        semantic_result = run(
+            [
+                "python3",
+                str(engine / "scripts/check_bugate_v13_semantics.py"),
+                str(uc),
+                "--scope",
+                "pre-code",
+            ],
+            root,
+            env=probe_env,
+            timeout=60,
+        )
+        semantic_marker = "divergence_report"
+        divergence = uc / "00_multiview/divergence_report.md"
+        enforced = (
+            outcome_matches(semantic_result, 1, semantic_marker)
+            and not divergence.exists()
+        )
+        add(
+            checks,
+            "Hardening flags enforce (multiview)",
+            init_ok and baseline_ok and enforced,
+            (
+                f"init_exit={init_result.returncode}/0; init_marker="
+                f"{'present' if init_marker in init_result.stdout else 'missing'}; "
+                f"all_precode_files={initialized_files}; "
+                f"baseline_exit={baseline_result.returncode}/0; "
+                f"semantic_exit={semantic_result.returncode}/1; semantic_marker="
+                f"{'present' if semantic_marker in semantic_result.stdout else 'missing'}; "
+                "required_report=absent"
+            ),
+        )
+
+
+def run_real_peer_dispatch_probe(
+    checks: list[Check],
+    root: Path,
+    engine: Path,
+    *,
+    timeout: int,
+) -> None:
+    """Run real Wave-1 peers against one isolated, SUT-neutral fixture."""
+
+    with tempfile.TemporaryDirectory(prefix="bugate-full-check.") as tmp:
+        tmp_root = Path(tmp)
+        uc_dir = tmp_root / "peer-uc"
+        _, peer_env = build_probe_profile(tmp_root, "peer")
+        peer_env["SDTD_CLI_TIMEOUT_SECONDS"] = str(timeout)
+        peer_env["SDTD_CODEX_SKIP_GIT_REPO_CHECK"] = "1"
+        init_result = run(
+            [
+                "python3",
+                str(engine / "scripts/sdtd_orchestrator.py"),
+                str(uc_dir),
+                "--init",
+            ],
+            root,
+            cwd=tmp_root,
+            env=peer_env,
+            timeout=60,
+        )
+        initialized_files = all((uc_dir / name).is_file() for name in PRECODE_NAMES)
+        init_ok = (
+            outcome_matches(init_result, 0, "created 01_business_brief.md")
+            and initialized_files
+        )
+        add(
+            checks,
+            "Peer fixture init (templates)",
+            init_ok,
+            (
+                f"exit={init_result.returncode}/0; all_precode_files="
+                f"{initialized_files}"
+            ),
+        )
+        if not init_ok:
+            add(checks, "Real multi-view dispatch", False, "peer fixture init failed")
+            add(checks, "Real adversarial dispatch", False, "peer fixture init failed")
+            return
+
+        result = run(
+            [
+                "python3",
+                str(engine / "scripts/sdtd_multiview_cli_bridge.py"),
+                "run-all",
+                str(uc_dir),
+            ],
+            root,
+            cwd=tmp_root,
+            env=peer_env,
+            timeout=timeout * 2,
+        )
+        mv_paths = (
+            uc_dir / "00_multiview/divergence_report.md",
+            uc_dir / "00_multiview/codex_view.md",
+            uc_dir / "00_multiview/claude_view.md",
+        )
+        mv_text = [
+            path.read_text(encoding="utf-8", errors="ignore")
+            if path.is_file()
+            else ""
+            for path in mv_paths
+        ]
+        mv_ok = (
+            result.returncode == 0
+            and all(mv_text)
+            and "dispatch_mode: real_peer_dispatch" in mv_text[0]
+            and "fallback_placeholder" not in "".join(mv_text[1:])
+        )
+        add(checks, "Real multi-view dispatch", mv_ok, result.stdout)
+
+        result = run(
+            [
+                "python3",
+                str(engine / "scripts/sdtd_adversarial_cli_bridge.py"),
+                "run-all",
+                str(uc_dir),
+            ],
+            root,
+            cwd=tmp_root,
+            env=peer_env,
+            timeout=timeout * 2,
+        )
+        adv_paths = (
+            uc_dir / "03b_adversarial_cases.yaml",
+            uc_dir / "00_adversarial/codex_adversarial_view.md",
+            uc_dir / "00_adversarial/claude_adversarial_view.md",
+        )
+        adv_text = [
+            path.read_text(encoding="utf-8", errors="ignore")
+            if path.is_file()
+            else ""
+            for path in adv_paths
+        ]
+        adv_ok = (
+            result.returncode == 0
+            and all(adv_text)
+            and "dispatch_mode: real_peer_dispatch" in adv_text[0]
+            and "fallback_placeholder" not in "".join(adv_text[1:])
+        )
+        add(checks, "Real adversarial dispatch", adv_ok, result.stdout)
 
 
 def build_role_workspace(base: Path) -> tuple[Path, Path, Path]:
@@ -1285,17 +1506,20 @@ def main() -> int:
     result = run(["python3", "-m", "py_compile", *py_files], root, timeout=60)
     add(checks, "Python compile", result.returncode == 0, result.stdout or "scripts compiled")
 
-    result = run(
-        [
-            "python3",
-            eng("scripts/check_bugate_v13_semantics.py"),
-            eng(".shared/skills/bugate/templates"),
-            "--scope",
-            "pre-code",
-        ],
-        root,
-        timeout=60,
-    )
+    with tempfile.TemporaryDirectory(prefix="bugate-core-gate.") as tmp:
+        _, core_gate_env = build_probe_profile(Path(tmp), "core-gate")
+        result = run(
+            [
+                "python3",
+                eng("scripts/check_bugate_v13_semantics.py"),
+                eng(".shared/skills/bugate/templates"),
+                "--scope",
+                "pre-code",
+            ],
+            root,
+            env=core_gate_env,
+            timeout=60,
+        )
     add(checks, "4-layer gate engine (templates, pre-code)", result.returncode == 0, result.stdout)
 
     # Runtime binaries and auth.
@@ -1350,57 +1574,37 @@ def main() -> int:
     add(checks, "Adversarial check-env", result.returncode == 0 and "real_peer_dispatch" in result.stdout, result.stdout)
 
     if args.mode == "full":
-        with tempfile.TemporaryDirectory(prefix="bugate-full-check.") as tmp:
-            tmp_root = Path(tmp)
-            uc_dir = tmp_root / "peer-uc"
-            result = run(
-                ["python3", eng("scripts/sdtd_orchestrator.py"), str(uc_dir), "--init"],
-                root,
-                timeout=60,
-            )
-            add(checks, "Peer fixture init (templates)", result.returncode == 0, result.stdout)
-            peer_env = {"SDTD_CLI_TIMEOUT_SECONDS": str(args.timeout_seconds)}
-
-            result = run(
-                ["python3", eng("scripts/sdtd_multiview_cli_bridge.py"), "run-all", str(uc_dir)],
-                root,
-                env=peer_env,
-                timeout=args.timeout_seconds * 2,
-            )
-            mv_report = (uc_dir / "00_multiview/divergence_report.md").read_text(encoding="utf-8", errors="ignore")
-            mv_codex = (uc_dir / "00_multiview/codex_view.md").read_text(encoding="utf-8", errors="ignore")
-            mv_claude = (uc_dir / "00_multiview/claude_view.md").read_text(encoding="utf-8", errors="ignore")
-            mv_ok = result.returncode == 0 and "dispatch_mode: real_peer_dispatch" in mv_report and "fallback_placeholder" not in (mv_codex + mv_claude)
-            add(checks, "Real multi-view dispatch", mv_ok, result.stdout)
-
-            result = run(
-                ["python3", eng("scripts/sdtd_adversarial_cli_bridge.py"), "run-all", str(uc_dir)],
-                root,
-                env=peer_env,
-                timeout=args.timeout_seconds * 2,
-            )
-            adv_yaml = (uc_dir / "03b_adversarial_cases.yaml").read_text(encoding="utf-8", errors="ignore")
-            adv_codex = (uc_dir / "00_adversarial/codex_adversarial_view.md").read_text(encoding="utf-8", errors="ignore")
-            adv_claude = (uc_dir / "00_adversarial/claude_adversarial_view.md").read_text(encoding="utf-8", errors="ignore")
-            adv_ok = result.returncode == 0 and "dispatch_mode: real_peer_dispatch" in adv_yaml and "fallback_placeholder" not in (adv_codex + adv_claude)
-            add(checks, "Real adversarial dispatch", adv_ok, result.stdout)
+        run_real_peer_dispatch_probe(
+            checks,
+            root,
+            engine,
+            timeout=args.timeout_seconds,
+        )
     else:
         checks.append(Check("Real peer dispatch", "WARN", "Skipped in smoke mode; rerun with --mode full."))
 
     # Memory bus and ONNX.
-    result = run(["bash", eng("bin/memory-bus-status")], root, timeout=30)
+    memory_probe_env = {"MEMORY_BUS_PROJECT_TAG": ROLE_FLOW_NAMESPACE}
+    result = run(
+        ["bash", eng("bin/memory-bus-status")],
+        root,
+        env=memory_probe_env,
+        timeout=30,
+    )
     add(checks, "Memory-bus status", result.returncode == 0 and "OK" in result.stdout, result.stdout)
 
     smoke = f"memory smoke {os.getpid()}"
     result = run(
         ["bash", eng("bin/memory-service-note"), "--agent", "agent", "--type", "finding", "--msg", smoke, "--tag", "full-check-smoke"],
         root,
+        env=memory_probe_env,
         timeout=30,
     )
     add(checks, "Memory-bus note", result.returncode == 0, result.stdout)
     result = run(
         ["bash", eng("bin/memory-service-search"), "--query", smoke, "--tag", "full-check-smoke", "--limit", "1"],
         root,
+        env=memory_probe_env,
         timeout=30,
     )
     add(checks, "Memory-bus search", result.returncode == 0 and smoke in result.stdout, result.stdout)
@@ -1496,7 +1700,10 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="bugate-guard.") as tmp:
         ws = build_guard_workspace(Path(tmp))
         guard = eng("scripts/check_bugate.py")
-        neutral_env = {"BUGATE_PROFILE": ""}
+        neutral_env = {
+            "BUGATE_PROFILE": str(ws / "bugate.profile.yaml"),
+            "BUGATE_PROJECT_ROOT": str(ws),
+        }
         result = run([sys.executable, guard, "tests/ok/test_x.py"],
                      root, cwd=ws, input_text="", env=neutral_env, timeout=30)
         add(checks, "Write guard allows passed UC", result.returncode == 0, result.stdout or "allowed")
@@ -1523,13 +1730,10 @@ def main() -> int:
             ),
         )
 
-        role_env = {
-            "BUGATE_PROFILE": str(ws / "bugate.profile.yaml"),
-            "BUGATE_AGENT_ROLE": "implementer",
-        }
+        role_env = {**neutral_env, "BUGATE_AGENT_ROLE": "implementer"}
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "mirror/spec.md"}})
         result = run(["python3", eng("scripts/check_agent_role_paths.py")],
-                     root, input_text=payload, env=role_env, timeout=30)
+                     root, cwd=ws, input_text=payload, env=role_env, timeout=30)
         forbidden_absent = not (ws / "mirror/spec.md").exists()
         add(
             checks,
@@ -1546,48 +1750,19 @@ def main() -> int:
         )
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "tests/ok/test_x.py"}})
         result = run(["python3", eng("scripts/check_agent_role_paths.py")],
-                     root, input_text=payload, env=role_env, timeout=30)
+                     root, cwd=ws, input_text=payload, env=role_env, timeout=30)
         add(checks, "Role guard allows permitted path", result.returncode == 0, result.stdout or "allowed")
 
     # Hardening flags enforce (fabricated): a template-initialized UC must be
-    # REJECTED once the profile demands the Wave-1 multiview report.
-    with tempfile.TemporaryDirectory(prefix="bugate-harden.") as tmp:
-        uc = Path(tmp) / "uc"
-        result = run(["python3", eng("scripts/sdtd_orchestrator.py"), str(uc), "--init"], root, timeout=60)
-        init_ok = result.returncode == 0
-        prof = Path(tmp) / "harden.profile.yaml"
-        prof.write_text(
-            f"artifact_dir_template: {tmp}/{{uc}}/\nrequire_multiview: true\n",
-            encoding="utf-8",
-        )
-        result = run(
-            ["python3", eng("scripts/check_bugate_v13_semantics.py"), str(uc), "--scope", "pre-code"],
-            root,
-            env={"BUGATE_PROFILE": str(prof)},
-            timeout=60,
-        )
-        divergence = uc / "00_multiview/divergence_report.md"
-        enforced = (
-            result.returncode == 1
-            and "divergence_report" in result.stdout
-            and not divergence.exists()
-        )
-        add(
-            checks,
-            "Hardening flags enforce (multiview)",
-            init_ok and enforced,
-            (
-                f"exit={result.returncode}/1; semantic_marker="
-                f"{'present' if 'divergence_report' in result.stdout else 'missing'}; "
-                f"required_report=absent"
-            ),
-        )
+    # REJECTED once the probe-owned profile demands the Wave-1 multiview report.
+    run_hardening_multiview_probe(checks, root, engine)
 
     # Alternate semantic-schema dialect: dialect selection must be a real fork —
     # a minimal original-gate Layer-1 brief passes under --schema original-gate
     # and is rejected by the canonical v1.3 schema (canonical ids + sections).
     with tempfile.TemporaryDirectory(prefix="bugate-dialect.") as tmp:
         uc = Path(tmp)
+        _, dialect_env = build_probe_profile(uc, "dialect")
         (uc / "01_business_brief.md").write_text(
             "---\ngate: layer1_business_brief\ngate_status: passed\n---\n\n"
             "## SUT And Scope\nA neutral request flow under test.\n\n"
@@ -1599,14 +1774,14 @@ def main() -> int:
         result = run(
             ["python3", eng("scripts/check_bugate_brief_semantics.py"), str(uc),
              "--require-passed", "--schema", "original-gate"],
-            root, timeout=60,
+            root, env=dialect_env, timeout=60,
         )
         alt_ok = result.returncode == 0
         brief_before = (uc / "01_business_brief.md").read_bytes()
         result = run(
             ["python3", eng("scripts/check_bugate_brief_semantics.py"), str(uc),
              "--require-passed", "--schema", "v1.3"],
-            root, timeout=60,
+            root, env=dialect_env, timeout=60,
         )
         default_marker = "must define at least one P-xxx proposition"
         rejects_default = (

@@ -71,7 +71,7 @@ The bridges invoke these **exact** commands (read from `build_command()` in both
 scripts), piping the prompt on **stdin**:
 
 - **claude:** `claude -p [--model M] [--effort E] --permission-mode dontAsk --output-format text`
-- **codex:** `codex exec [--ask-for-approval never] --sandbox read-only [--model M] [-c model_reasoning_effort="E"] -`
+- **codex:** `codex exec [--ask-for-approval never] [--skip-git-repo-check] --sandbox read-only [--model M] [-c model_reasoning_effort="E"] -`
 
 The `--model` / `--effort` (claude) and `--model` / `-c model_reasoning_effort`
 (codex) flags are appended **only when** the corresponding env var is set —
@@ -84,11 +84,17 @@ defaults, all overridable):
 | `SDTD_CODEX_MODEL` / `SDTD_CLAUDE_MODEL` | model override (empty → CLI default) | unset |
 | `SDTD_CODEX_REASONING_EFFORT` / `SDTD_CLAUDE_EFFORT` | reasoning effort | unset |
 | `SDTD_CLI_TIMEOUT_SECONDS` | per-peer subprocess timeout | `1800` |
+| `SDTD_CODEX_SKIP_GIT_REPO_CHECK=1` | allow Codex dispatch from an intentionally non-git automation CWD | unset; repository check active |
 | `SDTD_CLI_HTTPS_PROXY` / `SDTD_CLI_HTTP_PROXY` / `SDTD_CLI_ALL_PROXY` | optional proxy values (injected into the child env only if set) | unset |
 | `SDTD_CLI_PROXY=0` | force-disable proxy injection even when proxy vars are set | injection on |
 
 Proxy injection is **OFF unless** one of the proxy vars above is explicitly set;
 no host:port is ever hardcoded. Run the bridges per use-case artifact dir:
+
+Leave `SDTD_CODEX_SKIP_GIT_REPO_CHECK` unset for ordinary imported-project
+dispatch. BUGate full-check sets it only for its SUT-neutral temporary peer
+fixture, where there is deliberately no git repository. The opt-in does not
+bypass hook trust and does not change the bridge's `read-only` sandbox.
 
 ```bash
 python3 scripts/sdtd_multiview_cli_bridge.py    run-all <uc-dir>   # Wave 1 multi-view

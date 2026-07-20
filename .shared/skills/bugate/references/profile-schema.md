@@ -286,6 +286,7 @@ peer is therefore not allowed to inherit the designer's Wave 7 identity.
 | `SDTD_CODEX_REASONING_EFFORT` | str (stripped) | `''` (empty → CLI default) | Codex reasoning effort, appended as `-c model_reasoning_effort="E"` only when set. |
 | `SDTD_CLAUDE_EFFORT` | str (stripped) | `''` (empty → CLI default) | Claude reasoning effort, appended as `--effort E` only when set. |
 | `SDTD_CLI_TIMEOUT_SECONDS` | int (parsed with `int()`) | `1800` | Per-peer subprocess timeout in seconds for each Codex/Claude CLI dispatch. |
+| `SDTD_CODEX_SKIP_GIT_REPO_CHECK` | `'1'` to enable | unset (Codex repository check remains active) | Explicit automation-only opt-in for dispatch from a SUT-neutral, non-git fixture CWD. BUGate full-check sets it only for its isolated synthetic real-peer probe. It does not bypass hook trust, and ordinary imported-project dispatch must leave it unset. |
 | `SDTD_CLI_HTTPS_PROXY` | proxy URL | `''` (empty → not injected) | If set (and `SDTD_CLI_PROXY != '0'`), injected into child env as `https_proxy`/`HTTPS_PROXY` for peer CLI calls. |
 | `SDTD_CLI_HTTP_PROXY` | proxy URL | `''` (empty → not injected) | If set (and `SDTD_CLI_PROXY != '0'`), injected as `http_proxy`/`HTTP_PROXY` for peer CLI calls. |
 | `SDTD_CLI_ALL_PROXY` | proxy URL | `''` (empty → not injected) | If set (and `SDTD_CLI_PROXY != '0'`), injected as `all_proxy`/`ALL_PROXY` for peer CLI calls. |
