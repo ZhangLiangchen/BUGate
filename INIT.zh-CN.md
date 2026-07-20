@@ -8,6 +8,10 @@
 >
 > 在 BUGate 发布 packaged console-script 前，文档里的 `bugate init` shorthand
 > 指 `python3 scripts/bugate_init.py`。
+>
+> 当前正式版本是 **v0.4.0**。tar/zip archive 随附
+> `bugate-0.4.0.SHA256SUMS`；导入模式必须在解压前校验所选 archive（见
+> `IMPORT_PROMPT.zh-CN.md`）。
 
 ---
 
@@ -66,7 +70,7 @@ cd scripts && python3 -c "import bugate_core as c; cfg=c.load_config(); print('m
 BUGate 作为 skill 跑在 Claude Code 与 Codex 之下：
 
 - 技能：`.shared/skills/bugate/`（Claude Code 通过 `.claude/skills/` 发现，Codex 通过 `.agents/skills/` 发现；`.codex/skills/` 仅作为旧 Codex 兼容桥保留）。
-- Hooks：项目开发态用 `.claude/settings.json` 与 `.codex/hooks.json`；plugin 安装态用 plugin-root 的 `hooks/hooks.json`。根定位**无需 git** 且已拆分：hook 向上找 `scripts/bugate_core.py` 或使用 plugin/vendor root 定位引擎；门脚本自 CWD 向上找最近的 `bugate.config.yaml` 定位被治理工作区（开发态用哨兵 fallback）。
+- Hooks：项目开发态用 `.claude/settings.json` 与 `.codex/hooks.json`；plugin 安装态用 plugin-root 的 `hooks/hooks.json`。根定位**无需 git** 且已拆分：hook 向上找 `scripts/bugate_core.py` 或使用 plugin/vendor root 定位引擎；门脚本自 CWD 向上找最近的 `bugate.config.yaml` 定位被治理工作区（开发态用哨兵 fallback）。v0.4.0 保持 pre-code guard 与 role-evidence guard 职责独立；orchestrator/Core mutator 也执行同一 role preflight，因为 Python 直接写文件不会触发 agent PreToolUse hook。
 - Plugins：`.claude-plugin/plugin.json` 与 `.codex-plugin/plugin.json` 只放 manifest；共享的 `skills/`、`commands/`、`agents/`、`hooks/`、`scripts/`、`bin/` 都在 plugin root。
 - **仅 Codex：** 改任何 hook 都要在 Codex 的 hook 管理界面重新信任其 hash。**Claude plugin 改动：**运行 `/reload-plugins` 或重新安装/更新 plugin。
 
@@ -99,7 +103,11 @@ profile 完整参考：[`.shared/skills/bugate/references/profile-schema.md`](.s
 
 ## 核心之外的运行时
 
-零依赖核心覆盖 **4 层门**。另外三套机制调用外部运行时。**记忆总线（b）是必要的** —— `bugate init` / `bin/memory-bus-*` 自动安装并自愈,你无需手工操作。**双 agent CLI（a）** 与 **agent 角色隔离（c）** 是**可选**的,缺席时优雅回退。
+零依赖核心覆盖 **4 层门**，另外三套机制继续扩展它。**记忆总线（b）是必要的**
+—— `bugate init` / `bin/memory-bus-*` 自动安装并自愈，无需手工操作。
+**双 agent CLI（a）** 仍是可选项，缺席时优雅回退。Wave 7 生命周期治理（c）
+只用标准库、由 imported profile opt-in；一旦设为 `required` 就有意 fail-closed，
+不会降级放行。
 
 ### a) 双 agent 视角互审（Wave 1）
 
@@ -130,12 +138,42 @@ bin/memory-service-note --agent <a> --type finding --msg "..."
 bin/promote-memory ...                                  # 把一条 finding 晋级为 status:confirmed
 ```
 
-命名空间来自 SUT profile（`memory.namespace`）或 `MEMORY_BUS_PROJECT_TAG`（默认 `project:bugate`）。服务是**机器级**的（ADR-BUGATE-003）：全机一个实例，数据家目录 `~/.bugate/memory-bus/`（用 `BUGATE_MEMORY_HOME` 覆盖；服务自身的 `MCP_MEMORY_BASE_DIR` 优先级最高），被本机所有被治理仓共享、项目间靠 namespace tag 隔离 —— 被治理仓只在 profile 里声明其 namespace，**不**脚手架本地服务目录。仓内遗留 `.memory_bus/` 仍作为弃用回退被读取。可选 macOS 加固：`bin/memory-bus-install-launchd`（RunAtLoad + KeepAlive；`--uninstall` 卸载）。记忆总线是**必要核心组件**：`bugate init` / `bin/memory-bus-*` 缺席则**自动安装**机器级服务、异常则**自愈拉起**；运行时非阻断（临时抖动重启而非锁死编辑）。`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过自动安装。
+命名空间来自 SUT profile（`memory.namespace`）或 `MEMORY_BUS_PROJECT_TAG`（默认 `project:bugate`）。服务是**机器级**的（ADR-BUGATE-003）：全机一个实例，数据家目录 `~/.bugate/memory-bus/`（用 `BUGATE_MEMORY_HOME` 覆盖；服务自身的 `MCP_MEMORY_BASE_DIR` 优先级最高），被本机所有被治理仓共享、项目间靠 namespace tag 隔离 —— 被治理仓只在 profile 里声明其 namespace，**不**脚手架本地服务目录。仓内遗留 `.memory_bus/` 仍作为弃用回退被读取。可选 macOS 加固：`bin/memory-bus-install-launchd`（RunAtLoad + KeepAlive；`--uninstall` 卸载）。记忆总线是**必要核心组件**：`bugate init` / `bin/memory-bus-*` 缺席则**自动安装**机器级服务、异常则**自愈拉起**。普通 recall/note/Stop 与每次编辑继续 best-effort/本地校验；Wave 7 `memory_mode: required` 下，临时故障会有意只阻塞下一次 handoff/acceptance/completion，并且不生成解锁 receipt。`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过自动安装。
 
-### c) 三层 agent 角色隔离（Wave 7）
+### c) 可审计生命周期角色治理（Wave 7）
 
-- **我们提供：** `scripts/check_agent_role_paths.py`（一个 PreToolUse 路径守卫）。
-- 用 `BUGATE_AGENT_ROLE=builder|designer|implementer` 按会话启用；禁止的路径 pattern 来自 SUT profile 的 `agent_roles:` 映射。未设角色 / profile 无规则 → 空操作（默认 OFF）。
+- **我们提供：** `bin/bugate-role`、`scripts/role_governance.py`、
+  `scripts/check_role_evidence.py`，以及独立且兼容 legacy 的路径守卫
+  `scripts/check_agent_role_paths.py`。
+- **默认值：** `role_governance.mode: off`，v0.3.x profile 行为不变；
+  `agent_roles` 仍可单独使用，它不是生命周期状态机。
+- **required 模式：** 未设置/错误角色和缺 required session ID 都会阻塞；历史
+  passed UC 也必须新建 human/designer/implementer receipts。用三个独立会话：
+
+  ```bash
+  bin/bugate-role run --role designer -- codex
+  bin/bugate-role run --role implementer -- claude
+  bin/bugate-role run --role reviewer -- codex
+  ```
+
+  Pre-code `--init` 与 `--auto` 必须分开运行。人类把 03B 改为
+  `gate_status: passed` 后，不得再次跑 `--auto`：designer 用
+  `bugate-role approve` 记录既有决定，再 handoff；新 implementer session
+  使用 receipt 的 exact `memory.memory_id` 接单。进入 post-run 前还需要
+  implementer handoff 与新的 reviewer acceptance。完整命令见
+  [README 操作顺序](README.zh-CN.md#wave-7-可审计生命周期角色v040) 与
+  [规范协议](docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.zh-CN.md)。
+
+普通编辑只验证本地 hash chain；strict Memory 故障会阻塞下一次转换，恢复后可
+幂等重试。profile/pre-code drift 从 human/designer evidence 重新开始；
+implementation drift 从 implementer handoff/reviewer acceptance 重新开始。
+Evidence 只追加，禁止删除或手改来 reset。
+
+`bugate-role run` 只给子进程 export role/session。Hook 不能 export 到父进程，
+已经运行的 Desktop app 必须从目标环境重新启动；Codex Desktop 还必须 re-trust
+v0.4.0 新 hook hash。证据链不是强身份认证：`approved_by` 只是声明，本地 hook
+拦不住任意 shell/外部编辑器写入；不可抵赖需要 OS/container/managed-runner
+或按角色 credential 隔离。
 
 ---
 
@@ -193,9 +231,13 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
 7. 验证物理写守卫（双布局，临时构造 fixture）:
    - python3 tests/test_write_guard_layouts.py 应输出 PASS(both layouts)——
      imported(config 标记根)与 engine-development(哨兵 fallback)各自 放行/阻断/fail-closed。
-8. 验证 Wave 7 角色隔离（临时 profile，见 full-check 的构造方式）:
-   - 在 /tmp 造一个含 agent_roles 的 profile，用 BUGATE_PROFILE=<该文件> 加
-     BUGATE_AGENT_ROLE=implementer 测被禁路径应返回 2，允许路径应返回 0。
+8. 验证 Wave 7 角色治理（临时 profile，见 full-check 的构造方式）:
+   - 先确认 legacy `agent_roles` 路径 allow/deny 仍可独立工作。
+   - 在 `role_governance.mode: required` 下证明 unset/wrong role 阻断；再用
+     scratch fixture 跑完整 designer → human acceptance → handoff → 新
+     implementer acceptance → guarded-write allow → implementer handoff → 新
+     reviewer acceptance → post-run → completion。加入 strict-Memory failure
+     和 profile/artifact/implementation drift 负控；不得使用真实 SUT fixture。
 9. 验证 profile hardening gates（强制生效探针）:
    - 用 orchestrator --init 的模板 UC + 一个 require_multiview: true 的临时
      profile 跑 v13 pre-code，应因缺 divergence_report.md 而拒绝（非 0 退出）。
@@ -225,7 +267,8 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
 | 在 agent 里跑 | 无 | `.claude` / `.codex` hooks | — |
 | 导入进 SUT 仓 | 无 | `bugate.config.yaml` + profile schema | — |
 | 双 agent 互审 | `codex` + `claude` CLI | `sdtd_multiview*` | 会 → 确定性占位 |
-| Agent 记忆 + 晋级（**必要核心**） | 无 —— 由 `bugate init` 自动安装 | `memory_bus.py` + `bin/memory-*` | 必要；自动安装 + 自愈（运行时非阻断） |
-| Agent 角色隔离 | 无 | `check_agent_role_paths.py` | —（默认 OFF） |
+| Agent 记忆 + 晋级（**必要核心**） | 无 —— 由 `bugate init` 自动安装 | `memory_bus.py` + `bin/memory-*` | 必要；自动安装 + 自愈；普通编辑不阻断，strict 生命周期转换 fail-closed |
+| 路径角色隔离 | 无 | `check_agent_role_paths.py` | —（独立、默认 OFF） |
+| 可审计生命周期角色 | 无 | `bugate-role` + role-evidence hook/state machine | opt-in；`required` fail-closed |
 
-**结论：** `git clone` → `python3 --version`（3.9+）→ 跑第 2 步冒烟测试 → **门禁引擎零安装即就绪**（stdlib-only）。**记忆服务是必要核心组件**（长期记忆、双 agent 进展同步/接力、记忆升级）：`bugate init` / `bin/memory-bus-*` 检测到未装则**自动安装**机器级 `mcp-memory-service`、异常则**自愈拉起**（运行时非阻断，临时抖动重启而非锁死编辑）；`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过自动安装。**双 agent CLI（codex/claude）仍为可选**——缺席时干净回退到确定性占位。
+**结论：** `git clone` → `python3 --version`（3.9+）→ 跑第 2 步冒烟测试 → **门禁引擎零安装即就绪**（stdlib-only）。**记忆服务是必要核心组件**（长期记忆、双 agent 进展同步/接力、记忆升级）：`bugate init` / `bin/memory-bus-*` 检测到未装则**自动安装**机器级 `mcp-memory-service`、异常则**自愈拉起**。普通编辑只做本地角色证据检查，不因 Memory 短暂抖动而阻断；`memory_mode: required` 的 handoff/acceptance/completion 转换则必须 fail-closed。`BUGATE_MEMORY_NO_INSTALL=1` 可在离线/受限机器跳过自动安装。**双 agent CLI（codex/claude）仍为可选**——缺席时干净回退到确定性占位。

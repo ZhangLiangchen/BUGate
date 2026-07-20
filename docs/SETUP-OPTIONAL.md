@@ -17,10 +17,14 @@ beyond stdlib. **One is required, two are optional:**
   **self-heal** on an anomaly, so you normally don't run §2 by hand — it is here
   as the manual/offline reference and as the diagnosis path (set
   `BUGATE_MEMORY_NO_INSTALL=1` to install manually). Runtime is non-blocking (a
-  transient outage restarts rather than fail-closing edits), but a BUGate setup
-  is incomplete without it.
-- **Optional — the dual-agent CLIs** (§1) and **agent role isolation** (§3):
-  each degrades cleanly when absent (placeholder peer views / role guard off).
+  transient outage does not fail-close ordinary recall or edits), but a BUGate
+  setup is incomplete without it. When a profile selects
+  `role_governance.memory_mode: required`, lifecycle transitions use strict
+  Memory and fail closed before local receipt publication.
+- **Optional — the dual-agent CLIs** (§1) and **profile activation of Wave 7
+  controls** (§3). `agent_roles` path isolation and the auditable lifecycle are
+  default-off until the imported profile enables them. Once lifecycle mode is
+  `required`, it does not degrade to advisory behavior.
 
 Each section follows the same shape: **Install → Wire → Verify → Fallback**.
 
@@ -28,7 +32,7 @@ Each section follows the same shape: **Install → Wire → Verify → Fallback*
 |---|---|---|
 | 1. Dual-agent CLIs (multi-view + adversarial) | `codex` + `claude` CLIs | optional — deterministic placeholder views, gate stays green |
 | 2. MCP memory service + ONNX | auto-installed by init (`mcp-memory-service` + ONNX model) | **required core** — init installs/self-heals; §2 is the manual/offline reference |
-| 3. Agent role isolation | nothing (env + profile) | optional — default OFF (no-op when role unset) |
+| 3. Wave 7 role controls | nothing (env + profile) | opt-in — `agent_roles` path policy and `role_governance`; required mode is fail-closed |
 
 ---
 
@@ -229,61 +233,91 @@ the service's default environment instead of the shared bus home database
 
 ### Fallback
 
-When the service is unreachable, `memory_bus.py` prints a clear hint ("Start it
-with `bin/memory-bus-start`") and **exits non-fatally (0)** — its note, search,
-and lint subcommands all return 0 when `service_available()` is false, so hooks
-and the gate are never blocked by a down memory service.
+When the service is unreachable, ordinary session-start/Stop bookkeeping and
+normal note/search/recall keep their best-effort behavior and print a clear
+start hint. This does **not** apply to strict role-transition operations:
+`get --strict`, `handoff --strict`, `accept-handoff --strict`,
+`verify-handoff --strict`, and `bugate-role` transitions under
+`memory_mode: required` return non-zero on service, timeout, write, exact-ID,
+namespace, role, UC, phase, transition, or receipt mismatch. They publish no
+local unlock receipt or chain advancement. Ordinary per-edit role checks use
+the local hash-linked receipt chain and make no live Memory request.
 
 ---
 
-## 3. Agent role isolation — three-layer path guard (Wave 7)
+## 3. Wave 7 role controls — lifecycle plus path policy
 
-`scripts/check_agent_role_paths.py` is a PreToolUse path guard that stops one
-agent role from touching files that belong to another (e.g. keeping a test
-implementer from re-deriving expectations out of SUT source). It ships with **no
-hardcoded paths or role names** — everything comes from the env and the active
-SUT profile, and it is **default OFF**.
+Wave 7 has two complementary, default-off profile mechanisms:
+
+- `role_governance` owns the auditable `designer` → `implementer` →
+  `reviewer` lifecycle, sessions, strict Memory transitions, hash-linked local
+  receipts, drift detection, and phase unlocks.
+- `agent_roles` plus `check_agent_role_paths.py` owns profile-defined forbidden
+  read/write paths. It retains custom/legacy role tokens and bare-list or
+  `read`/`write` forms.
+
+Wave 1 Codex/Claude peers are separate read-only workers inside the designer
+phase; their child environments remove lifecycle identity.
 
 ### Install
 
-Nothing to install — it is a stdlib-only core script.
+Nothing to install: `bin/bugate-role`, `scripts/role_governance.py`,
+`scripts/check_role_evidence.py`, and the path guard are stdlib-only. The
+machine-level Memory service from §2 must be healthy for strict transitions.
 
 ### Wire
 
-Enable **per session** by exporting the role and supplying forbidden patterns in
-the profile:
+Keep `role_governance.mode: off` for v0.3.x compatibility, or copy the complete
+`required` block from
+[`profile-schema.md`](../.shared/skills/bugate/references/profile-schema.md).
+Then start each lifecycle actor as a new child process/session:
 
 ```bash
-export BUGATE_AGENT_ROLE=builder      # or designer | implementer | <your role>
+bin/bugate-role run --role designer -- codex
+bin/bugate-role run --role implementer -- claude
+bin/bugate-role run --role reviewer -- codex
 ```
 
-Declare the role's forbidden path patterns under an `agent_roles:` map in the
-active profile (a bare list applies to both reads and writes; or use `read:` /
-`write:` sub-lists to scope). See the canonical
-[`profile-schema.md`](../.shared/skills/bugate/references/profile-schema.md) for
-the full shape. Patterns are Python regexes; deny wins, everything else is
-allowed.
+`run` generates `BUGATE_SESSION_ID`; explicit CLI role/session flags must match
+the environment and cannot silently replace it. A hook subprocess cannot export
+identity into its parent. Desktop must be launched from an equivalent role
+environment and reopened.
 
-The PreToolUse wiring is **already shipped** in `.codex/hooks.json` and
-`.claude/settings.json` (matcher `Edit|Write`). Hooks locate the engine by
-walking up for `scripts/bugate_core.py` or through the plugin/vendor root, then
-the guard resolves the active project by walking up from CWD to the nearest
-`bugate.config.yaml`. In BUGate core, role isolation is verified through
-temporary fixture profiles, not by mounting a SUT. Codex Desktop requires
-re-trusting the hook hash after any hook change.
+Declare forbidden paths separately under `agent_roles:` when needed. Patterns
+are Python regexes; deny wins, everything else is allowed.
+
+The shipped Claude surface keeps two matchers: `Edit|Write` invokes
+`check_bugate.py`, `check_plan_lock.py`, and `check_role_evidence.py`, while
+`Read|Edit|Write` invokes `check_agent_role_paths.py`. Codex `apply_patch`
+invokes all four. SessionStart performs best-effort Memory recall and
+`bugate-role session-start`; Stop remains a best-effort heartbeat using the
+active role or `agent`.
+
+Re-running `bugate_init.py` refreshes vendored scripts and BUGate-owned hooks
+while preserving SUT-owned hooks. Any Codex hook hash change requires re-trust;
+before it, do not claim runtime enforcement is active.
 
 ### Verify
 
-With a role exported and a matching forbidden pattern in the profile, attempt an
-edit/write to a forbidden path: the guard exits non-zero and prints
-`BUGate agent-role path isolation (role=<role>) blocked:` with the offending
-path. An allowed path returns 0.
+Run `bin/bugate-role status <artifact-dir>` and `verify ... --phase ...` for the
+local chain; add `--strict-memory` for external anchors. In required mode also
+prove unset/wrong-role rejection, same-session acceptance rejection, exact-ID
+acceptance, and that both `check_bugate.py` and `check_role_evidence.py` allow
+Layer 4 only after implementer acceptance. Direct agent-tool edits to
+`00_role_evidence/**` must fail.
 
 ### Fallback
 
-Default **OFF**: if `BUGATE_AGENT_ROLE` is unset/empty, or the active profile
-defines no `agent_roles` rules for the role/action, the guard is a **no-op**
-(exit 0, allow everything).
+Default `off` preserves v0.3.x behavior. `advisory` warns on ordinary lifecycle
+violations but still protects evidence files. `required` never falls back:
+missing role/session/receipt, strict Memory failure, or profile/artifact/
+implementation drift blocks. Recovery appends a superseding receipt generation;
+deleting evidence is not a reset.
+
+This is auditable role declaration and tamper/drift detection, not
+non-repudiable identity. Hooks cannot intercept arbitrary shell redirection or
+external editors. Strong isolation needs separate OS accounts, containers,
+managed runners, or role-scoped server credentials.
 
 ---
 

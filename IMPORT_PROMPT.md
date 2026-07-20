@@ -32,11 +32,14 @@ core files.
   hooks load from the session's workspace, so a session rooted at a parent
   (monorepo) directory silently loads no guard. The importer warns when the
   target is not the git toplevel; relay that warning to the user.
-- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.5`.
+- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.4.0`.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
 - If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
   release, use it. Otherwise download the GitHub Release tarball outside the
   SUT repo.
+- The v0.4.0 release has exactly three assets: `bugate-0.4.0.tar.gz`,
+  `bugate-0.4.0.zip`, and `bugate-0.4.0.SHA256SUMS`. The checksum asset is
+  mandatory; verify the selected archive before extraction.
 
 ### Required Flow
 
@@ -53,18 +56,31 @@ core files.
    - Otherwise run the equivalent of:
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.5}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.4.0}"
      BUGATE_TMP="$(mktemp -d)"
+     BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
+     BUGATE_SUMS="bugate-${BUGATE_VERSION}.SHA256SUMS"
      if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
-       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then
-       tar -xzf "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" -C "$BUGATE_TMP"
+       "$BUGATE_RELEASE/bugate-${BUGATE_VERSION}.tar.gz"; then
+       BUGATE_ARCHIVE="bugate-${BUGATE_VERSION}.tar.gz"
      elif curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" \
-       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.zip"; then
-       unzip -q "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" -d "$BUGATE_TMP"
+       "$BUGATE_RELEASE/bugate-${BUGATE_VERSION}.zip"; then
+       BUGATE_ARCHIVE="bugate-${BUGATE_VERSION}.zip"
      else
        echo "BUGate release v${BUGATE_VERSION} was not downloadable; ask the user for BUGATE_ENGINE_DIR or a valid version." >&2
        exit 2
      fi
+     curl -fL -o "$BUGATE_TMP/$BUGATE_SUMS" "$BUGATE_RELEASE/$BUGATE_SUMS"
+     if ! grep "${BUGATE_ARCHIVE}$" "$BUGATE_TMP/$BUGATE_SUMS" \
+       | sed 's#  dist/#  #' \
+       | (cd "$BUGATE_TMP" && shasum -a 256 -c -); then
+       echo "BUGate archive checksum verification failed; do not extract or install it." >&2
+       exit 2
+     fi
+     case "$BUGATE_ARCHIVE" in
+       *.tar.gz) tar -xzf "$BUGATE_TMP/$BUGATE_ARCHIVE" -C "$BUGATE_TMP" ;;
+       *.zip) unzip -q "$BUGATE_TMP/$BUGATE_ARCHIVE" -d "$BUGATE_TMP" ;;
+     esac
      BUGATE_ENGINE_DIR="$BUGATE_TMP/bugate-${BUGATE_VERSION}"
      ```
 
@@ -72,6 +88,9 @@ core files.
 
      ```bash
      test -f "$BUGATE_ENGINE_DIR/scripts/bugate_init.py"
+     test -f "$BUGATE_ENGINE_DIR/scripts/role_governance.py"
+     test -f "$BUGATE_ENGINE_DIR/scripts/check_role_evidence.py"
+     test -x "$BUGATE_ENGINE_DIR/bin/bugate-role"
      test -f "$BUGATE_ENGINE_DIR/.shared/skills/bugate/SKILL.md"
      ```
 
@@ -126,6 +145,9 @@ core files.
    test -f "$BUGATE_VENDOR_DIR/scripts/check_bugate.py"
    test -f "$BUGATE_VENDOR_DIR/scripts/bugate_prompt_reminder.py"
    test -f "$BUGATE_VENDOR_DIR/scripts/memory_bus.py"
+   test -f "$BUGATE_VENDOR_DIR/scripts/role_governance.py"
+   test -f "$BUGATE_VENDOR_DIR/scripts/check_role_evidence.py"
+   test -x "$BUGATE_VENDOR_DIR/bin/bugate-role"
    test -f "$BUGATE_VENDOR_DIR/.shared/skills/bugate/SKILL.md"
    test -e .claude/skills/bugate/SKILL.md
    test -e .agents/skills/bugate/SKILL.md
@@ -148,7 +170,9 @@ core files.
    cfg = bugate_core.load_config(root=Path.cwd())
    print("profile=", cfg.get("profile") or cfg.get("active_profile"))
    print("guarded_path_regex=", cfg.get("guarded_path_regex"))
-   print("memory.namespace=", cfg.get("namespace") or cfg.get("memory.namespace"))
+   memory = cfg.get("memory") if isinstance(cfg.get("memory"), dict) else {}
+   print("memory.namespace=", memory.get("namespace") or cfg.get("namespace"))
+   print("role_governance=", cfg.get("role_governance"))
    PY
    ```
 
@@ -203,6 +227,8 @@ core files.
      `.agents/skills/`, `.codex/skills/`, `.codex/agents/`, `docs/usecases/`,
      and the `.gitignore` BUGate block.
    - State whether `guarded_path_regex` is active.
+   - State the active `role_governance.mode` and `memory_mode`. A legacy/off
+     profile is compatible but does not activate the Wave 7 lifecycle gate.
    - State Memory Bus status.
    - State that Codex requires a one-time re-trust of the changed hook hash in
      Codex Desktop before Codex hooks become active. Claude Code may need a new
@@ -210,10 +236,11 @@ core files.
    - Point the user at the vendored usage guide for day-to-day work:
      `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/using-bugate.md`
      (中文: `using-bugate.zh-CN.md` beside it) — open this repo as the
-     session's project root, then drive new requirements through the
-     orchestrator working loop (`--auto` → human accepts 03b → guard admits
-     test code → post-run closure). ALL post-import guidance is consolidated
-     under that one skill.
+     session's project root, then drive new requirements through separate
+     designer / implementer / reviewer sessions (`--init`, then pre-code
+     `--auto`, then human 03B acceptance, explicit role receipts, guarded
+     implementation, and post-run closure). ALL post-import guidance is
+     consolidated under that one skill.
    - Do not stage, commit, or push unless the user explicitly asks.
 
 ### Appendix: activating the optional waves (Wave 7 / Wave 8)
@@ -229,10 +256,11 @@ Both waves are dormant by default — configuration switches, not defects.
 Enable them in the SUT profile once the evidence is ready (the profile
 scaffold now carries commented example blocks).
 
-- **Wave 7 role isolation**: add a top-level `agent_roles:` block to the
-  profile (role names lowercase; a bare list forbids both read and write,
-  `read:`/`write:` sub-lists scope each side), and set
-  `BUGATE_AGENT_ROLE=<role>` at runtime. Example:
+- **Wave 7 lifecycle governance**: `agent_roles` and `role_governance` are
+  complementary, not aliases. `agent_roles` remains an independent path
+  read/write policy (a bare list forbids both; `read:` / `write:` can scope
+  each action). The new state machine owns phase, handoff, acceptance, and
+  evidence. To enable complete fail-closed governance, add:
 
   ```yaml
   agent_roles:
@@ -241,13 +269,84 @@ scaffold now carries commented example blocks).
     designer:
       write:
         - "^tests/.*"       # designers must not write test code directly
+
+  role_governance:
+    mode: required
+    memory_mode: required
+    evidence_dir: 00_role_evidence
+    session_id_required: true
+    require_distinct_sessions: true
+    human_acceptance_artifacts:
+      - 03b_adversarial_cases.yaml
+    phases:
+      pre_code:
+        allowed_roles:
+          - designer
+      implementation:
+        allowed_roles:
+          - implementer
+        requires_handoff_from:
+          - designer
+      post_run:
+        allowed_roles:
+          - reviewer
+        requires_handoff_from:
+          - implementer
   ```
+
+  No new block means v0.3.x behavior; `role_governance.mode: off` is also
+  legacy-compatible, and `agent_roles` can still operate alone. With
+  `required`, an unset/wrong role or missing required session ID fails closed.
+  Already-passed historical UCs receive no synthetic evidence: record a new
+  human acceptance, designer handoff, and implementer acceptance before Layer
+  4, then an implementer handoff and reviewer acceptance before post-run.
+
+  Re-run `bugate_init.py` when upgrading an existing import. It refreshes the
+  vendored BUGate scripts and BUGate-owned hook entries while preserving the
+  SUT's own hooks. Then start three independent sessions; do not attempt to set
+  role variables from a SessionStart hook:
+
+  ```bash
+  "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role designer -- codex
+  "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role implementer -- claude
+  "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role reviewer -- codex
+  ```
+
+  A hook process cannot export into its parent, and an already-running Desktop
+  process does not inherit later shell changes. Relaunch each Desktop/CLI role
+  from the intended environment. Because v0.4.0 changes `.codex/hooks.json`,
+  Codex Desktop must explicitly re-trust its hash before enforcement is active.
+
+  The daily transition order is: designer runs `--init` and pre-code `--auto`
+  as **separate** commands; a human reviews 03B and explicitly sets it to
+  `gate_status: passed`; the designer runs `bugate-role approve` (which only
+  records the existing decision) and `handoff --phase pre_code --to
+  implementer`; a fresh implementer accepts the exact `memory.memory_id`,
+  writes/tests, then hands off with at least one `--implementation-file`; a
+  fresh reviewer accepts, runs post-run, and completes with 04/05 plus execution
+  evidence. Do not run `--auto` again after human 03B acceptance — proceed
+  directly to `approve`/`handoff`.
+
+  Every normal edit checks only local receipt/profile/artifact/implementation
+  hashes. A Memory outage blocks only the next strict role transition and
+  publishes no unlocking receipt; restore the service and retry idempotently.
+  Profile/pre-code drift requires a new human/designer generation;
+  implementation drift requires a new implementer handoff/reviewer acceptance.
+  Direct edits to `00_role_evidence/**` are denied. Do not delete evidence to
+  reset; restore any tampered receipt from a trusted source before appending a
+  superseding transition.
 
   Read-isolation only covers tools the hook sees (importer v0.3.2+ wires the
   role guard on its own `Read|Edit|Write` matcher; the write-shaped
   `check_bugate` must NEVER be matched on Read — it does not inspect the
   action and would block reads of guarded tests). Shell-level reads
-  (cat/grep) stay review discipline, not physical enforcement.
+  (`cat`/`grep`) and writes through arbitrary redirection/external editors are
+  outside hook interception. The supported agent tools, orchestrator, and Core
+  mutators enforce the state machine; stronger filesystem isolation belongs in
+  a managed runner. `approved_by`, environment roles, local hashes, and Memory
+  anchors are auditable declarations, not non-repudiable human authentication.
+  Strong identity requires separate OS accounts, containers, managed runners,
+  or role-scoped server credentials.
 - **Wave 8 mutation / oracle falsification**: write a falsification spec for
   real captured evidence JSON (declarative oracles + per-field mutations;
   `evidence` paths resolve relative to the spec file's directory), then

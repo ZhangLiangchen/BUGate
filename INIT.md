@@ -8,6 +8,10 @@
 >
 > Until BUGate ships a packaged console-script, prose shorthand `bugate init`
 > means `python3 scripts/bugate_init.py`.
+>
+> The current release is **v0.4.0**. Its tar and zip archives are accompanied
+> by `bugate-0.4.0.SHA256SUMS`; imported-mode adoption must verify the selected
+> archive before extraction (see `IMPORT_PROMPT.md`).
 
 ---
 
@@ -68,7 +72,7 @@ Expect `mode= core | guard= [] | precode= 5`. The core ships **pure**: the write
 BUGate runs as a skill under Claude Code and Codex:
 
 - Skill: `.shared/skills/bugate/` (discovered via `.claude/skills/` for Claude Code and `.agents/skills/` for Codex; `.codex/skills/` remains a legacy Codex compatibility bridge).
-- Hooks: `.claude/settings.json` and `.codex/hooks.json` for project-local development; plugin installs use plugin-root `hooks/hooks.json`. Root resolution is **git-free** and split: hooks find the engine by walking up for `scripts/bugate_core.py` or via the plugin/vendor root; gate scripts find the active project via the nearest `bugate.config.yaml` (sentinel fallback for self-development).
+- Hooks: `.claude/settings.json` and `.codex/hooks.json` for project-local development; plugin installs use plugin-root `hooks/hooks.json`. Root resolution is **git-free** and split: hooks find the engine by walking up for `scripts/bugate_core.py` or via the plugin/vendor root; gate scripts find the active project via the nearest `bugate.config.yaml` (sentinel fallback for self-development). In v0.4.0, the hook set keeps the pre-code guard and role-evidence guard independent; the orchestrator/Core mutators also run the same role preflight because Python writes do not trigger an agent PreToolUse hook.
 - Plugins: `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` are manifests only; shared `skills/`, `commands/`, `agents/`, `hooks/`, `scripts/`, and `bin/` stay at the plugin root.
 - **Codex only:** changing any hook requires re-trusting its hash in the Codex hook-management UI. **Claude plugin changes:** run `/reload-plugins` or reinstall/update the plugin.
 
@@ -106,10 +110,11 @@ The methodology and gate flow: [`README.md`](README.md) and
 ## Runtimes beyond the stdlib core
 
 The zero-dependency core covers the **4-layer gate**. Three further mechanisms
-call out to external runtimes. **The memory bus (b) is REQUIRED** — `bugate init`
-/ `bin/memory-bus-*` auto-install and self-heal it, you run nothing by hand. The
-**dual-agent CLIs (a)** and **agent-role isolation (c)** are **optional** and
-degrade gracefully when absent.
+extend it. **The memory bus (b) is REQUIRED** — `bugate init` /
+`bin/memory-bus-*` auto-install and self-heal it, you run nothing by hand. The
+**dual-agent CLIs (a)** remain optional and degrade gracefully when absent.
+Wave 7 lifecycle governance (c) is stdlib-only and opt-in per imported profile;
+once set to `required`, it deliberately fails closed rather than degrading.
 
 ### a) Dual-agent multi-view cross-audit (Wave 1)
 
@@ -144,12 +149,46 @@ bin/memory-service-note --agent <a> --type finding --msg "..."
 bin/promote-memory ...                                  # promote a finding to status:confirmed
 ```
 
-Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT_TAG` (default `project:bugate`). The service is **machine-level** (ADR-BUGATE-003): one instance per machine with its data home at `~/.bugate/memory-bus/` (override `BUGATE_MEMORY_HOME`; the service's own `MCP_MEMORY_BASE_DIR` wins), shared by every governed repo and isolated per project by the namespace tag — a governed repo only declares its namespace in its profile and does NOT scaffold a local service dir. A legacy in-repo `.memory_bus/` is still read as a deprecated fallback. Optional macOS hardening: `bin/memory-bus-install-launchd` (RunAtLoad + KeepAlive; `--uninstall` to remove). The memory bus is a **required core component**: `bugate init` / `bin/memory-bus-*` **auto-install** the machine-level service once when absent and **self-heal** (restart) on an anomaly; runtime stays non-blocking (a transient outage restarts, never fail-closes edits). Set `BUGATE_MEMORY_NO_INSTALL=1` to skip auto-install on locked-down/offline machines.
+Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT_TAG` (default `project:bugate`). The service is **machine-level** (ADR-BUGATE-003): one instance per machine with its data home at `~/.bugate/memory-bus/` (override `BUGATE_MEMORY_HOME`; the service's own `MCP_MEMORY_BASE_DIR` wins), shared by every governed repo and isolated per project by the namespace tag — a governed repo only declares its namespace in its profile and does NOT scaffold a local service dir. A legacy in-repo `.memory_bus/` is still read as a deprecated fallback. Optional macOS hardening: `bin/memory-bus-install-launchd` (RunAtLoad + KeepAlive; `--uninstall` to remove). The memory bus is a **required core component**: `bugate init` / `bin/memory-bus-*` **auto-install** the machine-level service once when absent and **self-heal** (restart) on an anomaly. Ordinary recall/notes/Stop and every edit remain best-effort/local; with Wave 7 `memory_mode: required`, a transient outage intentionally blocks only the next handoff/acceptance/completion transition and publishes no unlocking receipt. Set `BUGATE_MEMORY_NO_INSTALL=1` to skip auto-install on locked-down/offline machines.
 
-### c) Three-layer agent-role isolation (Wave 7)
+### c) Auditable lifecycle-role governance (Wave 7)
 
-- **We ship:** `scripts/check_agent_role_paths.py` (a PreToolUse path guard).
-- Enable per session with `BUGATE_AGENT_ROLE=builder|designer|implementer`; forbidden path patterns come from your SUT profile's `agent_roles:` map. Unset role / no profile rules → no-op (default-OFF).
+- **We ship:** `bin/bugate-role`, `scripts/role_governance.py`,
+  `scripts/check_role_evidence.py`, and the independent legacy-compatible
+  `scripts/check_agent_role_paths.py` path guard.
+- **Default:** `role_governance.mode: off`; v0.3.x profiles behave unchanged.
+  `agent_roles` can still be used alone and is not the lifecycle state machine.
+- **Required mode:** unset/wrong roles and missing required session IDs block;
+  historical passed UCs need new human/designer/implementer receipts. Start
+  three separate sessions with:
+
+  ```bash
+  bin/bugate-role run --role designer -- codex
+  bin/bugate-role run --role implementer -- claude
+  bin/bugate-role run --role reviewer -- codex
+  ```
+
+  Run pre-code `--init` and `--auto` as separate commands. Once a human has
+  changed 03B to `gate_status: passed`, do not run `--auto` again: the designer
+  records the existing decision with `bugate-role approve`, hands off, and the
+  new implementer session accepts the receipt's exact `memory.memory_id`.
+  Implementation handoff and a fresh reviewer acceptance are required before
+  post-run. See [the operating sequence in README](README.md#wave-7-auditable-lifecycle-roles-v040)
+  and the [normative protocol](docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md).
+
+Normal edits verify only the local hash chain; strict Memory failures block the
+next transition and can be retried idempotently after recovery. Profile or
+pre-code drift restarts from human/designer evidence; implementation drift
+restarts from implementer handoff/reviewer acceptance. Evidence is append-only:
+never delete or hand-edit it as a reset.
+
+`bugate-role run` exports role/session values only to its child. Hooks cannot
+export into a parent, and an already-running Desktop app must be relaunched
+from the intended environment. Codex Desktop must also re-trust the changed
+v0.4.0 hook hash. The chain is audit evidence, not strong identity:
+`approved_by` is declarative, local hooks cannot catch arbitrary shell or
+external-editor writes, and non-repudiation requires OS/container/managed-runner
+or role-scoped credential isolation.
 
 ---
 
@@ -221,10 +260,14 @@ Requirements:
    - python3 tests/test_write_guard_layouts.py must print PASS (both layouts) —
      imported (config-marked root) and engine-development (sentinel fallback)
      each allow / block / fail-closed.
-8. Verify Wave 7 role isolation (temp profile, as full-check constructs it):
-   - Build a profile with agent_roles under /tmp, and with BUGATE_PROFILE=<that file>
-     plus BUGATE_AGENT_ROLE=implementer confirm a forbidden path returns 2 and an
-     allowed path returns 0.
+8. Verify Wave 7 role governance (temp profile, as full-check constructs it):
+   - Confirm `agent_roles` legacy path allow/deny still works independently.
+   - With `role_governance.mode: required`, prove unset/wrong role blocks, then
+     run the scratch designer → human acceptance → handoff → fresh implementer
+     acceptance → guarded-write allow → implementer handoff → fresh reviewer
+     acceptance → post-run → completion chain. Include strict-Memory failure
+     and profile/artifact/implementation drift negative controls; never use a
+     real SUT fixture.
 9. Verify profile hardening gates (enforced-effect probe):
    - With the orchestrator --init template UC plus a temp profile carrying
      require_multiview: true, run v13 pre-code and confirm it is rejected
@@ -257,7 +300,8 @@ ephemeral fixtures, and optional runtimes are verified.
 | Run under an agent | nothing | `.claude` / `.codex` hooks | — |
 | Import into a SUT repo | nothing | `bugate.config.yaml` + profile schema | — |
 | Dual-agent cross-audit | `codex` + `claude` CLIs | `sdtd_multiview*` | yes → deterministic placeholder |
-| Agent memory + promotion (**required core**) | nothing — auto-installed by `bugate init` | `memory_bus.py` + `bin/memory-*` | required; auto-installs + self-heals (runtime non-blocking) |
-| Agent-role isolation | nothing | `check_agent_role_paths.py` | — (default-OFF) |
+| Agent memory + promotion (**required core**) | nothing — auto-installed by `bugate init` | `memory_bus.py` + `bin/memory-*` | required; auto-installs + self-heals; ordinary edits stay non-blocking, strict lifecycle transitions fail closed |
+| Path-role isolation | nothing | `check_agent_role_paths.py` | — (independent, default-OFF) |
+| Auditable lifecycle roles | nothing | `bugate-role` + role-evidence hook/state machine | opt-in; `required` fails closed |
 
 **Bottom line:** `git clone` → `python3 --version` (3.9+) → run the Step 2 smoke test → the **gate engine is ready with zero installs**. The **memory bus is required** and auto-installs / self-heals via `bugate init` / `bin/memory-bus-*` (`BUGATE_MEMORY_NO_INSTALL=1` to opt out on offline hosts). The **dual-agent CLIs** stay opt-in — install them and the driver scripts we ship will use them, falling back cleanly when absent.

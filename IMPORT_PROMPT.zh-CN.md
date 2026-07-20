@@ -27,10 +27,13 @@ BUGate core 文件。
   **测试框架的家目录**,且之后的 agent 会话必须以**该目录**为项目根打开——
   hook 从会话工作区加载,开在父目录(monorepo 根)的会话不会加载任何守卫。
   importer 在目标不是 git 顶层时会发出警告;把该警告转达给用户。
-- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.5`。
+- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.4.0`。
 - Vendor 目录：若设置了 `BUGATE_VENDOR_DIR` 就使用它，否则使用 `.bugate`。
 - 若 `BUGATE_ENGINE_DIR` 指向已有 BUGate checkout 或已解包 release，就使用它。
   否则在 SUT 仓外下载 GitHub Release tarball。
+- v0.4.0 release 只有三个资产：`bugate-0.4.0.tar.gz`、
+  `bugate-0.4.0.zip` 与 `bugate-0.4.0.SHA256SUMS`。checksum asset 是
+  必需项；必须在解压前校验所选 archive。
 
 ### 必须执行的流程
 
@@ -46,18 +49,31 @@ BUGate core 文件。
    - 否则执行等价步骤：
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.5}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.4.0}"
      BUGATE_TMP="$(mktemp -d)"
+     BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
+     BUGATE_SUMS="bugate-${BUGATE_VERSION}.SHA256SUMS"
      if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
-       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then
-       tar -xzf "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" -C "$BUGATE_TMP"
+       "$BUGATE_RELEASE/bugate-${BUGATE_VERSION}.tar.gz"; then
+       BUGATE_ARCHIVE="bugate-${BUGATE_VERSION}.tar.gz"
      elif curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" \
-       "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.zip"; then
-       unzip -q "$BUGATE_TMP/bugate-${BUGATE_VERSION}.zip" -d "$BUGATE_TMP"
+       "$BUGATE_RELEASE/bugate-${BUGATE_VERSION}.zip"; then
+       BUGATE_ARCHIVE="bugate-${BUGATE_VERSION}.zip"
      else
        echo "BUGate release v${BUGATE_VERSION} 无法下载；请向用户索取 BUGATE_ENGINE_DIR 或有效版本。" >&2
        exit 2
      fi
+     curl -fL -o "$BUGATE_TMP/$BUGATE_SUMS" "$BUGATE_RELEASE/$BUGATE_SUMS"
+     if ! grep "${BUGATE_ARCHIVE}$" "$BUGATE_TMP/$BUGATE_SUMS" \
+       | sed 's#  dist/#  #' \
+       | (cd "$BUGATE_TMP" && shasum -a 256 -c -); then
+       echo "BUGate archive checksum 校验失败；不得解压或安装。" >&2
+       exit 2
+     fi
+     case "$BUGATE_ARCHIVE" in
+       *.tar.gz) tar -xzf "$BUGATE_TMP/$BUGATE_ARCHIVE" -C "$BUGATE_TMP" ;;
+       *.zip) unzip -q "$BUGATE_TMP/$BUGATE_ARCHIVE" -d "$BUGATE_TMP" ;;
+     esac
      BUGATE_ENGINE_DIR="$BUGATE_TMP/bugate-${BUGATE_VERSION}"
      ```
 
@@ -65,6 +81,9 @@ BUGate core 文件。
 
      ```bash
      test -f "$BUGATE_ENGINE_DIR/scripts/bugate_init.py"
+     test -f "$BUGATE_ENGINE_DIR/scripts/role_governance.py"
+     test -f "$BUGATE_ENGINE_DIR/scripts/check_role_evidence.py"
+     test -x "$BUGATE_ENGINE_DIR/bin/bugate-role"
      test -f "$BUGATE_ENGINE_DIR/.shared/skills/bugate/SKILL.md"
      ```
 
@@ -118,6 +137,9 @@ BUGate core 文件。
    test -f "$BUGATE_VENDOR_DIR/scripts/check_bugate.py"
    test -f "$BUGATE_VENDOR_DIR/scripts/bugate_prompt_reminder.py"
    test -f "$BUGATE_VENDOR_DIR/scripts/memory_bus.py"
+   test -f "$BUGATE_VENDOR_DIR/scripts/role_governance.py"
+   test -f "$BUGATE_VENDOR_DIR/scripts/check_role_evidence.py"
+   test -x "$BUGATE_VENDOR_DIR/bin/bugate-role"
    test -f "$BUGATE_VENDOR_DIR/.shared/skills/bugate/SKILL.md"
    test -e .claude/skills/bugate/SKILL.md
    test -e .agents/skills/bugate/SKILL.md
@@ -140,7 +162,9 @@ BUGate core 文件。
    cfg = bugate_core.load_config(root=Path.cwd())
    print("profile=", cfg.get("profile") or cfg.get("active_profile"))
    print("guarded_path_regex=", cfg.get("guarded_path_regex"))
-   print("memory.namespace=", cfg.get("namespace") or cfg.get("memory.namespace"))
+   memory = cfg.get("memory") if isinstance(cfg.get("memory"), dict) else {}
+   print("memory.namespace=", memory.get("namespace") or cfg.get("namespace"))
+   print("role_governance=", cfg.get("role_governance"))
    PY
    ```
 
@@ -189,14 +213,17 @@ BUGate core 文件。
      `.agents/skills/`、`.codex/skills/`、`.codex/agents/`、`docs/usecases/`
      以及 `.gitignore` 中的 BUGate block。
    - 说明 `guarded_path_regex` 是否已激活。
+   - 说明 active `role_governance.mode` 与 `memory_mode`。legacy/off profile
+     保持兼容，但没有激活 Wave 7 生命周期门。
    - 说明 Memory Bus 状态。
    - 说明 Codex 需要在 Codex Desktop 中对变更后的 hook hash 做一次 re-trust，
      Codex hooks 才会生效。Claude Code 是否需要新 session 或 plugin reload 取决于打开方式。
    - 把 vendored 使用指导交给用户作为日常手册：
      `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/using-bugate.zh-CN.md`
-     （English: 同目录 `using-bugate.md`）——以本仓为会话项目根打开，然后按
-     orchestrator 工作循环推进新需求（`--auto` → 人工放行 03b → 守卫放行
-     测试代码 → post-run 闭环）。导入后的全部指导都整合在这一个技能之下。
+     （English: 同目录 `using-bugate.md`）——以本仓为会话项目根打开，然后在
+     独立 designer / implementer / reviewer session 中推进新需求（先 `--init`，
+     再 pre-code `--auto`，之后是人工 03B 接受、显式角色 receipts、受治理实现与
+     post-run 闭环）。导入后的全部指导都整合在这一个技能之下。
    - 除非用户明确要求，不要 stage、commit 或 push。
 
 ### 附录：按需激活可选波次（Wave 7 / Wave 8）
@@ -210,9 +237,10 @@ BUGate core 文件。
 这两个波次默认休眠，是配置开关而非缺陷；证据就绪后在 SUT profile 里开启
 （profile 脚手架里已含注释掉的示例块）。
 
-- **Wave 7 角色隔离**：在 profile 顶层加 `agent_roles:`（角色名小写；裸列表 =
-  读写皆禁，`read:`/`write:` 子列表分别限定），并在运行时设
-  `BUGATE_AGENT_ROLE=<role>`。示例：
+- **Wave 7 生命周期治理**：`agent_roles` 与 `role_governance` 互补，不是别名。
+  `agent_roles` 继续作为独立的路径读写策略（裸列表 = 读写皆禁，`read:` /
+  `write:` 可分别限定）；新状态机负责 phase、handoff、acceptance 与 evidence。
+  要启用完整 fail-closed 治理，加入：
 
   ```yaml
   agent_roles:
@@ -221,12 +249,75 @@ BUGate core 文件。
     designer:
       write:
         - "^tests/.*"       # 设计角色不许直接写测试代码
+
+  role_governance:
+    mode: required
+    memory_mode: required
+    evidence_dir: 00_role_evidence
+    session_id_required: true
+    require_distinct_sessions: true
+    human_acceptance_artifacts:
+      - 03b_adversarial_cases.yaml
+    phases:
+      pre_code:
+        allowed_roles:
+          - designer
+      implementation:
+        allowed_roles:
+          - implementer
+        requires_handoff_from:
+          - designer
+      post_run:
+        allowed_roles:
+          - reviewer
+        requires_handoff_from:
+          - implementer
   ```
+
+  不新增配置块或设置 `role_governance.mode: off` 都保持 v0.3.x 行为；
+  `agent_roles` 仍可单独工作。启用 `required` 后，角色未设置/错误或缺 required
+  session ID 都会 fail-closed。历史 passed UC 不会获得伪造证据：Layer 4 前必须
+  新建 human acceptance、designer handoff、implementer acceptance；post-run
+  前还需要 implementer handoff 与 reviewer acceptance。
+
+  升级已有导入仓时 rerun `bugate_init.py`：它会刷新 vendored BUGate scripts 与
+  BUGate-owned hook entries，同时保留 SUT 自有 hooks。然后启动三个独立 session，
+  不要试图从 SessionStart hook 设置父进程角色：
+
+  ```bash
+  "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role designer -- codex
+  "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role implementer -- claude
+  "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role reviewer -- codex
+  ```
+
+  Hook 进程不能向父进程 export，已运行的 Desktop 进程也不会继承后续 shell 环境
+  变更；每个 Desktop/CLI 角色都要从目标环境重新启动。v0.4.0 改变了
+  `.codex/hooks.json`，Codex Desktop 必须显式 re-trust hash 后才算 enforcement
+  已激活。
+
+  日常转换顺序：designer 把 `--init` 与 pre-code `--auto` 作为**两个命令**运行；
+  人类评审 03B 并显式设为 `gate_status: passed`；designer 用
+  `bugate-role approve`（仅记录既有决定）并
+  `handoff --phase pre_code --to implementer`；新 implementer 用 exact
+  `memory.memory_id` accept，完成写入/测试后至少带一个 `--implementation-file`
+  handoff；新 reviewer accept 后运行 post-run，再携带 04/05 与执行证据 complete。
+  人工接受 03B 后不得再运行 `--auto`，应直接 `approve` / `handoff`。
+
+  每次普通编辑只检查本地 receipt/profile/artifact/implementation hash。Memory
+  故障只阻塞下一次 strict 角色转换，并且不会生成解锁 receipt；恢复服务后幂等
+  重试。profile/pre-code drift 需要新 human/designer generation；implementation
+  drift 需要新 implementer handoff/reviewer acceptance。直接修改
+  `00_role_evidence/**` 会被拒绝；禁止删除 evidence 来 reset，receipt 被篡改时
+  先从可信来源恢复，再追加 superseding transition。
 
   注意：读隔离只对 hook 能看到的 `Read` 工具生效（importer v0.3.2+ 已把角色
   守卫单独接到 `Read|Edit|Write` matcher；写形守卫 `check_bugate` 绝不能挂到
   `Read`，它不辨别 action、会把读也拦下）。shell 级读取（cat/grep）不在物理
-  守卫范围内，属评审纪律。
+  守卫范围内；任意重定向/外部编辑器写入也无法被 hook 拦截。受支持的 agent
+  tool、orchestrator 与 Core mutator 会强制状态机；更强文件系统隔离属于 managed
+  runner。`approved_by`、环境角色、本地 hash 与 Memory anchor 是可审计声明，
+  不是不可抵赖的人类身份认证。强身份需要独立 OS 账号、容器、managed runner
+  或按角色 credential。
 - **Wave 8 突变/证伪**：为真实捕获的证据 JSON 写一份 falsification spec
   （声明式 oracle + 每字段突变；`evidence` 路径相对 spec 文件所在目录），然后
   在 profile 里声明：

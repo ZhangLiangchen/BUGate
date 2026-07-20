@@ -8,6 +8,12 @@
 
 BUGate 的定位、唯一规范使用方式（**导入模式**；打开本仓只是在开发 BUGate 本身）、命名与演进计划见 [`CHARTER.md`](CHARTER.md)（CHARTER-BUGATE-001）。
 
+**当前正式版本：v0.4.0。** 详见
+[release notes](docs/releases/v0.4.0.zh-CN.md)。GitHub Release 发布三个资产：
+`bugate-0.4.0.tar.gz`、`bugate-0.4.0.zip` 与
+`bugate-0.4.0.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
+并在解压前校验 SHA-256。
+
 ## 前 5 分钟（从这里开始）
 
 已经把 BUGate 导入 SUT 仓、想知道日常怎么**用**？导入后的全部指导整合在
@@ -90,6 +96,108 @@ flowchart LR
 
 第一性原则见 [`.shared/skills/bugate/references/sdtd-constitution.md`](.shared/skills/bugate/references/sdtd-constitution.md)；完整方法论见 [`docs/qa-methodology/METHOD.md`](docs/qa-methodology/METHOD.md) 与 [`SOP.md`](docs/qa-methodology/SOP.md)。
 
+## Wave 7 可审计生命周期角色（v0.4.0）
+
+Wave 7 是 opt-in 生命周期状态机，不是 Wave 1 的另一个名字。Wave 1 在同一
+设计阶段让相互独立的 Codex/Claude peer 交叉评审；这些子进程是只读分析
+worker，生命周期身份会从其环境中清除。Wave 7 则把职责拆到新的 `designer`、
+`implementer`、`reviewer` session，并记录 hash-linked、Memory-anchored 转换。
+
+除非导入仓 profile 显式启用，否则 Core 与所有 legacy profile 均保持 inert。
+`agent_roles` 也继续作为可独立启用的路径读写策略：
+
+```yaml
+role_governance:
+  mode: required
+  memory_mode: required
+  evidence_dir: 00_role_evidence
+  session_id_required: true
+  require_distinct_sessions: true
+  human_acceptance_artifacts:
+    - 03b_adversarial_cases.yaml
+  phases:
+    pre_code:
+      allowed_roles:
+        - designer
+    implementation:
+      allowed_roles:
+        - implementer
+      requires_handoff_from:
+        - designer
+    post_run:
+      allowed_roles:
+        - reviewer
+      requires_handoff_from:
+        - implementer
+```
+
+启用 `mode: required` 后，角色未设置/错误或缺少 required session ID 都会硬
+阻塞。历史 UC 即使 artifact 已 `passed` 也不会 grandfather：Layer 4 前必须
+建立当前 human-acceptance receipt、designer handoff 与 implementer acceptance；
+post-run 同样需要 implementer handoff 与 reviewer acceptance。
+
+三个生命周期角色必须作为独立子 session 启动（每个角色都可选择 Codex 或
+Claude runtime）：
+
+```bash
+bin/bugate-role run --role designer -- codex
+bin/bugate-role run --role implementer -- claude
+bin/bugate-role run --role reviewer -- codex
+```
+
+规范操作顺序如下：
+
+```bash
+# Designer session：初始化与自动流程必须分开执行。
+python3 scripts/sdtd_orchestrator.py <uc-dir> --init
+python3 scripts/sdtd_orchestrator.py <uc-dir> --auto --scope pre-code --run-cli-workers
+
+# 人类评审 03B，并显式把 gate_status 改为 passed。
+# 此命令只记录既有决定；不会编辑 03B，也不会替人批准。
+bin/bugate-role approve <uc-dir> --approved-by "<声明的人类评审者>"
+bin/bugate-role handoff <uc-dir> --phase pre_code --to implementer
+
+# 新 implementer session；使用上一 receipt 的 exact memory.memory_id。
+bin/bugate-role accept <uc-dir> --phase implementation --handoff-id <memory-id>
+# ……编写并运行受治理实现……
+bin/bugate-role handoff <uc-dir> --phase implementation --to reviewer \
+  --implementation-file <workspace-relative-test-path>
+
+# 新 reviewer session；同样使用 exact handoff memory.memory_id。
+bin/bugate-role accept <uc-dir> --phase post_run --handoff-id <memory-id>
+python3 scripts/sdtd_orchestrator.py <uc-dir> --auto --scope post-run \
+  --pytest-log <run.log> --command "<test command>" --exit-code 0
+# 依据执行证据完成评审并把 04/05 设为 passed 后：
+bin/bugate-role complete <uc-dir> --phase post_run \
+  --run-command "<test command>" --exit-code 0 \
+  --evidence-file <run.log> --gate-status passed
+```
+
+人类把 03B 设为 passed 后，**不要**再运行 `--auto`：它已经是接受过的证据，
+应直接执行 `approve` 与 `handoff`。用
+`bin/bugate-role status <uc-dir>` 查看本地状态；用 `verify`（可加
+`--strict-memory`）审计证据链。普通编辑只校验本地 receipt/hash；Memory 故障
+只阻塞下一次 strict 转换，不拖垮每次编辑，服务恢复后可幂等重试。
+
+profile/pre-code drift 需要新 human/designer generation；implementation drift
+需要新 implementer handoff 与 reviewer acceptance。不得删除或手改
+`00_role_evidence/` 来 reset；receipt 被篡改时应先从可信证据恢复，再追加
+superseding transition。rerun `bugate_init.py` 会刷新 BUGate-owned scripts/hooks，
+但保留 SUT-owned hooks。
+
+环境传播必须显式处理。`bugate-role run` 只为其子进程设置角色和新 session ID；
+hook 不能向父进程 export 变量，已经运行的 Desktop app 也不会获得之后的 shell
+环境变更。每个角色都要从目标环境重新启动/打开。v0.4.0 改变了 Codex hook hash，
+所以 Codex Desktop 必须显式 re-trust 项目，之后才能宣称 runtime enforcement
+已激活。
+
+证据链提供声明角色、session 区分、本地 hash、外部 Memory 锚点、drift 检测与
+审计轨迹。`approved_by` 只是声明，环境变量与本地 hook 都不能证明真实人类身份。
+不可抵赖身份需要独立 OS 账号、容器、managed runner 或按角色发放的服务端凭据。
+Hook 也无法拦截任意 shell 重定向或外部编辑器；当前只强制治理受支持的 agent
+tool、orchestrator 与 Core mutator。规范细节见
+[角色治理协议](docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.zh-CN.md)。
+
 ## Quickstart
 
 ### A) 导入模式 —— 治理你的 SUT 测试仓（默认）
@@ -103,16 +211,20 @@ hook/script 接线检查、Memory Bus 初始化、profile 激活以及 Codex re-
 **Release tarball 路径 —— SUT 仓内无需 clone BUGate core。** 下载版本化 GitHub Release asset，在 SUT 仓外解包，然后把 installer 指向 SUT 自动化测试仓：
 
 ```bash
-BUGATE_VERSION=0.3.5
-curl -L -o bugate-${BUGATE_VERSION}.tar.gz \
-  https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz
+BUGATE_VERSION=0.4.0
+BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
+curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
+curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
+grep "bugate-${BUGATE_VERSION}.tar.gz$" "bugate-${BUGATE_VERSION}.SHA256SUMS" \
+  | sed 's#  dist/#  #' | shasum -a 256 -c -
 tar -xzf bugate-${BUGATE_VERSION}.tar.gz
 
 python3 bugate-${BUGATE_VERSION}/scripts/bugate_init.py /path/to/sut-test-framework --dry-run
 python3 bugate-${BUGATE_VERSION}/scripts/bugate_init.py /path/to/sut-test-framework
 ```
 
-`.zip` release asset 在更适合 zip 的环境中等价可用；优先推荐 `.tar.gz`，因为它通常更稳定地保留 symlink。
+`.zip` release asset 在更适合 zip 的环境中等价可用；解包前同样要用 checksum
+asset 中对应的行校验。优先推荐 `.tar.gz`，因为它通常更稳定地保留 symlink。
 
 **Source checkout 路径 —— 适合开发 BUGate 本身时使用。** 在本仓执行：
 
@@ -163,17 +275,26 @@ python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-ter
 从干净 BUGate checkout 构建 Phase 1 GitHub Release archive assets：
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.3.5
+python3 scripts/build_release_archives.py --version 0.4.0
+(cd dist && shasum -a 256 -c bugate-0.4.0.SHA256SUMS)
 ```
+
+构建器会直接生成三个文件，默认拒绝 tracked 或未被 ignore 的 untracked dirt，
+并要求请求版本与两个 plugin manifest 完全一致；archive timestamp/metadata 会被
+规范化以支持可复现构建。`--allow-dirty` 与 `--include-untracked` 仅供开发预览。
 
 输出：
 
 ```text
-dist/bugate-0.3.5.tar.gz
-dist/bugate-0.3.5.zip
+dist/bugate-0.4.0.tar.gz
+dist/bugate-0.4.0.zip
+dist/bugate-0.4.0.SHA256SUMS
 ```
 
-把两个文件都附到 tag `v0.3.5` 的 GitHub Release。这些归档以一个版本化 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、hooks、scripts 与 bin wrappers。
+把三个文件都附到 tag `v0.4.0` 的 GitHub Release。这些归档以一个版本化
+BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、
+hooks、scripts 与 bin wrappers。正式资产必须来自干净 release commit；开发态
+dirty-tree flag 不能用于正式发布。
 
 core 默认带 `guarded_path_regex: []`（写守卫**关闭**）和空 `artifact_dir`；导入后的 SUT profile 会在被治理 SUT 测试仓中开启它们。
 

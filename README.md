@@ -15,6 +15,12 @@ opening this repo is just developing BUGate itself), naming, and the
 evolution plan are chartered in
 [`CHARTER.md`](CHARTER.md) (CHARTER-BUGATE-001).
 
+**Current release: v0.4.0.** See the
+[release notes](docs/releases/v0.4.0.md). GitHub Releases publish three assets:
+`bugate-0.4.0.tar.gz`, `bugate-0.4.0.zip`, and
+`bugate-0.4.0.SHA256SUMS`. Download the checksum file with either archive and
+verify SHA-256 before extracting it.
+
 ## First 5 minutes (start here)
 
 Already imported BUGate into a SUT repo and wondering how to USE it day to
@@ -128,6 +134,117 @@ Test development is gated through layered artifacts; code is blocked until the p
 
 First principles live in [`.shared/skills/bugate/references/sdtd-constitution.md`](.shared/skills/bugate/references/sdtd-constitution.md); the full methodology in [`docs/qa-methodology/METHOD.md`](docs/qa-methodology/METHOD.md) and [`SOP.md`](docs/qa-methodology/SOP.md).
 
+## Wave 7 auditable lifecycle roles (v0.4.0)
+
+Wave 7 is an opt-in lifecycle state machine, not another name for Wave 1.
+Wave 1 asks independent Codex/Claude peers to cross-review one design phase;
+those subprocesses are read-only analysis workers and have lifecycle identity
+removed from their environment. Wave 7 separates responsibility across fresh
+`designer`, `implementer`, and `reviewer` sessions and records hash-linked,
+Memory-anchored transitions.
+
+Core and every legacy profile remain inert unless an imported profile enables
+the new contract. `agent_roles` also remains a separate, independently usable
+read/write path policy:
+
+```yaml
+role_governance:
+  mode: required
+  memory_mode: required
+  evidence_dir: 00_role_evidence
+  session_id_required: true
+  require_distinct_sessions: true
+  human_acceptance_artifacts:
+    - 03b_adversarial_cases.yaml
+  phases:
+    pre_code:
+      allowed_roles:
+        - designer
+    implementation:
+      allowed_roles:
+        - implementer
+      requires_handoff_from:
+        - designer
+    post_run:
+      allowed_roles:
+        - reviewer
+      requires_handoff_from:
+        - implementer
+```
+
+With `mode: required`, an unset/wrong role or missing required session ID is a
+hard block. A historical UC whose artifacts are already `passed` is not
+grandfathered; it needs a current human-acceptance receipt, designer handoff,
+and implementer acceptance before Layer 4. Post-run similarly needs an
+implementer handoff and reviewer acceptance.
+
+Run the three lifecycle actors as independent child sessions (the runtime can
+be Codex or Claude in any role):
+
+```bash
+bin/bugate-role run --role designer -- codex
+bin/bugate-role run --role implementer -- claude
+bin/bugate-role run --role reviewer -- codex
+```
+
+The canonical operating sequence is:
+
+```bash
+# Designer session: initialization and automation are separate operations.
+python3 scripts/sdtd_orchestrator.py <uc-dir> --init
+python3 scripts/sdtd_orchestrator.py <uc-dir> --auto --scope pre-code --run-cli-workers
+
+# A human reviews 03B and explicitly changes its gate_status to passed.
+# This command only records that existing decision; it never edits or approves 03B.
+bin/bugate-role approve <uc-dir> --approved-by "<declared human reviewer>"
+bin/bugate-role handoff <uc-dir> --phase pre_code --to implementer
+
+# Fresh implementer session; use the preceding receipt's exact memory.memory_id.
+bin/bugate-role accept <uc-dir> --phase implementation --handoff-id <memory-id>
+# ...write and run the governed implementation...
+bin/bugate-role handoff <uc-dir> --phase implementation --to reviewer \
+  --implementation-file <workspace-relative-test-path>
+
+# Fresh reviewer session; again use the exact handoff memory.memory_id.
+bin/bugate-role accept <uc-dir> --phase post_run --handoff-id <memory-id>
+python3 scripts/sdtd_orchestrator.py <uc-dir> --auto --scope post-run \
+  --pytest-log <run.log> --command "<test command>" --exit-code 0
+# After evidence-backed review has put 04/05 in passed state:
+bin/bugate-role complete <uc-dir> --phase post_run \
+  --run-command "<test command>" --exit-code 0 \
+  --evidence-file <run.log> --gate-status passed
+```
+
+Do **not** run `--auto` again after a human has passed 03B: it is accepted
+evidence, so proceed directly to `approve` and `handoff`. Use
+`bin/bugate-role status <uc-dir>` for local state, or `verify` (optionally
+`--strict-memory`) to audit the chain. Normal edits validate only local
+receipts and hashes; a Memory outage blocks the next strict transition, not
+every edit, and a healthy retry is idempotent.
+
+Profile or pre-code drift requires a new human/designer generation;
+implementation drift requires a new implementer handoff and reviewer
+acceptance. Never delete or hand-edit `00_role_evidence/` to reset it. Restore
+tampered receipts from trusted evidence, then append a superseding transition.
+Re-running `bugate_init.py` refreshes BUGate-owned scripts/hooks but preserves
+SUT-owned hooks.
+
+Environment propagation is explicit. `bugate-role run` sets the role and a new
+session ID for its child process; a hook cannot export variables into its
+parent, and an already-running Desktop app does not inherit later shell
+changes. Relaunch/open each role session from the intended environment. Any
+v0.4.0 Codex hook update changes the trusted hook hash, so Codex Desktop must
+explicitly re-trust the project before runtime enforcement can be claimed.
+
+The evidence chain provides declared roles, session separation, local hashes,
+external Memory anchors, drift detection, and an audit trail. `approved_by` is
+declarative, and neither environment variables nor local hooks prove human
+identity. Non-repudiable identity needs separate OS accounts, containers,
+managed runners, or role-scoped server credentials. Hooks also cannot intercept
+arbitrary shell redirection or an external editor; supported agent tools,
+orchestrators, and Core mutators are enforced. See the
+[normative protocol](docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md).
+
 ## Quickstart
 
 ### A) Imported mode — govern your SUT test repo (default)
@@ -144,9 +261,12 @@ the versioned GitHub Release asset, unpack it outside the SUT repo, then run the
 installer against the SUT automation test repo:
 
 ```bash
-BUGATE_VERSION=0.3.5
-curl -L -o bugate-${BUGATE_VERSION}.tar.gz \
-  https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz
+BUGATE_VERSION=0.4.0
+BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
+curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
+curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
+grep "bugate-${BUGATE_VERSION}.tar.gz$" "bugate-${BUGATE_VERSION}.SHA256SUMS" \
+  | sed 's#  dist/#  #' | shasum -a 256 -c -
 tar -xzf bugate-${BUGATE_VERSION}.tar.gz
 
 python3 bugate-${BUGATE_VERSION}/scripts/bugate_init.py /path/to/sut-test-framework --dry-run
@@ -154,7 +274,8 @@ python3 bugate-${BUGATE_VERSION}/scripts/bugate_init.py /path/to/sut-test-framew
 ```
 
 The `.zip` release asset is equivalent for environments where zip archives are
-easier to handle; the `.tar.gz` path is preferred because it preserves symlinks
+easier to handle; verify its matching line from the same checksum asset before
+unpacking it. The `.tar.gz` path is preferred because it preserves symlinks
 most consistently.
 
 **Source checkout path — useful while developing BUGate itself.** From this repo:
@@ -243,19 +364,27 @@ open that SUT repo as the project root. The core checkout remains pure.
 To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.3.5
+python3 scripts/build_release_archives.py --version 0.4.0
+(cd dist && shasum -a 256 -c bugate-0.4.0.SHA256SUMS)
 ```
+
+The builder emits all three files directly, rejects tracked or non-ignored
+untracked dirt by default, requires the requested version to equal both plugin
+manifests, and normalizes archive timestamps/metadata for reproducibility.
+`--allow-dirty` and `--include-untracked` are development-preview flags only.
 
 This writes:
 
 ```text
-dist/bugate-0.3.5.tar.gz
-dist/bugate-0.3.5.zip
+dist/bugate-0.4.0.tar.gz
+dist/bugate-0.4.0.zip
+dist/bugate-0.4.0.SHA256SUMS
 ```
 
-Attach both files to the GitHub Release for tag `v0.3.5`. These archives include
+Attach all three files to the GitHub Release for tag `v0.4.0`. These archives include
 the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
-bin wrappers as one versioned BUGate kit.
+bin wrappers as one versioned BUGate kit. Formal assets must come from a clean
+release commit; development-only dirty-tree flags are not valid for a release.
 
 The core ships with `guarded_path_regex: []` (write-guard **disabled**) and an
 empty `artifact_dir`; an imported SUT profile turns these on in the governed SUT
