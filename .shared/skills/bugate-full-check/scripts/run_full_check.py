@@ -27,34 +27,111 @@ class Check:
     detail: str
 
 
+ENGINE_SENTINELS = (
+    Path("scripts/bugate_core.py"),
+    Path(".shared/skills/bugate/SKILL.md"),
+    Path(".shared/skills/bugate-full-check/SKILL.md"),
+)
+
+
+def _missing_engine_sentinels(candidate: Path) -> list[str]:
+    return [path.as_posix() for path in ENGINE_SENTINELS if not (candidate / path).is_file()]
+
+
+def _validated_engine(candidate: Path, source: str) -> Path:
+    resolved = candidate.expanduser().resolve()
+    missing = _missing_engine_sentinels(resolved)
+    if missing:
+        raise SystemExit(
+            f"Resolved BUGate engine from {source} is invalid: {resolved}; "
+            f"missing {', '.join(missing)}. Run the vendored full-check skill "
+            "or set BUGATE_ENGINE_ROOT to the actual kit root."
+        )
+    return resolved
+
+
+def _script_engine() -> Optional[Path]:
+    """Find the kit that owns this full-check script, including symlink entrypoints."""
+    for candidate in Path(__file__).resolve().parents:
+        if not _missing_engine_sentinels(candidate):
+            return candidate
+    return None
+
+
+def _within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
 def find_roots(start: Path) -> tuple[Path, Path, str]:
     """Resolve (workspace_root, engine_root, layout).
 
     Two supported layouts:
-    - core: the BUGate checkout itself (AGENTS.md + .shared at root); the
-      engine is the checkout.
+    - core: the BUGate checkout/release itself; workspace and engine are the
+      same validated kit root.
     - imported: a governed SUT test repo (bugate.config.yaml at root) with the
-      kit vendored under BUGATE_VENDOR_DIR (default .bugate).
-    BUGATE_ENGINE_ROOT overrides engine resolution in both layouts.
+      kit vendored beneath it. A SUT-owned AGENTS.md + .shared directory must
+      not make this look like core.
+
+    Workspace and engine are deliberately independent: BUGATE_PROJECT_ROOT or
+    the nearest bugate.config.yaml selects the governed workspace, while
+    BUGATE_ENGINE_ROOT, an explicit BUGATE_VENDOR_DIR, or this script's own
+    resolved location selects the engine. The broad AGENTS.md + .shared legacy
+    sentinel is used only as a final fallback for a validated core engine.
     """
-    engine_env = os.environ.get("BUGATE_ENGINE_ROOT")
-    for candidate in (start, *start.parents):
-        if (candidate / "AGENTS.md").exists() and (candidate / ".shared").exists():
-            engine = Path(engine_env) if engine_env else candidate
-            return candidate, engine, "core"
-        if (candidate / "bugate.config.yaml").exists():
-            vendor = os.environ.get("BUGATE_VENDOR_DIR", ".bugate")
-            engine = Path(engine_env) if engine_env else candidate / vendor
-            if (engine / "scripts" / "bugate_core.py").exists():
-                return candidate, engine, "imported"
+    start = start.expanduser().resolve()
+    project_env = os.environ.get("BUGATE_PROJECT_ROOT", "").strip()
+    if project_env:
+        root: Optional[Path] = Path(project_env).expanduser().resolve()
+        if not root.is_dir():
+            raise SystemExit(f"BUGATE_PROJECT_ROOT is not a directory: {root}")
+    else:
+        root = next(
+            (candidate for candidate in (start, *start.parents)
+             if (candidate / "bugate.config.yaml").is_file()),
+            None,
+        )
+
+    engine_env = os.environ.get("BUGATE_ENGINE_ROOT", "").strip()
+    vendor_env = os.environ.get("BUGATE_VENDOR_DIR", "").strip()
+    script_engine = _script_engine()
+    if engine_env:
+        engine = _validated_engine(Path(engine_env), "BUGATE_ENGINE_ROOT")
+    elif script_engine is not None and (root is None or script_engine == root):
+        # A global/import helper may leave BUGATE_VENDOR_DIR set. It applies to
+        # imported workspaces only and must not redirect a validated core run
+        # into a nonexistent <core>/.bugate directory.
+        engine = _validated_engine(script_engine, "the running core full-check skill")
+    elif vendor_env:
+        if root is None:
+            raise SystemExit("BUGATE_VENDOR_DIR requires a governed workspace root")
+        vendor_path = Path(vendor_env).expanduser()
+        candidate = vendor_path if vendor_path.is_absolute() else root / vendor_path
+        engine = _validated_engine(candidate, "BUGATE_VENDOR_DIR")
+    elif script_engine is not None and root is not None and _within(script_engine, root):
+        engine = _validated_engine(script_engine, "the running full-check skill")
+    elif root is not None:
+        engine = _validated_engine(root / ".bugate", "the workspace's default .bugate vendor dir")
+    else:
+        raise SystemExit(
+            "BUGate engine not found: run the full-check script from a core checkout/release "
+            "or from the vendored kit, or set BUGATE_ENGINE_ROOT."
+        )
+
+    if root is None:
+        if (engine / "AGENTS.md").is_file() and (engine / ".shared").is_dir():
+            root = engine
+        else:
             raise SystemExit(
-                f"Found governed workspace {candidate} (bugate.config.yaml) but no vendored kit at "
-                f"{engine}; set BUGATE_VENDOR_DIR or BUGATE_ENGINE_ROOT."
+                "BUGate workspace root not found: expected bugate.config.yaml in an ancestor, "
+                "BUGATE_PROJECT_ROOT, or a validated core engine with AGENTS.md + .shared."
             )
-    raise SystemExit(
-        "BUGate root not found: expected a core checkout (AGENTS.md + .shared) "
-        "or an imported governed repo (bugate.config.yaml + vendored kit)."
-    )
+
+    layout = "core" if root.resolve() == engine.resolve() else "imported"
+    return root, engine, layout
 
 
 def run(
@@ -91,6 +168,15 @@ def compact(text: str, limit: int = 280) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3] + "..."
+
+
+def outcome_matches(
+    result: subprocess.CompletedProcess[str],
+    returncode: int,
+    marker: Optional[str] = None,
+) -> bool:
+    """Require both the expected process status and its BUGate semantic signal."""
+    return result.returncode == returncode and (marker is None or marker in result.stdout)
 
 
 PRECODE_NAMES = [
@@ -320,7 +406,12 @@ def main() -> int:
         result.stdout,
     )
     result = run(["python3", eng("scripts/generate_assertion_coverage_matrix.py"), "--help"], root, timeout=30)
-    add(checks, "Wave 8 coverage-matrix CLI present", result.returncode == 0, "argparse help ok")
+    add(
+        checks,
+        "Wave 8 coverage-matrix CLI present",
+        result.returncode == 0,
+        result.stdout or "argparse help ok",
+    )
 
     # Write guard and role isolation — fabricated governed workspace.
     with tempfile.TemporaryDirectory(prefix="bugate-guard.") as tmp:
@@ -332,7 +423,12 @@ def main() -> int:
         add(checks, "Write guard allows passed UC", result.returncode == 0, result.stdout or "allowed")
         result = run([sys.executable, guard, "tests/pending/test_x.py"],
                      root, cwd=ws, input_text="", env=neutral_env, timeout=30)
-        add(checks, "Write guard blocks pending UC", result.returncode == 2, result.stdout)
+        add(
+            checks,
+            "Write guard blocks pending UC",
+            outcome_matches(result, 2, "BUGate guard blocked edits to configured implementation paths"),
+            result.stdout,
+        )
 
         role_env = {
             "BUGATE_PROFILE": str(ws / "bugate.profile.yaml"),
@@ -341,7 +437,12 @@ def main() -> int:
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "mirror/spec.md"}})
         result = run(["python3", eng("scripts/check_agent_role_paths.py")],
                      root, input_text=payload, env=role_env, timeout=30)
-        add(checks, "Role guard blocks forbidden path", result.returncode == 2, result.stdout)
+        add(
+            checks,
+            "Role guard blocks forbidden path",
+            outcome_matches(result, 2, "BUGate agent-role path isolation"),
+            result.stdout,
+        )
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "tests/ok/test_x.py"}})
         result = run(["python3", eng("scripts/check_agent_role_paths.py")],
                      root, input_text=payload, env=role_env, timeout=30)
@@ -410,18 +511,21 @@ def main() -> int:
         root,
         timeout=30,
     )
-    guards_inactive = "'guarded_path_regex': []" in result.stdout
-    checks.append(
-        Check(
-            "Activation boundary",
-            "WARN" if guards_inactive else "PASS",
-            (
-                "No guarded paths configured; real SUT gates require an (activated) imported SUT profile."
-                if guards_inactive
-                else f"Guarded SUT profile active ({layout} layout): " + compact(result.stdout)
-            ),
+    if result.returncode != 0:
+        add(checks, "Activation boundary", False, result.stdout)
+    else:
+        guards_inactive = "'guarded_path_regex': []" in result.stdout
+        checks.append(
+            Check(
+                "Activation boundary",
+                "WARN" if guards_inactive else "PASS",
+                (
+                    "No guarded paths configured; real SUT gates require an (activated) imported SUT profile."
+                    if guards_inactive
+                    else f"Guarded SUT profile active ({layout} layout): " + compact(result.stdout)
+                ),
+            )
         )
-    )
 
     print("# BUGate Full Check")
     print()
