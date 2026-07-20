@@ -32,13 +32,13 @@ core files.
   hooks load from the session's workspace, so a session rooted at a parent
   (monorepo) directory silently loads no guard. The importer warns when the
   target is not the git toplevel; relay that warning to the user.
-- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.4.0`.
+- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.4.1`.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
 - If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
   release, use it. Otherwise download the GitHub Release tarball outside the
   SUT repo.
-- The v0.4.0 release has exactly three assets: `bugate-0.4.0.tar.gz`,
-  `bugate-0.4.0.zip`, and `bugate-0.4.0.SHA256SUMS`. The checksum asset is
+- The v0.4.1 release has exactly three assets: `bugate-0.4.1.tar.gz`,
+  `bugate-0.4.1.zip`, and `bugate-0.4.1.SHA256SUMS`. The checksum asset is
   mandatory; verify the selected archive before extraction.
 
 ### Required Flow
@@ -56,7 +56,7 @@ core files.
    - Otherwise run the equivalent of:
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.4.0}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.4.1}"
      BUGATE_TMP="$(mktemp -d)"
      BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
      BUGATE_SUMS="bugate-${BUGATE_VERSION}.SHA256SUMS"

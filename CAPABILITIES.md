@@ -7,9 +7,9 @@ testability → inventory/oracle map → readable cases → adversarial review �
 execution report → knowledge update) *before* any test implementation is
 generated.
 
-Current distribution version: **v0.4.0**. Its release assets are
-`bugate-0.4.0.tar.gz`, `bugate-0.4.0.zip`, and
-`bugate-0.4.0.SHA256SUMS`; verify the selected archive before extraction.
+Current distribution version: **v0.4.1**. Its release assets are
+`bugate-0.4.1.tar.gz`, `bugate-0.4.1.zip`, and
+`bugate-0.4.1.SHA256SUMS`; verify the selected archive before extraction.
 
 **Runtime contract**
 

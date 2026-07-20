@@ -15,10 +15,10 @@ opening this repo is just developing BUGate itself), naming, and the
 evolution plan are chartered in
 [`CHARTER.md`](CHARTER.md) (CHARTER-BUGATE-001).
 
-**Current release: v0.4.0.** See the
-[release notes](docs/releases/v0.4.0.md). GitHub Releases publish three assets:
-`bugate-0.4.0.tar.gz`, `bugate-0.4.0.zip`, and
-`bugate-0.4.0.SHA256SUMS`. Download the checksum file with either archive and
+**Current release: v0.4.1.** See the
+[release notes](docs/releases/v0.4.1.md). GitHub Releases publish three assets:
+`bugate-0.4.1.tar.gz`, `bugate-0.4.1.zip`, and
+`bugate-0.4.1.SHA256SUMS`. Download the checksum file with either archive and
 verify SHA-256 before extracting it.
 
 ## First 5 minutes (start here)
@@ -261,7 +261,7 @@ the versioned GitHub Release asset, unpack it outside the SUT repo, then run the
 installer against the SUT automation test repo:
 
 ```bash
-BUGATE_VERSION=0.4.0
+BUGATE_VERSION=0.4.1
 BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -364,8 +364,8 @@ open that SUT repo as the project root. The core checkout remains pure.
 To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.4.0
-(cd dist && shasum -a 256 -c bugate-0.4.0.SHA256SUMS)
+python3 scripts/build_release_archives.py --version 0.4.1
+(cd dist && shasum -a 256 -c bugate-0.4.1.SHA256SUMS)
 ```
 
 The builder emits all three files directly, rejects tracked or non-ignored
@@ -376,12 +376,12 @@ manifests, and normalizes archive timestamps/metadata for reproducibility.
 This writes:
 
 ```text
-dist/bugate-0.4.0.tar.gz
-dist/bugate-0.4.0.zip
-dist/bugate-0.4.0.SHA256SUMS
+dist/bugate-0.4.1.tar.gz
+dist/bugate-0.4.1.zip
+dist/bugate-0.4.1.SHA256SUMS
 ```
 
-Attach all three files to the GitHub Release for tag `v0.4.0`. These archives include
+Attach all three files to the GitHub Release for tag `v0.4.1`. These archives include
 the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
 bin wrappers as one versioned BUGate kit. Formal assets must come from a clean
 release commit; development-only dirty-tree flags are not valid for a release.

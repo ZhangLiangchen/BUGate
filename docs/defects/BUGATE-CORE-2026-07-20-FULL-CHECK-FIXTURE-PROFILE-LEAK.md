@@ -1,7 +1,7 @@
 # BUGATE-CORE-2026-07-20-FULL-CHECK-FIXTURE-PROFILE-LEAK
 
 - Classification: BUGate Core full-check fixture-isolation defect
-- Status: fixed in source; release verification pending (target v0.4.1)
+- Status: fixed in v0.4.1
 - Found: 2026-07-20 downstream imported-mode acceptance of v0.4.0
 - Affected surface: `.shared/skills/bugate-full-check/scripts/run_full_check.py`
 - Affected release: v0.4.0

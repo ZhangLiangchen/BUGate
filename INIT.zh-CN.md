@@ -9,8 +9,8 @@
 > 在 BUGate 发布 packaged console-script 前，文档里的 `bugate init` shorthand
 > 指 `python3 scripts/bugate_init.py`。
 >
-> 当前正式版本是 **v0.4.0**。tar/zip archive 随附
-> `bugate-0.4.0.SHA256SUMS`；导入模式必须在解压前校验所选 archive（见
+> 当前正式版本是 **v0.4.1**。tar/zip archive 随附
+> `bugate-0.4.1.SHA256SUMS`；导入模式必须在解压前校验所选 archive（见
 > `IMPORT_PROMPT.zh-CN.md`）。
 
 ---

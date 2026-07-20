@@ -9,8 +9,8 @@
 > Until BUGate ships a packaged console-script, prose shorthand `bugate init`
 > means `python3 scripts/bugate_init.py`.
 >
-> The current release is **v0.4.0**. Its tar and zip archives are accompanied
-> by `bugate-0.4.0.SHA256SUMS`; imported-mode adoption must verify the selected
+> The current release is **v0.4.1**. Its tar and zip archives are accompanied
+> by `bugate-0.4.1.SHA256SUMS`; imported-mode adoption must verify the selected
 > archive before extraction (see `IMPORT_PROMPT.md`).
 
 ---

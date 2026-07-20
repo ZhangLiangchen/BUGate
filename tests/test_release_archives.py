@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILDER = ROOT / "scripts" / "build_release_archives.py"
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 
 class ReleaseArchiveTests(unittest.TestCase):
@@ -215,14 +215,14 @@ class ReleaseArchiveTests(unittest.TestCase):
             self.assertIn(f"bugate-{VERSION}/untracked.txt", archive.getnames())
 
     def test_explicit_version_must_match_both_manifests(self) -> None:
-        result = self.run_builder("--version", "0.4.1")
+        result = self.run_builder("--version", "0.4.2")
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("does not match both plugin manifests", result.stderr)
         self.assertFalse(self.dist.exists())
 
     def test_manifest_version_mismatch_is_rejected(self) -> None:
-        self.write_manifest(".claude-plugin", "0.4.1")
+        self.write_manifest(".claude-plugin", "0.4.2")
         self.commit("make manifest versions inconsistent")
 
         result = self.run_builder()
