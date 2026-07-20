@@ -32,7 +32,7 @@ core files.
   hooks load from the session's workspace, so a session rooted at a parent
   (monorepo) directory silently loads no guard. The importer warns when the
   target is not the git toplevel; relay that warning to the user.
-- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.4`.
+- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.3.5`.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
 - If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
   release, use it. Otherwise download the GitHub Release tarball outside the
@@ -53,7 +53,7 @@ core files.
    - Otherwise run the equivalent of:
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.4}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.3.5}"
      BUGATE_TMP="$(mktemp -d)"
      if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
        "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then

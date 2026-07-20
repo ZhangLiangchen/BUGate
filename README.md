@@ -144,7 +144,7 @@ the versioned GitHub Release asset, unpack it outside the SUT repo, then run the
 installer against the SUT automation test repo:
 
 ```bash
-BUGATE_VERSION=0.3.4
+BUGATE_VERSION=0.3.5
 curl -L -o bugate-${BUGATE_VERSION}.tar.gz \
   https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz
 tar -xzf bugate-${BUGATE_VERSION}.tar.gz
@@ -243,17 +243,17 @@ open that SUT repo as the project root. The core checkout remains pure.
 To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.3.4
+python3 scripts/build_release_archives.py --version 0.3.5
 ```
 
 This writes:
 
 ```text
-dist/bugate-0.3.4.tar.gz
-dist/bugate-0.3.4.zip
+dist/bugate-0.3.5.tar.gz
+dist/bugate-0.3.5.zip
 ```
 
-Attach both files to the GitHub Release for tag `v0.3.4`. These archives include
+Attach both files to the GitHub Release for tag `v0.3.5`. These archives include
 the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
 bin wrappers as one versioned BUGate kit.
 

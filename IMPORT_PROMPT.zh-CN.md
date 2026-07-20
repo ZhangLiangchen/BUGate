@@ -27,7 +27,7 @@ BUGate core 文件。
   **测试框架的家目录**,且之后的 agent 会话必须以**该目录**为项目根打开——
   hook 从会话工作区加载,开在父目录(monorepo 根)的会话不会加载任何守卫。
   importer 在目标不是 git 顶层时会发出警告;把该警告转达给用户。
-- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.4`。
+- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.3.5`。
 - Vendor 目录：若设置了 `BUGATE_VENDOR_DIR` 就使用它，否则使用 `.bugate`。
 - 若 `BUGATE_ENGINE_DIR` 指向已有 BUGate checkout 或已解包 release，就使用它。
   否则在 SUT 仓外下载 GitHub Release tarball。
@@ -46,7 +46,7 @@ BUGate core 文件。
    - 否则执行等价步骤：
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.3.4}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.3.5}"
      BUGATE_TMP="$(mktemp -d)"
      if curl -fL -o "$BUGATE_TMP/bugate-${BUGATE_VERSION}.tar.gz" \
        "https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}/bugate-${BUGATE_VERSION}.tar.gz"; then
