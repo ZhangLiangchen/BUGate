@@ -3,7 +3,7 @@
 - Component: Wave 7 role-governance policy and terminal evidence verification
 - Classification: BUGate Core governance defect; not a SUT defect
 - Severity: P1
-- Status: code/test closure verified; clean-archive acceptance still blocks release
+- Status: fixed and closed on 2026-07-22; publication gates remain independent
 - Scope: SUT-neutral temporary fixtures only
 
 ## Confirmed behavior
@@ -78,8 +78,32 @@ execution-log drift control is an acceptable closure.
   contracts.
 - Focused updater transaction suite: 93/93 PASS; compile and
   `git diff --check`: PASS.
+- Clean candidate `8f7b6edad8d88b92502220809e932edd3882a8ff` (tree
+  `e8f29c7e4906e78daadc4bfceae1d13947c23b86`) produced exactly the tar, zip,
+  and checksum assets. The archive-native `smoke + both` report returned
+  `decision: GO` for both workflows.
+- Tar SHA-256:
+  `00f7f5a941090c6e88836e10fd9806a5988989a0e16049760ec74fec3a25b8a4`;
+  zip SHA-256:
+  `dee3f7a72c2acd23bb25860a076ee4798a9725092977ffbfcbbc44a2b48badb8`;
+  release-manifest digest:
+  `0e879537c1437ebca70deff9e1d52693d09e3a9b0e471d955ff5e92e7bd1e570`.
+- Each archive independently completed v0.3.2 bootstrap plan/apply, installed
+  verify, same-version idempotence, rollback, legacy-preimage verification,
+  reapply, final verify, the imported `smoke` full-check, and six strict Memory
+  transitions. SUT-owned fixtures, hooks, profile, role evidence, Memory
+  namespace, unrelated dirty state, and `.gitignore` content outside the
+  BUGate marker remained unchanged.
+- Complete discovery after adding the provider-neutral release-gate regression:
+  378/378 PASS. Two newly spawned same-provider reviewer sessions independently
+  confirmed the updater/archive evidence and rejected use of stale or dirty-tree
+  assets; neither placeholder output nor the failed optional heterogeneous
+  runtime diagnostic was relabeled as GO.
 
-The implementation and source-tree regression closure is complete. This
-record remains a release blocker until the exact clean-built tar and zip also
-pass archive-native imported full acceptance; that evidence must be appended
-before changing the status to closed.
+The implementation, source-tree regression, and clean-archive behavior closure
+are complete, so this defect is closed. Publication remains separately NO-GO
+until the final merged-main bytes pass the same archive-native `smoke + both`
+gate, main and annotated-tag CI pass, and the three public release assets are
+downloaded, checksum-verified, and reaccepted. A documentation-only candidate
+change therefore requires a fresh final archive build, but does not reopen this
+fixed state-integrity defect unless its governed behavior changes.

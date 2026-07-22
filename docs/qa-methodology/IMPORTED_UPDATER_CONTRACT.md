@@ -496,6 +496,24 @@ recorded commands, exit codes, and test counts:
 4. unit, integration, negative, concurrency, crash-recovery, and failure-
    injection coverage for every transaction stage and ownership boundary.
 
+For the updater/archive release gate, "imported smoke/full-check" means running
+the archive-native acceptance with
+`--full-check-mode smoke --full-check-archive both`. This mode is not a shallow
+binary check: it exercises installed-state verification, the strict
+six-transition Memory contract, bootstrap/apply, idempotence, rollback/reapply,
+and the post-check ownership-preservation oracles on both tar and zip. The
+separate `--full-check-mode full` audits an operator machine's optional
+heterogeneous Codex+Claude runtime. Its real result must be reported, but one
+provider's account or network outage does not invalidate an otherwise verified
+updater archive.
+
+Semantic release review remains provider-neutral and requires at least two real
+independent sessions. Cross-provider review is preferred; when one provider is
+unavailable, a newly spawned same-provider session is acceptable only if it
+uses a different review prompt and cannot see the first reviewer's output before
+synthesis. The fallback and both conclusions are recorded. Placeholder output,
+a continued conversation, or self-review never satisfies this gate.
+
 Tests construct SUT-neutral temporary repositories at runtime. They do not read,
 copy, clone, worktree, or modify a real imported SUT. GO requires all release,
 archive, updater, compatibility, and pre-existing Wave 7 gates to pass; a

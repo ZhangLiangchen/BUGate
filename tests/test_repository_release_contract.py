@@ -73,8 +73,13 @@ class RepositoryReleaseContractTests(unittest.TestCase):
 
     def test_updater_release_gate_is_provider_neutral(self) -> None:
         version = updater_version()
-        for suffix in ("", ".zh-CN"):
-            path = ROOT / f"docs/releases/v{version}{suffix}.md"
+        documents = (
+            ROOT / f"docs/releases/v{version}.md",
+            ROOT / f"docs/releases/v{version}.zh-CN.md",
+            ROOT / "docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.md",
+            ROOT / "docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.zh-CN.md",
+        )
+        for path in documents:
             with self.subTest(path=path.name):
                 text = " ".join(path.read_text(encoding="utf-8").split()).lower()
                 self.assertIn("--full-check-mode smoke --full-check-archive both", text)
@@ -83,6 +88,19 @@ class RepositoryReleaseContractTests(unittest.TestCase):
                 self.assertIn("placeholder", text)
                 self.assertNotIn("required for the exact release archives", text)
                 self.assertNotIn("必须完成的 real codex/claude/memory", text)
+
+        defect = (
+            ROOT
+            / "docs/defects/BUGATE-CORE-2026-07-22-ROLE-GOVERNANCE-STATE-INTEGRITY.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Status: fixed and closed", defect)
+        self.assertIn("archive-native `smoke + both`", defect)
+        self.assertIn("378/378 PASS", defect)
+        self.assertIn("final merged-main bytes", defect)
+        self.assertIn("main and annotated-tag CI pass", defect)
+        self.assertIn("downloaded, checksum-verified, and reaccepted", defect)
+        self.assertIn("documentation-only candidate", defect)
+        self.assertIn("fresh final archive build", defect)
 
     def test_codex_default_prompt_routes_existing_installs_to_the_updater(self) -> None:
         plugin = json.loads(
