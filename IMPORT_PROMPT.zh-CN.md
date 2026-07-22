@@ -3,13 +3,14 @@
 [English](IMPORT_PROMPT.md) | [简体中文](IMPORT_PROMPT.zh-CN.md)
 
 > 在 **SUT 自动化测试仓**作为项目根打开时，把这份 prompt 粘给 Claude Code 或
-> Codex。agent 应把 BUGate 作为 kit 导入，保持 Claude Code / Codex 双端对称
-> 接线，初始化机器级 Memory Bus，在测试布局清晰时激活 SUT profile，并报告剩余
-> 人工动作。
+> Codex。agent 必须先区分首次安装、外部 bootstrap/pre-lock 路径与
+> lock+launcher 仓内更新，再使用
+> 唯一适用的事务边界，保留 SUT-owned state，验证结果并报告剩余人工与 runtime
+> reload 动作。
 
 ## Agent 指令
 
-你正在把 BUGate 安装进一个 SUT 自动化测试仓。BUGate 是 SUT-neutral 的
+你正在把 BUGate 安装或更新到一个 SUT 自动化测试仓。BUGate 是 SUT-neutral 的
 Agentic QA Governance Kernel。保持 SUT 仓作为项目根；不要在 SUT 仓里 clone
 BUGate core，不要把 SUT 挂进 BUGate core，也不要把产品 secret 或环境事实写进
 BUGate core 文件。
@@ -27,29 +28,54 @@ BUGate core 文件。
   **测试框架的家目录**,且之后的 agent 会话必须以**该目录**为项目根打开——
   hook 从会话工作区加载,开在父目录(monorepo 根)的会话不会加载任何守卫。
   importer 在目标不是 git 顶层时会发出警告;把该警告转达给用户。
-- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.4.1`。
+- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.4.2`。
 - Vendor 目录：若设置了 `BUGATE_VENDOR_DIR` 就使用它，否则使用 `.bugate`。
-- 若 `BUGATE_ENGINE_DIR` 指向已有 BUGate checkout 或已解包 release，就使用它。
-  否则在 SUT 仓外下载 GitHub Release tarball。
-- v0.4.1 release 只有三个资产：`bugate-0.4.1.tar.gz`、
-  `bugate-0.4.1.zip` 与 `bugate-0.4.1.SHA256SUMS`。checksum asset 是
+- 安装路径：只读检测。不能用用户记忆的版本替代 installed layout 证据；只要
+  vendor path 以任何形态存在，就绝不能运行 `bugate_init.py`。
+- 首次安装可有意使用 BUGate development checkout。legacy bootstrap 必须使用
+  带 canonical/legacy manifests 的正式已解包 v0.4.2 release。若
+  `BUGATE_ENGINE_DIR` 不是适用来源，就在 SUT 仓外下载 GitHub Release。
+- v0.4.2 release 只有三个资产：`bugate-0.4.2.tar.gz`、
+  `bugate-0.4.2.zip` 与 `bugate-0.4.2.SHA256SUMS`。checksum asset 是
   必需项；必须在解压前校验所选 archive。
 
 ### 必须执行的流程
 
-1. **预检 SUT 仓**
+1. **预检并分类 SUT 仓**
    - 运行 `pwd`、`git status --short --branch`、`python3 --version`。
    - 确认 Python >= 3.9。
    - 用只读命令检查测试布局，例如 `find . -maxdepth 3 -type d | sort` 与
      定向 `rg --files`。
    - 如果当前目录就是 BUGate core 本身，停止并询问 SUT 自动化测试仓路径。
+   - 设置 `BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"`，然后分类：
 
-2. **在 SUT 仓外获取 BUGate kit**
+     ```bash
+     if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \
+       && test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
+       BUGATE_ROUTE=locked-in-repo-update
+     elif test -e "$BUGATE_VENDOR_DIR" || test -L "$BUGATE_VENDOR_DIR"; then
+       BUGATE_ROUTE=external-bootstrap-candidate
+     else
+       BUGATE_ROUTE=fresh-install
+     fi
+     printf 'BUGATE_ROUTE=%s\n' "$BUGATE_ROUTE"
+     ```
+
+   - `external-bootstrap-candidate` 此时还不能认定为 v0.3.x 或 pre-lock
+     v0.4.x。必须由 v0.4.2 或更高的外部 updater 通过 exact supported
+     legacy/pre-lock manifest 识别，或诊断不一致的 lock/launcher state；未知、
+     混合、locally modified 或不完整 lock-based layout 一律 `NO-GO`。不能只凭
+     版本字符串选择仓内路径。
+
+2. **仅在需要时于 SUT 仓外获取 BUGate kit**
+   - `locked-in-repo-update` 跳过第 2–3 步：vendored updater 会解析显式指定的
+     target release，或接受离线 archive/checksum 对。
+   - 首次安装与 legacy bootstrap 需要已解包 v0.4.2 release。
    - 如果 `BUGATE_ENGINE_DIR` 可用，继续使用。
    - 否则执行等价步骤：
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.4.1}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
      BUGATE_TMP="$(mktemp -d)"
      BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
      BUGATE_SUMS="bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -81,13 +107,19 @@ BUGate core 文件。
 
      ```bash
      test -f "$BUGATE_ENGINE_DIR/scripts/bugate_init.py"
+     test -f "$BUGATE_ENGINE_DIR/scripts/bugate_update.py"
      test -f "$BUGATE_ENGINE_DIR/scripts/role_governance.py"
      test -f "$BUGATE_ENGINE_DIR/scripts/check_role_evidence.py"
      test -x "$BUGATE_ENGINE_DIR/bin/bugate-role"
+     test -x "$BUGATE_ENGINE_DIR/bin/bugate-update"
      test -f "$BUGATE_ENGINE_DIR/.shared/skills/bugate/SKILL.md"
      ```
 
-3. **安装前验证下载的 engine**
+   - legacy bootstrap 还必须存在
+     `$BUGATE_ENGINE_DIR/.bugate-release/manifest.json`；缺失说明它不是正式
+     bootstrap source。
+
+3. **首次安装或 bootstrap 前验证下载的 engine**
 
    ```bash
    cd "$BUGATE_ENGINE_DIR"
@@ -96,7 +128,9 @@ BUGate core 文件。
    cd -
    ```
 
-4. **预览并运行 importer**
+4. **只执行一个 install/update 路径**
+
+   **仅首次安装**（`BUGATE_ROUTE=fresh-install`）：
 
    ```bash
    SUT_REPO="$(pwd)"
@@ -112,7 +146,110 @@ BUGate core 文件。
    `.codex/hooks.json`、`bugate.config.yaml`、`bugate.profile.yaml`、
    `docs/usecases/`、`.gitignore` 与机器级 Memory Bus。
 
-5. **只基于证据激活 SUT profile**
+   若 vendor path 在 preview 与 apply 之间出现，立即停止。installer 只负责首次
+   安装，必须在任何 target 或 machine-state 写入前 fail；它不是 update/repair
+   命令。
+
+   **受支持 v0.3.x/pre-lock bootstrap**
+   （`BUGATE_ROUTE=external-bootstrap-candidate`）：
+
+   ```bash
+   SUT_REPO="$(pwd)"
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   BOOTSTRAP="$BUGATE_ENGINE_DIR/scripts/bugate_update.py"
+   python3 "$BOOTSTRAP" status "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   python3 "$BOOTSTRAP" plan "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   # 完整复核，除非 plan 输出 Decision: GO，否则停止。
+   python3 "$BOOTSTRAP" apply "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   python3 "$BOOTSTRAP" verify "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   ```
+
+   这是一条只用于 v0.4.2 release 携带的 exact supported v0.3.x 与 pre-lock layout
+   的一次性桥接。`status`/`plan` 为 `NO-GO` 时，不得手工复制文件、运行 importer
+   或猜测版本。
+
+   **Lock+launcher 仓内更新**（`BUGATE_ROUTE=locked-in-repo-update`）：
+
+   ```bash
+   BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   UPDATER="$BUGATE_VENDOR_DIR/bin/bugate-update"
+   "$UPDATER" status
+   "$UPDATER" plan --to "$BUGATE_VERSION"
+   # 完整复核，除非 plan 输出 Decision: GO，否则停止。
+   "$UPDATER" apply --to "$BUGATE_VERSION"
+   "$UPDATER" verify
+   ```
+
+   不存在隐式 `latest`。`status`、`plan`、`verify` 都只读；`plan` 与
+   `apply --dry-run` 对目标零持久写入。若 `status` 报告 interrupted recovery，
+   不得自行清理：先报告，再使用 updater 经复核的 mutating `apply` recovery
+   path。
+
+   两种 updater 入口的确定性离线操作都必须把 archive 与 checksum asset 同时
+   传给 plan 和 apply：
+
+   ```bash
+   "$UPDATER" plan \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   "$UPDATER" apply \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   "$UPDATER" verify
+   ```
+
+   bootstrap 直接调用外部脚本并传相同资产，不要在 SUT 仓创建 wrapper：
+
+   ```bash
+   python3 "$BOOTSTRAP" plan "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   python3 "$BOOTSTRAP" apply "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   python3 "$BOOTSTRAP" verify "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   ```
+
+   checksum 缺失、歧义或不匹配会在 target 写入前被拒绝。
+
+   rollback 必须显式指定 transaction，不能把 warning 当作自动回滚理由。执行前，
+   在 SUT 仓外保留或取得一份已验证且已解包的 v0.4.2 或更高 release，并让
+   `BOOTSTRAP` 指向其中 updater；exact rollback 移除 vendored launcher 后仍需此
+   路径：
+
+   ```bash
+   BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+   "$BUGATE_VENDOR_DIR/bin/bugate-update" rollback \
+     --transaction <32-hex-transaction-id>
+   if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \
+     && test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
+     "$BUGATE_VENDOR_DIR/bin/bugate-update" verify
+   else
+     python3 "$BOOTSTRAP" verify . --vendor-dir "$BUGATE_VENDOR_DIR"
+   fi
+   ```
+
+   只能使用 committed `apply` 输出的 id。rollback 只恢复 engine transaction；
+   不会撤销单独评审的 profile 变更。第一笔 v0.4.2 updater transaction 可能精确
+   恢复 v0.3.x 或 pre-lock v0.4.0/v0.4.1，包括删除 lock 与 launcher；这不是
+   rollback 失败。若 rollback 在 launcher 变化后中断，用 `python3 "$BOOTSTRAP"
+   status . --vendor-dir "$BUGATE_VENDOR_DIR"` 诊断；需要 recovery 时通过
+   `$BOOTSTRAP` 重试同一个 exact rollback，最后执行外部 `verify`。禁止复制
+   launcher 回去或手改 transaction state。
+
+   managed local change、未知/重复 hook identity 或 shape、type/permission drift、
+   critical file 缺失与混合 legacy fingerprint 都是冲突，会令 plan `NO-GO`。
+   不存在宽泛 `--force`。保留全部文件，报告 expected/actual 细节，并让用户处理
+   指定 path；无关 dirty file 只报告 warning。
+
+5. **把 SUT profile 作为独立动作处理**
+   - 只有首次安装才按下述步骤基于证据激活新 profile。
+   - bootstrap/update 的 engine transaction 不得编辑 `bugate.config.yaml` 或
+     `bugate.profile.yaml`。保留当前 profile，并报告 updater 的
+     `migration_available` 或会阻塞的 `migration_required`。proposed migration
+     必须是独立的人审 diff 与独立可回滚 commit；绝不能隐式把
+     `role_governance.mode: off` 改成 `required`。
    - 打开 `bugate.profile.yaml`。
    - 保留 `memory.namespace`。
    - 如果测试布局清晰，用一个或多个带命名捕获 `(?P<uc>...)` 的 regex 更新
@@ -206,18 +343,28 @@ BUGate core 文件。
      `SDTD_CLI_HTTP_PROXY` / `SDTD_CLI_ALL_PROXY`。
 
 9. **报告最终状态**
+   - 说明实际执行的 route：`fresh-install`、`legacy-bootstrap` 或
+     `locked-in-repo-update`；给出 installed version、最终 `verify` decision，以及
+     transaction id/rollback availability。
    - 列出 SUT 仓中所有变更文件/目录。
-   - 列出应该提交的精确文件：
+   - 首次安装时，列出应该提交的精确文件：
      `bugate.config.yaml`、`bugate.profile.yaml`、`$BUGATE_VENDOR_DIR/`、
      `.claude/settings.json`、`.codex/hooks.json`、`.claude/skills/`、
      `.agents/skills/`、`.codex/skills/`、`.codex/agents/`、`docs/usecases/`
      以及 `.gitignore` 中的 BUGate block。
+   - 更新时，只列出 transaction 报告的 manifest-owned change 与 exact BUGate
+     hook entries。确认 SUT-owned config、profile、tests、artifacts、evidence、
+     hooks、Memory data 与无关 dirty files 均未变化。
    - 说明 `guarded_path_regex` 是否已激活。
    - 说明 active `role_governance.mode` 与 `memory_mode`。legacy/off profile
      保持兼容，但没有激活 Wave 7 生命周期门。
    - 说明 Memory Bus 状态。
-   - 说明 Codex 需要在 Codex Desktop 中对变更后的 hook hash 做一次 re-trust，
-     Codex hooks 才会生效。Claude Code 是否需要新 session 或 plugin reload 取决于打开方式。
+   - 首次安装时，报告新加入的 Codex hook 文件需要 re-trust，且所有新 hook 都
+     要求新 session。更新时，报告 updater 结果中的 `codex_hook_hash_changed` 与
+     `new_session_required`。**只有** Codex hook bytes/hash 变化时才对 Codex
+     Desktop re-trust；same-byte no-op 不得要求重复 re-trust。任何 hook 变化都
+     必须以该 SUT 仓为根启动新 Claude/Codex session，之后新 runtime surface
+     才生效；re-trust 本身不是 reload。plugin 通道可能还要 reload/update plugin。
    - 把 vendored 使用指导交给用户作为日常手册：
      `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/using-bugate.zh-CN.md`
      （English: 同目录 `using-bugate.md`）——以本仓为会话项目根打开，然后在
@@ -280,9 +427,12 @@ BUGate core 文件。
   新建 human acceptance、designer handoff、implementer acceptance；post-run
   前还需要 implementer handoff 与 reviewer acceptance。
 
-  升级已有导入仓时 rerun `bugate_init.py`：它会刷新 vendored BUGate scripts 与
-  BUGate-owned hook entries，同时保留 SUT 自有 hooks。然后启动三个独立 session，
-  不要试图从 SessionStart hook 设置父进程角色：
+  升级已有导入仓只能使用 v0.4.2 外部 bootstrap updater（v0.3.x 或 pre-lock
+  v0.4.0/v0.4.1），或在 lock+launcher 同时存在时使用 vendored
+  `bugate-update`，按第 4 步执行 status → plan → 人工复核后的 apply →
+  verify。`bugate_init.py` 仅首次安装。engine transaction 保留 profile，因此
+  启用 Wave 7 仍是独立的人审 profile 变更。完成该独立决定后，启动三个独立
+  session；不要试图从 SessionStart hook 设置父进程角色：
 
   ```bash
   "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role designer -- codex
@@ -291,9 +441,9 @@ BUGate core 文件。
   ```
 
   Hook 进程不能向父进程 export，已运行的 Desktop 进程也不会继承后续 shell 环境
-  变更；每个 Desktop/CLI 角色都要从目标环境重新启动。v0.4.0 改变了
-  `.codex/hooks.json`，Codex Desktop 必须显式 re-trust hash 后才算 enforcement
-  已激活。
+  变更；每个 Desktop/CLI 角色都要从目标环境重新启动。任何 hook 变化都要求新
+  session；只有 `.codex/hooks.json` bytes 变化时，Codex Desktop 才额外需要
+  re-trust（updater 会报告该条件）。
 
   日常转换顺序：designer 把 `--init` 与 pre-code `--auto` 作为**两个命令**运行；
   人类评审 03B 并显式设为 `gate_status: passed`；designer 用

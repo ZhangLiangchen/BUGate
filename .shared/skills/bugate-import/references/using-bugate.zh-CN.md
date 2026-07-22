@@ -8,9 +8,11 @@ BUGate 已导入 SUT 自动化测试仓后，Claude Code / Codex 的日常
 ## 0. 打开正确目录和角色会话
 
 将**包含 `bugate.config.yaml` 的 SUT 测试仓本身**作为项目根打开。
-Hook 从当前会话工作区加载；打开父目录时没有物理守卫。导入或
-重新导入后，必须在 Codex Desktop 重新信任变更后的 hook hash。未 re-trust
-时，只能说文件验收通过，不能说 Codex runtime 门禁已激活。
+Hook 从当前会话工作区加载；打开父目录时没有物理守卫。首次导入按 installer
+验收输出执行；已有安装必须使用 [`updating-bugate.zh-CN.md`](updating-bugate.zh-CN.md)，
+禁止重新导入。只有 import/update 实际改变 Codex hook hash 时才 re-trust Codex
+Desktop；任一 hook 变化后都必须新开 agent session。在这些 process boundary 完成前，
+只能说文件验收通过，不能说新的 runtime 门禁已激活。
 
 启用 `role_governance.mode: required` 时，用三个独立进程/会话：
 
@@ -145,6 +147,8 @@ effort、proxy、profile/root 配置，同时清除生命周期 role/session/rec
 
 ## 5. 更深的文档
 
+- 首次安装/更新选路、transactional upgrade、验证、回滚及 profile/session 边界：
+  `updating-bugate.zh-CN.md`。
 - 布局/profile 适配：本技能上一级的 `SKILL.md`。
 - 运维、诊断与恢复：`field-guide.md`。
 - 门禁判据与 schema：`.bugate/.shared/skills/bugate/`。

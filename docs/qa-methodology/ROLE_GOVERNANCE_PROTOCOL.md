@@ -20,6 +20,11 @@ Wave 1 and Wave 7 solve different independence problems:
 names such as `codex` and `claude` belong in receipt runtime metadata, never in
 role fields. The existing `agent_roles` mapping remains a separate path-access
 policy and retains legacy/custom role tokens and its bare-list/read/write forms.
+For the frozen v0.4.x state machine, phase ownership is canonical rather than
+programmable: pre-code is `designer`, implementation is `implementer`, and
+post-run is `reviewer`. In `required` mode a profile that swaps or combines
+those owners is malformed and fails closed; `advisory` reports it without
+claiming an unlock.
 
 ## 2. Configuration contract
 
@@ -119,13 +124,37 @@ Designer handoff captures the active profile, every required pre-code artifact,
 formal `00_multiview` outputs when present, 03B dispatch provenance, and the
 current human-acceptance receipt. Implementer handoff adds guarded
 implementation hashes. Reviewer completion adds 04/05 plus execution logs and
-evidence.
+evidence. A successful completion is terminal: its profile, 04/05, and
+execution-evidence snapshot remains locally verified by status, verify, and
+post-run preflight. In `required` mode supported tool writes are blocked after
+`closed`; in `advisory` they remain warning-only. An intentional governed
+change requires a new handoff/acceptance lifecycle generation.
 
 Receipt and chain publication uses same-directory temporary files, flush,
 `fsync`, and `os.replace`. No secret or Memory credential is persisted. Receipt
 content/hash, chain linkage/head, profile hash, pre-code hash/gate status, and
 implementation hashes are locally revalidated on every governed edit. No
 per-edit Memory request is permitted.
+
+New receipts bind both configuration sources: `profile.path` and
+`profile.sha256` identify the selected profile file, while
+`profile.effective_config_sha256` hashes the canonical merged base+profile
+mapping that actually enforced the transition. Changing inherited base policy
+therefore re-locks the chain even when selected profile bytes are unchanged.
+The validator still parses the legacy v0.4.0/v0.4.1 two-field profile snapshot
+so its append-only chain can append recovery events, but that snapshot is stale
+for a current unlock and requires a superseding human-acceptance/handoff
+generation. When governance is `off`, lifecycle publisher commands (`approve`,
+`handoff`, `accept`, and `complete`) reject rather than creating inert-looking
+receipts.
+
+Reviewer completion accepts only dedicated execution evidence. It rejects the
+base config, selected profile, every configured role-evidence directory, and
+pre-code, implementation, or post-run phase-owned paths. Hook ownership for an
+arbitrary captured log is its canonical resolved workspace path, not its
+spelling: `..` and symlink aliases cannot bypass the terminal snapshot. If more
+than one UC captures the same path, the write must pass post-run preflight for
+every owner; ambiguity never selects the first matching UC.
 
 ## 5. Strict Memory transition protocol
 
@@ -174,6 +203,7 @@ reasoning effort.
 
 ## 7. Compatibility, recovery, and security boundary
 
+Historical v0.4.0 behavior—superseded by §8 for v0.4.2 and later—follows.
 Profiles without `role_governance` behave as v0.3.x. Enabling `required` does
 not grandfather historical passed UCs: they need a current human acceptance,
 handoff, and acceptance chain. Profile/artifact drift restarts from designer
@@ -190,3 +220,21 @@ separate OS accounts, containers, managed runners, or role-scoped server
 credentials. Hooks also cannot intercept arbitrary shell redirection or an
 external editor; supported agent tools, orchestrators, and Core mutators are
 enforced, while stronger filesystem isolation belongs to a managed runner.
+
+## 8. Amendment — imported updater boundary (2026-07-22)
+
+Section 7's sentence that re-running the importer refreshes an existing
+installation is preserved as the frozen v0.4.0 record, but is superseded for
+v0.4.2 and later compatible releases. `bugate_init.py` is fresh-install-only.
+An exact v0.3.x or pre-lock v0.4.x installation bootstraps from an unpacked
+release; an installation with the updater uses vendored `status` → `plan` →
+`apply` → `verify`, with rollback by explicit transaction ID. See the
+[Imported-mode updater contract](IMPORTED_UPDATER_CONTRACT.md) and the vendored
+`bugate-import/references/updating-bugate.md` runbook.
+
+The updater may replace role-governance-capable engine/hook files, but it never
+activates governance, edits a profile/Memory/role evidence, or manufactures a
+lifecycle receipt. Engine update and profile migration remain separately
+reviewed, separately reversible commits. Codex Desktop re-trust is required
+only when its hook bytes actually change; any hook change requires a new agent
+session before the new enforcement surface may be claimed active.

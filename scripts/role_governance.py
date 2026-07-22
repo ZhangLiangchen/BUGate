@@ -16,14 +16,23 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import lru_cache, wraps
 from pathlib import Path
 from typing import Any, Callable, Iterable
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - BUGate's hook/runtime surface is POSIX.
+    fcntl = None  # type: ignore[assignment]
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bugate_core import (  # noqa: E402
@@ -73,6 +82,10 @@ EVENT_STATES = {
 INITIAL_STATE = "awaiting_human_acceptance"
 POSTRUN_NAMES = {"04_execution_report.md", "05_knowledge_update.md"}
 PRECODE_PREFIX_RE = re.compile(r"^(?:01|02|03)(?:[ab])?[_-]", re.I)
+
+_TRANSITION_THREAD_LOCKS: dict[str, threading.RLock] = {}
+_TRANSITION_THREAD_LOCKS_GUARD = threading.Lock()
+_TRANSITION_LOCK_STATE = threading.local()
 
 
 class RoleGovernanceError(RuntimeError):
@@ -125,6 +138,106 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+def _transition_lock_key(ctx: GovernanceContext) -> str:
+    try:
+        root_stat = ctx.root.resolve().stat()
+        artifact_stat = ctx.artifact_dir.resolve().stat()
+    except OSError as exc:
+        raise RoleGovernanceError(
+            f"cannot identify role transition workspace: {exc}"
+        ) from exc
+    if not stat.S_ISDIR(root_stat.st_mode) or not stat.S_ISDIR(artifact_stat.st_mode):
+        raise RoleGovernanceError(
+            "role transition workspace and artifact path must be directories"
+        )
+    identity = (
+        f"{root_stat.st_dev}:{root_stat.st_ino}\0"
+        f"{artifact_stat.st_dev}:{artifact_stat.st_ino}"
+    ).encode("ascii")
+    return sha256_bytes(identity)
+
+
+def _thread_transition_lock(key: str) -> threading.RLock:
+    with _TRANSITION_THREAD_LOCKS_GUARD:
+        return _TRANSITION_THREAD_LOCKS.setdefault(key, threading.RLock())
+
+
+@contextmanager
+def _transition_lock(ctx: GovernanceContext):
+    """Serialize one UC's complete transition/Memory/publication critical section."""
+
+    if fcntl is None:
+        raise RoleGovernanceError(
+            "role transition locking requires the POSIX fcntl standard-library module"
+        )
+    key = _transition_lock_key(ctx)
+    with _thread_transition_lock(key):
+        artifact = ctx.artifact_dir.resolve()
+        fd = -1
+        locked = False
+        registered = False
+        try:
+            try:
+                # Lock the governed artifact directory itself.  Directory
+                # flock is keyed by the filesystem object, so case/symlink
+                # aliases, distinct TMPDIR settings, and cooperating OS users
+                # all serialize on one UC without a persistent SUT lock file.
+                flags = os.O_RDONLY
+                if hasattr(os, "O_DIRECTORY"):
+                    flags |= os.O_DIRECTORY
+                if hasattr(os, "O_NOFOLLOW"):
+                    flags |= os.O_NOFOLLOW
+                fd = os.open(artifact, flags)
+                lock_stat = os.fstat(fd)
+                artifact_stat = artifact.stat()
+                if (
+                    not stat.S_ISDIR(lock_stat.st_mode)
+                    or (lock_stat.st_dev, lock_stat.st_ino)
+                    != (artifact_stat.st_dev, artifact_stat.st_ino)
+                ):
+                    raise RoleGovernanceError(
+                        "role transition lock path changed during acquisition"
+                    )
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                locked = True
+            except RoleGovernanceError:
+                raise
+            except OSError as exc:
+                raise RoleGovernanceError(
+                    f"cannot prepare role transition lock: {exc}"
+                ) from exc
+            held = set(getattr(_TRANSITION_LOCK_STATE, "keys", set()))
+            held.add(key)
+            _TRANSITION_LOCK_STATE.keys = held
+            registered = True
+            yield
+        finally:
+            if registered:
+                held = set(getattr(_TRANSITION_LOCK_STATE, "keys", set()))
+                held.discard(key)
+                _TRANSITION_LOCK_STATE.keys = held
+            if fd >= 0:
+                if locked:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    finally:
+                        os.close(fd)
+                else:
+                    os.close(fd)
+
+
+def _serialized_transition(function: Callable[..., dict[str, Any]]):
+    @wraps(function)
+    def wrapped(artifact_dir: str | Path, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        ctx = load_context(artifact_dir)
+        if ctx.mode == "off":
+            return function(artifact_dir, *args, **kwargs)
+        with _transition_lock(ctx):
+            return function(artifact_dir, *args, **kwargs)
+
+    return wrapped
+
+
 def sha256_file(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
 
@@ -133,6 +246,126 @@ def receipt_sha256(receipt: dict[str, Any]) -> str:
     payload = copy.deepcopy(receipt)
     payload.pop("receipt_sha256", None)
     return sha256_bytes(canonical_json(payload))
+
+
+def _same_existing_path(left: Path, right: Path) -> bool:
+    try:
+        return left.exists() and right.exists() and os.path.samefile(left, right)
+    except OSError:
+        return False
+
+
+def _alternate_case(name: str) -> str | None:
+    for index, char in enumerate(name):
+        swapped = char.swapcase()
+        if swapped != char:
+            return name[:index] + swapped + name[index + 1 :]
+    return None
+
+
+def _filesystem_case_insensitive(path: Path) -> bool:
+    """Probe actual directory lookup semantics on the workspace filesystem."""
+
+    root = path.resolve()
+    try:
+        device = root.stat().st_dev
+    except OSError:
+        return False
+    for directory in (root, *root.parents):
+        try:
+            if directory.stat().st_dev != device or not directory.is_dir():
+                continue
+            entries = list(directory.iterdir())
+        except OSError:
+            continue
+        names = {entry.name for entry in entries}
+        for entry in entries:
+            alternate = _alternate_case(entry.name)
+            if alternate is None or alternate in names:
+                continue
+            alias = directory / alternate
+            try:
+                alias_stat = alias.lstat()
+            except OSError:
+                return False
+            if stat.S_ISLNK(alias_stat.st_mode):
+                continue
+            if _same_existing_path(entry, alias):
+                return True
+    return False
+
+
+@lru_cache(maxsize=4096)
+def _canonical_existing_path_cached(
+    raw: str,
+    device: int,
+    inode: int,
+    parent_mtime_ns: int,
+    ancestor_fingerprint: tuple[tuple[int, int, int], ...],
+) -> str:
+    # Identity and directory metadata are cache-invalidation inputs; the names
+    # make their purpose explicit even though traversal only needs ``raw``.
+    # Every ancestor is included because renaming an ancestor entry changes its
+    # parent directory, not necessarily the leaf or immediate parent inode.
+    del device, inode, parent_mtime_ns, ancestor_fingerprint
+    resolved = Path(raw)
+    current = Path(resolved.anchor)
+    for part in resolved.parts[1:]:
+        requested = current / part
+        if not requested.exists() or not current.is_dir():
+            current = requested
+            continue
+        try:
+            entries = list(current.iterdir())
+        except OSError:
+            current = requested
+            continue
+        exact = next((entry for entry in entries if entry.name == part), None)
+        if exact is not None:
+            current = exact
+            continue
+        identities = [entry for entry in entries if _same_existing_path(entry, requested)]
+        folded = [entry for entry in identities if entry.name.casefold() == part.casefold()]
+        current = folded[0] if len(folded) == 1 else (
+            identities[0] if len(identities) == 1 else requested
+        )
+    return current.as_posix()
+
+
+def _canonical_existing_path(path: Path) -> Path:
+    """Recover actual directory-entry spelling for an existing path.
+
+    ``Path.resolve`` removes symlinks but preserves caller case on common APFS
+    volumes.  Lifecycle identity must not depend on that spelling.  Cache keys
+    include leaf identity plus every ancestor directory's identity/mtime so a
+    replacement or case-only rename at any level refreshes the traversal.
+    """
+
+    resolved = path.resolve()
+    try:
+        identity = resolved.stat()
+        parent = resolved.parent.stat()
+        ancestor_fingerprint: list[tuple[int, int, int]] = []
+        ancestor = resolved.parent
+        while True:
+            item = ancestor.stat()
+            ancestor_fingerprint.append(
+                (item.st_dev, item.st_ino, item.st_mtime_ns)
+            )
+            if ancestor.parent == ancestor:
+                break
+            ancestor = ancestor.parent
+    except OSError:
+        return resolved
+    return Path(
+        _canonical_existing_path_cached(
+            resolved.as_posix(),
+            identity.st_dev,
+            identity.st_ino,
+            parent.st_mtime_ns,
+            tuple(ancestor_fingerprint),
+        )
+    )
 
 
 def _within(path: Path, parent: Path) -> bool:
@@ -257,6 +490,11 @@ def governance_policy(config: dict[str, Any]) -> dict[str, Any]:
                 valid_roles=LIFECYCLE_ROLES,
             ),
         }
+    if phases != DEFAULT_PHASES:
+        raise RoleConfigError(
+            "role_governance.phases must preserve canonical lifecycle ownership: "
+            "pre_code=designer, implementation=implementer, post_run=reviewer"
+        )
     for phase, prior in (("implementation", "pre_code"), ("post_run", "implementation")):
         invalid = set(phases[phase]["requires_handoff_from"]) - set(
             phases[prior]["allowed_roles"]
@@ -349,6 +587,8 @@ def _template_uc(root: Path, artifact_dir: Path, template: str) -> str | None:
 
 
 def resolve_uc(root: Path, artifact_dir: Path, config: dict[str, Any]) -> str:
+    root = _canonical_existing_path(root)
+    artifact_dir = _canonical_existing_path(artifact_dir)
     configured = config.get("uc") or config.get("use_case_id")
     template = config.get("artifact_dir_template")
     parsed = _template_uc(root, artifact_dir, str(template)) if template else None
@@ -362,7 +602,7 @@ def resolve_uc(root: Path, artifact_dir: Path, config: dict[str, Any]) -> str:
     if configured_dir:
         path = Path(str(configured_dir))
         path = path if path.is_absolute() else root / path
-        if path.resolve() != artifact_dir.resolve():
+        if _canonical_existing_path(path) != artifact_dir:
             raise RoleConfigError(
                 f"artifact dir {workspace_rel(artifact_dir, root)} does not match active profile "
                 f"artifact_dir {workspace_rel(path, root)}"
@@ -385,9 +625,9 @@ def load_context(
     artifact = Path(artifact_dir)
     if root is None:
         root = find_root(artifact.resolve() if artifact.exists() else Path.cwd())
-    root = root.resolve()
+    root = _canonical_existing_path(root)
     artifact = artifact if artifact.is_absolute() else root / artifact
-    artifact = artifact.resolve()
+    artifact = _canonical_existing_path(artifact)
     if not _within(artifact, root):
         raise RoleConfigError("artifact_dir must be inside the governed workspace")
     try:
@@ -420,7 +660,11 @@ def _snapshot(path: Path, ctx: GovernanceContext, *, with_gate: bool = False) ->
 
 def profile_snapshot(ctx: GovernanceContext) -> dict[str, str]:
     snap = _snapshot(ctx.profile_path, ctx)
-    return {"path": snap["path"], "sha256": snap["sha256"]}
+    return {
+        "path": snap["path"],
+        "sha256": snap["sha256"],
+        "effective_config_sha256": sha256_bytes(canonical_json(ctx.config)),
+    }
 
 
 def _precode_snapshot(ctx: GovernanceContext) -> list[dict[str, Any]]:
@@ -563,7 +807,7 @@ def _empty_chain() -> dict[str, Any]:
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RoleGovernanceError(f"invalid JSON evidence {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise RoleGovernanceError(f"JSON evidence must be an object: {path}")
@@ -652,8 +896,14 @@ def _validate_receipt_contract(receipt: dict[str, Any], path: Path) -> None:
     if actor.get("role") not in LIFECYCLE_ROLES:
         raise RoleGovernanceError(f"invalid lifecycle actor in {path.name}")
     profile = receipt.get("profile")
-    if not isinstance(profile, dict) or set(profile) != {"path", "sha256"}:
+    valid_profile_fields = (
+        {"path", "sha256"},
+        {"path", "sha256", "effective_config_sha256"},
+    )
+    if not isinstance(profile, dict) or set(profile) not in valid_profile_fields:
         raise RoleGovernanceError(f"invalid receipt profile schema in {path.name}")
+    if not all(isinstance(value, str) and value for value in profile.values()):
+        raise RoleGovernanceError(f"invalid receipt profile values in {path.name}")
     artifacts = receipt.get("artifacts")
     if not isinstance(artifacts, list) or artifacts != sorted(
         artifacts, key=lambda item: str(item.get("path") or "") if isinstance(item, dict) else ""
@@ -673,6 +923,7 @@ def _validate_receipt_contract(receipt: dict[str, Any], path: Path) -> None:
 
 def verify_chain(ctx: GovernanceContext) -> list[dict[str, Any]]:
     chain = load_chain(ctx)
+    expected_artifact_dir = workspace_rel(ctx.artifact_dir, ctx.root)
     required_keys = {"schema", "state", "sequence", "head_sha256", "latest_receipts"}
     if set(chain) != required_keys:
         raise RoleGovernanceError("chain.json contains missing or non-minimal keys")
@@ -693,6 +944,14 @@ def verify_chain(ctx: GovernanceContext) -> list[dict[str, Any]]:
     for expected, path in enumerate(paths, 1):
         receipt = _read_json(path)
         _validate_receipt_contract(receipt, path)
+        if receipt.get("uc") != ctx.uc:
+            raise RoleGovernanceError(
+                f"receipt UC does not match active context: {path.name}"
+            )
+        if receipt.get("artifact_dir") != expected_artifact_dir:
+            raise RoleGovernanceError(
+                f"receipt artifact_dir does not match active context: {path.name}"
+            )
         if receipt.get("schema") != ROLE_SCHEMA or receipt.get("sequence") != expected:
             raise RoleGovernanceError(f"invalid receipt schema/sequence: {path.name}")
         actual = receipt_sha256(receipt)
@@ -910,13 +1169,23 @@ def _idempotency_payload(base: dict[str, Any]) -> str:
 
 
 def _publish(ctx: GovernanceContext, base: dict[str, Any], state: str) -> dict[str, Any]:
+    if _transition_lock_key(ctx) not in set(
+        getattr(_TRANSITION_LOCK_STATE, "keys", set())
+    ):
+        raise RoleGovernanceError(
+            "role transition publication requires the per-UC transition lock"
+        )
     receipts = verify_chain(ctx)
     event = str(base["event"])
     idem = _idempotency_payload(base)
     prior = _latest(receipts, event)
-    if prior and prior.get("idempotency_sha256") == idem:
-        return prior
     chain = load_chain(ctx)
+    if (
+        prior
+        and prior.get("idempotency_sha256") == idem
+        and prior.get("receipt_sha256") == chain["head_sha256"]
+    ):
+        return prior
     transition = {
         "schema": TRANSITION_SCHEMA,
         "event": event,
@@ -980,12 +1249,22 @@ def _publish(ctx: GovernanceContext, base: dict[str, Any], state: str) -> dict[s
         if key in base:
             receipt[key] = base[key]
     receipt["receipt_sha256"] = receipt_sha256(receipt)
-    _memory_finalize(
+    finalized_memory = _memory_finalize(
         ctx,
         prepared,
         receipt["receipt_sha256"],
         {**transition, "transition_sha256": transition_hash},
     )
+    finalized_public = {
+        key: value for key, value in finalized_memory.items() if not key.startswith("_")
+    }
+    if finalized_public != receipt["memory"]:
+        # A best-effort finalize failure is part of the durable audit result.
+        # Strict mode has already raised before this point; the failed
+        # best-effort binding cannot authenticate the pre-finalize hash, so the
+        # local receipt is safely re-hashed with its explicit failure marker.
+        receipt["memory"] = finalized_public
+        receipt["receipt_sha256"] = receipt_sha256(receipt)
     filename = (
         f"{receipt['sequence']:06d}-{event.replace('_', '-')}-"
         f"{receipt['receipt_sha256']}.json"
@@ -1038,6 +1317,7 @@ def _human_acceptance_ref(
     }
 
 
+@_serialized_transition
 def approve(
     artifact_dir: str | Path,
     *,
@@ -1093,7 +1373,8 @@ def _phase_for_handoff(ctx: GovernanceContext, actor_role: str, to_role: str) ->
 def _compiled_guarded(ctx: GovernanceContext) -> list[re.Pattern[str]]:
     raw = ctx.config.get("guarded_path_regex") or []
     values = [raw] if isinstance(raw, str) else raw
-    return [re.compile(str(value)) for value in values]
+    flags = re.IGNORECASE if _filesystem_case_insensitive(ctx.root) else 0
+    return [re.compile(str(value), flags) for value in values]
 
 
 def _guard_match(ctx: GovernanceContext, path: Path) -> re.Match[str] | None:
@@ -1104,6 +1385,450 @@ def _guard_match(ctx: GovernanceContext, path: Path) -> re.Match[str] | None:
         if match:
             return match
     return None
+
+
+def _files_below(directory: Path) -> list[Path]:
+    if not directory.is_dir():
+        return []
+
+    def fail_walk(exc: OSError) -> None:
+        raise RoleGovernanceError(
+            f"cannot enumerate phase-owned directory {directory}: {exc}"
+        ) from exc
+
+    files: list[Path] = []
+    for parent, _subdirs, names in os.walk(
+        directory,
+        topdown=True,
+        onerror=fail_walk,
+        followlinks=False,
+    ):
+        for name in names:
+            candidate = Path(parent) / name
+            if candidate.is_file():
+                files.append(candidate.resolve())
+    return files
+
+
+def _context_artifact_candidates(ctx: GovernanceContext) -> list[Path]:
+    candidates = [ctx.artifact_dir]
+    template = str(ctx.config.get("artifact_dir_template") or "")
+    if template.count("{uc}") == 1:
+        before, after = template.split("{uc}", 1)
+        prefix = Path(before.rstrip("/")) if before.rstrip("/") else Path(".")
+        parent = prefix if prefix.is_absolute() else ctx.root / prefix
+        suffix = Path(after.strip("/")) if after.strip("/") else None
+        parent = _canonical_existing_path(parent)
+        if parent.is_dir() and _within(parent, ctx.root):
+            for child in sorted(parent.iterdir()):
+                if not child.is_dir():
+                    continue
+                candidate = child / suffix if suffix is not None else child
+                if candidate.is_dir() and _within(candidate, ctx.root):
+                    candidates.append(_canonical_existing_path(candidate))
+    dedup = {path.as_posix(): path for path in candidates}
+    return [dedup[key] for key in sorted(dedup)]
+
+
+def _role_evidence_dirs(ctx: GovernanceContext) -> list[Path]:
+    evidence = Path(ctx.policy["evidence_dir"])
+    directories = [
+        (artifact / evidence).resolve()
+        for artifact in _context_artifact_candidates(ctx)
+        if (artifact / evidence).is_dir()
+    ]
+    dedup = {path.as_posix(): path for path in directories}
+    return [dedup[key] for key in sorted(dedup)]
+
+
+def _same_file_as_descendant(path: Path, directories: Iterable[Path]) -> bool:
+    if not path.exists() or not path.is_file():
+        return False
+    return any(
+        _same_existing_path(path, candidate)
+        for directory in directories
+        for candidate in _files_below(directory)
+    )
+
+
+def _phase_owned_files(
+    ctx: GovernanceContext,
+    receipts: Iterable[dict[str, Any]],
+) -> dict[str, tuple[Path, str]]:
+    """Return existing pre-code/implementation/post-run file identities."""
+
+    owned: dict[str, tuple[Path, str]] = {}
+
+    def add(path: Path, phase: str) -> None:
+        canonical = path.resolve()
+        if canonical.is_file():
+            owned.setdefault(canonical.as_posix(), (canonical, phase))
+
+    for name in required_precode_artifacts(ctx.config):
+        add(ctx.artifact_dir / name, "pre_code")
+    if ctx.artifact_dir.is_dir():
+        for path in ctx.artifact_dir.iterdir():
+            if path.is_file() and PRECODE_PREFIX_RE.match(path.name):
+                add(path, "pre_code")
+    for name in POSTRUN_NAMES:
+        add(ctx.artifact_dir / name, "post_run")
+    for name, phase in {
+        "00_multiview": "pre_code",
+        "00_adversarial": "pre_code",
+        "04_execution": "post_run",
+        "05_knowledge": "post_run",
+        "00_post_run": "post_run",
+    }.items():
+        for path in _files_below(ctx.artifact_dir / name):
+            add(path, phase)
+
+    receipt_phases = {
+        "human_acceptance": "pre_code",
+        "designer_handoff": "pre_code",
+        "implementer_acceptance": "pre_code",
+        "implementer_handoff": "implementation",
+        "reviewer_acceptance": "implementation",
+    }
+    for receipt in receipts:
+        phase = receipt_phases.get(str(receipt.get("event") or ""))
+        if phase is not None:
+            for item in receipt.get("artifacts", []):
+                if isinstance(item, dict) and isinstance(item.get("path"), str):
+                    add(ctx.root / item["path"], phase)
+        implementation_files = receipt.get("implementation_files", [])
+        if isinstance(implementation_files, list):
+            for value in implementation_files:
+                if isinstance(value, str):
+                    add(ctx.root / value, "implementation")
+    return owned
+
+
+def _workspace_identity_aliases(root: Path, path: Path) -> list[Path]:
+    """Return existing workspace entries that name the same file object."""
+
+    try:
+        target_stat = path.stat()
+    except OSError:
+        return []
+    if not path.is_file():
+        return []
+    aliases: dict[str, Path] = {}
+
+    def add(candidate: Path) -> None:
+        if _within(candidate, root) and _same_existing_path(path, candidate):
+            aliases.setdefault(candidate.as_posix(), candidate)
+
+    add(path)
+    if target_stat.st_nlink < 2:
+        return [aliases[key] for key in sorted(aliases)]
+
+    def fail_walk(exc: OSError) -> None:
+        raise RoleGovernanceError(
+            f"cannot enumerate workspace file identities below {root}: {exc}"
+        ) from exc
+
+    for parent, subdirs, names in os.walk(
+        root,
+        topdown=True,
+        onerror=fail_walk,
+        followlinks=False,
+    ):
+        subdirs[:] = [
+            name for name in subdirs if name not in {".git", ".bugate-update"}
+        ]
+        for name in names:
+            add(Path(parent) / name)
+    return [aliases[key] for key in sorted(aliases)]
+
+
+def _context_structural_phase_owned_files(ctx: GovernanceContext) -> list[Path]:
+    """Enumerate deterministic pre-code/post-run owners for every configured UC."""
+
+    owned: dict[str, Path] = {}
+
+    def add(path: Path) -> None:
+        canonical = path.resolve()
+        if canonical.is_file():
+            owned.setdefault(canonical.as_posix(), canonical)
+
+    for artifact in _context_artifact_candidates(ctx):
+        for name in required_precode_artifacts(ctx.config):
+            add(artifact / name)
+        for path in artifact.iterdir():
+            if path.is_file() and PRECODE_PREFIX_RE.match(path.name):
+                add(path)
+        for name in POSTRUN_NAMES:
+            add(artifact / name)
+        for name in (
+            "00_multiview",
+            "00_adversarial",
+            "04_execution",
+            "05_knowledge",
+            "00_post_run",
+        ):
+            for path in _files_below(artifact / name):
+                add(path)
+    return [owned[key] for key in sorted(owned)]
+
+
+def _receipt_store_mentions_alias(
+    artifact: Path,
+    evidence_dir: Path,
+    root: Path,
+    aliases: Iterable[Path],
+) -> bool:
+    """Cheaply bind a target identity to a receipt store before parsing it."""
+
+    relpaths = {
+        workspace_rel(alias, root)
+        for alias in aliases
+        if _within(alias, root)
+    }
+    if not relpaths:
+        return False
+
+    def path_values(value: object, *, allow_bare: bool) -> list[str]:
+        if isinstance(value, str):
+            return [value] if allow_bare else []
+        if isinstance(value, list):
+            values: list[str] = []
+            for child in value:
+                if isinstance(child, str):
+                    if allow_bare:
+                        values.append(child)
+                else:
+                    values.extend(path_values(child, allow_bare=False))
+            return values
+        if isinstance(value, dict):
+            values = [
+                child
+                for key, child in value.items()
+                if key == "path" and isinstance(child, str)
+            ]
+            values.extend(
+                item
+                for key, child in value.items()
+                if key != "path" and isinstance(child, (dict, list))
+                for item in path_values(child, allow_bare=False)
+            )
+            return values
+        return []
+
+    def owned_paths(payload: object) -> list[str]:
+        if not isinstance(payload, dict):
+            return []
+        values: list[str] = []
+        if "artifacts" in payload:
+            values.extend(path_values(payload["artifacts"], allow_bare=True))
+        if "implementation_files" in payload:
+            values.extend(
+                path_values(payload["implementation_files"], allow_bare=True)
+            )
+        return values
+
+    def malformed_ownership_mentions(body: bytes) -> bool:
+        text = body.decode("utf-8", errors="ignore")
+        json_string = r'"(?:\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4})|[^"\\])*"'
+
+        def value_fragment(start: int) -> str:
+            while start < len(text) and text[start].isspace():
+                start += 1
+            direct = re.match(json_string, text[start:])
+            if direct:
+                return direct.group(0)
+            if start >= len(text) or text[start] not in "[{":
+                end = start
+                while end < len(text) and text[end] not in ",\n\r}]":
+                    end += 1
+                return text[start:end]
+            stack: list[str] = []
+            quoted = False
+            escaped = False
+            pairs = {"}": "{", "]": "["}
+            for index in range(start, len(text)):
+                char = text[index]
+                if quoted:
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == '"':
+                        quoted = False
+                    continue
+                if char == '"':
+                    quoted = True
+                elif char in "[{":
+                    stack.append(char)
+                elif char in "]}":
+                    if not stack or stack[-1] != pairs[char]:
+                        return text[start:index]
+                    stack.pop()
+                    if not stack:
+                        return text[start : index + 1]
+            return text[start:]
+
+        def decoded_token(token: str) -> str | None:
+            try:
+                value = json.loads(token)
+            except json.JSONDecodeError:
+                return None
+            return value if isinstance(value, str) else None
+
+        def keyed_string_tokens(fragment: str, key: str) -> list[str]:
+            tokens: list[str] = []
+            index = 0
+            while index < len(fragment):
+                match = re.match(json_string, fragment[index:])
+                if match is None:
+                    index += 1
+                    continue
+                token = match.group(0)
+                end = index + len(token)
+                cursor = end
+                while cursor < len(fragment) and fragment[cursor].isspace():
+                    cursor += 1
+                if (
+                    decoded_token(token) == key
+                    and cursor < len(fragment)
+                    and fragment[cursor] == ":"
+                ):
+                    cursor += 1
+                    while cursor < len(fragment) and fragment[cursor].isspace():
+                        cursor += 1
+                    value_match = re.match(json_string, fragment[cursor:])
+                    if value_match is not None:
+                        tokens.append(value_match.group(0))
+                index = end
+            return tokens
+
+        fragments: list[str] = []
+        depth = 0
+        index = 0
+        while index < len(text):
+            match = re.match(json_string, text[index:])
+            if match is not None:
+                token = match.group(0)
+                end = index + len(token)
+                cursor = end
+                while cursor < len(text) and text[cursor].isspace():
+                    cursor += 1
+                if (
+                    depth == 1
+                    and decoded_token(token)
+                    in {"artifacts", "implementation_files"}
+                    and cursor < len(text)
+                    and text[cursor] == ":"
+                ):
+                    fragments.append(value_fragment(cursor + 1))
+                index = end
+                continue
+            if text[index] in "[{":
+                depth += 1
+            elif text[index] in "]}":
+                depth = max(0, depth - 1)
+            index += 1
+
+        for fragment in fragments:
+            try:
+                decoded = json.loads(fragment)
+            except json.JSONDecodeError:
+                tokens = keyed_string_tokens(fragment, "path")
+                stripped = fragment.lstrip()
+                direct = re.match(json_string, stripped)
+                if direct:
+                    tokens.append(direct.group(0))
+                if stripped.startswith("[") and "{" not in stripped:
+                    tokens.extend(re.findall(json_string, stripped))
+                values = [
+                    value
+                    for token in tokens
+                    if (value := decoded_token(token)) is not None
+                ]
+            else:
+                values = path_values(decoded, allow_bare=True)
+            if any(value in relpaths for value in values):
+                return True
+        return False
+
+    receipts = artifact / evidence_dir / "receipts"
+    if not receipts.is_dir():
+        return False
+    for receipt in sorted(receipts.glob("*.json")):
+        try:
+            body = receipt.read_bytes()
+        except OSError as exc:
+            raise RoleGovernanceError(
+                f"cannot inspect role receipt ownership {receipt}: {exc}"
+            ) from exc
+        try:
+            payload = json.loads(body)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            if malformed_ownership_mentions(body):
+                return True
+            continue
+        if any(value in relpaths for value in owned_paths(payload)):
+            return True
+        # A valid JSON parser discards all but the last duplicate object key.
+        # The ownership-limited raw scan preserves visible earlier ownership
+        # fragments without treating run/metadata strings as path authority.
+        if malformed_ownership_mentions(body):
+            return True
+    return False
+
+
+def _completion_evidence_reuses_phase_path(
+    ctx: GovernanceContext,
+    path: Path,
+    receipts: Iterable[dict[str, Any]],
+) -> bool:
+    """Reject phase-owned evidence by path or filesystem-object identity."""
+
+    current_owned = [
+        item for item, _phase in _phase_owned_files(ctx, receipts).values()
+    ]
+    structural_owned = _context_structural_phase_owned_files(ctx)
+    if any(
+        _same_existing_path(path, reserved)
+        for reserved in current_owned + structural_owned
+    ):
+        return True
+
+    aliases = _workspace_identity_aliases(ctx.root, path)
+    if any(_guard_match(ctx, alias) is not None for alias in aliases):
+        return True
+
+    evidence_dir = Path(ctx.policy["evidence_dir"])
+    for artifact in _context_artifact_candidates(ctx):
+        if _same_existing_path(artifact, ctx.artifact_dir):
+            continue
+        if not _receipt_store_mentions_alias(
+            artifact,
+            evidence_dir,
+            ctx.root,
+            aliases,
+        ):
+            continue
+        other = load_context(artifact, root=ctx.root, config=ctx.config)
+        other_receipts = verify_chain(other)
+        if any(
+            _same_existing_path(path, reserved)
+            for reserved, _phase in _phase_owned_files(
+                other, other_receipts
+            ).values()
+        ):
+            return True
+    return False
+
+
+def role_phase_owned_paths(artifact_dir: str | Path) -> dict[str, str]:
+    """Expose verified phase-owned paths for hook same-file identity checks."""
+
+    ctx = load_context(artifact_dir)
+    receipts = verify_chain(ctx) if ctx.mode != "off" else []
+    return {
+        workspace_rel(path, ctx.root): phase
+        for path, phase in _phase_owned_files(ctx, receipts).values()
+    }
 
 
 def implementation_snapshot(
@@ -1143,6 +1868,7 @@ def implementation_snapshot(
     return [dedup[key] for key in sorted(dedup)]
 
 
+@_serialized_transition
 def handoff(
     artifact_dir: str | Path,
     *,
@@ -1202,6 +1928,7 @@ def handoff(
     return _publish(ctx, base, EVENT_STATES[event])
 
 
+@_serialized_transition
 def accept(
     artifact_dir: str | Path,
     *,
@@ -1211,12 +1938,28 @@ def accept(
     session_id: str | None = None,
 ) -> dict[str, Any]:
     ctx = load_context(artifact_dir)
+    if ctx.mode == "off":
+        raise RoleGovernanceError("role governance is off for this profile")
     if phase not in {"implementation", "post_run"}:
         raise RoleGovernanceError("accept --phase must be implementation or post_run")
     actor = _actor(ctx, phase, role=role, session_id=session_id)
     receipts = verify_chain(ctx)
     source_roles = ctx.policy["phases"][phase]["requires_handoff_from"]
     handoff_receipt = _find_handoff(receipts, handoff_id)
+    expected_handoff_event = (
+        "designer_handoff" if phase == "implementation" else "implementer_handoff"
+    )
+    if handoff_receipt.get("event") != expected_handoff_event:
+        raise RoleGovernanceError(
+            f"{phase} acceptance requires a {expected_handoff_event} receipt"
+        )
+    latest_handoff = _latest(receipts, expected_handoff_event)
+    if not latest_handoff or latest_handoff.get("receipt_sha256") != handoff_receipt.get(
+        "receipt_sha256"
+    ):
+        raise RoleGovernanceError(
+            f"{phase} handoff is stale: accept the latest {expected_handoff_event}"
+        )
     if handoff_receipt.get("from_role") not in source_roles:
         raise RoleGovernanceError("handoff source role does not satisfy phase configuration")
     if handoff_receipt.get("to_role") != actor["role"]:
@@ -1246,11 +1989,34 @@ def accept(
         if item.get("event") == event
         and item.get("handoff_receipt_sha256") == handoff_receipt["receipt_sha256"]
     ]
+    chain_state = str(load_chain(ctx).get("state") or INITIAL_STATE)
+    expected_state = {
+        "implementation": "awaiting_implementer_acceptance",
+        "post_run": "awaiting_reviewer_acceptance",
+    }[phase]
+    retry_states = {
+        "implementation": {
+            "implementation_unlocked",
+            "awaiting_reviewer_acceptance",
+            "post_run_active",
+            "closed",
+        },
+        "post_run": {"post_run_active", "closed"},
+    }[phase]
     if existing:
+        if chain_state not in retry_states:
+            raise RoleGovernanceError(
+                f"{phase} acceptance is stale for current chain state {chain_state!r}"
+            )
         prior = existing[-1]
         if prior.get("actor") == actor:
             return prior
         raise RoleGovernanceError("this handoff was already accepted by a different session")
+    if chain_state != expected_state:
+        raise RoleGovernanceError(
+            f"{phase} acceptance requires chain state {expected_state!r}, "
+            f"not {chain_state!r}"
+        )
     base = {
         "event": event,
         "phase": phase,
@@ -1272,7 +2038,9 @@ def accept(
 def _verify_snapshot(ctx: GovernanceContext, receipt: dict[str, Any]) -> None:
     current_profile = profile_snapshot(ctx)
     if receipt.get("profile") != current_profile:
-        raise RoleGovernanceError("active profile hash/path drifted since role transition")
+        raise RoleGovernanceError(
+            "active profile hash/path drifted or effective config changed since role transition"
+        )
     artifacts = receipt.get("artifacts")
     if not isinstance(artifacts, list):
         raise RoleGovernanceError("receipt artifacts snapshot is malformed")
@@ -1283,6 +2051,73 @@ def _verify_snapshot(ctx: GovernanceContext, receipt: dict[str, Any]) -> None:
         current = _snapshot(path, ctx, with_gate="gate_status" in item)
         if current != item:
             raise RoleGovernanceError(f"artifact drift detected: {item['path']}")
+
+
+def _accepted_latest_handoff(
+    receipts: list[dict[str, Any]],
+    acceptance: dict[str, Any],
+    *,
+    phase: str,
+    event: str,
+) -> dict[str, Any]:
+    """Return the handoff accepted by the current generation, never an older one."""
+
+    latest = _latest(receipts, event)
+    if not latest:
+        raise RoleGovernanceError(f"{phase} is locked: {event} missing")
+    if acceptance.get("handoff_receipt_sha256") != latest.get("receipt_sha256"):
+        raise RoleGovernanceError(
+            f"{phase} acceptance is stale: latest {event} has not been accepted"
+        )
+    return _find_handoff(receipts, str(acceptance["handoff_receipt_sha256"]))
+
+
+def _verify_closed_completion(
+    ctx: GovernanceContext,
+    receipts: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Revalidate the terminal 04/05 and execution-evidence snapshot locally."""
+
+    if load_chain(ctx)["state"] != "closed":
+        return None
+    completion = _latest(receipts, "reviewer_completion")
+    if not completion or completion.get("resulting_state") != "closed":
+        raise RoleGovernanceError(
+            "closed role chain has no successful reviewer completion receipt"
+        )
+    _verify_snapshot(ctx, completion)
+    return completion
+
+
+def latest_completion_snapshot_paths(artifact_dir: str | Path) -> set[str]:
+    """Return exact workspace paths captured by the latest completion receipt.
+
+    Hooks use this read-only index so arbitrary execution-evidence names are
+    governed by their receipt identity instead of a filename heuristic.
+    """
+
+    ctx = load_context(artifact_dir)
+    if ctx.mode == "off":
+        return set()
+    receipts = verify_chain(ctx)
+    completion = _latest(receipts, "reviewer_completion")
+    if not completion:
+        return set()
+    artifacts = completion.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise RoleGovernanceError("reviewer completion artifacts snapshot is malformed")
+    paths: set[str] = set()
+    for item in artifacts:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            raise RoleGovernanceError("reviewer completion artifact item is malformed")
+        path = Path(item["path"])
+        if path.is_absolute() or ".." in path.parts or path.as_posix() in {"", "."}:
+            raise RoleGovernanceError("reviewer completion artifact path is unsafe")
+        resolved = (ctx.root / path).resolve()
+        if not _within(resolved, ctx.root):
+            raise RoleGovernanceError("reviewer completion artifact path escapes workspace")
+        paths.add(path.as_posix())
+    return paths
 
 
 def _verify_acceptance_session(
@@ -1317,7 +2152,13 @@ def verify_evidence(
     if ctx.mode == "off":
         return []
     receipts = verify_chain(ctx)
-    if phase in (None, "pre_code"):
+    if phase is None:
+        _verify_closed_completion(ctx, receipts)
+        if strict_memory:
+            for receipt in receipts:
+                _memory_verify(ctx, receipt)
+        return receipts
+    if phase == "pre_code":
         if strict_memory:
             for receipt in receipts:
                 _memory_verify(ctx, receipt)
@@ -1327,7 +2168,12 @@ def verify_evidence(
         if not acceptance:
             raise RoleGovernanceError("implementation is locked: implementer acceptance missing")
         _verify_acceptance_session(ctx, acceptance, phase)
-        handoff_receipt = _find_handoff(receipts, acceptance["handoff_receipt_sha256"])
+        handoff_receipt = _accepted_latest_handoff(
+            receipts,
+            acceptance,
+            phase=phase,
+            event="designer_handoff",
+        )
         if handoff_receipt.get("event") != "designer_handoff":
             raise RoleGovernanceError("implementer acceptance does not reference designer handoff")
         _verify_snapshot(ctx, handoff_receipt)
@@ -1342,8 +2188,20 @@ def verify_evidence(
         acceptance = _latest(receipts, "reviewer_acceptance")
         if not acceptance:
             raise RoleGovernanceError("post-run is locked: reviewer acceptance missing")
+        chain_state = str(load_chain(ctx).get("state") or INITIAL_STATE)
+        if chain_state not in {"post_run_active", "closed"}:
+            raise RoleGovernanceError(
+                f"post-run is locked in chain state {chain_state!r}; "
+                "a current reviewer acceptance is required"
+            )
+        _verify_closed_completion(ctx, receipts)
         _verify_acceptance_session(ctx, acceptance, phase)
-        handoff_receipt = _find_handoff(receipts, acceptance["handoff_receipt_sha256"])
+        handoff_receipt = _accepted_latest_handoff(
+            receipts,
+            acceptance,
+            phase=phase,
+            event="implementer_handoff",
+        )
         if handoff_receipt.get("event") != "implementer_handoff":
             raise RoleGovernanceError("reviewer acceptance does not reference implementer handoff")
         _verify_snapshot(ctx, handoff_receipt)
@@ -1371,6 +2229,7 @@ def preflight(
         if ctx.mode == "off":
             return GovernanceResult(True, "off", phase, INITIAL_STATE)
         chain = load_chain(ctx)
+        chain_state = str(chain.get("state") or INITIAL_STATE)
         errors: list[str] = []
         role = os.environ.get("BUGATE_AGENT_ROLE", "").strip().lower()
         session = os.environ.get("BUGATE_SESSION_ID", "").strip()
@@ -1383,6 +2242,11 @@ def preflight(
             )
         if ctx.policy["session_id_required"] and not session:
             errors.append("BUGATE_SESSION_ID is unset")
+        if phase == "post_run" and chain_state == "closed":
+            errors.append(
+                "post-run is closed by reviewer completion; start a new lifecycle "
+                "generation before further post-run writes"
+            )
         try:
             verify_chain(ctx)
             if require_acceptance and phase in {"implementation", "post_run"}:
@@ -1390,12 +2254,12 @@ def preflight(
         except RoleGovernanceError as exc:
             errors.append(str(exc))
         if errors and ctx.mode == "required":
-            return GovernanceResult(False, ctx.mode, phase, chain["state"], errors=errors)
+            return GovernanceResult(False, ctx.mode, phase, chain_state, errors=errors)
         return GovernanceResult(
             True,
             ctx.mode,
             phase,
-            chain["state"],
+            chain_state,
             warnings=errors if ctx.mode == "advisory" else [],
         )
     except (RoleGovernanceError, SystemExit) as exc:
@@ -1424,6 +2288,7 @@ def preflight(
         return GovernanceResult(False, "required", phase, INITIAL_STATE, errors=[str(exc)])
 
 
+@_serialized_transition
 def complete(
     artifact_dir: str | Path,
     *,
@@ -1438,14 +2303,46 @@ def complete(
     if phase != "post_run":
         raise RoleGovernanceError("complete --phase must be post_run")
     ctx = load_context(artifact_dir)
+    if ctx.mode == "off":
+        raise RoleGovernanceError("role governance is off for this profile")
     actor = _actor(ctx, phase, role=role, session_id=session_id)
-    verify_evidence(ctx.artifact_dir, phase="post_run")
+    receipts = verify_evidence(ctx.artifact_dir, phase="post_run")
     if not run_command.strip():
         raise RoleGovernanceError("--run-command summary is required")
     if final_gate_status not in {"passed", "failed"}:
         raise RoleGovernanceError("--gate-status must be passed or failed")
     report_items = [_snapshot(ctx.artifact_dir / name, ctx, with_gate=True) for name in sorted(POSTRUN_NAMES)]
-    evidence = [_snapshot((Path(p) if Path(p).is_absolute() else ctx.root / Path(p)), ctx) for p in evidence_files]
+    config_owned = [
+        path
+        for path in (
+            ctx.profile_path.resolve(),
+            (ctx.root / "bugate.config.yaml").resolve(),
+        )
+        if path.is_file()
+    ]
+    role_evidence_dirs = _role_evidence_dirs(ctx)
+    evidence = []
+    for supplied in evidence_files:
+        path = Path(supplied)
+        path = _canonical_existing_path(
+            path if path.is_absolute() else ctx.root / path
+        )
+        workspace_rel(path, ctx.root)
+        if any(_within(path, directory) for directory in role_evidence_dirs) or (
+            _same_file_as_descendant(path, role_evidence_dirs)
+        ):
+            raise RoleGovernanceError(
+                "reviewer completion evidence cannot be inside the role evidence directory"
+            )
+        if (
+            any(_same_existing_path(path, reserved) for reserved in config_owned)
+            or _completion_evidence_reuses_phase_path(ctx, path, receipts)
+        ):
+            raise RoleGovernanceError(
+                "reviewer completion evidence cannot reuse a profile, pre-code, "
+                "implementation, or post-run phase-owned path"
+            )
+        evidence.append(_snapshot(path, ctx))
     if not evidence:
         raise RoleGovernanceError("reviewer completion requires at least one --evidence-file")
     if final_gate_status == "passed":
@@ -1476,6 +2373,14 @@ def complete(
             "gate_status": final_gate_status,
         },
     }
+    if load_chain(ctx)["state"] == "closed":
+        prior = _latest(receipts, "reviewer_completion")
+        if prior and prior.get("idempotency_sha256") == _idempotency_payload(base):
+            return prior
+        raise RoleGovernanceError(
+            "post-run is already closed; start a new lifecycle generation before "
+            "publishing a different reviewer completion"
+        )
     return _publish(ctx, base, state)
 
 
@@ -1486,6 +2391,8 @@ def status_data(artifact_dir: str | Path) -> dict[str, Any]:
         error = ""
         try:
             receipts = verify_chain(ctx) if ctx.mode != "off" else []
+            if ctx.mode != "off":
+                _verify_closed_completion(ctx, receipts)
         except RoleGovernanceError as exc:
             receipts = []
             error = str(exc)
@@ -1497,10 +2404,10 @@ def status_data(artifact_dir: str | Path) -> dict[str, Any]:
             "session_id": os.environ.get("BUGATE_SESSION_ID", ""),
             "uc": ctx.uc,
             "artifact_dir": workspace_rel(ctx.artifact_dir, ctx.root),
-            "state": chain["state"],
-            "sequence": chain["sequence"],
-            "head_sha256": chain["head_sha256"],
-            "latest_receipts": chain["latest_receipts"],
+            "state": chain.get("state", "invalid"),
+            "sequence": chain.get("sequence", 0),
+            "head_sha256": chain.get("head_sha256", ""),
+            "latest_receipts": chain.get("latest_receipts", {}),
             "receipt_count": len(receipts),
             "error": error,
         }

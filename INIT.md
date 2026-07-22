@@ -9,8 +9,8 @@
 > Until BUGate ships a packaged console-script, prose shorthand `bugate init`
 > means `python3 scripts/bugate_init.py`.
 >
-> The current release is **v0.4.1**. Its tar and zip archives are accompanied
-> by `bugate-0.4.1.SHA256SUMS`; imported-mode adoption must verify the selected
+> The current release is **v0.4.2**. Its tar and zip archives are accompanied
+> by `bugate-0.4.2.SHA256SUMS`; imported-mode adoption must verify the selected
 > archive before extraction (see `IMPORT_PROMPT.md`).
 
 ---
@@ -37,6 +37,70 @@ BUGate has one usage mode — imported (normative rules: `CHARTER.md` §2 + Amen
   regression). Continue with the core verification steps below. Real-SUT
   validation happens by importing BUGate into an external SUT test repo or a
   scratch repo outside BUGate core; do not mount a SUT into this repository.
+
+Before any imported-mode mutation, classify the target and use exactly one
+entry point:
+
+- **Fresh target (no vendor path):** use the unpacked release's
+  `scripts/bugate_init.py`, first with `--dry-run`, then once without it.
+- **Supported v0.3.x or pre-lock v0.4.0/v0.4.1 import:** do not re-run the
+  installer. From the SUT repo root, use an unpacked v0.4.2-or-later
+  bootstrap, and retain that verified unpacked release outside the repo until
+  the rollback window closes:
+
+  ```bash
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py plan . --vendor-dir .bugate
+  # Require a reviewed Decision: GO.
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
+  ```
+
+- **Lock-based import:** use the installed interface only when both
+  `.bugate/bugate.lock.json` and executable `.bugate/bin/bugate-update` exist.
+  A version label alone is not routing evidence. There is no implicit `latest`;
+  explicitly select a target version:
+
+  ```bash
+  .bugate/bin/bugate-update status
+  .bugate/bin/bugate-update plan --to 0.4.2
+  # Require a reviewed Decision: GO.
+  .bugate/bin/bugate-update apply --to 0.4.2
+  .bugate/bin/bugate-update verify
+  # Only for an intentional reversal of a committed transaction:
+  .bugate/bin/bugate-update rollback --transaction <transaction-id>
+  BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+  if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
+    .bugate/bin/bugate-update verify
+  else
+    python3 "$BOOTSTRAP" verify . --vendor-dir .bugate
+  fi
+  ```
+
+  The fallback is required when the first updater transaction rolls back to a
+  v0.3.x or pre-lock v0.4.0/v0.4.1 projection: exact restoration removes the
+  installed lock and launcher. If rollback is interrupted after that removal,
+  use the same external bootstrap for `status`, exact rollback recovery, and
+  `verify`; never copy the launcher back manually.
+
+For an offline update, pass the matching archive and checksum asset together to
+both `plan` and `apply`: `--archive /outside/bugate-0.4.2.tar.gz --checksums
+/outside/bugate-0.4.2.SHA256SUMS`. `status`, `plan`, and `verify` are read-only;
+`plan` and `apply --dry-run` make zero persistent target writes. A managed
+local change, unknown hook shape, type/mode drift, or mixed legacy layout makes
+the plan `NO-GO`; there is no broad `--force` and no installer fallback.
+Unrelated dirty files are preserved and reported only as warnings.
+
+Engine update and profile migration are separate changes. The updater may
+report `migration_available` or blocking `migration_required`, but never edits
+`bugate.config.yaml`, `bugate.profile.yaml`, tests, artifacts, evidence, Memory,
+or SUT-owned hooks. Review any profile migration separately and commit it as a
+separately reversible change.
+
+After a fresh install or an apply that changes hooks, start a **new** session
+rooted at the imported repo. Re-trust Codex Desktop only when the installer or
+updater reports that `.codex/hooks.json` changed; re-trust does not replace the
+new-session requirement.
 
 ### Step 1 — Check the one hard requirement: Python
 
@@ -74,7 +138,10 @@ BUGate runs as a skill under Claude Code and Codex:
 - Skill: `.shared/skills/bugate/` (discovered via `.claude/skills/` for Claude Code and `.agents/skills/` for Codex; `.codex/skills/` remains a legacy Codex compatibility bridge).
 - Hooks: `.claude/settings.json` and `.codex/hooks.json` for project-local development; plugin installs use plugin-root `hooks/hooks.json`. Root resolution is **git-free** and split: hooks find the engine by walking up for `scripts/bugate_core.py` or via the plugin/vendor root; gate scripts find the active project via the nearest `bugate.config.yaml` (sentinel fallback for self-development). In v0.4.0, the hook set keeps the pre-code guard and role-evidence guard independent; the orchestrator/Core mutators also run the same role preflight because Python writes do not trigger an agent PreToolUse hook.
 - Plugins: `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` are manifests only; shared `skills/`, `commands/`, `agents/`, `hooks/`, `scripts/`, and `bin/` stay at the plugin root.
-- **Codex only:** changing any hook requires re-trusting its hash in the Codex hook-management UI. **Claude plugin changes:** run `/reload-plugins` or reinstall/update the plugin.
+- **Runtime reload:** any changed hook requires a new Claude/Codex session.
+  **Codex only:** re-trust in the hook-management UI only when the Codex hook
+  file hash actually changed. **Claude plugin changes:** run `/reload-plugins`
+  or reinstall/update the plugin as well.
 
 No install is needed for this — the hooks invoke the same stdlib-only scripts you verified in Step 2.
 
@@ -184,8 +251,8 @@ never delete or hand-edit it as a reset.
 
 `bugate-role run` exports role/session values only to its child. Hooks cannot
 export into a parent, and an already-running Desktop app must be relaunched
-from the intended environment. Codex Desktop must also re-trust the changed
-v0.4.0 hook hash. The chain is audit evidence, not strong identity:
+from the intended environment. Codex Desktop must also re-trust when its hook
+hash changed (as it did for the v0.4.0 transition). The chain is audit evidence, not strong identity:
 `approved_by` is declarative, local hooks cannot catch arbitrary shell or
 external-editor writes, and non-repudiation requires OS/container/managed-runner
 or role-scoped credential isolation.
@@ -231,6 +298,9 @@ Requirements:
    ephemeral fixtures only):
    - python3 -m py_compile scripts/*.py
    - python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
+   - If this is an imported installation with `.bugate/bin/bugate-update`, run
+     its read-only `status` and `verify`; any conflict or recovery-required
+     state is a failed installation check, not a green core check.
 3. Verify Codex / Claude Code:
    - type -a codex; type -a claude
    - codex --version; claude --version
@@ -299,6 +369,7 @@ ephemeral fixtures, and optional runtimes are verified.
 | 4-layer gate engine (core) | **nothing** | gate scripts + templates | — (always works) |
 | Run under an agent | nothing | `.claude` / `.codex` hooks | — |
 | Import into a SUT repo | nothing | `bugate.config.yaml` + profile schema | — |
+| Update an imported install | nothing | `bugate-update` status/plan/apply/verify/rollback + installed lock/transaction journal | fail-closed on drift/conflict; profile migration stays separate |
 | Dual-agent cross-audit | `codex` + `claude` CLIs | `sdtd_multiview*` | yes → deterministic placeholder |
 | Agent memory + promotion (**required core**) | nothing — auto-installed by `bugate init` | `memory_bus.py` + `bin/memory-*` | required; auto-installs + self-heals; ordinary edits stay non-blocking, strict lifecycle transitions fail closed |
 | Path-role isolation | nothing | `check_agent_role_paths.py` | — (independent, default-OFF) |

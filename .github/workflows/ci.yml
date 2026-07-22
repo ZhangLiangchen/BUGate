@@ -4,17 +4,153 @@ on:
   push:
   pull_request:
 
+env:
+  BUGATE_RELEASE_VERSION: "0.4.2"
+
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Enforce repository, plugin, updater, and tag version consistency
+        run: |
+          python3 - <<'PY'
+          import ast
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          version = os.environ["BUGATE_RELEASE_VERSION"]
+          plugin_versions = {
+              path: json.loads(Path(path).read_text(encoding="utf-8"))["version"]
+              for path in (
+                  ".codex-plugin/plugin.json",
+                  ".claude-plugin/plugin.json",
+              )
+          }
+
+          updater_path = Path("scripts/bugate_update.py")
+          tree = ast.parse(
+              updater_path.read_text(encoding="utf-8"),
+              filename=str(updater_path),
+          )
+          updater_versions = []
+          for node in tree.body:
+              if isinstance(node, ast.Assign):
+                  targets = node.targets
+                  value = node.value
+              elif isinstance(node, ast.AnnAssign):
+                  targets = [node.target]
+                  value = node.value
+              else:
+                  continue
+              if any(
+                  isinstance(target, ast.Name) and target.id == "UPDATER_VERSION"
+                  for target in targets
+              ):
+                  updater_versions.append(ast.literal_eval(value))
+          if updater_versions != [version]:
+              raise SystemExit(
+                  f"updater/repository version mismatch: "
+                  f"repository={version!r}, updater={updater_versions!r}"
+              )
+          mismatched = {
+              path: value
+              for path, value in plugin_versions.items()
+              if value != version
+          }
+          if mismatched:
+              raise SystemExit(
+                  f"plugin/repository version mismatch: "
+                  f"repository={version!r}, plugins={mismatched!r}"
+              )
+
+          for suffix in (".md", ".zh-CN.md"):
+              note = Path(f"docs/releases/v{version}{suffix}")
+              if not note.is_file():
+                  raise SystemExit(f"missing bilingual release note: {note}")
+
+          if os.environ.get("GITHUB_REF_TYPE") == "tag":
+              tag = os.environ.get("GITHUB_REF_NAME", "")
+              expected = f"v{version}"
+              if tag != expected:
+                  raise SystemExit(
+                      f"tag/repository version mismatch: "
+                      f"repository={version!r}, tag={tag!r}"
+                  )
+              tag_type = subprocess.check_output(
+                  ["git", "cat-file", "-t", f"refs/tags/{tag}"], text=True
+              ).strip()
+              if tag_type != "tag":
+                  raise SystemExit(f"release ref must be an annotated tag: {tag}")
+              peeled = subprocess.check_output(
+                  ["git", "rev-parse", f"{tag}^{{commit}}"], text=True
+              ).strip()
+              head = subprocess.check_output(
+                  ["git", "rev-parse", "HEAD"], text=True
+              ).strip()
+              if peeled != head:
+                  raise SystemExit(
+                      f"release tag does not peel to checked-out commit: "
+                      f"tag={peeled}, HEAD={head}"
+                  )
+
+          print(
+              f"release version agreement: repository/plugins/updater"
+              + ("/tag" if os.environ.get("GITHUB_REF_TYPE") == "tag" else "")
+              + f" = {version}"
+          )
+          PY
+
+      - name: Verify seven formal legacy tags
+        run: |
+          python3 - <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          sys.path.insert(0, "scripts")
+          import bugate_install_contract as contract
+
+          expected = (
+              "v0.3.0",
+              "v0.3.1",
+              "v0.3.2",
+              "v0.3.4",
+              "v0.3.5",
+              "v0.4.0",
+              "v0.4.1",
+          )
+          if tuple(contract.SUPPORTED_LEGACY_TAGS) != expected:
+              raise SystemExit(
+                  "legacy-tag contract drift: "
+                  f"expected={expected!r}, actual={contract.SUPPORTED_LEGACY_TAGS!r}"
+              )
+          for tag in expected:
+              ref = f"refs/tags/{tag}"
+              kind = subprocess.check_output(
+                  ["git", "cat-file", "-t", ref], text=True
+              ).strip()
+              if kind != "tag":
+                  raise SystemExit(f"legacy source is not an annotated tag: {tag}")
+              commit = subprocess.check_output(
+                  ["git", "rev-parse", f"{tag}^{{commit}}"], text=True
+              ).strip()
+              if re.fullmatch(r"[0-9a-f]{40,64}", commit) is None:
+                  raise SystemExit(f"legacy tag does not peel to a commit: {tag}")
+              print(f"verified annotated legacy tag: {tag} -> {commit}")
+          PY
 
       - name: Compile all gate scripts
         run: python3 -m py_compile scripts/*.py
@@ -110,3 +246,51 @@ jobs:
               sys.exit(1)
           print("Core is stdlib-only: OK")
           PY
+
+      - name: Build and checksum actual repository release archives
+        run: |
+          if [ -n "$(git status --porcelain=v1 --untracked-files=all)" ]; then
+            echo "release archive build requires a clean checkout" >&2
+            git status --short >&2
+            exit 1
+          fi
+          release_dir="$RUNNER_TEMP/bugate-release"
+          python3 scripts/build_release_archives.py \
+            --version "$BUGATE_RELEASE_VERSION" \
+            --out-dir "$release_dir"
+          (
+            cd "$release_dir"
+            test "$(find . -maxdepth 1 -type f | wc -l | tr -d ' ')" = "3"
+            shasum -a 256 -c "bugate-${BUGATE_RELEASE_VERSION}.SHA256SUMS"
+          )
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Archive-native v0.3.2 update acceptance (synthetic CI runtime)
+        run: |
+          release_dir="$RUNNER_TEMP/bugate-release"
+          python3 tests/accept_release_assets.py \
+            --tar "$release_dir/bugate-${BUGATE_RELEASE_VERSION}.tar.gz" \
+            --zip "$release_dir/bugate-${BUGATE_RELEASE_VERSION}.zip" \
+            --checksums "$release_dir/bugate-${BUGATE_RELEASE_VERSION}.SHA256SUMS" \
+            --version "$BUGATE_RELEASE_VERSION" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --full-check-mode smoke \
+            --full-check-archive both \
+            --full-check-timeout 180 \
+            --report "$RUNNER_TEMP/bugate-release-acceptance.json"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      # CI audit retention only. Publication remains a separate, gated manual
+      # action after main/tag/archive-native acceptance.
+      - name: Upload verified release archives for audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: bugate-${{ env.BUGATE_RELEASE_VERSION }}-verified-release-archives
+          path: |
+            ${{ runner.temp }}/bugate-release/bugate-${{ env.BUGATE_RELEASE_VERSION }}.tar.gz
+            ${{ runner.temp }}/bugate-release/bugate-${{ env.BUGATE_RELEASE_VERSION }}.zip
+            ${{ runner.temp }}/bugate-release/bugate-${{ env.BUGATE_RELEASE_VERSION }}.SHA256SUMS
+            ${{ runner.temp }}/bugate-release-acceptance.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

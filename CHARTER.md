@@ -4,14 +4,15 @@ id: CHARTER-BUGATE-001
 title: BUGate positioning, usage model, and evolution plan
 status: accepted
 created_at: 2026-07-03
-amended_at: 2026-07-06 (A4; A3/A2 2026-07-04; A1 2026-07-03)
+amended_at: 2026-07-22 (A5; A4 2026-07-06; A3/A2 2026-07-04; A1 2026-07-03)
 authority: ADR-BUGATE-001
 companions:
   - docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md
   - docs/qa-methodology/TRANSITION_PROTOCOL.md
   - docs/qa-methodology/BUGATE_DESUT_CALIBRATION_ADR.md
   - docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md
-updated_at: 2026-07-20 (Wave 7 capability alignment; no charter decision changed)
+  - docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.md
+updated_at: 2026-07-22 (A5 imported-updater boundary)
 provenance: >
   Produced by independent dual-agent analysis (Claude Code and Codex reached
   convergent conclusions from separate contexts, then were cross-checked),
@@ -487,6 +488,38 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
   ADR / transition protocol 中的旧工作台挂载、local profile pointer 例外统一
   改读为 Governed SUT Test Repo / imported SUT repo。历史案例可提旧桥接方式，
   但必须标注为 retired extraction-era practice。
+
+### A5 — Imported 安装增量更新：init 与 update 分权（2026-07-22）
+
+- **批准**：human owner 直接指令（2026-07-22）。规范锚点：
+  `docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.md`（target release v0.4.2）。
+- **立法本意**：R5 的“版本化引入、升级走版本号”不能继续由重跑 importer 或
+  手工 re-vendor 实现。首次安装、engine update 与 profile/governance activation
+  必须成为三条 ownership 清晰、可分别审计和回滚的路径。
+- **§2.2 R5 / §5.2 生效文本**（旧 P1 规划原文保留作为历史）：
+  1. `bugate_init.py` 只负责 fresh imported installation；不得把 re-import、scaffold
+     refresh 或第二套 upgrade engine 包装成 init。
+  2. 精确受支持的 v0.3.x 与 pre-lock v0.4.x 安装，从解压 release 的
+     `bugate_update.py` 一次性 bootstrap；建立 installed lock 后，只使用 vendored
+     `bugate-update status` → `plan` → `apply` → `verify`，rollback 必须指定 exact
+     transaction ID。禁止隐式 `latest` 与 best-effort layout 猜测。
+  3. `plan` 对 target repo 零写入；`apply` 只按 release manifest projection 做
+     journaled transaction。无宽泛 `--force`；managed local drift、混合 fingerprint、
+     非标准 hook、stale rollback 或 128 条 descriptor-safe history 上限均 fail-closed，
+     禁止靠删除 journal/history 或覆盖冲突制造“升级成功”。
+  4. Offline update 必须成对提供 archive 与 checksum。SHA-256/manifest 校验是
+     tamper-evident integrity，不是 publisher identity 或 signed supply chain；能同时
+     替换 archive/checksum 的攻击者不在该保证内。
+  5. Engine transaction 永不编辑 profile/config、Memory、acceptance、role receipt、
+     `00_role_evidence/**` 或 SUT-owned surface。兼容的 engine 更新先保持 legacy/off
+     profile 并形成第一个 commit；profile migration/strict governance activation 是
+     第二个显式人工 action、独立 diff 与独立 commit，且不得伪造 lifecycle evidence。
+  6. 只有 `.codex/hooks.json` bytes 实际变化时才要求 Codex Desktop re-trust；任一
+     hook 变化都要求新 agent session。在所需 re-trust/session boundary 完成前，
+     只能宣布 file/engine verification，不能宣布新 runtime enforcement 已激活。
+- **历史文本读法**：ADR-BUGATE-002 §6“升级重跑 installer”与 v0.4.0
+  ROLE_GOVERNANCE_PROTOCOL §7 同类句子均保留为当时记录，但由本修正案及各文档的
+  2026-07-22 amendment 明确取代，不再是当前 SOP。
 
 ---
 

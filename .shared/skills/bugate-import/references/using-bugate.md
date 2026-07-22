@@ -9,9 +9,13 @@ imported into a SUT automation test repo. (`.bugate` below = the vendor dir.)
 
 Open the **SUT test repo itself** (the directory holding `bugate.config.yaml`)
 as the project root. Hooks load from that session workspace; opening a parent
-directory carries no physical guard. After import or re-import, re-trust the
-changed Codex hook hash in Desktop. Until re-trust, file acceptance can pass but
-Codex runtime enforcement is not active.
+directory carries no physical guard. For a fresh import, follow the install
+acceptance output; for an existing installation, use
+[`updating-bugate.md`](updating-bugate.md), never a re-import. Re-trust Codex
+Desktop only when import/update actually changes its hook hash, and open a new
+agent session after any hook change. Until those required process boundaries
+are complete, file acceptance can pass but the new runtime enforcement is not
+active.
 
 With `role_governance.mode: required`, use three separate processes/sessions:
 
@@ -154,6 +158,8 @@ for peer subprocesses while lifecycle role/session/receipt identity is removed.
 
 ## 5. Where the deeper docs live
 
+- Fresh-install versus update routing, transactional upgrade, verification,
+  rollback, and profile/session boundaries: `updating-bugate.md`.
 - Layout/profile adaptation: this skill's `SKILL.md` (one directory up).
 - Operations, diagnosis, and recovery: `field-guide.md`.
 - Gate criteria and schema: `.bugate/.shared/skills/bugate/`.

@@ -6,15 +6,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_bugate.py\""
+            "command": "BUGATE_HOOK_ID='bugate.claude.pre.write.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_bugate.py\""
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_plan_lock.py\""
+            "command": "BUGATE_HOOK_ID='bugate.claude.pre.write.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_plan_lock.py\""
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_role_evidence.py\""
+            "command": "BUGATE_HOOK_ID='bugate.claude.pre.write.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_role_evidence.py\""
           }
         ]
       },
@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_agent_role_paths.py\""
+            "command": "BUGATE_HOOK_ID='bugate.claude.pre.role.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_agent_role_paths.py\""
           }
         ]
       },
@@ -32,19 +32,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_bugate.py\""
+            "command": "BUGATE_HOOK_ID='bugate.codex.pre.write.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_bugate.py\""
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_plan_lock.py\""
+            "command": "BUGATE_HOOK_ID='bugate.codex.pre.write.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_plan_lock.py\""
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_agent_role_paths.py\""
+            "command": "BUGATE_HOOK_ID='bugate.codex.pre.write.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_agent_role_paths.py\""
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_role_evidence.py\""
+            "command": "BUGATE_HOOK_ID='bugate.codex.pre.write.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/check_role_evidence.py\""
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/bugate_prompt_reminder.py\""
+            "command": "BUGATE_HOOK_ID='bugate.plugin.prompt.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/bugate_prompt_reminder.py\""
           }
         ]
       }
@@ -64,11 +64,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/memory_bus.py\" session-start --agent agent"
+            "command": "BUGATE_HOOK_ID='bugate.plugin.session-start.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/memory_bus.py\" session-start --agent agent"
           },
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; \"${CLAUDE_PLUGIN_ROOT}/bin/bugate-role\" session-start"
+            "command": "BUGATE_HOOK_ID='bugate.plugin.session-start.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; \"${CLAUDE_PLUGIN_ROOT}/bin/bugate-role\" session-start"
           }
         ]
       }
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/memory_bus.py\" stop --agent \"${BUGATE_AGENT_ROLE:-agent}\""
+            "command": "BUGATE_HOOK_ID='bugate.plugin.stop.v1'; export BUGATE_HOOK_ID; ROOT=\"$(/usr/bin/env python3 -c 'import os; from pathlib import Path; p=Path.cwd(); print(os.environ.get(\"BUGATE_PROJECT_ROOT\") or next((str(c) for c in [p,*p.parents] if (c/\"bugate.config.yaml\").exists()), \"\"))')\"; [ -n \"$ROOT\" ] || exit 0; /usr/bin/env python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/memory_bus.py\" stop --agent \"${BUGATE_AGENT_ROLE:-agent}\""
           }
         ]
       }

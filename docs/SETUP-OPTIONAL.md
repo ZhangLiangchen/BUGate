@@ -7,6 +7,14 @@ manual/offline reference for the component that `bugate_init.py` and
 packaged console-script, prose shorthand `bugate init` means
 `python3 scripts/bugate_init.py`.
 
+That shorthand is **fresh-install-only**. Never use it to refresh an existing
+import. For an exact v0.3.x/pre-lock v0.4.x baseline, bootstrap from an unpacked
+release; once the updater is installed, use the vendored
+`status` → `plan` → `apply` → `verify` flow (or explicit transaction rollback).
+The complete online/offline, conflict, recovery, profile-migration, re-trust,
+and new-session procedure is
+[`updating-bugate.md`](../.shared/skills/bugate-import/references/updating-bugate.md).
+
 The BUGate **gate engine** (the 4-layer gate) is zero-dependency stdlib Python —
 see [`INIT.md`](../INIT.md). This document covers the runtimes that call out
 beyond stdlib. **One is required, two are optional:**
@@ -299,9 +307,12 @@ invokes all four. SessionStart performs best-effort Memory recall and
 `bugate-role session-start`; Stop remains a best-effort heartbeat using the
 active role or `agent`.
 
-Re-running `bugate_init.py` refreshes vendored scripts and BUGate-owned hooks
-while preserving SUT-owned hooks. Any Codex hook hash change requires re-trust;
-before it, do not claim runtime enforcement is active.
+Update an existing engine only through `bugate-update`; do not rerun
+`bugate_init.py`. The updater preserves profiles, role evidence, Memory, and
+SUT-owned hooks, and profile activation remains a separate explicit diff and
+commit. Re-trust Codex only when the update reports an actual Codex hook hash
+change. Any hook change also requires a new agent session; before both required
+boundaries are complete, do not claim the new runtime enforcement is active.
 
 ### Verify
 

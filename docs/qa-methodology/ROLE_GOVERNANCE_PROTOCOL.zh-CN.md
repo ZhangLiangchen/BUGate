@@ -18,6 +18,10 @@ Wave 1 与 Wave 7 解决不同的独立性问题：
 runtime 名只能进入 receipt runtime metadata，不能充当角色。现有 `agent_roles`
 是独立的路径访问策略，继续兼容 legacy/SUT 自定义角色以及 bare-list、read、
 write 三种形式。
+冻结的 v0.4.x 状态机采用 canonical phase ownership，而不是可编程角色交换：
+pre-code 固定为 `designer`，implementation 固定为 `implementer`，post-run 固定为
+`reviewer`。在 `required` 模式中，交换或组合这些 owner 的 profile 属于非法配置，
+必须 fail-closed；`advisory` 只报告该配置且不宣称解锁。
 
 ## 2. 配置契约
 
@@ -109,12 +113,30 @@ transition hash。
 Designer handoff 捕获 active profile、全部 required pre-code 工件、存在时的正式
 `00_multiview` 输出、03B dispatch provenance 与当前 human-acceptance receipt。
 Implementer handoff 增加实现文件 hash；reviewer completion 增加 04/05、执行日志
-与 evidence。
+与 evidence。成功 completion 是 terminal：status、verify 与 post-run preflight
+必须持续本地复验其 profile、04/05 和执行 evidence snapshot。在 `required` 模式
+进入 `closed` 后，受支持 tool 的写入必须阻塞；`advisory` 仍只警告。有意修改受治理
+内容必须建立新的 handoff/acceptance lifecycle generation。
 
 Receipt/chain 发布使用同目录临时文件、flush、`fsync` 与 `os.replace`。不得落盘
 secret 或 Memory credential。每次受治理编辑只在本地复核 receipt 内容/hash、链
 链接/head、profile hash、pre-code hash/gate status 与实现文件 hash；禁止每次编辑
 访问 Memory Service。
+
+新 receipt 同时绑定两类配置来源：`profile.path` 和 `profile.sha256` 标识被选中的
+profile 文件，`profile.effective_config_sha256` 则对转换时真正生效的 canonical
+base+profile 合并 mapping 做摘要。因此，即使 profile 文件字节未变，继承自 base
+config 的策略发生变化也会重新上锁。Validator 仍能解析 v0.4.0/v0.4.1 的旧两字段
+profile snapshot，避免 append-only chain 无法恢复；但旧 snapshot 不能继续解锁，
+必须追加 superseding human-acceptance/handoff generation。治理为 `off` 时，
+`approve`、`handoff`、`accept`、`complete` 等 lifecycle publisher 会拒绝，而不是
+生成看似有效但实际 inert 的 receipt。
+
+Reviewer completion 只接受专用 execution evidence；base config、selected profile、
+任一已配置 role-evidence 目录，以及 pre-code、implementation、post-run phase-owned
+路径都不能复用为 evidence。Hook 以 canonical resolved workspace path 绑定任意捕获
+日志，因此 `..` 与 symlink alias 不能绕过 terminal snapshot。同一路径若被多个 UC
+捕获，写入必须同时通过所有 owner 的 post-run preflight；不得按排序选择第一个 UC。
 
 ## 5. Strict Memory 转换协议
 
@@ -157,7 +179,8 @@ project root、proxy、model 与 reasoning effort 配置。
 
 ## 7. 兼容、恢复与安全边界
 
-不含 `role_governance` 的 profile 与 v0.3.x 行为一致。启用 `required` 不会给历史
+以下为冻结的 v0.4.0 行为，自 v0.4.2 起已由 §8 取代。不含 `role_governance` 的
+profile 与 v0.3.x 行为一致。启用 `required` 不会给历史
 passed UC 自动补证据：必须创建当前 human acceptance、handoff、acceptance chain。
 profile/pre-code drift 从 designer acceptance/handoff 重启；implementation drift 从
 implementer handoff/reviewer acceptance 重启。rerun importer 会刷新 vendored scripts
@@ -168,3 +191,18 @@ implementer handoff/reviewer acceptance 重启。rerun importer 会刷新 vendor
 真实操作者。强身份隔离需要独立 OS 账号、容器、managed runner 或按角色发放的
 服务端凭据。Hook 也无法拦截任意 shell 重定向或外部编辑器；支持的 agent tool、
 orchestrator 与 Core mutator 会被强制治理，更强的文件系统隔离属于 managed runner。
+
+## 8. 修正案——imported updater 边界（2026-07-22）
+
+§7 中“重跑 importer 刷新已有安装”的句子作为冻结的 v0.4.0 历史记录保留，但自
+v0.4.2 及后续兼容 release 起已被取代。`bugate_init.py` 只用于首次安装。精确匹配的
+v0.3.x 或 pre-lock v0.4.x 安装从解压 release bootstrap；已有 updater 的安装使用
+vendored `status` → `plan` → `apply` → `verify`，并只按明确 transaction ID 回滚。
+详见 [Imported-mode 更新器契约](IMPORTED_UPDATER_CONTRACT.zh-CN.md) 与 vendored
+`bugate-import/references/updating-bugate.zh-CN.md` 操作手册。
+
+更新器可以替换支持 role governance 的 engine/hook 文件，但绝不激活 governance、
+编辑 profile/Memory/role evidence 或制造 lifecycle receipt。Engine update 与 profile
+migration 必须分别审查、分别提交、分别可回滚。只有 Codex hook bytes 实际变化时才
+要求 Codex Desktop re-trust；任一 hook 变化都要求新开 agent session，完成前不得声称
+新的 enforcement surface 已激活。

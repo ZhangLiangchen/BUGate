@@ -3,6 +3,7 @@ title: "新人 QA 执行手册（SOP）"
 subtitle: "基于业务理解约束层方法论的工程化操作指南"
 version: 1.0
 date: 2026-05-11
+last_updated: 2026-07-22
 companion: METHOD.md
 scope: Wave 0 - Wave 3（业务理解闭环）+ Wave 7（已发布可审计执行 SOP）
 ---
@@ -779,13 +780,26 @@ known_unknowns:
 > 适用条件：imported repo 显式启用 `role_governance.mode: required`。
 > Wave 1 peer review 是 designer 阶段内的独立互审，不是 Wave 7 actor。
 
-### A. 一次性激活与负控制
+### A. 引擎更新、治理激活与负控制（两个动作、两个 commit）
 
-1. 用 `bugate_init.py` 重跑导入器，刷新 vendored scripts/hooks，并确认 SUT 自有 hook 仍在。
-2. 将 profile 中唯一的 `role_governance` 从 `mode: off` 替换为
-   `profile-schema.md` 的完整 required 块；`agent_roles` 保持为独立路径策略。
-3. Codex Desktop 对新 hook hash 执行 re-trust。未 re-trust 时只能宣布文件/re-vendor 验收通过，不能宣布 Wave 7 runtime 已激活。
-4. 在临时 UC 上验证：角色 unset 和 wrong role 都拒绝；直接改
+1. `bugate_init.py` 只用于首次导入，禁止通过重跑 importer 升级已有安装。需要更新
+   引擎时，按 imported adapter 的
+   [`updating-bugate.zh-CN.md`](../../.shared/skills/bugate-import/references/updating-bugate.zh-CN.md)
+   执行：pre-updater v0.3.x/pre-lock v0.4.x 从解压 release bootstrap；之后使用
+   `.bugate/bin/bugate-update status` → `plan` → `apply` → `verify`。offline 模式必须
+   同时给 archive 与 checksum；任何 conflict/`NO-GO` 都先停止处理，禁止 `--force`。
+2. 审查 update diff、transaction ID、`verify` 与 smoke 结果，确认 SUT-owned hook/profile/
+   receipt/Memory 未被修改；先把完整 BUGate-owned installed projection（含 lock/hook）
+   作为**第一个 commit**提交，
+   legacy/off profile 保持不变。
+3. 只有 update 实际改变 `.codex/hooks.json` hash 时才在 Codex Desktop re-trust；任一
+   hook 变化后都要新开 agent session。完成这些边界前，只能宣布文件/engine 验收通过，
+   不能宣布 Wave 7 runtime 已激活。
+4. 再把 profile 中唯一的 `role_governance` 从 `mode: off` 替换为
+   `profile-schema.md` 的完整 required 块；`agent_roles` 保持为独立路径策略。该 profile
+   migration 是显式人工动作，须独立审 diff、独立验证并作为**第二个 commit**提交；
+   updater 不得代改 profile，也不得伪造 acceptance/handoff/receipt。
+5. 在临时 UC 上验证：角色 unset 和 wrong role 都拒绝；直接改
    `00_role_evidence/**` 拒绝；Memory 不可用时 strict transition 非零且无本地 receipt。
 
 ### B. 三个独立会话
@@ -848,6 +862,12 @@ bin/bugate-role complete <artifact-dir> --phase post_run \
 
 Passed completion 要求 exit code 0 且 04/05 均 passed。Failed completion 保持
 `post_run_active`，不制造假绿。
+
+`--evidence-file` 必须指向专用执行证据，不能复用 `bugate.config.yaml`、active
+profile、任何 UC 的 `00_role_evidence/**`、pre-code、实现文件或 04/05 路径。
+共享 external log 会同时受所有引用它的 UC 约束；任一 owner 已关闭、stale 或 session
+不匹配，hook 都会阻止写入。路径按 canonical resolved identity 比对，不能借 `..` 或
+symlink alias 绕过。
 
 ### F. Drift 恢复和安全边界
 
