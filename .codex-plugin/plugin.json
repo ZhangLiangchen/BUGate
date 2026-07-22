@@ -1,7 +1,7 @@
 {
   "name": "bugate",
-  "version": "0.4.1",
-  "description": "Agentic QA governance kit / SDTD gate engine: pre-code gates, auditable lifecycle-role handoffs, hash-linked evidence, strict Memory transitions, dual-runtime peer bridges, and physical write guards. Inert until the project carries a committed bugate.config.yaml.",
+  "version": "0.4.2",
+  "description": "Agentic QA governance kit / SDTD gate engine: pre-code gates, auditable lifecycle-role handoffs, first-class imported-mode updates, hash-linked evidence, strict Memory transitions, dual-runtime peer bridges, and physical write guards. Inert until the project carries a committed bugate.config.yaml.",
   "author": {
     "name": "BUGate maintainers"
   },
@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "BUGate",
     "shortDescription": "Govern AI test development with auditable gates.",
-    "longDescription": "BUGate packages SUT-neutral Agentic QA governance: shared skills, fail-closed hooks, stdlib gate scripts, auditable designer/implementer/reviewer transitions, peer-review adapters, and Memory-backed evidence for imported SUT automation test repos.",
+    "longDescription": "BUGate packages SUT-neutral Agentic QA governance: shared skills, fail-closed hooks, stdlib gate scripts, auditable designer/implementer/reviewer transitions, peer-review adapters, first-class manifest-bound updates, and Memory-backed evidence for imported SUT automation test repos.",
     "developerName": "BUGate maintainers",
     "category": "Productivity",
     "capabilities": [
@@ -31,6 +31,8 @@
     "websiteURL": "https://github.com/ZhangLiangchen/BUGate",
     "defaultPrompt": [
       "Use BUGate to govern this SUT test workspace: recall the active profile, build the pre-code artifacts, and enforce any configured role handoff before test implementation.",
+      "For a fresh BUGate import, use the bugate-import guidance to inspect the test repo, run bugate_init.py, and bind the profile from evidence without inventing SUT facts.",
+      "For an existing imported BUGate installation, use the bugate-import updater guidance and bugate-update status/plan/apply/verify/rollback; do not use bugate_init.py as an updater, and preserve the profile, Memory namespace, evidence, and SUT-owned files.",
       "Use BUGate full check to verify this checkout's skills, hooks, gates, optional runtimes, and memory-bus wiring."
     ]
   }

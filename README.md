@@ -15,10 +15,10 @@ opening this repo is just developing BUGate itself), naming, and the
 evolution plan are chartered in
 [`CHARTER.md`](CHARTER.md) (CHARTER-BUGATE-001).
 
-**Current release: v0.4.1.** See the
-[release notes](docs/releases/v0.4.1.md). GitHub Releases publish three assets:
-`bugate-0.4.1.tar.gz`, `bugate-0.4.1.zip`, and
-`bugate-0.4.1.SHA256SUMS`. Download the checksum file with either archive and
+**Current release: v0.4.2.** See the
+[release notes](docs/releases/v0.4.2.md). GitHub Releases publish three assets:
+`bugate-0.4.2.tar.gz`, `bugate-0.4.2.zip`, and
+`bugate-0.4.2.SHA256SUMS`. Download the checksum file with either archive and
 verify SHA-256 before extracting it.
 
 ## First 5 minutes (start here)
@@ -226,15 +226,17 @@ Profile or pre-code drift requires a new human/designer generation;
 implementation drift requires a new implementer handoff and reviewer
 acceptance. Never delete or hand-edit `00_role_evidence/` to reset it. Restore
 tampered receipts from trusted evidence, then append a superseding transition.
-Re-running `bugate_init.py` refreshes BUGate-owned scripts/hooks but preserves
-SUT-owned hooks.
+Do not use `bugate_init.py` to refresh an installed kit: it is a fresh-install
+command and now fails closed when the vendor path already exists. Use the
+transactional `bugate-update` flow in Quickstart A instead.
 
 Environment propagation is explicit. `bugate-role run` sets the role and a new
 session ID for its child process; a hook cannot export variables into its
 parent, and an already-running Desktop app does not inherit later shell
 changes. Relaunch/open each role session from the intended environment. Any
-v0.4.0 Codex hook update changes the trusted hook hash, so Codex Desktop must
-explicitly re-trust the project before runtime enforcement can be claimed.
+hook change requires a new Claude/Codex session. Codex Desktop additionally
+requires re-trust only when `.codex/hooks.json` bytes changed; the installer or
+updater reports that condition, and a same-byte no-op does not require re-trust.
 
 The evidence chain provides declared roles, session separation, local hashes,
 external Memory anchors, drift detection, and an audit trail. `approved_by` is
@@ -251,17 +253,26 @@ orchestrators, and Core mutators are enforced. See the
 
 **Agent-assisted import prompt.** Open the SUT automation test repo as the
 project root, then paste [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) into Claude Code
-or Codex. The prompt guides the agent through release download, installer
-dry-run, import, hook/script wiring checks, Memory Bus initialization, profile
-activation, and the Codex re-trust reminder. Chinese mirror:
+or Codex. The prompt first distinguishes a fresh install, a v0.3.x bootstrap,
+and a v0.4+ in-repo update, then guides the applicable release, verification,
+profile, runtime-reload, and Memory steps. Chinese mirror:
 [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md).
 
-**Release tarball path — no BUGate core clone required in the SUT repo.** Download
-the versioned GitHub Release asset, unpack it outside the SUT repo, then run the
-installer against the SUT automation test repo:
+Choose exactly one lifecycle entry point:
+
+| Detected state | Entry point | Rule |
+|---|---|---|
+| No BUGate vendor path | unpacked release `scripts/bugate_init.py` | Fresh install only; preview with `--dry-run`. |
+| Supported v0.3.x import with no updater | unpacked v0.4.2 `scripts/bugate_update.py` | One-time bootstrap; never re-run the installer. |
+| v0.4+ import with `.bugate/bin/bugate-update` | vendored `bugate-update` | Run `status` → `plan` → reviewed `apply` → `verify`; use the exact transaction id for rollback. |
+| Unknown/mixed layout or managed-file drift | none | `NO-GO`; preserve the workspace and resolve each reported conflict. There is no broad `--force`. |
+
+**Fresh release install — no BUGate core clone required in the SUT repo.** Download
+the versioned GitHub Release asset, verify it, unpack it outside the SUT repo,
+then run the installer against a repo with no existing vendor path:
 
 ```bash
-BUGATE_VERSION=0.4.1
+BUGATE_VERSION=0.4.2
 BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -289,10 +300,72 @@ It vendors the kit into `<sut-repo>/.bugate/`, links skill discovery through
 `.codex/skills/`, merges the hook blocks into the SUT repo's `.claude/settings.json` +
 `.codex/hooks.json` (existing hooks preserved), scaffolds a **committed**
 `bugate.config.yaml` + `bugate.profile.yaml`, creates `docs/usecases/`, and
-prints the acceptance checklist — including the Codex re-trust caveat and the
-R4 negative control. Idempotent; re-running refreshes the vendored kit and the
-BUGate hook wiring (upgrading an older import's hook shape; the repo's own
-hooks are never rewritten).
+prints the acceptance checklist — including re-trust for the newly changed
+Codex hook hash and the
+R4 negative control. It also writes the first installed lock. If the vendor
+path already exists in any form, the installer performs no target or
+machine-state write and directs you to the updater.
+
+**Upgrade an existing import.** Work from the imported SUT test repo root and
+keep unrelated dirty files untouched. A supported v0.3.x installation has no
+vendored updater, so use the updater from the unpacked v0.4.2 release exactly
+once:
+
+```bash
+python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
+python3 /outside/bugate-0.4.2/scripts/bugate_update.py plan . --vendor-dir .bugate
+# Review the complete plan and require Decision: GO before mutation.
+python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bugate
+python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
+```
+
+For v0.4+ installations, use the in-repo interface and always name the target
+version—there is no implicit `latest`:
+
+```bash
+.bugate/bin/bugate-update status
+.bugate/bin/bugate-update plan --to 0.4.2
+# Apply only the reviewed GO plan.
+.bugate/bin/bugate-update apply --to 0.4.2
+.bugate/bin/bugate-update verify
+```
+
+`status`, `plan`, and `verify` are read-only; `plan` and `apply --dry-run` make
+zero persistent writes to the target. For a deterministic offline update, pass
+both assets to `plan` and `apply` (an archive without its matching checksum is
+rejected before target writes):
+
+```bash
+.bugate/bin/bugate-update plan \
+  --archive /outside/bugate-0.4.2.tar.gz \
+  --checksums /outside/bugate-0.4.2.SHA256SUMS
+.bugate/bin/bugate-update apply \
+  --archive /outside/bugate-0.4.2.tar.gz \
+  --checksums /outside/bugate-0.4.2.SHA256SUMS
+.bugate/bin/bugate-update verify
+```
+
+If a committed transaction must be reversed, use the exact 32-hex id printed
+by `apply`, then verify the restored installation:
+
+```bash
+.bugate/bin/bugate-update rollback --transaction <transaction-id>
+.bugate/bin/bugate-update verify
+```
+
+The updater changes only release-manifest-owned engine, skill/agent links, the
+marked `.gitignore` block, and exact BUGate-owned hook entries. Local managed
+changes, unknown hook shapes, type/mode drift, or mixed legacy fingerprints are
+conflicts and make the plan `NO-GO`; unrelated dirty files are warnings only.
+It never edits `bugate.config.yaml`, `bugate.profile.yaml`, tests, artifacts,
+evidence, Memory data, or SUT-owned hook entries. A reported
+`migration_available` is a separate human-reviewed profile change and should
+be a separate reversible commit; `migration_required` blocks the engine plan.
+
+After fresh install or any apply that changes hooks, start a **new**
+Claude/Codex session rooted at the imported repo. Re-trust Codex Desktop only
+when the plan/apply says `Codex hook hash changed: re-trust required`; re-trust
+does not replace the required new session.
 
 **Plugin channels (Codex + Claude Code).** Install this repo as a plugin when
 you want the reusable runtime surface without vendoring first. Codex uses
@@ -302,7 +375,7 @@ loads `commands/` and `agents/` from the same root. You still commit the
 config + profile in the SUT repo (steps 3–4). For Codex project-local gate
 agents, run the installer as well so the reviewed TOMLs land in `.codex/agents/`.
 
-**Manual equivalent** — everything below lands in the **SUT repo** and is
+**Manual fresh-install equivalent** — everything below lands in the **SUT repo** and is
 **committed** there; in imported mode the governance contract is reviewed and
 versioned with the tests it guards:
 
@@ -317,8 +390,8 @@ versioned with the tests it guards:
    `scripts/bugate_core.py` (the CHARTER §5.3 root-discovery split — the SUT
    repo does **not** need BUGate's `AGENTS.md`/`.shared/` sentinel), and the
    committed `bugate.config.yaml` from step 3 marks the workspace root the
-   gates govern. One constraint remains: Codex requires a one-time re-trust of
-   the changed hook hash.
+   gates govern. If this changes `.codex/hooks.json`, Codex requires re-trust
+   of that changed hash; any changed hook also requires a new session.
 3. **Create and commit the config + profile** in the SUT repo:
 
    ```yaml
@@ -364,8 +437,8 @@ open that SUT repo as the project root. The core checkout remains pure.
 To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.4.1
-(cd dist && shasum -a 256 -c bugate-0.4.1.SHA256SUMS)
+python3 scripts/build_release_archives.py --version 0.4.2
+(cd dist && shasum -a 256 -c bugate-0.4.2.SHA256SUMS)
 ```
 
 The builder emits all three files directly, rejects tracked or non-ignored
@@ -376,12 +449,12 @@ manifests, and normalizes archive timestamps/metadata for reproducibility.
 This writes:
 
 ```text
-dist/bugate-0.4.1.tar.gz
-dist/bugate-0.4.1.zip
-dist/bugate-0.4.1.SHA256SUMS
+dist/bugate-0.4.2.tar.gz
+dist/bugate-0.4.2.zip
+dist/bugate-0.4.2.SHA256SUMS
 ```
 
-Attach all three files to the GitHub Release for tag `v0.4.1`. These archives include
+Attach all three files to the GitHub Release for tag `v0.4.2`. These archives include
 the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
 bin wrappers as one versioned BUGate kit. Formal assets must come from a clean
 release commit; development-only dirty-tree flags are not valid for a release.
@@ -427,9 +500,10 @@ legacy bridge. Plugin packaging is root-standard: manifests live under
 engine is **stdlib-only** (no third-party deps) and resolves roots git-free:
 the active project via the nearest `bugate.config.yaml` up from CWD
 (`AGENTS.md` + `.shared/` sentinel as the self-development fallback), engine
-assets via the engine tree's own location. Note: adding or changing a Codex
-hook requires re-trusting its hash, and plugin changes may require
-Claude's `/reload-plugins` or a plugin reinstall/update.
+assets via the engine tree's own location. A changed hook requires a new
+runtime session; Codex re-trust is required only when the Codex hook-file hash
+actually changes. Plugin changes may additionally require Claude's
+`/reload-plugins` or a plugin reinstall/update.
 
 BUGate intentionally ships **no default `.mcp.json`** today: the Memory Bus is a
 **required but machine-level** `mcp-memory-service` (auto-installed by `bugate
@@ -468,13 +542,14 @@ agents -> .shared/…/agents  # plugin-root Claude gate agents
 hooks/hooks.json            # plugin-root lifecycle hooks for Codex + Claude
 .mcp.json                   # absent by default; add only for a real MCP server contract
 .claude/ .codex/            # per-runtime dev bridges: settings/hooks + skill & gate-agent links
-scripts/                    # gate engine + SDTD orchestration (stdlib-only)
-bin/                        # bash wrappers: memory-bus-* (required, auto-install/self-heal), memory-service-*, wave8-weekly
+scripts/                    # gate engine + SDTD orchestration + fresh installer and transactional updater (stdlib-only)
+bin/                        # wrappers: bugate-update, bugate-role, memory-bus-*, memory-service-*, wave8-weekly
+.bugate-release/            # generated archive metadata: canonical release + exact legacy/pre-lock manifests (release assets only)
 .shared/skills/bugate/      # the BUGate skill: SKILL.md, references/, templates/, adapters/, integration/
-docs/qa-methodology/        # METHOD.md, SOP.md, evolution timeline, decision records
+docs/qa-methodology/        # METHOD.md, SOP.md, updater/role protocols, evolution timeline, decision records
 docs/case-studies/          # narrative allowlist: real import/migration stories (identity-scan exempt)
-tests/                      # upstream-only ephemeral-fixture acceptances (dual-layout write guard, de-SUT meta-test) + legacy term fixture
-.github/workflows/          # CI: py_compile, semantics gates, de-SUT guard (hygiene/legacy/second-SUT/meta)
+tests/                      # upstream-only ephemeral-fixture acceptance: gates, importer/updater/archive, de-SUT, recovery and rollback
+.github/workflows/          # CI: compile/gates/de-SUT plus installer, updater, archive and imported-layout acceptance
 ```
 
 ## License

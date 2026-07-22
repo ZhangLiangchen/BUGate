@@ -114,14 +114,32 @@ python3 tests/test_desut_guard.py
 # 4. Write-guard dual-layout acceptance (ephemeral fixtures — the repo ships
 #    no committed example SUT trees)
 python3 tests/test_write_guard_layouts.py
+python3 tests/test_hook_surface_parity.py
+python3 tests/test_full_check_layouts.py
+
+# 5. Fresh-install + transactional-updater/release contract (all fixtures are
+#    synthetic temporary repos; never point these tests at a real SUT)
+python3 tests/test_install_contract.py
+python3 tests/test_release_manifests.py
+python3 tests/test_update_source.py
+python3 tests/test_bugate_update_engine.py
+python3 tests/test_bugate_update_cli.py
+python3 tests/test_bugate_update_transaction.py
+python3 tests/test_bugate_update_integration.py
+python3 tests/test_bugate_update_acceptance.py
+python3 tests/test_init_scaffold.py
+python3 tests/test_release_archives.py
 ```
 
-CI also runs the `bugate init` scratch-repo e2e (R4 negative control), the
-Wave 0 / Wave 8 graceful-degradation checks, an orchestrator init smoke, and a
-stdlib-only import check — see `ci.yml` for the exact invocations. If your change
-touches any of those subsystems, run the matching steps too. The simplest way to
-catch everything is to run each step listed in `ci.yml` locally before opening
-the PR.
+CI also runs the fresh `bugate init` scratch-repo e2e (R4 negative control),
+release-manifest/archive agreement, exact v0.3.x bootstrap, v0.4+ update,
+conflict/zero-write, rollback/recovery acceptance, Wave 0 / Wave 8 graceful-
+degradation checks, an orchestrator init smoke, and a stdlib-only import check.
+See `ci.yml` for the exact current invocations. If your change touches any of
+those subsystems, run the matching steps too. The simplest way to catch
+everything is to run each step listed in `ci.yml` locally before opening the
+PR. All installer/updater acceptance must construct SUT-neutral temporary
+repositories; never read, copy, clone, worktree, or modify a real SUT.
 
 The zero-install smoke test in [`INIT.md`](INIT.md) (Step 2 / Step 3) is the
 fastest sanity check that the engine still imports and config still loads.
@@ -132,11 +150,12 @@ fastest sanity check that the engine still imports and config still loads.
 
 | Path | What it is |
 |---|---|
-| `scripts/` | the gate engine and driver scripts — **stdlib-only** |
-| `bin/` | thin wrappers (e.g. memory-bus / promote helpers) |
+| `scripts/` | the gate engine, fresh installer, transactional updater/source/transaction workers, release/legacy manifest tools, and drivers — **stdlib-only** |
+| `bin/` | thin wrappers, including `bugate-update`, `bugate-role`, memory-bus, and promotion helpers |
+| `.bugate-release/` | generated canonical release + exact legacy/pre-lock manifests inside formal archives; never SUT data |
 | `.shared/skills/bugate/` | the shared skill: `SKILL.md`, `references/`, `templates/`, `adapters/` |
 | `docs/qa-methodology/` | SUT-neutral method, SOP, ADR, protocols |
-| `tests/` | upstream-only ephemeral-fixture acceptances (dual-layout write guard, de-SUT meta-test) + fixtures (`fixtures/legacy-sut-terms.txt` is the regression term list); not part of the vendored kit |
+| `tests/` | upstream-only ephemeral-fixture acceptances (gates, fresh install, update/bootstrap/archive, conflicts, recovery/rollback, de-SUT) + neutral fixtures; not a real SUT workspace |
 | `docs/case-studies/` | narrative allowlist: real import/migration stories (identity-scan exempt, hygiene enforced) |
 | `bugate.config.yaml` | core default config; ships with **no profile bound** (no guarded paths) |
 
@@ -168,7 +187,16 @@ SUT-specific wiring belongs in the imported SUT test repo, not the adapter.
 
 **Hooks** (`.claude/`, `.codex/`) must call only SUT-neutral scripts from
 `scripts/` and must not depend on git metadata (AGENTS.md Hook Policy). Note:
-changing `.codex/hooks.json` may require Codex Desktop to re-trust the hook hash.
+an actual `.codex/hooks.json` byte/hash change requires Codex Desktop re-trust;
+a same-byte no-op does not. Any hook change also requires a new runtime session.
+
+**Changing installer/updater/release code:** preserve the single ownership
+catalog and single update engine. `bugate_init.py` remains fresh-install-only;
+do not add a second upgrade path or restore “re-run init” behavior. Keep
+`status`/`plan`/`verify` read-only, keep `plan` and `apply --dry-run` zero-write,
+and keep profile migration outside the engine transaction. Add a synthetic
+temporary-repo negative for every new conflict/failure boundary and verify
+byte-and-metadata preservation before adding a positive path.
 
 ---
 

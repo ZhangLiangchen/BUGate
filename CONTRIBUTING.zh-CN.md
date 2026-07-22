@@ -70,9 +70,30 @@ python3 tests/test_desut_guard.py
 
 # 4. Write-guard dual-layout acceptance（临时 fixtures；本仓不提交示例 SUT 树）
 python3 tests/test_write_guard_layouts.py
+python3 tests/test_hook_surface_parity.py
+python3 tests/test_full_check_layouts.py
+
+# 5. 首次安装 + 事务 updater/release contract（全部使用 SUT-neutral 临时仓；
+#    绝不能把这些测试指向真实 SUT）
+python3 tests/test_install_contract.py
+python3 tests/test_release_manifests.py
+python3 tests/test_update_source.py
+python3 tests/test_bugate_update_engine.py
+python3 tests/test_bugate_update_cli.py
+python3 tests/test_bugate_update_transaction.py
+python3 tests/test_bugate_update_integration.py
+python3 tests/test_bugate_update_acceptance.py
+python3 tests/test_init_scaffold.py
+python3 tests/test_release_archives.py
 ```
 
-CI 还会运行 `bugate init` scratch-repo e2e（R4 negative control）、Wave 0 / Wave 8 graceful-degradation checks、orchestrator init smoke 与 stdlib-only import check —— 精确命令见 `ci.yml`。如果你的改动触及这些子系统，请运行对应步骤。最稳妥的方式是在打开 PR 前本地跑完 `ci.yml` 中列出的每一步。
+CI 还会运行首次 `bugate init` scratch-repo e2e（R4 negative control）、
+release-manifest/archive agreement、exact v0.3.x bootstrap、v0.4+ update、
+conflict/zero-write、rollback/recovery acceptance、Wave 0 / Wave 8 graceful-
+degradation checks、orchestrator init smoke 与 stdlib-only import check。精确当前
+命令见 `ci.yml`。如果改动触及这些子系统，请运行对应步骤；最稳妥的是 PR 前本地
+跑完 `ci.yml` 的每一步。所有 installer/updater acceptance 必须构造 SUT-neutral
+临时仓；禁止读取、复制、clone、worktree 或修改真实 SUT。
 
 [`INIT.md`](INIT.md) / [`INIT.zh-CN.md`](INIT.zh-CN.md) 中的零安装 smoke test（Step 2 / Step 3）是确认 engine 仍能 import、config 仍能 load 的最快 sanity check。
 
@@ -82,11 +103,12 @@ CI 还会运行 `bugate init` scratch-repo e2e（R4 negative control）、Wave 0
 
 | Path | 含义 |
 |---|---|
-| `scripts/` | gate engine 与 driver scripts —— **stdlib-only** |
-| `bin/` | thin wrappers（如 memory-bus / promote helpers） |
+| `scripts/` | gate engine、首次 installer、事务 updater/source/transaction workers、release/legacy manifest tools 与 drivers —— **stdlib-only** |
+| `bin/` | thin wrappers，包括 `bugate-update`、`bugate-role`、memory-bus 与 promotion helpers |
+| `.bugate-release/` | 正式 archive 内生成的 canonical release + exact legacy/pre-lock manifests；绝不存 SUT data |
 | `.shared/skills/bugate/` | 共享 skill：`SKILL.md`、`references/`、`templates/`、`adapters/` |
 | `docs/qa-methodology/` | SUT-neutral method、SOP、ADR、protocols |
-| `tests/` | upstream-only 临时 fixture acceptances（dual-layout write guard、de-SUT meta-test）+ fixtures（`fixtures/legacy-sut-terms.txt` 是 regression term list）；不是 vendored kit 的一部分 |
+| `tests/` | upstream-only 临时 fixture acceptances（gates、首次安装、update/bootstrap/archive、conflicts、recovery/rollback、de-SUT）+ neutral fixtures；不是真实 SUT workspace |
 | `docs/case-studies/` | narrative allowlist：真实导入/迁移故事（identity-scan exempt，hygiene enforced） |
 | `bugate.config.yaml` | core 默认配置；随仓保持**不绑定 profile**（无 guarded paths） |
 
@@ -101,7 +123,14 @@ CI 还会运行 `bugate init` scratch-repo e2e（R4 negative control）、Wave 0
 
 **新增 adapter：** adapters 放在 `.shared/skills/bugate/adapters/`（ADR Implementation Notes）。保持中立；SUT-specific wiring 属于导入后的 SUT 测试仓，不属于 adapter。
 
-**Hooks**（`.claude/`、`.codex/`）只能调用 `scripts/` 中的 SUT-neutral scripts，且不能依赖 git metadata（AGENTS.md Hook Policy）。注意：修改 `.codex/hooks.json` 可能要求 Codex Desktop 重新信任 hook hash。
+**Hooks**（`.claude/`、`.codex/`）只能调用 `scripts/` 中的 SUT-neutral scripts，且不能依赖 git metadata（AGENTS.md Hook Policy）。只有 `.codex/hooks.json` 字节/hash 确实变化时才要求 Codex Desktop re-trust；same-byte no-op 不需要。任何 hook 变化还要求新 runtime session。
+
+**修改 installer/updater/release code：** 保持单一 ownership catalog 与单一
+update engine。`bugate_init.py` 继续只负责首次安装；不得增加第二套升级路径，也
+不得恢复“rerun init”行为。`status`/`plan`/`verify` 必须只读，`plan` 与
+`apply --dry-run` 必须零写入，profile migration 必须留在 engine transaction
+之外。每新增一个 conflict/failure boundary，都要增加 SUT-neutral 临时仓负控，
+先验证 byte-and-metadata 保持，再增加正向路径。
 
 ---
 

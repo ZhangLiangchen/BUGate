@@ -9,8 +9,8 @@
 > 在 BUGate 发布 packaged console-script 前，文档里的 `bugate init` shorthand
 > 指 `python3 scripts/bugate_init.py`。
 >
-> 当前正式版本是 **v0.4.1**。tar/zip archive 随附
-> `bugate-0.4.1.SHA256SUMS`；导入模式必须在解压前校验所选 archive（见
+> 当前正式版本是 **v0.4.2**。tar/zip archive 随附
+> `bugate-0.4.2.SHA256SUMS`；导入模式必须在解压前校验所选 archive（见
 > `IMPORT_PROMPT.zh-CN.md`）。
 
 ---
@@ -35,6 +35,51 @@ BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 
   脚本/hooks、方法论、profile schema、语义门、跨 SUT 回归）。继续走完下面
   core 验证步骤。真实 SUT 验收应通过把 BUGate 导入外部 SUT 测试仓或 BUGate
   core 之外的 scratch 仓完成；不要把 SUT 挂进本仓。
+
+任何导入模式写入前，先分类目标并且只选一个入口：
+
+- **全新目标（无 vendor path）：** 使用已解包 release 的
+  `scripts/bugate_init.py`，先 `--dry-run`，再只执行一次正式安装。
+- **受支持 v0.3.x import（无 vendored updater）：** 禁止 rerun installer。
+  从 SUT 仓根目录使用已解包 v0.4.2 的 bootstrap：
+
+  ```bash
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py plan . --vendor-dir .bugate
+  # 完整复核，并要求 Decision: GO。
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
+  ```
+
+- **v0.4+ import：** 使用已安装入口。没有隐式 `latest`；必须显式选择目标版本：
+
+  ```bash
+  .bugate/bin/bugate-update status
+  .bugate/bin/bugate-update plan --to 0.4.2
+  # 完整复核，并要求 Decision: GO。
+  .bugate/bin/bugate-update apply --to 0.4.2
+  .bugate/bin/bugate-update verify
+  # 仅用于有意撤销一个已提交 transaction：
+  .bugate/bin/bugate-update rollback --transaction <transaction-id>
+  .bugate/bin/bugate-update verify
+  ```
+
+离线更新时，`plan` 与 `apply` 都必须同时传匹配的 archive 和 checksum：
+`--archive /outside/bugate-0.4.2.tar.gz --checksums
+/outside/bugate-0.4.2.SHA256SUMS`。`status`、`plan`、`verify` 都是只读的；
+`plan` 与 `apply --dry-run` 对目标零持久写入。managed local change、未知 hook
+shape、type/mode drift 或混合 legacy layout 会令 plan `NO-GO`；没有宽泛
+`--force`，也不能退回 installer。无关 dirty files 保持不动，只报告 warning。
+
+engine update 与 profile migration 是两个动作。updater 可报告
+`migration_available` 或会阻塞的 `migration_required`，但绝不编辑
+`bugate.config.yaml`、`bugate.profile.yaml`、测试、artifacts、evidence、Memory
+或 SUT-owned hooks。任何 profile migration 都要单独评审，并作为独立可回滚变更
+提交。
+
+首次安装后，或 apply 改变 hook 后，必须以导入仓为根启动**新** session。只有
+installer/updater 报告 `.codex/hooks.json` 已变化时才在 Codex Desktop
+re-trust；re-trust 不能代替新 session。
 
 ### 第 1 步 —— 检查唯一的硬要求：Python
 
@@ -72,7 +117,10 @@ BUGate 作为 skill 跑在 Claude Code 与 Codex 之下：
 - 技能：`.shared/skills/bugate/`（Claude Code 通过 `.claude/skills/` 发现，Codex 通过 `.agents/skills/` 发现；`.codex/skills/` 仅作为旧 Codex 兼容桥保留）。
 - Hooks：项目开发态用 `.claude/settings.json` 与 `.codex/hooks.json`；plugin 安装态用 plugin-root 的 `hooks/hooks.json`。根定位**无需 git** 且已拆分：hook 向上找 `scripts/bugate_core.py` 或使用 plugin/vendor root 定位引擎；门脚本自 CWD 向上找最近的 `bugate.config.yaml` 定位被治理工作区（开发态用哨兵 fallback）。v0.4.0 保持 pre-code guard 与 role-evidence guard 职责独立；orchestrator/Core mutator 也执行同一 role preflight，因为 Python 直接写文件不会触发 agent PreToolUse hook。
 - Plugins：`.claude-plugin/plugin.json` 与 `.codex-plugin/plugin.json` 只放 manifest；共享的 `skills/`、`commands/`、`agents/`、`hooks/`、`scripts/`、`bin/` 都在 plugin root。
-- **仅 Codex：** 改任何 hook 都要在 Codex 的 hook 管理界面重新信任其 hash。**Claude plugin 改动：**运行 `/reload-plugins` 或重新安装/更新 plugin。
+- **Runtime reload：** 任何 hook 变化都要求新 Claude/Codex session。
+  **仅 Codex：** 只有 Codex hook 文件 hash 确实变化时才在 hook 管理界面
+  re-trust。**Claude plugin 改动：**还要运行 `/reload-plugins` 或重新安装/更新
+  plugin。
 
 这一步无需安装 —— hooks 调用的正是你在第 2 步验证过的、只用标准库的脚本。
 
@@ -170,8 +218,8 @@ implementation drift 从 implementer handoff/reviewer acceptance 重新开始。
 Evidence 只追加，禁止删除或手改来 reset。
 
 `bugate-role run` 只给子进程 export role/session。Hook 不能 export 到父进程，
-已经运行的 Desktop app 必须从目标环境重新启动；Codex Desktop 还必须 re-trust
-v0.4.0 新 hook hash。证据链不是强身份认证：`approved_by` 只是声明，本地 hook
+已经运行的 Desktop app 必须从目标环境重新启动；Codex hook hash 确实变化时
+Codex Desktop 还必须 re-trust（v0.4.0 转换就是这种情况）。证据链不是强身份认证：`approved_by` 只是声明，本地 hook
 拦不住任意 shell/外部编辑器写入；不可抵赖需要 OS/container/managed-runner
 或按角色 credential 隔离。
 
@@ -205,6 +253,9 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
 2. 验证 core 4-layer gate（仓内无示例 SUT 树，一律模板 + 临时构造）:
    - python3 -m py_compile scripts/*.py
    - python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
+   - 如果这是带 `.bugate/bin/bugate-update` 的 imported installation，运行其
+     只读 `status` 与 `verify`；任何 conflict 或 recovery-required 都是安装检查
+     失败，不能拿 core 绿灯掩盖。
 3. 验证 Codex / Claude Code:
    - type -a codex; type -a claude
    - codex --version; claude --version
@@ -266,6 +317,7 @@ python3 .shared/skills/bugate-full-check/scripts/run_full_check.py --mode full
 | 4 层门引擎（核心） | **无** | 门脚本 + 模板 | —（永远可用） |
 | 在 agent 里跑 | 无 | `.claude` / `.codex` hooks | — |
 | 导入进 SUT 仓 | 无 | `bugate.config.yaml` + profile schema | — |
+| 更新 imported install | 无 | `bugate-update` status/plan/apply/verify/rollback + installed lock/transaction journal | drift/conflict 时 fail-closed；profile migration 独立处理 |
 | 双 agent 互审 | `codex` + `claude` CLI | `sdtd_multiview*` | 会 → 确定性占位 |
 | Agent 记忆 + 晋级（**必要核心**） | 无 —— 由 `bugate init` 自动安装 | `memory_bus.py` + `bin/memory-*` | 必要；自动安装 + 自愈；普通编辑不阻断，strict 生命周期转换 fail-closed |
 | 路径角色隔离 | 无 | `check_agent_role_paths.py` | —（独立、默认 OFF） |

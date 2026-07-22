@@ -11,10 +11,12 @@ profile or the imported SUT test repo. On any conflict,
 |---|---|
 | [METHOD.md](METHOD.md) | The "why": full AI-assisted black-box test methodology, the nine-Wave flow, theory mapping, and rationale. |
 | [SOP.md](SOP.md) | The "what to do next": step-by-step execution handbook for the Wave 0–3 minimum viable loop. |
+| [IMPORTED_UPDATER_CONTRACT.md](IMPORTED_UPDATER_CONTRACT.md) | Normative imported-install update contract: fresh-install separation, exact legacy adoption, manifest ownership, plan/apply/verify/rollback transactions, archive integrity, profile isolation, and runtime activation boundaries. ([简体中文](IMPORTED_UPDATER_CONTRACT.zh-CN.md)) |
 | [ROLE_GOVERNANCE_PROTOCOL.md](ROLE_GOVERNANCE_PROTOCOL.md) | The normative Wave 7 lifecycle contract: distinct designer / implementer / reviewer sessions, human acceptance, strict Memory-anchored handoffs, hash-linked receipts, drift recovery, and enforcement limits. |
 | [AGENTIC_QA_PLATFORM_GUIDE.md](AGENTIC_QA_PLATFORM_GUIDE.md) | Working guide for evolving BUGate from an Agentic QA Governance Kernel into an enterprise Agentic QA Platform with a self-hosted agent control center and multi-role SOP orchestration. |
 | [EXPERIENCE_PROMOTION_PROTOCOL.md](EXPERIENCE_PROMOTION_PROTOCOL.md) | How a SUT-local lesson is decided to either stay local or be promoted into SUT-neutral BUGate Core. |
 | [BUGATE_PLATFORM_DECOUPLING_ADR.md](BUGATE_PLATFORM_DECOUPLING_ADR.md) | ADR-BUGATE-001: the accepted BUGate Core / SUT Profile / Governed SUT Test Repo / SUT Product Runtime architecture and its promotion rule. |
+| [BUGATE_HOSTING_CORRECTION_ADR.md](BUGATE_HOSTING_CORRECTION_ADR.md) | ADR-BUGATE-002: imported mode becomes the real hosting direction; its historical rerun-installer upgrade consequence is explicitly superseded by the updater amendment. |
 | [TRANSITION_PROTOCOL.md](TRANSITION_PROTOCOL.md) | PROTO-BUGATE-TRANS-001: the *journey* from an old embedded BUGate to the decoupled core — asymmetric strangler-fig, the 3-bucket capability-gap classifier, the transition-gap ledger, and retirement exit criteria. |
 | [BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md](BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md) | ADR-BUGATE-003: the machine-level memory bus — one service instance per machine (`~/.bugate/memory-bus`), namespace-tag isolation instead of per-repo databases, client resolution order, and the 2026-07-03 migration/rollback record. |
 | [BUGATE_DESUT_CALIBRATION_ADR.md](BUGATE_DESUT_CALIBRATION_ADR.md) | ADR-BUGATE-004: de-SUT calibration — "block seepage, not mention"; the three-layer discriminator, profile-supplied identity terms, narrative exemption channels, and the upstream legacy-fixture regression. The narrative dividend lives in [`../case-studies/`](../case-studies/). |
@@ -24,11 +26,12 @@ profile or the imported SUT test repo. On any conflict,
 
 1. `METHOD.md` — understand the method and its reasoning first.
 2. `SOP.md` — then learn how to execute it day to day.
-3. `ROLE_GOVERNANCE_PROTOCOL.md` — the auditable Wave 7 lifecycle and receipt contract.
-4. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
-5. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
-6. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
-7. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
+3. `IMPORTED_UPDATER_CONTRACT.md` — before changing an existing imported engine; the vendored operator route is `.shared/skills/bugate-import/references/updating-bugate.md`.
+4. `ROLE_GOVERNANCE_PROTOCOL.md` — the auditable Wave 7 lifecycle and receipt contract.
+5. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
+6. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
+7. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
+8. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
 
 ## Method summary (English)
 

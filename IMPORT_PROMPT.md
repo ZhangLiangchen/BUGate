@@ -3,14 +3,14 @@
 [English](IMPORT_PROMPT.md) | [简体中文](IMPORT_PROMPT.zh-CN.md)
 
 > Paste this prompt into Claude Code or Codex while the **SUT automation test
-> repo** is open as the project root. The agent should import BUGate as a kit,
-> wire Claude Code and Codex symmetrically, initialize the machine-level Memory
-> Bus, activate the SUT profile when the test layout is clear, and report the
-> remaining human actions.
+> repo** is open as the project root. The agent must first distinguish a fresh
+> install, a v0.3.x bootstrap, and a v0.4+ in-repo update. It should then use
+> the one applicable transaction boundary, preserve SUT-owned state, verify the
+> result, and report the remaining human and runtime-reload actions.
 
 ## Agent Instructions
 
-You are installing BUGate into a SUT automation test repo. BUGate is a
+You are installing or updating BUGate in a SUT automation test repo. BUGate is a
 SUT-neutral Agentic QA Governance Kernel. Keep the SUT repo as the project root;
 do not clone BUGate core inside the SUT repo, do not mount the SUT inside
 BUGate core, and do not put product secrets or environment facts into BUGate
@@ -32,31 +32,55 @@ core files.
   hooks load from the session's workspace, so a session rooted at a parent
   (monorepo) directory silently loads no guard. The importer warns when the
   target is not the git toplevel; relay that warning to the user.
-- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.4.1`.
+- BUGate version: use `BUGATE_VERSION` if set, otherwise `0.4.2`.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
-- If `BUGATE_ENGINE_DIR` points to an existing BUGate checkout or unpacked
-  release, use it. Otherwise download the GitHub Release tarball outside the
-  SUT repo.
-- The v0.4.1 release has exactly three assets: `bugate-0.4.1.tar.gz`,
-  `bugate-0.4.1.zip`, and `bugate-0.4.1.SHA256SUMS`. The checksum asset is
+- Installation route: detect it read-only. Do not accept a user's remembered
+  version as proof of the installed layout, and never use `bugate_init.py` when
+  the vendor path already exists in any form.
+- For a fresh install, an intentional BUGate development checkout may be used.
+  Legacy bootstrap requires a formal unpacked v0.4.2 release carrying its
+  canonical and legacy manifests. If `BUGATE_ENGINE_DIR` does not point to the
+  applicable source, download the GitHub Release outside the SUT repo.
+- The v0.4.2 release has exactly three assets: `bugate-0.4.2.tar.gz`,
+  `bugate-0.4.2.zip`, and `bugate-0.4.2.SHA256SUMS`. The checksum asset is
   mandatory; verify the selected archive before extraction.
 
 ### Required Flow
 
-1. **Preflight the SUT repo**
+1. **Preflight and classify the SUT repo**
    - Run `pwd`, `git status --short --branch`, and `python3 --version`.
    - Confirm Python is >= 3.9.
    - Inspect the repo's test layout with read-only commands such as
      `find . -maxdepth 3 -type d | sort` and targeted `rg --files`.
    - If the current directory is BUGate core itself, stop and ask for the SUT
      automation test repo path.
+   - Set `BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"`, then classify:
 
-2. **Acquire the BUGate kit outside the SUT repo**
+     ```bash
+     if test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
+       BUGATE_ROUTE=v04-in-repo-update
+     elif test -e "$BUGATE_VENDOR_DIR" || test -L "$BUGATE_VENDOR_DIR"; then
+       BUGATE_ROUTE=legacy-bootstrap-candidate
+     else
+       BUGATE_ROUTE=fresh-install
+     fi
+     printf 'BUGATE_ROUTE=%s\n' "$BUGATE_ROUTE"
+     ```
+
+   - A `legacy-bootstrap-candidate` is not yet accepted as v0.3.x. The v0.4.2
+     bootstrap updater must identify an exact supported legacy/pre-lock
+     manifest. Unknown, mixed, or locally modified layouts are `NO-GO`.
+
+2. **Acquire the BUGate kit outside the SUT repo when required**
+   - For `v04-in-repo-update`, skip Steps 2–3: the vendored updater resolves an
+     explicitly named target release itself, or accepts an offline
+     archive/checksum pair.
+   - Fresh install and legacy bootstrap require an unpacked v0.4.2 release.
    - If `BUGATE_ENGINE_DIR` is usable, keep it.
    - Otherwise run the equivalent of:
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.4.1}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
      BUGATE_TMP="$(mktemp -d)"
      BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
      BUGATE_SUMS="bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -88,13 +112,19 @@ core files.
 
      ```bash
      test -f "$BUGATE_ENGINE_DIR/scripts/bugate_init.py"
+     test -f "$BUGATE_ENGINE_DIR/scripts/bugate_update.py"
      test -f "$BUGATE_ENGINE_DIR/scripts/role_governance.py"
      test -f "$BUGATE_ENGINE_DIR/scripts/check_role_evidence.py"
      test -x "$BUGATE_ENGINE_DIR/bin/bugate-role"
+     test -x "$BUGATE_ENGINE_DIR/bin/bugate-update"
      test -f "$BUGATE_ENGINE_DIR/.shared/skills/bugate/SKILL.md"
      ```
 
-3. **Verify the downloaded engine before installing**
+   - For legacy bootstrap also require
+     `$BUGATE_ENGINE_DIR/.bugate-release/manifest.json`; absence means this is
+     not a formal bootstrap source.
+
+3. **Verify the downloaded engine before fresh install or bootstrap**
 
    ```bash
    cd "$BUGATE_ENGINE_DIR"
@@ -103,7 +133,9 @@ core files.
    cd -
    ```
 
-4. **Preview and run the importer**
+4. **Run exactly one install/update path**
+
+   **Fresh install only** (`BUGATE_ROUTE=fresh-install`):
 
    ```bash
    SUT_REPO="$(pwd)"
@@ -119,7 +151,101 @@ core files.
    `.codex/hooks.json`, `bugate.config.yaml`, `bugate.profile.yaml`,
    `docs/usecases/`, `.gitignore`, and the machine-level Memory Bus.
 
-5. **Activate the SUT profile only from evidence**
+   If the vendor path appears between preview and apply, stop. The installer is
+   fresh-install-only and must fail before any target or machine-state write;
+   it is not an update or repair command.
+
+   **Supported v0.3.x/pre-lock bootstrap**
+   (`BUGATE_ROUTE=legacy-bootstrap-candidate`):
+
+   ```bash
+   SUT_REPO="$(pwd)"
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   BOOTSTRAP="$BUGATE_ENGINE_DIR/scripts/bugate_update.py"
+   python3 "$BOOTSTRAP" status "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   python3 "$BOOTSTRAP" plan "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   # Stop unless the complete reviewed plan says Decision: GO.
+   python3 "$BOOTSTRAP" apply "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   python3 "$BOOTSTRAP" verify "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   ```
+
+   This is the one-time bridge for the exact supported v0.3.x and pre-lock
+   layouts carried by the v0.4.2 release. Do not copy files manually, run the
+   importer, or invent a version when `status`/`plan` is `NO-GO`.
+
+   **v0.4+ in-repo update** (`BUGATE_ROUTE=v04-in-repo-update`):
+
+   ```bash
+   BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
+   BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
+   UPDATER="$BUGATE_VENDOR_DIR/bin/bugate-update"
+   "$UPDATER" status
+   "$UPDATER" plan --to "$BUGATE_VERSION"
+   # Stop unless the complete reviewed plan says Decision: GO.
+   "$UPDATER" apply --to "$BUGATE_VERSION"
+   "$UPDATER" verify
+   ```
+
+   There is no implicit `latest`. `status`, `plan`, and `verify` are read-only;
+   `plan` and `apply --dry-run` make zero persistent writes to the target.
+   If `status` reports interrupted recovery, do not improvise cleanup: report
+   it and use the updater's reviewed mutating `apply` recovery path.
+
+   For either updater entry point, deterministic offline operation passes the
+   archive and its checksum asset together to both plan and apply:
+
+   ```bash
+   "$UPDATER" plan \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   "$UPDATER" apply \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   "$UPDATER" verify
+   ```
+
+   For bootstrap, invoke the external script directly with the same pair; do
+   not create a wrapper in the SUT repo:
+
+   ```bash
+   python3 "$BOOTSTRAP" plan "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   python3 "$BOOTSTRAP" apply "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
+     --archive /outside/bugate-0.4.2.tar.gz \
+     --checksums /outside/bugate-0.4.2.SHA256SUMS
+   python3 "$BOOTSTRAP" verify "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
+   ```
+
+   A missing, ambiguous, or mismatched checksum is rejected before target
+   writes.
+
+   Rollback is explicit and transaction-specific, never an automatic response
+   to a warning:
+
+   ```bash
+   "$BUGATE_VENDOR_DIR/bin/bugate-update" rollback \
+     --transaction <32-hex-transaction-id>
+   "$BUGATE_VENDOR_DIR/bin/bugate-update" verify
+   ```
+
+   Use only an id printed by a committed `apply`. Rollback restores the engine
+   transaction; it does not roll back a separately reviewed profile change.
+
+   Managed local changes, unknown/duplicate hook identities or shapes,
+   type/permission drift, missing critical files, and mixed legacy fingerprints
+   are conflicts and make the plan `NO-GO`. There is no broad `--force`.
+   Preserve all files, report expected/actual details, and ask the user to
+   resolve the named path; unrelated dirty files are warnings only.
+
+5. **Handle the SUT profile as a separate action**
+   - On a fresh install only, activate the new profile from evidence as below.
+   - On bootstrap/update, do not edit `bugate.config.yaml` or
+     `bugate.profile.yaml` in the engine transaction. Preserve the current
+     profile and report the updater's `migration_available` or blocking
+     `migration_required` result. A proposed migration is a separate
+     human-reviewed diff and a separate reversible commit; it must never turn
+     `role_governance.mode: off` into `required` implicitly.
    - Open `bugate.profile.yaml`.
    - Preserve `memory.namespace`.
    - If the test layout is obvious, update `guarded_path_regex` with one or
@@ -220,19 +346,31 @@ core files.
      `SDTD_CLI_HTTPS_PROXY` / `SDTD_CLI_HTTP_PROXY` / `SDTD_CLI_ALL_PROXY`.
 
 9. **Report final status**
+   - State which route ran: `fresh-install`, `legacy-bootstrap`, or
+     `v04-in-repo-update`; include the installed version, final `verify`
+     decision, and any transaction id/rollback availability.
    - List every file or directory changed in the SUT repo.
-   - List the exact files that should be committed:
+   - For a fresh install, list the exact files that should be committed:
      `bugate.config.yaml`, `bugate.profile.yaml`, `$BUGATE_VENDOR_DIR/`,
      `.claude/settings.json`, `.codex/hooks.json`, `.claude/skills/`,
      `.agents/skills/`, `.codex/skills/`, `.codex/agents/`, `docs/usecases/`,
      and the `.gitignore` BUGate block.
+   - For an update, list only the manifest-owned changes and exact BUGate hook
+     entries reported by the transaction. Confirm that SUT-owned config,
+     profile, tests, artifacts, evidence, hooks, Memory data, and unrelated
+     dirty files were not changed.
    - State whether `guarded_path_regex` is active.
    - State the active `role_governance.mode` and `memory_mode`. A legacy/off
      profile is compatible but does not activate the Wave 7 lifecycle gate.
    - State Memory Bus status.
-   - State that Codex requires a one-time re-trust of the changed hook hash in
-     Codex Desktop before Codex hooks become active. Claude Code may need a new
-     session or plugin reload depending on how the repo is opened.
+   - For fresh install, report that the newly added Codex hook file requires
+     re-trust and all new hooks require a new session. For update, state
+     `codex_hook_hash_changed` and `new_session_required` from the updater
+     result. Re-trust Codex Desktop **only** when the Codex
+     hook bytes/hash changed; do not prescribe it for a same-byte no-op. If any
+     hook changed, a new Claude/Codex session rooted at this SUT repo is
+     required before the new runtime surface is active; re-trust alone is not
+     a reload. A plugin channel may additionally require plugin reload/update.
    - Point the user at the vendored usage guide for day-to-day work:
      `$BUGATE_VENDOR_DIR/.shared/skills/bugate-import/references/using-bugate.md`
      (中文: `using-bugate.zh-CN.md` beside it) — open this repo as the
@@ -301,10 +439,13 @@ scaffold now carries commented example blocks).
   human acceptance, designer handoff, and implementer acceptance before Layer
   4, then an implementer handoff and reviewer acceptance before post-run.
 
-  Re-run `bugate_init.py` when upgrading an existing import. It refreshes the
-  vendored BUGate scripts and BUGate-owned hook entries while preserving the
-  SUT's own hooks. Then start three independent sessions; do not attempt to set
-  role variables from a SessionStart hook:
+  Upgrade an existing import only with the v0.4.2 bootstrap updater (v0.3.x)
+  or the vendored `bugate-update` interface (v0.4+), using the status → plan →
+  reviewed apply → verify sequence in Step 4. `bugate_init.py` is fresh-only.
+  The engine transaction preserves the profile, so enabling Wave 7 remains a
+  separate reviewed profile change. After that separate decision, start three
+  independent sessions; do not attempt to set role variables from a
+  SessionStart hook:
 
   ```bash
   "$BUGATE_VENDOR_DIR/bin/bugate-role" run --role designer -- codex
@@ -314,8 +455,9 @@ scaffold now carries commented example blocks).
 
   A hook process cannot export into its parent, and an already-running Desktop
   process does not inherit later shell changes. Relaunch each Desktop/CLI role
-  from the intended environment. Because v0.4.0 changes `.codex/hooks.json`,
-  Codex Desktop must explicitly re-trust its hash before enforcement is active.
+  from the intended environment. A changed hook requires a new session; Codex
+  Desktop re-trust is additionally required only when `.codex/hooks.json`
+  bytes changed (the updater reports this condition).
 
   The daily transition order is: designer runs `--init` and pre-code `--auto`
   as **separate** commands; a human reviews 03B and explicitly sets it to
