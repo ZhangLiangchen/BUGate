@@ -129,6 +129,13 @@ role_governance:
 | `human_acceptance_artifacts` | list[relative path] | `[03b_adversarial_cases.yaml]` | Artifacts whose already-made human acceptance must be recorded. `approve` requires their current `gate_status: passed`, records their hash, and never edits them. |
 | `phases` | mapping | canonical three-phase mapping shown above | Maps each lifecycle phase to non-empty `allowed_roles` and, where applicable, `requires_handoff_from`. Unknown phases/keys and invalid relations are rejected. |
 
+The v0.4.x receipt/event schema is intentionally canonical: `pre_code` must be
+owned only by `designer`, `implementation` only by `implementer`, and
+`post_run` only by `reviewer`, with the handoff relations shown above. These
+fields make the contract explicit and auditable; they do not permit swapping
+or combining lifecycle owners. In `required` mode non-canonical ownership fails
+closed; `advisory` reports the malformed policy without claiming an unlock.
+
 Lifecycle `allowed_roles` and `requires_handoff_from` accept only
 `designer`, `implementer`, and `reviewer`; runtime/model names such as `codex`
 or `claude` are invalid role tokens. `agent_roles` remains profile-defined and
@@ -152,6 +159,25 @@ command/exit code, and log/evidence hashes. Profile or pre-code drift re-locks
 from designer acceptance/handoff; implementation drift re-locks from
 implementer handoff/reviewer acceptance. Recovery appends a new generation;
 deleting evidence is not a reset.
+
+New receipts bind both configuration sources: `profile.path` and
+`profile.sha256` identify the selected profile file, while
+`profile.effective_config_sha256` hashes the canonical merged base+profile
+mapping that actually enforced the transition. Changing inherited base policy
+therefore re-locks the chain even when selected profile bytes are unchanged.
+The validator still parses the legacy v0.4.0/v0.4.1 two-field profile snapshot
+so its append-only chain can recover, but that snapshot is stale for a current
+unlock and requires a superseding human-acceptance/handoff generation. When
+governance is `off`, lifecycle publisher commands (`approve`, `handoff`,
+`accept`, and `complete`) reject instead of creating inert-looking receipts.
+
+Reviewer completion accepts only dedicated execution evidence. It rejects the
+base config, selected profile, every configured role-evidence directory, and
+pre-code, implementation, or post-run phase-owned paths. Hooks bind arbitrary
+captured logs by canonical resolved workspace path, so `..` and symlink aliases
+cannot bypass the snapshot. If several UCs capture one shared path, every
+current owner must pass post-run preflight; one closed, stale, or wrong-session
+owner blocks the write.
 
 The normative state, receipt, Memory ordering, compatibility, and threat-model
 contract is

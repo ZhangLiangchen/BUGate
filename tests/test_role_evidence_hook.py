@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests"))
 import role_governance as rg  # noqa: E402
-from test_role_governance import Fixture, fake_memory, role_env  # noqa: E402
+from test_role_governance import PRECODE, Fixture, fake_memory, role_env  # noqa: E402
 
 
 HOOK = ROOT / "scripts" / "check_role_evidence.py"
@@ -94,6 +95,97 @@ class RoleEvidenceHookTests(unittest.TestCase):
             allowed = run_hook(self.root, payload, role="designer", session="d-1")
             self.assertEqual(0, allowed.returncode, allowed.stderr)
 
+    def test_case_or_identity_aliases_preserve_phase_classification(self):
+        canonical_report = self.fx.artifact / "04_execution_report.md"
+        canonical_report.write_text("gate_status: draft\n", encoding="utf-8")
+        case_report = self.fx.artifact / "04_EXECUTION_REPORT.MD"
+        case_insensitive = case_report.exists() and os.path.samefile(
+            canonical_report, case_report
+        )
+        targets = {
+            "post_run": [
+                "usecases/UC-001/04_EXECUTION_REPORT.MD",
+                "usecases/UC-001/04_EXECUTION/new.txt",
+            ],
+            "pre_code": [
+                "usecases/UC-001/00_MULTIVIEW/new.md",
+                "usecases/UC-001/00_ADVERSARIAL/new.yaml",
+            ],
+        }
+        if not case_insensitive:
+            for phase_targets in targets.values():
+                for target in phase_targets:
+                    for payload in (claude(target), codex(target)):
+                        with self.subTest(
+                            kind="case-sensitive independent phase path",
+                            target=target,
+                            tool=payload["tool_name"],
+                        ):
+                            allowed = run_hook(
+                                self.root,
+                                payload,
+                                role="implementer",
+                                session="i-independent",
+                            )
+                            self.assertEqual(0, allowed.returncode, allowed.stderr)
+            aliases = {
+                "04_EXECUTION_REPORT.MD": canonical_report,
+                "04_EXECUTION": self.fx.artifact / "04_execution",
+                "00_MULTIVIEW": self.fx.artifact / "00_multiview",
+                "00_ADVERSARIAL": self.fx.artifact / "00_adversarial",
+            }
+            for name, canonical in aliases.items():
+                if canonical.suffix:
+                    (self.fx.artifact / name).symlink_to(canonical)
+                else:
+                    canonical.mkdir(exist_ok=True)
+                    (self.fx.artifact / name).symlink_to(
+                        canonical, target_is_directory=True
+                    )
+
+        for phase, phase_targets in targets.items():
+            for target in phase_targets:
+                for payload in (claude(target), codex(target)):
+                    with self.subTest(phase=phase, target=target, tool=payload["tool_name"]):
+                        blocked = run_hook(
+                            self.root,
+                            payload,
+                            role="implementer",
+                            session="i-wrong",
+                        )
+                        self.assertEqual(2, blocked.returncode, blocked.stderr)
+                        self.assertIn(f"not allowed in {phase}", blocked.stderr)
+
+        guarded_targets = ["tests/TEST_UC-001.PY", "TESTS/TEST_UC-001.PY"]
+        if not case_insensitive:
+            for target in guarded_targets:
+                for payload in (claude(target), codex(target)):
+                    with self.subTest(
+                        kind="case-sensitive independent guarded path",
+                        target=target,
+                        tool=payload["tool_name"],
+                    ):
+                        allowed = run_hook(self.root, payload)
+                        self.assertEqual(0, allowed.returncode, allowed.stderr)
+            canonical_implementation = self.root / "tests" / "test_UC-001.py"
+            canonical_implementation.write_text("fixture\n", encoding="utf-8")
+            (self.root / "tests" / "TEST_UC-001.PY").symlink_to(
+                canonical_implementation
+            )
+            (self.root / "TESTS").symlink_to(
+                self.root / "tests", target_is_directory=True
+            )
+            guarded_targets = ["tests/TEST_UC-001.PY", "TESTS/test_UC-001.py"]
+        for target in guarded_targets:
+            for payload in (claude(target), codex(target)):
+                with self.subTest(
+                    kind="case-or-identity guarded path",
+                    target=target,
+                    tool=payload["tool_name"],
+                ):
+                    blocked = run_hook(self.root, payload)
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+
     def test_evidence_direct_edit_always_blocked_when_enabled(self):
         target = "usecases/UC-001/00_role_evidence/chain.json"
         for payload in (claude(target), codex(target)):
@@ -114,6 +206,18 @@ class RoleEvidenceHookTests(unittest.TestCase):
         result = run_hook(self.root, multi, role="designer", session="d-1")
         self.assertEqual(2, result.returncode)
         self.assertIn(target, result.stderr)
+        evidence_dir = self.fx.artifact / "00_role_evidence"
+        evidence_dir.mkdir()
+        (self.root / "evidence-alias").symlink_to(evidence_dir, target_is_directory=True)
+        for payload in (claude("evidence-alias/chain.json"), codex("evidence-alias/chain.json")):
+            alias = run_hook(
+                self.root,
+                payload,
+                role="designer",
+                session="d-1",
+            )
+            self.assertEqual(2, alias.returncode, alias.stderr)
+            self.assertIn("direct edits", alias.stderr)
 
     def test_implementation_unlock_and_artifact_profile_drift_relock(self):
         target = "tests/test_UC-001.py"
@@ -151,6 +255,371 @@ class RoleEvidenceHookTests(unittest.TestCase):
         self.assertEqual(2, drift.returncode)
         self.assertIn("profile hash/path drifted", drift.stderr)
 
+    def test_lexical_phase_symlink_escapes_fail_closed_for_both_hook_shapes(self):
+        notes = self.root / "notes.txt"
+        notes.write_text("ordinary fixture notes\n", encoding="utf-8")
+        implementation = self.root / "tests" / "test_UC-001.py"
+
+        with role_env("designer", "d-1"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            designer_handoff = rg.handoff(
+                self.fx.artifact,
+                phase="pre_code",
+                to_role="implementer",
+            )
+        with role_env("implementer", "i-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=designer_handoff["receipt_sha256"],
+            )
+
+        implementation.symlink_to(notes)
+        guarded_targets = [
+            implementation.relative_to(self.root).as_posix(),
+            implementation.as_posix(),
+        ]
+        for target in guarded_targets:
+            for payload in (claude(target), codex(target)):
+                with self.subTest(kind="guarded escape", target=target, tool=payload["tool_name"]):
+                    blocked = run_hook(
+                        self.root,
+                        payload,
+                        role="implementer",
+                        session="i-1",
+                    )
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertIn("guarded surface", blocked.stderr)
+
+        implementation.unlink()
+        implementation.symlink_to(self.root / "missing-implementation.py")
+        for payload in (claude("tests/test_UC-001.py"), codex("tests/test_UC-001.py")):
+            with self.subTest(kind="dangling guarded escape", tool=payload["tool_name"]):
+                blocked = run_hook(
+                    self.root,
+                    payload,
+                    role="implementer",
+                    session="i-1",
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn("guarded surface", blocked.stderr)
+
+        for payload in (claude("missing-implementation.py"), codex("missing-implementation.py")):
+            with self.subTest(kind="reverse dangling guarded", tool=payload["tool_name"]):
+                blocked = run_hook(self.root, payload)
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn("implementation identity owner", blocked.stderr)
+
+        implementation.unlink()
+        with tempfile.TemporaryDirectory(prefix="bugate-role-hook-outside-") as outside:
+            external_missing_implementation = Path(outside) / "missing-implementation.py"
+            implementation.symlink_to(external_missing_implementation)
+            for payload in (
+                claude(external_missing_implementation.as_posix()),
+                codex(external_missing_implementation.as_posix()),
+            ):
+                with self.subTest(
+                    kind="reverse external dangling guarded",
+                    tool=payload["tool_name"],
+                ):
+                    blocked = run_hook(self.root, payload)
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertIn("implementation identity owner", blocked.stderr)
+            implementation.unlink()
+
+        implementation.write_text("def test_fixture(): pass\n", encoding="utf-8")
+        with role_env("implementer", "i-1"):
+            implementer_handoff = rg.handoff(
+                self.fx.artifact,
+                phase="implementation",
+                to_role="reviewer",
+                implementation_files=[implementation],
+            )
+        with role_env("reviewer", "r-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="post_run",
+                handoff_id=implementer_handoff["receipt_sha256"],
+            )
+
+        brief = self.fx.artifact / "01_business_brief.md"
+        brief.unlink()
+        brief.symlink_to(notes)
+        multiview_escape = self.fx.artifact / "00_multiview" / "escape.md"
+        multiview_escape.symlink_to(notes)
+        report_escape = self.fx.artifact / "04_execution_report.md"
+        report_escape.symlink_to(notes)
+        execution_dir = self.fx.artifact / "04_execution"
+        execution_dir.mkdir()
+        execution_escape = execution_dir / "raw.log"
+        execution_escape.symlink_to(notes)
+        dangling_precode = self.fx.artifact / "00_multiview" / "dangling.md"
+        dangling_precode.symlink_to(self.root / "missing-precode.md")
+        dangling_postrun = execution_dir / "dangling.log"
+        dangling_postrun.symlink_to(self.root / "missing-postrun.log")
+
+        phase_targets = {
+            "precode": (
+                "designer",
+                "d-1",
+                [
+                    brief,
+                    multiview_escape,
+                    dangling_precode,
+                ],
+            ),
+            "postrun": (
+                "reviewer",
+                "r-1",
+                [
+                    report_escape,
+                    execution_escape,
+                    dangling_postrun,
+                ],
+            ),
+        }
+        for kind, (role, session, paths) in phase_targets.items():
+            for path in paths:
+                target = path.relative_to(self.root).as_posix()
+                for payload in (claude(target), codex(target)):
+                    with self.subTest(kind=kind, target=target, tool=payload["tool_name"]):
+                        blocked = run_hook(
+                            self.root,
+                            payload,
+                            role=role,
+                            session=session,
+                        )
+                        self.assertEqual(2, blocked.returncode, blocked.stderr)
+                        self.assertIn("artifact surface", blocked.stderr)
+
+        reverse_dangling_targets = {
+            "precode": self.root / "missing-precode.md",
+            "postrun": self.root / "missing-postrun.log",
+        }
+        for kind, missing_target in reverse_dangling_targets.items():
+            for payload in (
+                claude(missing_target.relative_to(self.root).as_posix()),
+                codex(missing_target.relative_to(self.root).as_posix()),
+            ):
+                with self.subTest(
+                    kind=f"reverse dangling {kind}",
+                    tool=payload["tool_name"],
+                ):
+                    blocked = run_hook(self.root, payload)
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    owner_phase = "pre_code" if kind == "precode" else "post_run"
+                    self.assertIn(f"{owner_phase} identity owner", blocked.stderr)
+
+        with tempfile.TemporaryDirectory(prefix="bugate-role-hook-outside-") as outside:
+            outside_path = Path(outside)
+            external_precode = outside_path / "missing-precode.md"
+            external_postrun = outside_path / "missing-postrun.log"
+            external_precode_alias = self.fx.artifact / "00_multiview" / "external.md"
+            external_postrun_alias = execution_dir / "external.log"
+            external_precode_alias.symlink_to(external_precode)
+            external_postrun_alias.symlink_to(external_postrun)
+            for kind, missing_target in {
+                "precode": external_precode,
+                "postrun": external_postrun,
+            }.items():
+                for payload in (
+                    claude(missing_target.as_posix()),
+                    codex(missing_target.as_posix()),
+                ):
+                    with self.subTest(
+                        kind=f"reverse external dangling {kind}",
+                        tool=payload["tool_name"],
+                    ):
+                        blocked = run_hook(self.root, payload)
+                        self.assertEqual(2, blocked.returncode, blocked.stderr)
+                        owner_phase = "pre_code" if kind == "precode" else "post_run"
+                        self.assertIn(f"{owner_phase} identity owner", blocked.stderr)
+
+        # The ordinary target is also phase-owned by structural symlink
+        # identity.  Editing it directly must not bypass the same preflight.
+        for payload in (claude("notes.txt"), codex("notes.txt")):
+            with self.subTest(kind="reverse structural identity", tool=payload["tool_name"]):
+                blocked = run_hook(
+                    self.root,
+                    payload,
+                    role="reviewer",
+                    session="r-1",
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn("identity owner", blocked.stderr)
+
+        ordinary_target = self.root / "ordinary-target.txt"
+        ordinary_target.write_text("ordinary unowned target\n", encoding="utf-8")
+        ordinary_alias = self.root / "ordinary-alias.txt"
+        ordinary_alias.symlink_to(ordinary_target)
+        for payload in (claude("ordinary-alias.txt"), codex("ordinary-alias.txt")):
+            with self.subTest(kind="ordinary symlink", tool=payload["tool_name"]):
+                allowed = run_hook(self.root, payload)
+                self.assertEqual(0, allowed.returncode, allowed.stderr)
+
+        ordinary_missing = self.root / "ordinary-missing.txt"
+        ordinary_dangling = self.root / "ordinary-dangling.txt"
+        ordinary_dangling.symlink_to(ordinary_missing)
+        for target in ("ordinary-dangling.txt", "ordinary-missing.txt"):
+            for payload in (claude(target), codex(target)):
+                with self.subTest(
+                    kind="ordinary dangling symlink",
+                    target=target,
+                    tool=payload["tool_name"],
+                ):
+                    allowed = run_hook(self.root, payload)
+                    self.assertEqual(0, allowed.returncode, allowed.stderr)
+
+    def test_phase_owned_hardlinks_keep_their_original_owner(self):
+        aliases = self.root / "phase-hardlinks"
+        aliases.mkdir()
+        implementation = self.fx.implementation
+        implementation.write_text("fixture\n", encoding="utf-8")
+        targets = {
+            "pre_code": (self.fx.artifact / "01_business_brief.md", aliases / "brief.md"),
+            "implementation": (implementation, aliases / "implementation.py"),
+        }
+        for source, alias in targets.values():
+            os.link(source, alias)
+            self.assertTrue(os.path.samefile(source, alias))
+
+        for phase, (_source, alias) in targets.items():
+            target = alias.relative_to(self.root).as_posix()
+            for payload in (claude(target), codex(target)):
+                with self.subTest(phase=phase, tool=payload["tool_name"]):
+                    blocked = run_hook(
+                        self.root,
+                        payload,
+                        role="reviewer",
+                        session="r-wrong",
+                    )
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertIn(f"{phase} identity owner", blocked.stderr)
+
+    def test_unrelated_hardlink_ignores_malformed_sibling_role_store(self):
+        notes = self.root / "notes.txt"
+        alias = self.root / "notes-hardlink.txt"
+        notes.write_text("ordinary fixture notes\n", encoding="utf-8")
+        os.link(notes, alias)
+        target = alias.relative_to(self.root).as_posix()
+        malformed = (
+            self.root
+            / "usecases"
+            / "UC-002"
+            / "00_role_evidence"
+            / "chain.json"
+        )
+        malformed.parent.mkdir(parents=True)
+        malformed.write_text("{}\n", encoding="utf-8")
+        receipts = malformed.parent / "receipts"
+        receipts.mkdir()
+        (receipts / "000001-reviewer-completion-fixture.json").write_text(
+            json.dumps(
+                {
+                    "artifacts": [
+                        {
+                            "path": "runlogs/other.log",
+                            "sha256": target,
+                            "gate_status": target,
+                            "metadata": [target],
+                        }
+                    ],
+                    "implementation_files": [],
+                    "run": {"command_summary": target},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (receipts / "broken-unrelated.json").write_text(
+            '{"run":{"command_summary":'
+            + json.dumps(target)
+            + '},\n',
+            encoding="utf-8",
+        )
+
+        for payload in (claude(target), codex(target)):
+            with self.subTest(tool=payload["tool_name"]):
+                allowed = run_hook(self.root, payload)
+                self.assertEqual(0, allowed.returncode, allowed.stderr)
+
+    def test_resolved_artifact_alias_cannot_unlock_a_different_guarded_uc(self):
+        with role_env("designer", "d-1"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            handoff = rg.handoff(
+                self.fx.artifact, phase="pre_code", to_role="implementer"
+            )
+        with role_env("implementer", "i-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=handoff["receipt_sha256"],
+            )
+
+        (self.root / "usecases" / "UC-002").symlink_to(
+            "UC-001", target_is_directory=True
+        )
+        artifact_target = "usecases/UC-002/01_business_brief.md"
+        for payload in (claude(artifact_target), codex(artifact_target)):
+            with self.subTest(kind="artifact phase", tool=payload["tool_name"]):
+                blocked = run_hook(
+                    self.root,
+                    payload,
+                    role="designer",
+                    session="d-1",
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn("artifact lexical UC 'UC-002'", blocked.stderr)
+                self.assertIn("resolved artifact UC 'UC-001'", blocked.stderr)
+
+        target = "tests/test_UC-002.py"
+        for payload in (claude(target), codex(target)):
+            with self.subTest(tool=payload["tool_name"]):
+                blocked = run_hook(
+                    self.root,
+                    payload,
+                    role="implementer",
+                    session="i-1",
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn(target, blocked.stderr)
+                self.assertIn("UC-002", blocked.stderr)
+                self.assertIn("UC-001", blocked.stderr)
+                self.assertIn("artifact", blocked.stderr.lower())
+                self.assertRegex(
+                    blocked.stderr.lower(), r"(?:does not match|disagrees|mismatch)"
+                )
+
+    def test_copied_receipt_chain_cannot_unlock_guarded_uc_through_hook(self):
+        with role_env("designer", "d-1"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            handoff = rg.handoff(
+                self.fx.artifact, phase="pre_code", to_role="implementer"
+            )
+        with role_env("implementer", "i-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=handoff["receipt_sha256"],
+            )
+
+        copied_artifact = self.root / "usecases" / "UC-002"
+        shutil.copytree(self.fx.artifact, copied_artifact)
+        target = "tests/test_UC-002.py"
+        for payload in (claude(target), codex(target)):
+            with self.subTest(tool=payload["tool_name"]):
+                blocked = run_hook(
+                    self.root,
+                    payload,
+                    role="implementer",
+                    session="i-1",
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn(target, blocked.stderr)
+                self.assertIn(
+                    "receipt UC does not match active context", blocked.stderr
+                )
+
     def test_postrun_requires_reviewer_acceptance(self):
         with role_env("designer", "d-1"):
             rg.approve(self.fx.artifact, approved_by="qa-owner")
@@ -185,6 +654,422 @@ class RoleEvidenceHookTests(unittest.TestCase):
         stolen = run_hook(self.root, claude(target), role="reviewer", session="r-2")
         self.assertEqual(2, stolen.returncode)
         self.assertIn("different BUGATE_SESSION_ID", stolen.stderr)
+
+    def test_closed_completion_blocks_postrun_writes_for_both_hook_shapes(self):
+        with role_env("designer", "d-1"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            designer_handoff = rg.handoff(
+                self.fx.artifact, phase="pre_code", to_role="implementer"
+            )
+        with role_env("implementer", "i-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=designer_handoff["receipt_sha256"],
+            )
+            self.fx.implementation.write_text(
+                "def test_fixture(): pass\n", encoding="utf-8"
+            )
+            implementer_handoff = rg.handoff(
+                self.fx.artifact,
+                phase="implementation",
+                to_role="reviewer",
+                implementation_files=[self.fx.implementation],
+            )
+        with role_env("reviewer", "r-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="post_run",
+                handoff_id=implementer_handoff["receipt_sha256"],
+            )
+            for name in sorted(rg.POSTRUN_NAMES):
+                (self.fx.artifact / name).write_text(
+                    "gate_status: passed\nfixture: postrun\n", encoding="utf-8"
+                )
+            log = self.root / "runlogs" / "execution.log"
+            log.parent.mkdir()
+            log.write_text("fixture run\n", encoding="utf-8")
+            rg.complete(
+                self.fx.artifact,
+                phase="post_run",
+                run_command="fixture runner",
+                exit_code=0,
+                evidence_files=[log],
+                final_gate_status="passed",
+            )
+        (self.root / "runlogs" / "sub").mkdir()
+        (self.root / "runlogs" / "alias.log").symlink_to("execution.log")
+
+        for target in (
+            "usecases/UC-001/04_execution_report.md",
+            "runlogs/execution.log",
+            "runlogs/sub/../execution.log",
+            "runlogs/alias.log",
+        ):
+            for payload in (claude(target), codex(target)):
+                blocked = run_hook(
+                    self.root,
+                    payload,
+                    role="reviewer",
+                    session="r-1",
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn("post-run is closed", blocked.stderr)
+
+        unrelated = self.root / "runlogs" / "sut-owned.log"
+        unrelated.write_text("unrelated fixture\n", encoding="utf-8")
+        for payload in (claude("runlogs/sut-owned.log"), codex("runlogs/sut-owned.log")):
+            allowed = run_hook(
+                self.root,
+                payload,
+                role="reviewer",
+                session="r-1",
+            )
+            self.assertEqual(0, allowed.returncode, allowed.stderr)
+
+    def test_existing_evidence_and_completion_aliases_block_both_hook_shapes(self):
+        with role_env("designer", "d-1"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            designer_handoff = rg.handoff(
+                self.fx.artifact, phase="pre_code", to_role="implementer"
+            )
+        with role_env("implementer", "i-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=designer_handoff["receipt_sha256"],
+            )
+            self.fx.implementation.write_text(
+                "def test_fixture(): pass\n", encoding="utf-8"
+            )
+            implementer_handoff = rg.handoff(
+                self.fx.artifact,
+                phase="implementation",
+                to_role="reviewer",
+                implementation_files=[self.fx.implementation],
+            )
+        with role_env("reviewer", "r-1"):
+            rg.accept(
+                self.fx.artifact,
+                phase="post_run",
+                handoff_id=implementer_handoff["receipt_sha256"],
+            )
+            for name in sorted(rg.POSTRUN_NAMES):
+                (self.fx.artifact / name).write_text(
+                    "gate_status: passed\nfixture: postrun\n", encoding="utf-8"
+                )
+            log = self.root / "runlogs" / "execution.log"
+            log.parent.mkdir()
+            log.write_text("fixture run\n", encoding="utf-8")
+            rg.complete(
+                self.fx.artifact,
+                phase="post_run",
+                run_command="fixture runner",
+                exit_code=0,
+                evidence_files=[log],
+                final_gate_status="passed",
+            )
+
+        chain = self.fx.artifact / "00_role_evidence" / "chain.json"
+        case_chain = self.fx.artifact / "00_ROLE_EVIDENCE" / "CHAIN.JSON"
+        case_insensitive = case_chain.exists() and os.path.samefile(chain, case_chain)
+        if case_insensitive:
+            evidence_alias = case_chain
+            completion_alias = log.with_name("EXECUTION.LOG")
+            self.assertTrue(completion_alias.exists())
+            self.assertTrue(os.path.samefile(log, completion_alias))
+        else:
+            evidence_alias_dir = self.root / "role-evidence-identity-alias"
+            evidence_alias_dir.symlink_to(
+                chain.parent, target_is_directory=True
+            )
+            evidence_alias = evidence_alias_dir / chain.name
+            completion_alias = log.with_name("execution-hardlink.log")
+            os.link(log, completion_alias)
+            self.assertTrue(os.path.samefile(chain, evidence_alias))
+            self.assertTrue(os.path.samefile(log, completion_alias))
+
+        evidence_target = evidence_alias.relative_to(self.root).as_posix()
+        evidence_hardlink = self.root / "chain-hardlink.json"
+        os.link(chain, evidence_hardlink)
+        self.assertTrue(os.path.samefile(chain, evidence_hardlink))
+        for target in (
+            evidence_target,
+            evidence_hardlink.relative_to(self.root).as_posix(),
+        ):
+            for payload in (claude(target), codex(target)):
+                with self.subTest(kind="role evidence", tool=payload["tool_name"]):
+                    blocked = run_hook(
+                        self.root,
+                        payload,
+                        role="reviewer",
+                        session="r-1",
+                    )
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertIn("direct edits", blocked.stderr)
+
+        completion_target = completion_alias.relative_to(self.root).as_posix()
+        for payload in (claude(completion_target), codex(completion_target)):
+            with self.subTest(kind="completion evidence", tool=payload["tool_name"]):
+                blocked = run_hook(
+                    self.root,
+                    payload,
+                    role="reviewer",
+                    session="r-1",
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn("post-run is closed", blocked.stderr)
+
+        completion_receipt = sorted(
+            (
+                self.fx.artifact
+                / "00_role_evidence"
+                / "receipts"
+            ).glob("*-reviewer-completion-*.json")
+        )[-1]
+        completion_receipt_body = completion_receipt.read_bytes()
+        for malformed_artifacts in (
+            {"path": "runlogs/execution.log"},
+            "runlogs/execution.log",
+        ):
+            malformed_completion = json.loads(completion_receipt_body)
+            malformed_completion["artifacts"] = malformed_artifacts
+            completion_receipt.write_text(
+                json.dumps(
+                    malformed_completion,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            try:
+                for payload in (claude(completion_target), codex(completion_target)):
+                    with self.subTest(
+                        kind="schema-malformed owning completion",
+                        shape=type(malformed_artifacts).__name__,
+                        tool=payload["tool_name"],
+                    ):
+                        blocked = run_hook(
+                            self.root,
+                            payload,
+                            role="reviewer",
+                            session="r-1",
+                        )
+                        self.assertEqual(2, blocked.returncode, blocked.stderr)
+                        self.assertIn("receipt", blocked.stderr.lower())
+            finally:
+                completion_receipt.write_bytes(completion_receipt_body)
+
+        for raw_shape, raw_body in (
+            (
+                "invalid-utf8",
+                b'\xff{"artifacts":{"path":"runlogs/execution.log"}}',
+            ),
+            (
+                "escaped-slash",
+                b'{"artifacts":"runlogs\\/execution.log",',
+            ),
+            (
+                "unicode-escape",
+                b'{"artifacts":"\\u0072unlogs/execution.log",',
+            ),
+            (
+                "escaped-ownership-keys",
+                b'{"\\u0061rtifacts":{"\\u0070ath":"runlogs/execution.log"},',
+            ),
+            (
+                "duplicate-ownership-key",
+                b'{"artifacts":"runlogs/execution.log","artifacts":[]}',
+            ),
+        ):
+            completion_receipt.write_bytes(raw_body)
+            try:
+                for payload in (claude(completion_target), codex(completion_target)):
+                    with self.subTest(
+                        kind="raw-malformed owning completion",
+                        shape=raw_shape,
+                        tool=payload["tool_name"],
+                    ):
+                        blocked = run_hook(
+                            self.root,
+                            payload,
+                            role="reviewer",
+                            session="r-1",
+                        )
+                        self.assertEqual(2, blocked.returncode, blocked.stderr)
+                        self.assertIn("receipt", blocked.stderr.lower())
+            finally:
+                completion_receipt.write_bytes(completion_receipt_body)
+
+        for raw_shape, raw_body in (
+            (
+                "run-path-is-not-ownership",
+                b'{"run":{"path":"runlogs/execution.log"},',
+            ),
+            (
+                "metadata-path-is-not-ownership",
+                b'{"metadata":{"path":"runlogs/execution.log"},',
+            ),
+            (
+                "duplicate-run-key-is-not-ownership",
+                b'{"run":{"path":"runlogs/execution.log"},"run":{}}',
+            ),
+        ):
+            completion_receipt.write_bytes(raw_body)
+            try:
+                for payload in (claude(completion_target), codex(completion_target)):
+                    with self.subTest(
+                        kind="raw-malformed non-owner",
+                        shape=raw_shape,
+                        tool=payload["tool_name"],
+                    ):
+                        allowed = run_hook(
+                            self.root,
+                            payload,
+                            role="reviewer",
+                            session="r-1",
+                        )
+                        self.assertEqual(0, allowed.returncode, allowed.stderr)
+            finally:
+                completion_receipt.write_bytes(completion_receipt_body)
+
+        with tempfile.TemporaryDirectory(prefix="bugate-role-hook-external-") as outside:
+            external_hardlink = Path(outside) / "execution-hardlink.log"
+            os.link(log, external_hardlink)
+            self.assertTrue(os.path.samefile(log, external_hardlink))
+            for payload in (claude(str(external_hardlink)), codex(str(external_hardlink))):
+                with self.subTest(kind="external completion", tool=payload["tool_name"]):
+                    blocked = run_hook(
+                        self.root,
+                        payload,
+                        role="reviewer",
+                        session="r-1",
+                    )
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertIn("post-run is closed", blocked.stderr)
+
+        if completion_alias != log and completion_alias.exists():
+            completion_alias.unlink()
+        if log.exists():
+            log.unlink()
+        dangling = self.root / "runlogs" / "deleted-evidence-alias.log"
+        dangling.symlink_to("execution.log")
+        deleted_targets = [
+            "runlogs/execution.log",
+            "runlogs/deleted-evidence-alias.log",
+        ]
+        if case_insensitive:
+            deleted_targets.append("runlogs/EXECUTION.LOG")
+        for target in deleted_targets:
+            for payload in (claude(target), codex(target)):
+                with self.subTest(
+                    kind="deleted completion",
+                    target=target,
+                    tool=payload["tool_name"],
+                ):
+                    blocked = run_hook(
+                        self.root,
+                        payload,
+                        role="reviewer",
+                        session="r-1",
+                    )
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertIn("required evidence file is missing", blocked.stderr)
+
+    def test_shared_completion_evidence_checks_every_uc_owner(self):
+        second_artifact = self.root / "usecases" / "UC-002"
+        second_artifact.mkdir(parents=True)
+        for name in PRECODE:
+            extra = (
+                "dispatch_mode: real_peer_dispatch\n"
+                if name == "03b_adversarial_cases.yaml"
+                else ""
+            )
+            (second_artifact / name).write_text(
+                f"gate_status: passed\n{extra}fixture: {name}\n",
+                encoding="utf-8",
+            )
+        second_multi = second_artifact / "00_multiview"
+        second_multi.mkdir()
+        (second_multi / "divergence_report.md").write_text(
+            "---\ngate_status: passed\ndispatch_mode: real_peer_dispatch\n---\n# Fixture\n",
+            encoding="utf-8",
+        )
+        second_implementation = self.root / "tests" / "test_UC-002.py"
+        shared_log = self.root / "runlogs" / "shared.log"
+        shared_log.parent.mkdir()
+        shared_log.write_text("shared fixture run\n", encoding="utf-8")
+
+        def reach_reviewer(artifact: Path, implementation: Path, token: str) -> None:
+            with role_env("designer", f"d-{token}"):
+                rg.approve(artifact, approved_by="qa-owner")
+                designer_handoff = rg.handoff(
+                    artifact, phase="pre_code", to_role="implementer"
+                )
+            with role_env("implementer", f"i-{token}"):
+                rg.accept(
+                    artifact,
+                    phase="implementation",
+                    handoff_id=designer_handoff["receipt_sha256"],
+                )
+                implementation.write_text(
+                    "def test_fixture(): pass\n", encoding="utf-8"
+                )
+                implementer_handoff = rg.handoff(
+                    artifact,
+                    phase="implementation",
+                    to_role="reviewer",
+                    implementation_files=[implementation],
+                )
+            with role_env("reviewer", "r-shared"):
+                rg.accept(
+                    artifact,
+                    phase="post_run",
+                    handoff_id=implementer_handoff["receipt_sha256"],
+                )
+
+        reach_reviewer(self.fx.artifact, self.fx.implementation, "one")
+        with role_env("reviewer", "r-shared"):
+            for name in sorted(rg.POSTRUN_NAMES):
+                (self.fx.artifact / name).write_text(
+                    "gate_status: draft\nfixture: postrun\n", encoding="utf-8"
+                )
+            rg.complete(
+                self.fx.artifact,
+                phase="post_run",
+                run_command="fixture runner one",
+                exit_code=1,
+                evidence_files=[shared_log],
+                final_gate_status="failed",
+            )
+
+        reach_reviewer(second_artifact, second_implementation, "two")
+        with role_env("reviewer", "r-shared"):
+            for name in sorted(rg.POSTRUN_NAMES):
+                (second_artifact / name).write_text(
+                    "gate_status: passed\nfixture: postrun\n", encoding="utf-8"
+                )
+            rg.complete(
+                second_artifact,
+                phase="post_run",
+                run_command="fixture runner two",
+                exit_code=0,
+                evidence_files=[shared_log],
+                final_gate_status="passed",
+            )
+
+        for payload in (claude("runlogs/shared.log"), codex("runlogs/shared.log")):
+            blocked = run_hook(
+                self.root,
+                payload,
+                role="reviewer",
+                session="r-shared",
+            )
+            self.assertEqual(2, blocked.returncode, blocked.stderr)
+            self.assertIn("completion owner usecases/UC-002", blocked.stderr)
+            self.assertIn("post-run is closed", blocked.stderr)
 
     def test_advisory_warns_but_evidence_protection_remains_hard(self):
         profile = self.root / "bugate.profile.yaml"

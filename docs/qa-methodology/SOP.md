@@ -863,6 +863,12 @@ bin/bugate-role complete <artifact-dir> --phase post_run \
 Passed completion 要求 exit code 0 且 04/05 均 passed。Failed completion 保持
 `post_run_active`，不制造假绿。
 
+`--evidence-file` 必须指向专用执行证据，不能复用 `bugate.config.yaml`、active
+profile、任何 UC 的 `00_role_evidence/**`、pre-code、实现文件或 04/05 路径。
+共享 external log 会同时受所有引用它的 UC 约束；任一 owner 已关闭、stale 或 session
+不匹配，hook 都会阻止写入。路径按 canonical resolved identity 比对，不能借 `..` 或
+symlink alias 绕过。
+
 ### F. Drift 恢复和安全边界
 
 - profile/pre-code drift：重做 human acceptance + designer handoff + implementer acceptance。
