@@ -89,8 +89,24 @@ jobs:
                       f"tag/repository version mismatch: "
                       f"repository={version!r}, tag={tag!r}"
                   )
+              tag_ref = f"refs/tags/{tag}"
+              # actions/checkout can materialize a tag-push ref locally as a
+              # lightweight commit ref even when the remote object is an
+              # annotated tag. Fetch the exact remote tag object before
+              # checking its type; --force replaces only this local tag ref.
+              subprocess.run(
+                  [
+                      "git",
+                      "fetch",
+                      "--force",
+                      "--no-tags",
+                      "origin",
+                      f"{tag_ref}:{tag_ref}",
+                  ],
+                  check=True,
+              )
               tag_type = subprocess.check_output(
-                  ["git", "cat-file", "-t", f"refs/tags/{tag}"], text=True
+                  ["git", "cat-file", "-t", tag_ref], text=True
               ).strip()
               if tag_type != "tag":
                   raise SystemExit(f"release ref must be an annotated tag: {tag}")
