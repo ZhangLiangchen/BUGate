@@ -3,7 +3,8 @@
 [English](IMPORT_PROMPT.md) | [简体中文](IMPORT_PROMPT.zh-CN.md)
 
 > 在 **SUT 自动化测试仓**作为项目根打开时，把这份 prompt 粘给 Claude Code 或
-> Codex。agent 必须先区分首次安装、v0.3.x bootstrap 与 v0.4+ 仓内更新，再使用
+> Codex。agent 必须先区分首次安装、外部 bootstrap/pre-lock 路径与
+> lock+launcher 仓内更新，再使用
 > 唯一适用的事务边界，保留 SUT-owned state，验证结果并报告剩余人工与 runtime
 > reload 动作。
 
@@ -49,22 +50,25 @@ BUGate core 文件。
    - 设置 `BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"`，然后分类：
 
      ```bash
-     if test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
-       BUGATE_ROUTE=v04-in-repo-update
+     if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \
+       && test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
+       BUGATE_ROUTE=locked-in-repo-update
      elif test -e "$BUGATE_VENDOR_DIR" || test -L "$BUGATE_VENDOR_DIR"; then
-       BUGATE_ROUTE=legacy-bootstrap-candidate
+       BUGATE_ROUTE=external-bootstrap-candidate
      else
        BUGATE_ROUTE=fresh-install
      fi
      printf 'BUGATE_ROUTE=%s\n' "$BUGATE_ROUTE"
      ```
 
-   - `legacy-bootstrap-candidate` 此时还不能认定为 v0.3.x。必须由 v0.4.2
-     bootstrap updater 通过 exact supported legacy/pre-lock manifest 识别；未知、
-     混合或 locally modified layout 一律 `NO-GO`。
+   - `external-bootstrap-candidate` 此时还不能认定为 v0.3.x 或 pre-lock
+     v0.4.x。必须由 v0.4.2 或更高的外部 updater 通过 exact supported
+     legacy/pre-lock manifest 识别，或诊断不一致的 lock/launcher state；未知、
+     混合、locally modified 或不完整 lock-based layout 一律 `NO-GO`。不能只凭
+     版本字符串选择仓内路径。
 
 2. **仅在需要时于 SUT 仓外获取 BUGate kit**
-   - `v04-in-repo-update` 跳过第 2–3 步：vendored updater 会解析显式指定的
+   - `locked-in-repo-update` 跳过第 2–3 步：vendored updater 会解析显式指定的
      target release，或接受离线 archive/checksum 对。
    - 首次安装与 legacy bootstrap 需要已解包 v0.4.2 release。
    - 如果 `BUGATE_ENGINE_DIR` 可用，继续使用。
@@ -147,7 +151,7 @@ BUGate core 文件。
    命令。
 
    **受支持 v0.3.x/pre-lock bootstrap**
-   （`BUGATE_ROUTE=legacy-bootstrap-candidate`）：
+   （`BUGATE_ROUTE=external-bootstrap-candidate`）：
 
    ```bash
    SUT_REPO="$(pwd)"
@@ -164,7 +168,7 @@ BUGate core 文件。
    的一次性桥接。`status`/`plan` 为 `NO-GO` 时，不得手工复制文件、运行 importer
    或猜测版本。
 
-   **v0.4+ 仓内更新**（`BUGATE_ROUTE=v04-in-repo-update`）：
+   **Lock+launcher 仓内更新**（`BUGATE_ROUTE=locked-in-repo-update`）：
 
    ```bash
    BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
@@ -209,16 +213,30 @@ BUGate core 文件。
 
    checksum 缺失、歧义或不匹配会在 target 写入前被拒绝。
 
-   rollback 必须显式指定 transaction，不能把 warning 当作自动回滚理由：
+   rollback 必须显式指定 transaction，不能把 warning 当作自动回滚理由。执行前，
+   在 SUT 仓外保留或取得一份已验证且已解包的 v0.4.2 或更高 release，并让
+   `BOOTSTRAP` 指向其中 updater；exact rollback 移除 vendored launcher 后仍需此
+   路径：
 
    ```bash
+   BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
    "$BUGATE_VENDOR_DIR/bin/bugate-update" rollback \
      --transaction <32-hex-transaction-id>
-   "$BUGATE_VENDOR_DIR/bin/bugate-update" verify
+   if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \
+     && test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
+     "$BUGATE_VENDOR_DIR/bin/bugate-update" verify
+   else
+     python3 "$BOOTSTRAP" verify . --vendor-dir "$BUGATE_VENDOR_DIR"
+   fi
    ```
 
    只能使用 committed `apply` 输出的 id。rollback 只恢复 engine transaction；
-   不会撤销单独评审的 profile 变更。
+   不会撤销单独评审的 profile 变更。第一笔 v0.4.2 updater transaction 可能精确
+   恢复 v0.3.x 或 pre-lock v0.4.0/v0.4.1，包括删除 lock 与 launcher；这不是
+   rollback 失败。若 rollback 在 launcher 变化后中断，用 `python3 "$BOOTSTRAP"
+   status . --vendor-dir "$BUGATE_VENDOR_DIR"` 诊断；需要 recovery 时通过
+   `$BOOTSTRAP` 重试同一个 exact rollback，最后执行外部 `verify`。禁止复制
+   launcher 回去或手改 transaction state。
 
    managed local change、未知/重复 hook identity 或 shape、type/permission drift、
    critical file 缺失与混合 legacy fingerprint 都是冲突，会令 plan `NO-GO`。
@@ -326,7 +344,7 @@ BUGate core 文件。
 
 9. **报告最终状态**
    - 说明实际执行的 route：`fresh-install`、`legacy-bootstrap` 或
-     `v04-in-repo-update`；给出 installed version、最终 `verify` decision，以及
+     `locked-in-repo-update`；给出 installed version、最终 `verify` decision，以及
      transaction id/rollback availability。
    - 列出 SUT 仓中所有变更文件/目录。
    - 首次安装时，列出应该提交的精确文件：
@@ -409,8 +427,9 @@ BUGate core 文件。
   新建 human acceptance、designer handoff、implementer acceptance；post-run
   前还需要 implementer handoff 与 reviewer acceptance。
 
-  升级已有导入仓只能使用 v0.4.2 bootstrap updater（v0.3.x）或 vendored
-  `bugate-update`（v0.4+），按第 4 步执行 status → plan → 人工复核后的 apply →
+  升级已有导入仓只能使用 v0.4.2 外部 bootstrap updater（v0.3.x 或 pre-lock
+  v0.4.0/v0.4.1），或在 lock+launcher 同时存在时使用 vendored
+  `bugate-update`，按第 4 步执行 status → plan → 人工复核后的 apply →
   verify。`bugate_init.py` 仅首次安装。engine transaction 保留 profile，因此
   启用 Wave 7 仍是独立的人审 profile 变更。完成该独立决定后，启动三个独立
   session；不要试图从 SessionStart hook 设置父进程角色：

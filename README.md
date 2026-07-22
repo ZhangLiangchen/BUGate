@@ -253,9 +253,10 @@ orchestrators, and Core mutators are enforced. See the
 
 **Agent-assisted import prompt.** Open the SUT automation test repo as the
 project root, then paste [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) into Claude Code
-or Codex. The prompt first distinguishes a fresh install, a v0.3.x bootstrap,
-and a v0.4+ in-repo update, then guides the applicable release, verification,
-profile, runtime-reload, and Memory steps. Chinese mirror:
+or Codex. The prompt first distinguishes a fresh install, an external
+legacy/pre-lock bootstrap, and a lock+launcher in-repo update, then guides the
+applicable release, verification, profile, runtime-reload, and Memory steps.
+Chinese mirror:
 [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md).
 
 Choose exactly one lifecycle entry point:
@@ -263,8 +264,8 @@ Choose exactly one lifecycle entry point:
 | Detected state | Entry point | Rule |
 |---|---|---|
 | No BUGate vendor path | unpacked release `scripts/bugate_init.py` | Fresh install only; preview with `--dry-run`. |
-| Supported v0.3.x import with no updater | unpacked v0.4.2 `scripts/bugate_update.py` | One-time bootstrap; never re-run the installer. |
-| v0.4+ import with `.bugate/bin/bugate-update` | vendored `bugate-update` | Run `status` → `plan` → reviewed `apply` → `verify`; use the exact transaction id for rollback. |
+| Supported v0.3.x or pre-lock v0.4.0/v0.4.1 import | unpacked v0.4.2-or-later `scripts/bugate_update.py` | One-time bootstrap; never re-run the installer. |
+| Installed lock **and** executable `.bugate/bin/bugate-update` | vendored `bugate-update` | Run `status` → `plan` → reviewed `apply` → `verify`; use the exact transaction id for rollback. |
 | Unknown/mixed layout or managed-file drift | none | `NO-GO`; preserve the workspace and resolve each reported conflict. There is no broad `--force`. |
 
 **Fresh release install — no BUGate core clone required in the SUT repo.** Download
@@ -307,9 +308,11 @@ path already exists in any form, the installer performs no target or
 machine-state write and directs you to the updater.
 
 **Upgrade an existing import.** Work from the imported SUT test repo root and
-keep unrelated dirty files untouched. A supported v0.3.x installation has no
-vendored updater, so use the updater from the unpacked v0.4.2 release exactly
-once:
+keep unrelated dirty files untouched. A supported v0.3.x or exact pre-lock
+v0.4.0/v0.4.1 installation has no authoritative lock/updater pair, so use the
+updater from the unpacked v0.4.2-or-later release exactly once. Keep that
+verified unpacked release outside the SUT repo until the rollback window is
+closed:
 
 ```bash
 python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
@@ -319,8 +322,10 @@ python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bug
 python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
 ```
 
-For v0.4+ installations, use the in-repo interface and always name the target
-version—there is no implicit `latest`:
+Only an installation with both `.bugate/bugate.lock.json` and executable
+`.bugate/bin/bugate-update` uses the in-repo interface. Always name the target
+version—there is no implicit `latest`; a version label alone is not routing
+evidence:
 
 ```bash
 .bugate/bin/bugate-update status
@@ -346,12 +351,24 @@ rejected before target writes):
 ```
 
 If a committed transaction must be reversed, use the exact 32-hex id printed
-by `apply`, then verify the restored installation:
+by `apply`. A rollback of the first updater transaction to v0.3.x or pre-lock
+v0.4.0/v0.4.1 correctly removes the installed lock and vendored launcher, so
+verify through whichever entry point still exists. Here `BOOTSTRAP` is the
+retained, verified unpacked v0.4.2-or-later updater:
 
 ```bash
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-.bugate/bin/bugate-update verify
+BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
+  .bugate/bin/bugate-update verify
+else
+  python3 "$BOOTSTRAP" verify . --vendor-dir .bugate
+fi
 ```
+
+If rollback is interrupted after the launcher changes, use that same external
+bootstrap for read-only `status`/`verify` and for an exact reviewed rollback
+retry; never copy a launcher back or hand-edit transaction state.
 
 The updater changes only release-manifest-owned engine, skill/agent links, the
 marked `.gitignore` block, and exact BUGate-owned hook entries. Local managed

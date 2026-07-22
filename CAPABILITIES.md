@@ -17,8 +17,10 @@ Current distribution version: **v0.4.2**. Its release assets are
   console-script is added, prose shorthand `bugate init` means
   `python3 scripts/bugate_init.py` from an engine checkout or unpacked release.
   It is fresh-install-only and refuses any existing vendor path. Existing
-  imports use `bugate-update`: v0.3.x bootstraps from an unpacked v0.4.2
-  `scripts/bugate_update.py`; v0.4+ uses the vendored `bin/bugate-update`.
+  imports use `bugate-update`: v0.3.x and pre-lock v0.4.0/v0.4.1 bootstrap
+  from an unpacked v0.4.2-or-later `scripts/bugate_update.py`; only an
+  installation with both its authoritative lock and executable launcher uses
+  the vendored `bin/bugate-update`.
 - **Core is standard-library only.** Every script under `scripts/` and `bin/`
   runs on a bare Python 3 / bash install — no third-party deps. The BUGate YAML
   used by config and artifacts is a deliberately small subset parsed in
@@ -55,7 +57,7 @@ Normative rules: [`CHARTER.md`](CHARTER.md) §2 + Amendment A4. Per command clas
 |---|---|
 | Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation/governance, plan lock, prompt reminder, `wave8-weekly` | The **imported SUT test repo**; in BUGate core only template checks and ephemeral fixture acceptances run |
 | Fresh importer (`bugate_init.py`) — vendors the kit, links Claude skills plus official Codex `.agents/skills` (with `.codex/skills` kept as a legacy bridge), copies Codex gate agents, merges the initial BUGate hook entries without replacing repo-owned hooks, scaffolds committed config + profile, writes the first installed lock, and appends the marked ignore block. Any existing vendor path is a zero-write failure; it never performs an upgrade. | The **engine checkout or unpacked release**, pointed at a fresh target SUT repo |
-| Imported updater (`scripts/bugate_update.py` / `bin/bugate-update`) — exact legacy detection or installed-lock verification, zero-write planning, transactional apply/recovery, verify, and exact-transaction rollback. It writes only manifest-owned engine/link/marked-block/exact-hook surfaces; profile, tests, artifacts, evidence, Memory, SUT-owned hooks, and unrelated dirt remain outside its transaction. | Bootstrap script from an unpacked v0.4.2 release for v0.3.x; vendored wrapper from the **imported SUT test repo root** for v0.4+ |
+| Imported updater (`scripts/bugate_update.py` / `bin/bugate-update`) — exact legacy detection or installed-lock verification, zero-write planning, transactional apply/recovery, verify, and exact-transaction rollback. It writes only manifest-owned engine/link/marked-block/exact-hook surfaces; profile, tests, artifacts, evidence, Memory, SUT-owned hooks, and unrelated dirt remain outside its transaction. | Bootstrap script from an unpacked v0.4.2-or-later release for v0.3.x/pre-lock v0.4.0/v0.4.1 (and verification after rollback to those images); vendored wrapper from the **imported SUT test repo root** only while its installed lock and launcher both exist |
 | Release archive builder (`build_release_archives.py`) — directly creates the deterministic tar/zip/checksum inputs for the three-asset GitHub Release, including the dual Codex/Claude plugin surfaces and shared kit assets | The **engine checkout** only, from a clean tree for real releases |
 | De-SUT guard (`check_no_sut_terms.py`) | The **engine tree** it is part of — scans the kit subtree anywhere; the full upstream surface only in this repo (CI-enforced here) |
 | Memory bus (`memory_bus.py`, `bin/memory-*`) | Either — namespace isolated per project via `memory.namespace` / `MEMORY_BUS_PROJECT_TAG` |
@@ -79,7 +81,7 @@ external or scratch repo. Bash wrappers live in `bin/`.
 | Build a reproducible update plan | distribution | `bin/bugate-update plan` | `[target]`, `--to VERSION`, `--archive`, `--checksums`, `--vendor-dir`, `--json` | Read-only and zero persistent target writes. Remote mode requires explicit semver (no `latest`); offline mode requires the matching archive **and** checksum asset. Classifies every managed path/hook/profile result and reports rollback, Codex re-trust, new-session flags, and `GO`/`NO-GO`. |
 | Apply or dry-run one reviewed transaction | distribution | `bin/bugate-update apply` | plan source flags plus `--plan <json>`, `--dry-run`, `--json` | Rebuilds/revalidates the plan and rejects stale base state. `--dry-run` is zero-write. Real apply performs recovery/backup/journaling and writes only the owned projection; no broad `--force`. Local managed changes/conflicts fail closed, while unrelated dirty files are warnings. |
 | Verify installed state without repair | distribution | `bin/bugate-update verify` | `[target]`, `--vendor-dir`, `--json` | Read-only verification of lock/manifest, every owned type/hash/mode/link, exact hook ownership, and recovery stability. Non-zero means installation verification failed. |
-| Roll back one committed update | distribution | `bin/bugate-update rollback` | `[target]`, `--vendor-dir`, `--transaction <32-hex-id>`, `--json` | Mutating, transaction-specific reversal followed by `verify`; never guesses a transaction and never rolls back a separately reviewed profile change. |
+| Roll back one committed update | distribution | `bin/bugate-update rollback` | `[target]`, `--vendor-dir`, `--transaction <32-hex-id>`, `--json` | Mutating, transaction-specific reversal; never guesses a transaction and never rolls back a separately reviewed profile change. After rollback, use vendored `verify` only if lock+launcher remain; a restored legacy/pre-lock image is verified with `python3 <unpacked-release>/scripts/bugate_update.py verify . --vendor-dir .bugate`. |
 | Build GitHub Release assets (`bugate-<version>.tar.gz`, `.zip`, and `.SHA256SUMS`) | release | `build_release_archives.py` | `--version`, `--out-dir`, `--allow-dirty`, `--include-untracked` | Directly writes all three assets from deterministic git file ordering/metadata, preserves symlinks/executable modes, rejects tracked and non-ignored untracked dirt by default, and requires the requested version to equal both plugin manifests. Real releases use a clean release commit; `--allow-dirty --include-untracked` is development preview only. |
 
 The updater reports profile schema compatibility but does not edit a profile.
@@ -87,6 +89,12 @@ The updater reports profile schema compatibility but does not edit a profile.
 change; `migration_required` blocks the engine plan. Any changed hook requires
 a new Claude/Codex session. Codex Desktop re-trust is conditional on an actual
 `.codex/hooks.json` byte/hash change; same-byte no-ops do not require it.
+Keep the verified unpacked bootstrap outside the imported repo through the
+rollback window: the first v0.4.2 updater transaction can restore an exact
+pre-updater projection and therefore remove both the installed lock and
+vendored launcher. An interrupted rollback uses that external bootstrap for
+`status`, exact rollback recovery, and `verify`; manually replacing the
+launcher is not recovery.
 
 ### Pre-code gate engine (the 4-layer gate + physical write guard)
 

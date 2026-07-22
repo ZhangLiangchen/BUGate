@@ -4,7 +4,8 @@
 
 > Paste this prompt into Claude Code or Codex while the **SUT automation test
 > repo** is open as the project root. The agent must first distinguish a fresh
-> install, a v0.3.x bootstrap, and a v0.4+ in-repo update. It should then use
+> install, an external bootstrap/pre-lock path, and a lock+launcher in-repo
+> update. It should then use
 > the one applicable transaction boundary, preserve SUT-owned state, verify the
 > result, and report the remaining human and runtime-reload actions.
 
@@ -57,22 +58,26 @@ core files.
    - Set `BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"`, then classify:
 
      ```bash
-     if test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
-       BUGATE_ROUTE=v04-in-repo-update
+     if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \
+       && test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
+       BUGATE_ROUTE=locked-in-repo-update
      elif test -e "$BUGATE_VENDOR_DIR" || test -L "$BUGATE_VENDOR_DIR"; then
-       BUGATE_ROUTE=legacy-bootstrap-candidate
+       BUGATE_ROUTE=external-bootstrap-candidate
      else
        BUGATE_ROUTE=fresh-install
      fi
      printf 'BUGATE_ROUTE=%s\n' "$BUGATE_ROUTE"
      ```
 
-   - A `legacy-bootstrap-candidate` is not yet accepted as v0.3.x. The v0.4.2
-     bootstrap updater must identify an exact supported legacy/pre-lock
-     manifest. Unknown, mixed, or locally modified layouts are `NO-GO`.
+   - An `external-bootstrap-candidate` is not yet accepted as v0.3.x or
+     pre-lock v0.4.x. The v0.4.2-or-later external updater must identify an
+     exact supported legacy/pre-lock manifest or diagnose the inconsistent
+     lock/launcher state. Unknown, mixed, locally modified, or incomplete
+     lock-based layouts are `NO-GO`. A version string alone never selects the
+     in-repo route.
 
 2. **Acquire the BUGate kit outside the SUT repo when required**
-   - For `v04-in-repo-update`, skip Steps 2–3: the vendored updater resolves an
+   - For `locked-in-repo-update`, skip Steps 2–3: the vendored updater resolves an
      explicitly named target release itself, or accepts an offline
      archive/checksum pair.
    - Fresh install and legacy bootstrap require an unpacked v0.4.2 release.
@@ -156,7 +161,7 @@ core files.
    it is not an update or repair command.
 
    **Supported v0.3.x/pre-lock bootstrap**
-   (`BUGATE_ROUTE=legacy-bootstrap-candidate`):
+   (`BUGATE_ROUTE=external-bootstrap-candidate`):
 
    ```bash
    SUT_REPO="$(pwd)"
@@ -173,7 +178,7 @@ core files.
    layouts carried by the v0.4.2 release. Do not copy files manually, run the
    importer, or invent a version when `status`/`plan` is `NO-GO`.
 
-   **v0.4+ in-repo update** (`BUGATE_ROUTE=v04-in-repo-update`):
+   **Lock+launcher in-repo update** (`BUGATE_ROUTE=locked-in-repo-update`):
 
    ```bash
    BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
@@ -221,16 +226,32 @@ core files.
    writes.
 
    Rollback is explicit and transaction-specific, never an automatic response
-   to a warning:
+   to a warning. Before rollback, keep or acquire a verified unpacked
+   v0.4.2-or-later release outside the SUT repo and set `BOOTSTRAP` to its
+   updater; this path must remain available if exact rollback removes the
+   vendored launcher:
 
    ```bash
+   BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
    "$BUGATE_VENDOR_DIR/bin/bugate-update" rollback \
      --transaction <32-hex-transaction-id>
-   "$BUGATE_VENDOR_DIR/bin/bugate-update" verify
+   if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \
+     && test -x "$BUGATE_VENDOR_DIR/bin/bugate-update"; then
+     "$BUGATE_VENDOR_DIR/bin/bugate-update" verify
+   else
+     python3 "$BOOTSTRAP" verify . --vendor-dir "$BUGATE_VENDOR_DIR"
+   fi
    ```
 
    Use only an id printed by a committed `apply`. Rollback restores the engine
    transaction; it does not roll back a separately reviewed profile change.
+   The first v0.4.2 updater transaction can restore v0.3.x or pre-lock
+   v0.4.0/v0.4.1 exactly, which includes deleting the lock and launcher. This
+   is not a failed rollback. If rollback is interrupted after the launcher is
+   changed, use `python3 "$BOOTSTRAP" status . --vendor-dir
+   "$BUGATE_VENDOR_DIR"`, retry the same exact rollback through `$BOOTSTRAP`
+   when recovery is required, and finish with the external `verify`. Never
+   copy the launcher back or hand-edit transaction state.
 
    Managed local changes, unknown/duplicate hook identities or shapes,
    type/permission drift, missing critical files, and mixed legacy fingerprints
@@ -347,7 +368,7 @@ core files.
 
 9. **Report final status**
    - State which route ran: `fresh-install`, `legacy-bootstrap`, or
-     `v04-in-repo-update`; include the installed version, final `verify`
+     `locked-in-repo-update`; include the installed version, final `verify`
      decision, and any transaction id/rollback availability.
    - List every file or directory changed in the SUT repo.
    - For a fresh install, list the exact files that should be committed:
@@ -439,8 +460,9 @@ scaffold now carries commented example blocks).
   human acceptance, designer handoff, and implementer acceptance before Layer
   4, then an implementer handoff and reviewer acceptance before post-run.
 
-  Upgrade an existing import only with the v0.4.2 bootstrap updater (v0.3.x)
-  or the vendored `bugate-update` interface (v0.4+), using the status → plan →
+  Upgrade an existing import only with the v0.4.2 external bootstrap updater
+  (v0.3.x or pre-lock v0.4.0/v0.4.1) or, when lock+launcher both exist, the
+  vendored `bugate-update` interface, using the status → plan →
   reviewed apply → verify sequence in Step 4. `bugate_init.py` is fresh-only.
   The engine transaction preserves the profile, so enabling Wave 7 remains a
   separate reviewed profile change. After that separate decision, start three

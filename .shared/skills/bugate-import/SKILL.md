@@ -14,7 +14,7 @@ the SUT profile — never a kit patch, never an invented product fact.
 
 | You need | Read |
 |---|---|
-| Install a new import vs update an existing one; v0.3.x bootstrap; v0.4+ plan/apply/verify/rollback; offline/conflict/profile/session rules | `references/updating-bugate.md` · 中文 `references/updating-bugate.zh-CN.md` |
+| Install a new import vs update an existing one; external legacy/pre-lock bootstrap; lock+launcher plan/apply/verify/rollback; offline/conflict/profile/session rules | `references/updating-bugate.md` · 中文 `references/updating-bugate.zh-CN.md` |
 | Wire the write guard to THIS repo's layout (regex/binding/verification) | this file, below |
 | Day-to-day usage after import (three role sessions, human checkpoint, handoff/acceptance, post-run) | `references/using-bugate.md` · 中文 `references/using-bugate.zh-CN.md` |
 | Operations & diagnosis (peer dispatch, role drift/recovery, Memory boundaries, hooks/re-trust, copy hygiene, Wave 7/8, CI) | `references/field-guide.md` |
@@ -26,10 +26,18 @@ the SUT profile — never a kit patch, never an invented product fact.
 
 - No existing imported installation: use `scripts/bugate_init.py` once.
 - Existing exact v0.3.x or pre-lock v0.4.0/v0.4.1 installation: bootstrap
-  with `scripts/bugate_update.py` from an unpacked v0.4.2-or-later release.
-- Installation with an installed lock/updater: use the vendored
+  with `scripts/bugate_update.py` from an unpacked v0.4.2-or-later release;
+  retain that verified external release through the rollback window.
+- Installation with both its authoritative installed lock and executable
+  updater launcher: use the vendored
   `<vendor>/bin/bugate-update` `status` → `plan` → `apply` → `verify` flow;
   use `rollback --transaction <id>` only against its exact current post-image.
+- After rollback, use vendored `verify` only if both lock and launcher remain.
+  A first updater transaction rolled back to v0.3.x/pre-lock v0.4.0/v0.4.1
+  removes them by design; verify that restored image with
+  `python3 <unpacked-release>/scripts/bugate_update.py verify . --vendor-dir <vendor>`.
+  The same external updater supplies `status`/`verify` if rollback is
+  interrupted after the launcher changes.
 - Unknown/mixed/local-modified managed state: stop at `NO-GO`. Never rerun the
   importer, patch the vendored kit, or force an overwrite to simulate an
   upgrade.

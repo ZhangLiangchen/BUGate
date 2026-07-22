@@ -38,8 +38,9 @@ existing installed lock or a supported legacy layout, it exits non-zero and
 directs the operator to `bugate-update`; an explicit `--upgrade` may only
 delegate to this same updater engine, never a second implementation.
 
-For a v0.3.x installation without an updater, an unpacked v0.4.2 release
-provides the one-time bootstrap interface:
+For a v0.3.x or exact pre-lock v0.4.0/v0.4.1 installation without an
+authoritative lock/updater pair, an unpacked v0.4.2-or-later release provides
+the one-time bootstrap interface:
 
 ```sh
 cd <imported-sut-repository>
@@ -47,7 +48,11 @@ python3 <unpacked-release>/scripts/bugate_update.py plan . --vendor-dir .bugate
 python3 <unpacked-release>/scripts/bugate_update.py apply . --vendor-dir .bugate
 ```
 
-After installation, the vendored interfaces are:
+The verified unpacked release must remain available outside the imported repo
+through the intended rollback window. After installation, the vendored
+interfaces may be used only while both `<vendor-dir>/bugate.lock.json` and its
+executable `bin/bugate-update` launcher exist; version text is not routing
+evidence:
 
 ```sh
 .bugate/bin/bugate-update status
@@ -400,6 +405,25 @@ transaction it verifies every current owned item, semantic fragment, installed
 manifest, and lock against that transaction's recorded post-image. A later
 update or local drift makes the transaction stale and rollback NO-GO rather
 than overwriting newer state.
+
+Rollback restores the exact recorded pre-image, not a permanently upgraded
+control plane. Consequently, rollback of the first v0.4.2 updater transaction
+to v0.3.x or pre-lock v0.4.0/v0.4.1 removes the installed lock and vendored
+launcher. Post-rollback verification must select the entry point from the
+restored state: use vendored `verify` only when both lock and executable
+launcher remain; otherwise use the retained external updater:
+
+```sh
+python3 "$BOOTSTRAP" verify . --vendor-dir .bugate
+```
+
+`$BOOTSTRAP` names the verified updater in an unpacked v0.4.2-or-later release
+outside the imported repo. This read-only verification must recognize an exact
+supported legacy/pre-lock image without installing a lock or launcher. If a
+rollback is interrupted after the launcher changes, the same external updater
+must provide read-only `status`/`verify` and the exact transaction-specific
+rollback retry needed for recovery. Operators must not reconstruct the
+launcher or edit journals/sentinels manually.
 
 When rollback restores a pre-lock installation whose historical marked block
 does not ignore `/.bugate-update/`, the committed state and reports are copied,

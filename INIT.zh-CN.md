@@ -40,8 +40,9 @@ BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 
 
 - **全新目标（无 vendor path）：** 使用已解包 release 的
   `scripts/bugate_init.py`，先 `--dry-run`，再只执行一次正式安装。
-- **受支持 v0.3.x import（无 vendored updater）：** 禁止 rerun installer。
-  从 SUT 仓根目录使用已解包 v0.4.2 的 bootstrap：
+- **受支持 v0.3.x 或 pre-lock v0.4.0/v0.4.1 import：** 禁止 rerun
+  installer。从 SUT 仓根目录使用已解包 v0.4.2 或更高的 bootstrap，并把这份
+  位于仓外、已验证的 release 保留到 rollback 窗口结束：
 
   ```bash
   python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
@@ -51,7 +52,9 @@ BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 
   python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
   ```
 
-- **v0.4+ import：** 使用已安装入口。没有隐式 `latest`；必须显式选择目标版本：
+- **Lock-based import：** 只有 `.bugate/bugate.lock.json` 与 executable
+  `.bugate/bin/bugate-update` 同时存在才使用已安装入口；不能只凭版本标签选路。
+  没有隐式 `latest`；必须显式选择目标版本：
 
   ```bash
   .bugate/bin/bugate-update status
@@ -61,8 +64,18 @@ BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 
   .bugate/bin/bugate-update verify
   # 仅用于有意撤销一个已提交 transaction：
   .bugate/bin/bugate-update rollback --transaction <transaction-id>
-  .bugate/bin/bugate-update verify
+  BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+  if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
+    .bugate/bin/bugate-update verify
+  else
+    python3 "$BOOTSTRAP" verify . --vendor-dir .bugate
+  fi
   ```
+
+  第一笔 updater transaction 回滚到 v0.3.x 或 pre-lock v0.4.0/v0.4.1
+  projection 时会精确移除 installed lock 与 launcher，因此必须保留这条 fallback。
+  若 rollback 在移除后中断，用同一外部 bootstrap 执行 `status`、exact rollback
+  recovery 与 `verify`；禁止手工复制 launcher 回去。
 
 离线更新时，`plan` 与 `apply` 都必须同时传匹配的 archive 和 checksum：
 `--archive /outside/bugate-0.4.2.tar.gz --checksums

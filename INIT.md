@@ -43,8 +43,10 @@ entry point:
 
 - **Fresh target (no vendor path):** use the unpacked release's
   `scripts/bugate_init.py`, first with `--dry-run`, then once without it.
-- **Supported v0.3.x import (no vendored updater):** do not re-run the
-  installer. From the SUT repo root, use the unpacked v0.4.2 bootstrap:
+- **Supported v0.3.x or pre-lock v0.4.0/v0.4.1 import:** do not re-run the
+  installer. From the SUT repo root, use an unpacked v0.4.2-or-later
+  bootstrap, and retain that verified unpacked release outside the repo until
+  the rollback window closes:
 
   ```bash
   python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
@@ -54,8 +56,10 @@ entry point:
   python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
   ```
 
-- **v0.4+ import:** use the installed interface. There is no implicit
-  `latest`; explicitly select a target version:
+- **Lock-based import:** use the installed interface only when both
+  `.bugate/bugate.lock.json` and executable `.bugate/bin/bugate-update` exist.
+  A version label alone is not routing evidence. There is no implicit `latest`;
+  explicitly select a target version:
 
   ```bash
   .bugate/bin/bugate-update status
@@ -65,8 +69,19 @@ entry point:
   .bugate/bin/bugate-update verify
   # Only for an intentional reversal of a committed transaction:
   .bugate/bin/bugate-update rollback --transaction <transaction-id>
-  .bugate/bin/bugate-update verify
+  BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+  if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
+    .bugate/bin/bugate-update verify
+  else
+    python3 "$BOOTSTRAP" verify . --vendor-dir .bugate
+  fi
   ```
+
+  The fallback is required when the first updater transaction rolls back to a
+  v0.3.x or pre-lock v0.4.0/v0.4.1 projection: exact restoration removes the
+  installed lock and launcher. If rollback is interrupted after that removal,
+  use the same external bootstrap for `status`, exact rollback recovery, and
+  `verify`; never copy the launcher back manually.
 
 For an offline update, pass the matching archive and checksum asset together to
 both `plan` and `apply`: `--archive /outside/bugate-0.4.2.tar.gz --checksums

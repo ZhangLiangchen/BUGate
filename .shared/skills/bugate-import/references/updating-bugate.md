@@ -37,7 +37,13 @@ Before planning:
 2. Choose an explicit target version. Remote mode never resolves `latest`.
 3. Obtain the release archive and `SHA256SUMS` asset from a trusted channel if
    using archive/offline mode. Keep them outside the imported repository.
-4. If managed/shared files rely on ACLs, extended attributes, ownership,
+4. Keep a verified unpacked v0.4.2-or-later release outside the imported repo
+   until the update and any intended rollback window are closed. Define its
+   updater path, for example
+   `BOOTSTRAP=<unpacked-release>/scripts/bugate_update.py`. A first updater
+   transaction can restore a pre-updater projection, so the vendored launcher
+   is not guaranteed to survive rollback.
+5. If managed/shared files rely on ACLs, extended attributes, ownership,
    hardlink identity, or timestamps, back those up separately. The v1 journal
    restores logical bytes/type/mode/symlink targets, not that inode metadata.
 
@@ -54,7 +60,8 @@ python3 <unpacked-release>/scripts/bugate_update.py plan . \
   --vendor-dir .bugate
 python3 <unpacked-release>/scripts/bugate_update.py apply . \
   --vendor-dir .bugate
-python3 .bugate/bin/bugate-update verify
+python3 <unpacked-release>/scripts/bugate_update.py verify . \
+  --vendor-dir .bugate
 ```
 
 `plan` is zero-write. On an exact recognized baseline, `apply` may adopt that
@@ -88,6 +95,12 @@ This verifies the raw archive and extracts the update input into temporary
 storage outside the repository before any target write.
 
 ## 3. Routine updates after the updater is installed
+
+Use this route only when both the authoritative installed lock and executable
+launcher exist (normally `.bugate/bugate.lock.json` and
+`.bugate/bin/bugate-update`). A version label alone does not select this route.
+An exact pre-lock v0.4.0/v0.4.1 layout, or a legacy/pre-lock image restored by
+rollback, still uses the external bootstrap in §2.
 
 ### Remote release
 
@@ -199,7 +212,6 @@ Rollback one committed transaction by its reported 32-hex ID:
 
 ```sh
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-.bugate/bin/bugate-update verify
 ```
 
 Rollback is itself locked, journaled, atomic, and crash-recoverable. It first
@@ -208,12 +220,42 @@ that transaction's recorded post-image. A later update or local drift makes an
 old transaction stale and rollback `NO-GO`; it will not overwrite newer state.
 Review its hook flags and repeat conditional re-trust/new-session handling.
 
+Verify through whichever entry point exists **after** rollback. A rollback of
+the first v0.4.2 updater transaction to v0.3.x or pre-lock v0.4.0/v0.4.1
+restores that exact pre-updater projection, including removal of the installed
+lock and `.bugate/bin/bugate-update`. Do not recreate or copy the launcher:
+
+```sh
+if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
+  .bugate/bin/bugate-update verify
+else
+  python3 "$BOOTSTRAP" verify . --vendor-dir .bugate
+fi
+```
+
+`$BOOTSTRAP` must name the retained, verified updater from an unpacked
+v0.4.2-or-later release outside the imported repo. The external `verify` can
+recognize and verify an exact supported legacy/pre-lock image without writing
+a new lock or reinstalling the launcher.
+
 After an interrupted write, read-only `status`, `plan`, and `verify` report
 `recovery_required` without changing the repository. The next real `apply`, or
 an explicit `rollback`, performs journal-driven recovery under the workspace
 lock. Never delete, rename, or hand-edit `.bugate-update/`,
 `.bugate/plan.lock/bugate-update/`, journals, sentinels, or installed locks to
 “unstick” an update.
+
+An interrupted rollback may already have removed or replaced the vendored
+launcher. In that case use the retained external bootstrap for read-only
+diagnosis and verification, and use it to retry the exact reviewed rollback if
+recovery is required:
+
+```sh
+python3 "$BOOTSTRAP" status . --vendor-dir .bugate
+python3 "$BOOTSTRAP" rollback . --vendor-dir .bugate \
+  --transaction <transaction-id>
+python3 "$BOOTSTRAP" verify . --vendor-dir .bugate
+```
 
 The v1 implementation deliberately validates at most **128 transaction-history
 entries** while pinning descriptors against path-exchange attacks. At 128 it

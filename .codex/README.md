@@ -24,13 +24,15 @@ before the new runtime surface is active. Re-trust does not reload an existing
 session. Fresh imports and transactional updates report these two conditions
 separately as `codex_hook_hash_changed` and `new_session_required`.
 
-In an imported repo, `bugate_init.py` is fresh-install-only. Existing v0.3.x
-imports bootstrap once with an unpacked v0.4.2
-`scripts/bugate_update.py`; v0.4+ imports use the vendored
+In an imported repo, `bugate_init.py` is fresh-install-only. Existing exact
+v0.3.x or pre-lock v0.4.0/v0.4.1 imports bootstrap once with
+`scripts/bugate_update.py` from a verified unpacked v0.4.2-or-later release;
+keep that external updater through the rollback window. Use the vendored
 `.bugate/bin/bugate-update` `status` → `plan` → reviewed `apply` → `verify`
-flow (and exact-transaction `rollback` when needed). The updater refreshes only
-manifest-owned runtime surfaces; profile migration remains a separate reviewed
-change.
+flow (and exact-transaction `rollback` when needed) only when both the
+authoritative installed lock (`.bugate/bugate.lock.json`) and executable
+launcher exist. The updater refreshes only manifest-owned runtime surfaces;
+profile migration remains a separate reviewed change.
 
 The shared skill tree also carries Codex **command-equivalent** adapters (the
 multi-view and adversarial dual-CLI procedures) under

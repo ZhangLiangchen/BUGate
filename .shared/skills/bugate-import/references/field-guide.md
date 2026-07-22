@@ -132,8 +132,13 @@ v0.3.1 kit gaps found in the field are listed at the end.
   its parent. Desktop needs a fresh launch/session with the intended env.
 - **Updater correction (v0.4.2+):** historical rerun-importer upgrade advice is
   retired. `bugate_init.py` is fresh-install-only. Bootstrap an exact v0.3.x or
-  pre-lock v0.4.x baseline from an unpacked release, then use the vendored
-  `bugate-update` `status`/`plan`/`apply`/`verify`/`rollback` flow. Offline mode
+  pre-lock v0.4.x baseline from an unpacked release retained through the
+  rollback window. Use the vendored `bugate-update`
+  `status`/`plan`/`apply`/`verify`/`rollback` flow only while both its installed
+  lock and launcher exist. A first updater rollback may restore the exact
+  pre-updater image and remove that launcher; use the retained external
+  `scripts/bugate_update.py` for `status`/`verify` after that rollback or an
+  interruption, never recreate the launcher. Offline mode
   requires both archive and checksum; conflicts stay `NO-GO` without a broad
   force/adopt escape. Engine update preserves profiles, role evidence, Memory,
   and SUT-owned hooks; profile migration is a separate explicit commit. See
