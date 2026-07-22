@@ -1,459 +1,800 @@
 #!/usr/bin/env python3
-"""Installer scaffold + hook-wiring acceptance on ephemeral fixtures.
+"""Fresh imported-mode installer acceptance on synthetic temporary repos.
 
-Regressions pinned by the 2026-07 import-readiness review:
-
-  1. **Scaffold hygiene** — the config/profile bodies `bugate_init.py` writes
-     must carry no control characters: the `sut_identity_terms` example must
-     reach the file as a literal ``\\b`` (backslash + b), never as a 0x08
-     backspace (a non-raw Python string once ate it), because the simple YAML
-     parser does not unescape and users copy this line verbatim.
-  2. **Hook inertness** — the vendored hook command must degrade exactly like
-     the plugin channel: in a CWD with no ``bugate.config.yaml`` ancestor it
-     exits 0 (inert) instead of hard-blocking every write with a resolver
-     traceback (`next()` needs its default, plus the ``[ -n "$ROOT" ]`` guard).
-  3. **Wiring upgrade** — re-running init against a repo wired by an older
-     engine must refresh OUR stale hook entries to the current template while
-     never rewriting the repo's own hooks. Mixed entries stay theirs and gain
-     a separate canonical BUGate entry; a second pass must be a no-op.
-
-Stdlib-only, self-contained: run ``python3 tests/test_init_scaffold.py``.
+The tests never read, clone, copy, or name a real imported SUT.  Every target
+is created from scratch under ``TemporaryDirectory`` and Memory integration is
+replaced with a local mock; source inputs come only from BUGate Core itself.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
+import re
+import stat
 import subprocess
 import sys
 import tempfile
+import unittest
 from pathlib import Path
+from typing import Any
+from unittest import mock
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "scripts"))
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
 import bugate_init  # noqa: E402
-
-FAILURES: list[str] = []
-
-
-def check(name: str, ok: bool, detail: str = "") -> None:
-    print(f"  [{'ok' if ok else 'FAIL'}] {name}")
-    if not ok:
-        FAILURES.append(f"{name}: {detail}")
+import bugate_install_contract as contract  # noqa: E402
+import bugate_update_engine as engine  # noqa: E402
 
 
-def scenario_scaffold_hygiene() -> None:
-    print("S1 scaffold bodies: hygienic, backward-compatible, one active guard contract")
-    profile = bugate_init.PROFILE_SCAFFOLD.format(vendor_dir=".bugate", name="probe")
-    config = bugate_init.CONFIG_SCAFFOLD.format(vendor_dir=".bugate")
-    for label, body in (("profile", profile), ("config", config)):
-        bad = sorted({c for c in body if ord(c) < 0x20 and c != "\n"})
-        check(f"{label} scaffold is control-char free", not bad, f"found {bad!r}")
-    check(
-        "identity-term example is a literal backslash-b regex",
-        "\\bmy-product-name\\b" in profile,
-        "expected raw \\b...\\b in the sut_identity_terms comment",
-    )
-    check(
-        "profile has exactly one active guarded_path_regex key",
-        profile.count("\nguarded_path_regex:") == 1,
-        str(profile.count("\nguarded_path_regex:")),
-    )
-    check(
-        "profile explicitly defaults role governance off",
-        profile.count("\nrole_governance:") == 1
-        and "\nrole_governance:\n  mode: off\n" in profile,
-        "expected exactly one active mode: off block",
-    )
-    check(
-        "profile carries a complete commented required-mode migration example",
-        all(token in profile for token in (
-            "#   mode: required",
-            "#   memory_mode: required",
-            "#   evidence_dir: 00_role_evidence",
-            "#   require_distinct_sessions: true",
-            "#         - designer",
-            "#         - implementer",
-        )),
-        "required-mode example is incomplete",
-    )
+def tree_image(root: Path) -> dict[str, dict[str, Any]]:
+    """Capture type, mode, bytes, and link target without following symlinks."""
+
+    image: dict[str, dict[str, Any]] = {}
+    for current, directories, filenames in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        for name in sorted(directories + filenames):
+            path = current_path / name
+            details = os.lstat(path)
+            relative = path.relative_to(root).as_posix()
+            record: dict[str, Any] = {
+                "mode": f"{stat.S_IMODE(details.st_mode):04o}",
+            }
+            if stat.S_ISLNK(details.st_mode):
+                record.update(type="symlink", target=os.readlink(path))
+            elif stat.S_ISDIR(details.st_mode):
+                record.update(type="directory")
+            elif stat.S_ISREG(details.st_mode):
+                record.update(type="file", content=path.read_bytes())
+            elif stat.S_ISFIFO(details.st_mode):
+                record.update(type="fifo")
+            else:
+                record.update(type="special")
+            image[relative] = record
+    return image
 
 
-def scenario_root_snippet_contract() -> None:
-    print("S2 generated hooks: exact Claude/Codex gates and lifecycle order")
-    snippet = bugate_init._ROOT_SNIPPET
-    check("next() carries an empty-string default", ', ""))' in snippet, snippet)
-    check('lazy guard [ -n "$ROOT" ] || exit 0 present', '[ -n "$ROOT" ] || exit 0;' in snippet, snippet)
-    for runtime in ("claude", "codex"):
-        blocks = bugate_init.hook_blocks(".bugate", runtime)
-        cmds = [h["command"] for entries in blocks.values() for e in entries for h in e["hooks"]]
-        check(
-            f"every {runtime} hook command is lazy-guarded",
-            cmds and all('[ -n "$ROOT" ] || exit 0;' in c for c in cmds),
-            f"{len(cmds)} commands",
+class FreshInstallerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="bugate-init-synthetic-")
+        self.base = Path(self.temporary.name)
+        self.original_registry = bugate_init.NAMESPACE_REGISTRY
+        bugate_init.NAMESPACE_REGISTRY = self.base / "machine-home" / ".bugate" / "namespaces.tsv"
+
+    def tearDown(self) -> None:
+        bugate_init.NAMESPACE_REGISTRY = self.original_registry
+        self.temporary.cleanup()
+
+    def repo(self, name: str = "synthetic-repo") -> Path:
+        target = self.base / name
+        target.mkdir()
+        return target
+
+    def invoke(
+        self,
+        target: Path,
+        *arguments: str,
+        bus_result: list[str] | None = None,
+    ) -> tuple[int, str, str, mock.Mock]:
+        output = io.StringIO()
+        error = io.StringIO()
+        bus = mock.Mock(return_value=bus_result or ["memory-bus: synthetic test double"])
+        code = 0
+        message = ""
+        with (
+            mock.patch.object(bugate_init, "bus_ensure", bus),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(error),
+        ):
+            try:
+                code = bugate_init.main([str(target), *arguments])
+            except SystemExit as exc:
+                code = exc.code if isinstance(exc.code, int) else 1
+                message = "" if exc.code is None else str(exc.code)
+        return code, output.getvalue(), message + error.getvalue(), bus
+
+    def install(self, target: Path) -> str:
+        code, output, error, _bus = self.invoke(target)
+        self.assertEqual(code, 0, error)
+        return output
+
+    def test_scaffold_templates_are_hygienic_and_governance_stays_off(self) -> None:
+        profile = bugate_init.PROFILE_SCAFFOLD.format(
+            vendor_dir=".bugate", name="synthetic"
         )
-        contract = [
-            (entry.get("matcher"), [
-                next((name for name in (
-                    "check_bugate.py",
-                    "check_plan_lock.py",
-                    "check_agent_role_paths.py",
-                    "check_role_evidence.py",
-                ) if name in hook["command"]), "<unknown>")
-                for hook in entry["hooks"]
-            ])
-            for entry in blocks["PreToolUse"]
-        ]
-        expected = (
-            [
-                ("Edit|Write", [
-                    "check_bugate.py",
-                    "check_plan_lock.py",
-                    "check_role_evidence.py",
-                ]),
-                ("Read|Edit|Write", ["check_agent_role_paths.py"]),
-            ]
-            if runtime == "claude"
-            else [("apply_patch", [
-                "check_bugate.py",
-                "check_plan_lock.py",
-                "check_agent_role_paths.py",
-                "check_role_evidence.py",
-            ])]
+        config = bugate_init.CONFIG_SCAFFOLD.format(vendor_dir=".bugate")
+        for label, body in (("profile", profile), ("config", config)):
+            with self.subTest(label=label):
+                self.assertFalse(
+                    [character for character in body if ord(character) < 0x20 and character != "\n"]
+                )
+        self.assertIn("\\bmy-product-name\\b", profile)
+        self.assertEqual(profile.count("\nguarded_path_regex:"), 1)
+        self.assertEqual(profile.count("\nrole_governance:"), 1)
+        self.assertIn("\nrole_governance:\n  mode: off\n", profile)
+        self.assertIn("#   mode: required", profile)
+        self.assertIn("#   memory_mode: required", profile)
+
+    def test_hook_blocks_are_the_canonical_identity_bearing_contract(self) -> None:
+        identity_re = re.compile(
+            r"^BUGATE_HOOK_ID='([^']+)'; export BUGATE_HOOK_ID; "
         )
-        check(f"{runtime} exact matcher/gate contract", contract == expected, str(contract))
-        start = [h["command"] for entry in blocks["SessionStart"] for h in entry["hooks"]]
-        stop = [h["command"] for entry in blocks["Stop"] for h in entry["hooks"]]
-        check(
-            f"{runtime} SessionStart recalls Memory then reports role state",
-            len(start) == 2
-            and "memory_bus.py" in start[0]
-            and "bugate-role" in start[1]
-            and all("--core" not in command for command in start),
-            str(start),
+        for runtime in ("claude", "codex"):
+            with self.subTest(runtime=runtime):
+                blocks = bugate_init.hook_blocks(".bugate", runtime)
+                self.assertEqual(blocks, contract.hook_fragments(".bugate", runtime))
+                commands = [
+                    hook["command"]
+                    for entries in blocks.values()
+                    for entry in entries
+                    for hook in entry["hooks"]
+                ]
+                self.assertTrue(commands)
+                self.assertTrue(
+                    all(identity_re.match(command) for command in commands)
+                )
+                self.assertTrue(
+                    all('[ -n "$ROOT" ] || exit 0;' in command for command in commands)
+                )
+                self.assertTrue(all("--core" not in command for command in commands))
+
+    def test_fresh_install_writes_deterministic_manifest_lock_last_and_verifies(self) -> None:
+        target = self.repo()
+        resolved_target = target.resolve()
+        writes: list[str] = []
+        verify_entry_images: list[dict[str, dict[str, Any]]] = []
+        original_write = bugate_init._write_new_file
+        original_verify = bugate_init.update_engine.verify_installed
+
+        def recording_write(path: Path, data: bytes, mode: str) -> None:
+            original_write(path, data, mode)
+            try:
+                writes.append(path.relative_to(resolved_target).as_posix())
+            except ValueError:
+                pass
+
+        def recording_verify(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            verify_entry_images.append(tree_image(resolved_target))
+            return original_verify(*args, **kwargs)
+
+        with (
+            mock.patch.object(bugate_init, "_write_new_file", recording_write),
+            mock.patch.object(
+                bugate_init.update_engine,
+                "verify_installed",
+                recording_verify,
+            ),
+        ):
+            output = self.install(target)
+
+        manifest_path = target / ".bugate" / contract.INSTALLED_MANIFEST_PATH
+        lock_path = target / ".bugate" / contract.INSTALLED_LOCK_PATH
+        manifest = json.loads(manifest_path.read_bytes())
+        lock = json.loads(lock_path.read_bytes())
+        self.assertEqual(
+            manifest_path.read_bytes(), contract.canonical_json_bytes(manifest)
         )
-        check(
-            f"{runtime} Stop is one imported heartbeat using the active role",
-            len(stop) == 1
-            and "memory_bus.py" in stop[0]
-            and " stop " in stop[0]
-            and '"${BUGATE_AGENT_ROLE:-agent}"' in stop[0]
-            and "--core" not in stop[0],
-            str(stop),
+        self.assertEqual(lock_path.read_bytes(), contract.installed_lock_bytes(lock))
+        contract.validate_current_release_manifest(manifest, expected_version="0.4.2")
+        contract.validate_installed_lock(
+            lock,
+            release_manifest=manifest,
+            vendor_dir=".bugate",
+            strict_current=True,
+        )
+        self.assertIsNone(lock["previous_version"])
+        self.assertIsNone(lock["archive_sha256"])
+        self.assertEqual(
+            lock["archive_verification"], "unavailable-from-unpacked-source"
+        )
+        self.assertNotIn(str(self.base), lock_path.read_text(encoding="utf-8"))
+        self.assertNotIn("timestamp", lock)
+        self.assertEqual(writes[-1], ".bugate/bugate.lock.json")
+        self.assertEqual(len(verify_entry_images), 1)
+        self.assertEqual(tree_image(target), verify_entry_images[0])
+        self.assertEqual(engine.verify_installed(target)["decision"], "GO")
+        self.assertIn("verify installed lock: GO", output)
+        self.assertTrue(os.access(target / ".bugate/bin/bugate-update", os.X_OK))
+
+    def test_fresh_install_preserves_sut_hooks_format_and_mixed_entry(self) -> None:
+        target = self.repo()
+        claude_path = target / ".claude" / "settings.json"
+        codex_path = target / ".codex" / "hooks.json"
+        claude_path.parent.mkdir()
+        codex_path.parent.mkdir()
+        sut_entry = {
+            "matcher": "Bash",
+            "hooks": [{"type": "command", "command": "echo synthetic-sut-hook"}],
+        }
+        mixed_entry = {
+            "matcher": "Edit|Write",
+            "hooks": [
+                {"type": "command", "command": "echo synthetic-wrapper"},
+                {
+                    "type": "command",
+                    "command": "/usr/bin/env python3 .bugate/scripts/check_bugate.py",
+                },
+            ],
+        }
+        claude_path.write_text(
+            '{\n  "sutMeta" : {"keep" : true},\n  "hooks" : {\n'
+            '    "PreToolUse" : '
+            + json.dumps([sut_entry, mixed_entry], separators=(",", ":"))
+            + ',\n    "SyntheticEvent" : [{"hooks":[{"type":"command","command":"echo untouched"}]}]\n'
+            "  }\n}\n",
+            encoding="utf-8",
+        )
+        codex_entry = {
+            "matcher": "apply_patch",
+            "hooks": [{"type": "command", "command": "echo synthetic-codex"}],
+        }
+        codex_path.write_text(
+            json.dumps({"sutTop": [3, 2, 1], "hooks": {"PreToolUse": [codex_entry]}}, indent=4)
+            + "\n",
+            encoding="utf-8",
         )
 
+        self.install(target)
+        claude_bytes = claude_path.read_text(encoding="utf-8")
+        claude = json.loads(claude_bytes)
+        codex = json.loads(codex_path.read_text(encoding="utf-8"))
+        self.assertIn('"sutMeta" : {"keep" : true}', claude_bytes)
+        self.assertIn(
+            '"SyntheticEvent" : [{"hooks":[{"type":"command","command":"echo untouched"}]}]',
+            claude_bytes,
+        )
+        self.assertEqual(claude["sutMeta"], {"keep": True})
+        self.assertEqual(claude["hooks"]["SyntheticEvent"][0]["hooks"][0]["command"], "echo untouched")
+        self.assertIn(sut_entry, claude["hooks"]["PreToolUse"])
+        self.assertIn(mixed_entry, claude["hooks"]["PreToolUse"])
+        self.assertEqual(codex["sutTop"], [3, 2, 1])
+        self.assertIn(codex_entry, codex["hooks"]["PreToolUse"])
+        self.assertEqual(engine.verify_installed(target)["decision"], "GO")
 
-def scenario_wired_hook_inert_without_config() -> None:
-    print("S3 behavioral: an initialized repo's hook command exits 0 in a config-less CWD")
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
-        sut = tmp / "sut"
-        sut.mkdir()
-        cp = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(sut)],
-            capture_output=True, text=True,
+    def test_any_existing_canonical_hook_identity_fails_closed_before_writes(self) -> None:
+        canonical = contract.hook_fragments(".bugate", "claude")["PreToolUse"][0]
+        cases = {
+            "exact": canonical,
+            "spoofed": json.loads(json.dumps(canonical)),
+        }
+        cases["spoofed"]["hooks"][0]["command"] += "; echo spoofed"
+        for index, (label, value) in enumerate(cases.items()):
+            with self.subTest(shape=label):
+                target = self.repo(f"hook-identity-{index}")
+                path = target / ".claude" / "settings.json"
+                path.parent.mkdir()
+                path.write_text(
+                    json.dumps({"hooks": {"PreToolUse": [value]}}, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                before = tree_image(target)
+
+                code, _output, error, bus = self.invoke(target)
+
+                self.assertNotEqual(code, 0)
+                self.assertIn("cannot adopt existing canonical BUGate hook", error)
+                self.assertEqual(tree_image(target), before)
+                self.assertFalse(bugate_init.NAMESPACE_REGISTRY.exists())
+                bus.assert_not_called()
+
+    def test_pure_legacy_hook_is_not_migrated_by_fresh_init(self) -> None:
+        target = self.repo()
+        path = target / ".claude" / "settings.json"
+        path.parent.mkdir()
+        legacy = {
+            "matcher": "Edit|Write",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": 'ROOT="$(legacy)"; /usr/bin/env python3 "$ROOT/.bugate/scripts/check_bugate.py"',
+                }
+            ],
+        }
+        path.write_text(
+            json.dumps({"hooks": {"PreToolUse": [legacy]}}, indent=2) + "\n",
+            encoding="utf-8",
         )
-        check("bugate init succeeds", cp.returncode == 0, cp.stderr[-300:])
-        settings = json.loads((sut / ".claude" / "settings.json").read_text(encoding="utf-8"))
-        pre = [e for e in settings["hooks"]["PreToolUse"] if e.get("matcher") == "Edit|Write"]
-        role_paths = [e for e in settings["hooks"]["PreToolUse"] if e.get("matcher") == "Read|Edit|Write"]
-        check(
-            "fresh Claude wiring has the two independent canonical matchers",
-            len(pre) == 1
-            and len(role_paths) == 1
-            and [
-                next((name for name in (
-                    "check_bugate.py",
-                    "check_plan_lock.py",
-                    "check_role_evidence.py",
-                ) if name in hook["command"]), "<unknown>")
-                for hook in pre[0]["hooks"]
-            ] == ["check_bugate.py", "check_plan_lock.py", "check_role_evidence.py"]
-            and len(role_paths[0]["hooks"]) == 1
-            and "check_agent_role_paths.py" in role_paths[0]["hooks"][0]["command"],
-            str(settings["hooks"]["PreToolUse"]),
+        before = tree_image(target)
+
+        code, _output, error, bus = self.invoke(target)
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("legacy BUGate-only hook", error)
+        self.assertIn("use bugate-update", error)
+        self.assertEqual(tree_image(target), before)
+        bus.assert_not_called()
+
+    def test_existing_exact_workspace_managed_target_is_not_adopted(self) -> None:
+        target = self.repo()
+        link = target / ".agents" / "skills" / "bugate"
+        link.parent.mkdir(parents=True)
+        link.symlink_to("../../.bugate/.shared/skills/bugate")
+        before = tree_image(target)
+
+        code, _output, error, bus = self.invoke(target)
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("without prior lock authority", error)
+        self.assertEqual(tree_image(target), before)
+        bus.assert_not_called()
+
+    def test_shared_container_drift_after_preflight_is_not_overwritten(self) -> None:
+        target = self.repo()
+        path = target / ".claude" / "settings.json"
+        path.parent.mkdir()
+        path.write_text(
+            '{"hooks":{"SyntheticEvent":[{"hooks":[{"type":"command","command":"echo before"}]}]}}\n',
+            encoding="utf-8",
         )
-        start = [
-            hook["command"]
-            for entry in settings["hooks"]["SessionStart"]
-            for hook in entry["hooks"]
-        ]
-        check(
-            "fresh SessionStart wires Memory recall before bugate-role",
-            len(start) == 2 and "memory_bus.py" in start[0] and "bugate-role" in start[1],
-            str(start),
+        manifest, _source = bugate_init.load_install_manifest(ROOT)
+        lock = contract.build_installed_lock(
+            manifest,
+            previous_version=None,
+            archive_sha256=None,
+            updater_version=manifest["bugate_version"],
         )
-        command = pre[0]["hooks"][0]["command"]
-        scaffold = (sut / "bugate.profile.yaml").read_bytes()
-        check("written profile carries no 0x08 byte", b"\x08" not in scaffold)
-        nowhere = tmp / "nowhere"
+        prepared = bugate_init.prepare_shared_outputs(
+            target, lock["installed_projection"]
+        )
+        path.write_text(
+            '{"hooks":{"SyntheticEvent":[{"hooks":[{"type":"command","command":"echo drift"}]}]}}\n',
+            encoding="utf-8",
+        )
+        drift = path.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "changed after preflight"):
+            bugate_init.write_shared_outputs(target, prepared, dry=False)
+
+        self.assertEqual(path.read_bytes(), drift)
+        self.assertFalse((target / ".codex/hooks.json").exists())
+
+    def test_late_path_writer_wins_shared_commit_race_without_overwrite(self) -> None:
+        target = self.repo()
+        path = target / ".claude" / "settings.json"
+        path.parent.mkdir()
+        path.write_text(
+            '{"hooks":{"SyntheticEvent":[{"hooks":[{"type":"command","command":"echo base"}]}]}}\n',
+            encoding="utf-8",
+        )
+        manifest, _source = bugate_init.load_install_manifest(ROOT)
+        lock = contract.build_installed_lock(
+            manifest,
+            previous_version=None,
+            archive_sha256=None,
+            updater_version=manifest["bugate_version"],
+        )
+        prepared = bugate_init.prepare_shared_outputs(
+            target, lock["installed_projection"]
+        )
+        late = b'{"hooks":{"SyntheticEvent":[{"hooks":[{"type":"command","command":"echo late"}]}]}}\n'
+        original_link = bugate_init.os.link
+        injected = False
+
+        def inject_late_writer(
+            source: str,
+            destination: str,
+            *args: Any,
+            **kwargs: Any,
+        ) -> None:
+            nonlocal injected
+            if destination == "settings.json" and not injected:
+                injected = True
+                path.write_bytes(late)
+            return original_link(source, destination, *args, **kwargs)
+
+        with (
+            mock.patch.object(
+                bugate_init.os,
+                "link",
+                inject_late_writer,
+            ),
+            self.assertRaisesRegex(SystemExit, "raced during install"),
+        ):
+            bugate_init.write_shared_outputs(target, prepared, dry=False)
+
+        self.assertTrue(injected)
+        self.assertEqual(path.read_bytes(), late)
+        self.assertFalse(
+            list(path.parent.glob(".settings.json.bugate-init-backup-*"))
+        )
+        self.assertFalse((target / ".codex/hooks.json").exists())
+
+    def test_partial_installer_staged_write_restores_original_shared_file(self) -> None:
+        target = self.repo()
+        path = target / ".claude" / "settings.json"
+        path.parent.mkdir()
+        original = b'{"hooks":{"SyntheticEvent":[{"hooks":[{"type":"command","command":"echo original"}]}]}}\n'
+        path.write_bytes(original)
+        manifest, _source = bugate_init.load_install_manifest(ROOT)
+        lock = contract.build_installed_lock(
+            manifest,
+            previous_version=None,
+            archive_sha256=None,
+            updater_version=manifest["bugate_version"],
+        )
+        prepared = bugate_init.prepare_shared_outputs(
+            target, lock["installed_projection"]
+        )
+        original_write = bugate_init.os.write
+        injected = False
+
+        def fail_after_partial(descriptor: int, data: Any) -> int:
+            nonlocal injected
+            if not injected:
+                injected = True
+                partial = bytes(data[: min(len(data), 19)])
+                original_write(descriptor, partial)
+                raise OSError("synthetic staged write failure")
+            return original_write(descriptor, data)
+
+        with (
+            mock.patch.object(bugate_init.os, "write", fail_after_partial),
+            self.assertRaisesRegex(SystemExit, "staged write failed"),
+        ):
+            bugate_init.write_shared_outputs(target, prepared, dry=False)
+
+        self.assertTrue(injected)
+        self.assertEqual(path.read_bytes(), original)
+        self.assertFalse(
+            list(path.parent.glob(".settings.json.bugate-init-backup-*"))
+        )
+        staged = list(path.parent.glob(".settings.json.bugate-init-new-*"))
+        self.assertEqual(len(staged), 1)
+        self.assertTrue(staged[0].read_bytes().startswith(original[:19]))
+
+    def test_absent_shared_partial_cleanup_never_deletes_late_sut_path(self) -> None:
+        target = self.repo()
+        parent = target / ".claude"
+        parent.mkdir()
+        path = parent / "settings.json"
+        parent_details = os.lstat(parent)
+        base = {
+            "state": "absent",
+            "parent_device": parent_details.st_dev,
+            "parent_inode": parent_details.st_ino,
+        }
+        late = b"late-sut-path-writer\n"
+        partial = b"partial-installer-stage\n"
+        staged_names: list[str] = []
+
+        def partial_then_late(
+            parent_fd: int, name: str, data: bytes, mode: str
+        ) -> os.stat_result:
+            staged_names.append(name)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            descriptor = os.open(name, flags, 0o644, dir_fd=parent_fd)
+            try:
+                os.write(descriptor, partial)
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+            path.write_bytes(late)
+            raise OSError("synthetic absent staged failure")
+
+        with (
+            mock.patch.object(
+                bugate_init,
+                "_write_new_file_at",
+                partial_then_late,
+            ),
+            self.assertRaisesRegex(SystemExit, "staged write failed"),
+        ):
+            bugate_init._replace_bound_file(path, b"installer-final\n", base)
+
+        self.assertEqual(path.read_bytes(), late)
+        self.assertEqual(len(staged_names), 1)
+        self.assertEqual((parent / staged_names[0]).read_bytes(), partial)
+
+    def test_changed_backup_never_causes_final_path_unlink(self) -> None:
+        target = self.repo()
+        path = target / ".claude" / "settings.json"
+        path.parent.mkdir()
+        path.write_text(
+            '{"hooks":{"SyntheticEvent":[{"hooks":[{"type":"command","command":"echo base"}]}]}}\n',
+            encoding="utf-8",
+        )
+        manifest, _source = bugate_init.load_install_manifest(ROOT)
+        lock = contract.build_installed_lock(
+            manifest,
+            previous_version=None,
+            archive_sha256=None,
+            updater_version=manifest["bugate_version"],
+        )
+        prepared = bugate_init.prepare_shared_outputs(
+            target, lock["installed_projection"]
+        )
+        original_read_at = bugate_init._read_regular_at
+        backup_reads = 0
+        backup_edit = b"open-fd-sut-edit\n"
+        late_path = b"late-pathname-sut-edit\n"
+
+        def inject_two_writers(
+            parent_fd: int, name: str, *, label: str
+        ) -> tuple[bytes, os.stat_result]:
+            nonlocal backup_reads
+            if label == "shared managed backup":
+                backup_reads += 1
+                if backup_reads == 2:
+                    descriptor = os.open(name, os.O_WRONLY | os.O_TRUNC, dir_fd=parent_fd)
+                    try:
+                        os.write(descriptor, backup_edit)
+                        os.fsync(descriptor)
+                    finally:
+                        os.close(descriptor)
+                    replacement = path.parent / ".synthetic-late-replacement"
+                    replacement.write_bytes(late_path)
+                    os.replace(replacement, path)
+            return original_read_at(parent_fd, name, label=label)
+
+        with (
+            mock.patch.object(
+                bugate_init,
+                "_read_regular_at",
+                inject_two_writers,
+            ),
+            self.assertRaisesRegex(SystemExit, "backup retained"),
+        ):
+            bugate_init.write_shared_outputs(target, prepared, dry=False)
+
+        self.assertEqual(backup_reads, 2)
+        self.assertEqual(path.read_bytes(), late_path)
+        backups = list(path.parent.glob(".settings.json.bugate-init-backup-*"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), backup_edit)
+
+    def test_vendor_root_appearing_after_preflight_is_never_adopted(self) -> None:
+        target = self.repo()
+        original_preflight = bugate_init._preflight_physical_targets
+
+        def inject_vendor(
+            root: Path, projection: Any
+        ) -> None:
+            original_preflight(root, projection)
+            vendor = root / ".bugate"
+            vendor.mkdir()
+            (vendor / "rogue-unmanaged.py").write_bytes(b"operator-owned\n")
+
+        with mock.patch.object(
+            bugate_init,
+            "_preflight_physical_targets",
+            inject_vendor,
+        ):
+            code, _output, error, bus = self.invoke(target)
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("refusing adoption", error)
+        self.assertEqual(
+            (target / ".bugate/rogue-unmanaged.py").read_bytes(),
+            b"operator-owned\n",
+        )
+        self.assertFalse((target / ".bugate/bugate.lock.json").exists())
+        self.assertFalse((target / "bugate.config.yaml").exists())
+        bus.assert_not_called()
+
+    def test_namespace_registry_concurrent_update_is_not_lost_or_overwritten(self) -> None:
+        registry = bugate_init.NAMESPACE_REGISTRY
+        registry.parent.mkdir(parents=True)
+        registry.write_text("project:seed\t/synthetic/seed\n", encoding="utf-8")
+        target = self.repo()
+        original_replace = bugate_init._replace_bound_file
+        concurrent = "project:concurrent\t/synthetic/concurrent\n"
+
+        def inject_registry_change(
+            path: Path, content: bytes, base: Any
+        ) -> None:
+            path.write_text(
+                "project:seed\t/synthetic/seed\n" + concurrent,
+                encoding="utf-8",
+            )
+            original_replace(path, content, base)
+
+        with (
+            mock.patch.object(
+                bugate_init,
+                "_replace_bound_file",
+                inject_registry_change,
+            ),
+            self.assertRaisesRegex(SystemExit, "changed after preflight"),
+        ):
+            bugate_init._register_namespace("project:synthetic-repo", target)
+
+        text = registry.read_text(encoding="utf-8")
+        self.assertIn(concurrent, text)
+        self.assertNotIn("project:synthetic-repo", text)
+
+        registry.write_text(
+            f"project:synthetic-repo\t{self.base / 'other-repo'}\n",
+            encoding="utf-8",
+        )
+        before = registry.read_bytes()
+        with self.assertRaisesRegex(SystemExit, "claimed by another repository"):
+            bugate_init._register_namespace("project:synthetic-repo", target)
+        self.assertEqual(registry.read_bytes(), before)
+
+    def test_second_init_rejects_locked_install_and_preserves_full_tree(self) -> None:
+        target = self.repo()
+        self.install(target)
+        (target / "synthetic-dirty.txt").write_bytes(b"unrelated dirty bytes\n")
+        before = tree_image(target)
+        registry_before = bugate_init.NAMESPACE_REGISTRY.read_bytes()
+
+        with (
+            mock.patch.object(bugate_init, "load_install_manifest") as manifest_loader,
+            mock.patch.object(bugate_init, "_memory_namespace") as namespace_loader,
+        ):
+            code, _output, error, bus = self.invoke(target)
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("fresh-install only", error)
+        self.assertIn("<unpacked-v0.4.x>/scripts/bugate_update.py plan", error)
+        self.assertIn(".bugate/bin/bugate-update plan", error)
+        self.assertEqual(tree_image(target), before)
+        self.assertEqual(bugate_init.NAMESPACE_REGISTRY.read_bytes(), registry_before)
+        manifest_loader.assert_not_called()
+        namespace_loader.assert_not_called()
+        bus.assert_not_called()
+
+    def test_any_legacy_or_unsafe_vendor_leaf_is_existing_and_zero_write(self) -> None:
+        makers = {
+            "legacy-directory": lambda path: (
+                path.mkdir(),
+                (path / "scripts").mkdir(),
+                (path / "scripts" / "legacy.py").write_bytes(b"legacy\n"),
+            ),
+            "regular-file": lambda path: path.write_bytes(b"not a directory\n"),
+            "dangling-symlink": lambda path: path.symlink_to("missing-target"),
+            "fifo": lambda path: os.mkfifo(path),
+        }
+        for index, (label, maker) in enumerate(makers.items()):
+            with self.subTest(kind=label):
+                target = self.repo(f"synthetic-{index}")
+                maker(target / ".bugate")
+                before = tree_image(target)
+                with mock.patch.object(bugate_init, "load_install_manifest") as loader:
+                    code, _output, error, bus = self.invoke(target)
+                self.assertNotEqual(code, 0)
+                self.assertIn("existing BUGate vendor path detected", error)
+                self.assertEqual(tree_image(target), before)
+                loader.assert_not_called()
+                bus.assert_not_called()
+
+    def test_invalid_vendor_dir_is_rejected_without_writes(self) -> None:
+        for index, value in enumerate(("../escape", "/absolute", "nested/../escape", "")):
+            with self.subTest(value=value):
+                target = self.repo(f"invalid-vendor-{index}")
+                (target / "synthetic.txt").write_bytes(b"keep\n")
+                before = tree_image(target)
+                code, _output, _error, bus = self.invoke(
+                    target, "--vendor-dir", value
+                )
+                self.assertNotEqual(code, 0)
+                self.assertEqual(tree_image(target), before)
+                bus.assert_not_called()
+
+    def test_dry_run_is_zero_write_for_target_registry_and_memory(self) -> None:
+        target = self.repo()
+        (target / "synthetic-dirty.txt").write_bytes(b"keep me byte-identical\n")
+        (target / ".gitignore").write_bytes(b"synthetic-cache/\n")
+        before = tree_image(target)
+
+        code, output, error, bus = self.invoke(target, "--dry-run")
+
+        self.assertEqual(code, 0, error)
+        self.assertEqual(tree_image(target), before)
+        self.assertFalse(bugate_init.NAMESPACE_REGISTRY.exists())
+        bus.assert_called_once()
+        self.assertTrue(bus.call_args.args[1])
+        self.assertIn("would write .bugate/bugate.lock.json last", output)
+
+    def test_fresh_install_preserves_sut_owned_governance_and_unrelated_assets(self) -> None:
+        target = self.repo()
+        seeded = {
+            "bugate.config.yaml": b"bugate:\n  version: '0.1'\nprofile: bugate.profile.yaml\n",
+            "bugate.profile.yaml": b"memory:\n  namespace: synthetic:keep\n",
+            "docs/usecases/SYNTHETIC-1/case.md": b"synthetic use case\n",
+            "00_role_evidence/SYNTHETIC-1/receipt.json": b'{"synthetic":true}\n',
+            "bin/bugate-auto": b"#!/bin/sh\nexit 17\n",
+            "tests/test_synthetic.py": b"def test_synthetic():\n    assert True\n",
+        }
+        for relative, content in seeded.items():
+            path = target / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        (target / "bin/bugate-auto").chmod(0o755)
+        before = {
+            relative: tree_image(target)[relative]
+            for relative in seeded
+        }
+
+        self.install(target)
+        after = tree_image(target)
+
+        for relative, expected in before.items():
+            with self.subTest(relative=relative):
+                self.assertEqual(after[relative], expected)
+        self.assertIn("namespace: synthetic:keep", (target / "bugate.profile.yaml").read_text())
+        self.assertEqual(engine.verify_installed(target)["decision"], "GO")
+
+    def test_gitignore_contract_contains_update_state_and_preserves_sut_lines(self) -> None:
+        target = self.repo()
+        own = b"node_modules/\n*.synthetic-log\n/build/\n"
+        (target / ".gitignore").write_bytes(own)
+
+        self.install(target)
+        text = (target / ".gitignore").read_text(encoding="utf-8")
+
+        self.assertTrue(text.startswith(own.decode("utf-8")))
+        self.assertEqual(text.count(contract.GITIGNORE_BEGIN), 1)
+        self.assertIn("/.bugate-update/", text)
+        self.assertIn("/.bugate/plan.lock", text)
+        self.assertNotIn("bugate.config.yaml", text)
+        self.assertNotIn("bugate.profile.yaml", text)
+
+    def test_wired_guard_is_inert_outside_workspace_and_active_inside(self) -> None:
+        target = self.repo()
+        self.install(target)
+        settings = json.loads((target / ".claude/settings.json").read_bytes())
+        command = next(
+            entry["hooks"][0]["command"]
+            for entry in settings["hooks"]["PreToolUse"]
+            if entry.get("matcher") == "Edit|Write"
+        )
+        nowhere = self.base / "config-less"
         nowhere.mkdir()
-        env = {k: v for k, v in os.environ.items() if not k.startswith("BUGATE_")}
-        hook = subprocess.run(
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith("BUGATE_")
+        }
+        outside = subprocess.run(
             ["sh", "-c", command],
-            cwd=nowhere, env=env,
-            input='{"tool_input":{"file_path":"x.py"}}',
-            capture_output=True, text=True,
-        )
-        check(
-            "hook is inert (rc 0, silent) outside any governed workspace",
-            hook.returncode == 0 and not hook.stderr.strip(),
-            f"rc={hook.returncode} stderr={hook.stderr[:200]!r}",
+            cwd=nowhere,
+            env=environment,
+            input='{"tool_input":{"file_path":"synthetic.py"}}',
+            capture_output=True,
+            text=True,
         )
         inside = subprocess.run(
             ["sh", "-c", command],
-            cwd=sut, env=env,
-            input='{"tool_input":{"file_path":"x.py"}}',
-            capture_output=True, text=True,
+            cwd=target,
+            env=environment,
+            input='{"tool_input":{"file_path":"synthetic.py"}}',
+            capture_output=True,
+            text=True,
         )
-        check(
-            "hook still runs the guard inside the workspace (rc 0: no guards configured yet)",
-            inside.returncode == 0,
-            f"rc={inside.returncode} stderr={inside.stderr[:200]!r}",
-        )
+        self.assertEqual(outside.returncode, 0, outside.stderr)
+        self.assertFalse(outside.stderr)
+        self.assertEqual(inside.returncode, 0, inside.stderr)
 
-
-def scenario_merge_refreshes_stale_wiring() -> None:
-    print("S4 upgrade: stale owned wiring refreshes; SUT and mixed entries are preserved")
-    legacy_cmd = 'ROOT="$(legacy-resolver)"; /usr/bin/env python3 "$ROOT/.bugate/scripts/check_bugate.py"'
-    own = {"matcher": "Bash", "hooks": [{"type": "command", "command": "echo repo-own >/dev/null"}]}
-    stale = {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": legacy_cmd}]}
-    blocks = bugate_init.hook_blocks(".bugate", "claude")
-    merged, added = bugate_init.merge_hooks({"hooks": {"PreToolUse": [own, stale]}}, blocks, ".bugate")
-    pre = merged["hooks"]["PreToolUse"]
-    check("repo's own entry untouched", pre[0] == own, str(pre[0]))
-    cmds = [h["command"] for e in pre for h in e["hooks"] if ".bugate/scripts/" in h["command"]]
-    check(
-        "stale command replaced by the current guarded template",
-        cmds and all('[ -n "$ROOT" ] || exit 0;' in c for c in cmds) and legacy_cmd not in cmds,
-        str(cmds)[:200],
-    )
-    check("refresh reported", any(a.startswith("PreToolUse") and "refreshed" in a for a in added), str(added))
-    _, added2 = bugate_init.merge_hooks(merged, blocks, ".bugate")
-    check("second pass is a no-op", not added2, str(added2))
-    mixed = {"matcher": "Edit|Write", "hooks": [
-        {"type": "command", "command": "echo their-wrapper >/dev/null"},
-        {"type": "command", "command": legacy_cmd},
-    ]}
-    merged3, added3 = bugate_init.merge_hooks({"hooks": {"PreToolUse": [mixed]}}, blocks, ".bugate")
-    pre3 = merged3["hooks"]["PreToolUse"]
-    check(
-        "mixed entry remains byte-for-byte first-party SUT wiring",
-        pre3[0] == mixed,
-        str(pre3[0]),
-    )
-    check(
-        "mixed entry never substitutes for independent canonical wiring",
-        pre3[1:] == blocks["PreToolUse"]
-        and any(a == "PreToolUse" for a in added3),
-        str(added3),
-    )
-    snapshot = json.dumps(merged3, sort_keys=True)
-    merged4, added4 = bugate_init.merge_hooks(merged3, blocks, ".bugate")
-    check(
-        "mixed upgrade is idempotent on the second pass",
-        not added4 and json.dumps(merged4, sort_keys=True) == snapshot,
-        str(added4),
-    )
-    codex_blocks = bugate_init.hook_blocks(".bugate", "codex")
-    codex_own = {
-        "matcher": "apply_patch",
-        "hooks": [{"type": "command", "command": "echo sut-codex-hook >/dev/null"}],
-    }
-    codex_stale = {
-        "matcher": "apply_patch",
-        "hooks": [{"type": "command", "command": legacy_cmd}],
-    }
-    codex_merged, codex_added = bugate_init.merge_hooks(
-        {"hooks": {"PreToolUse": [codex_own, codex_stale]}},
-        codex_blocks,
-        ".bugate",
-    )
-    codex_pre = codex_merged["hooks"]["PreToolUse"]
-    check("SUT Codex hook is preserved on upgrade", codex_pre[0] == codex_own, str(codex_pre))
-    check(
-        "stale Codex owned hook upgrades to all four guards",
-        codex_pre[1:] == codex_blocks["PreToolUse"]
-        and any(item.startswith("PreToolUse") for item in codex_added),
-        str(codex_pre),
-    )
-    codex_snapshot = json.dumps(codex_merged, sort_keys=True)
-    codex_again, codex_added_again = bugate_init.merge_hooks(
-        codex_merged, codex_blocks, ".bugate"
-    )
-    check(
-        "Codex hook upgrade is idempotent",
-        not codex_added_again
-        and json.dumps(codex_again, sort_keys=True) == codex_snapshot,
-        str(codex_added_again),
-    )
-
-
-def scenario_gitignore_backstop() -> None:
-    print("S5 .gitignore backstop: marked block written once; SUT's own lines preserved")
-    begin = bugate_init.GITIGNORE_BEGIN
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
-
-        def run_init(sut: Path) -> subprocess.CompletedProcess:
-            return subprocess.run(
-                [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(sut)],
-                capture_output=True, text=True,
-            )
-
-        # (a) fresh init creates .gitignore with the marked block + the scorer defaults.
-        fresh = tmp / "fresh"
-        fresh.mkdir()
-        cp = run_init(fresh)
-        check("fresh init succeeds", cp.returncode == 0, cp.stderr[-300:])
-        gi = fresh / ".gitignore"
-        text = gi.read_text(encoding="utf-8") if gi.exists() else ""
-        check("fresh .gitignore carries the BUGate marker", begin in text, text[:200])
-        check(
-            "fresh block ignores the scorer defaults",
-            all(name in text for name in (
-                "/oracle_falsification_result.json",
-                "/prd_health_result.json",
-                "/prd_health_report.md",
-                "/assertion_coverage_matrix.md",
-            )),
-            text,
-        )
-        check(
-            "committed governance contract is NOT ignored",
-            "bugate.config.yaml" not in text and "bugate.profile.yaml" not in text,
-            text,
-        )
-
-        # (b) re-running init does not duplicate the block.
-        cp2 = run_init(fresh)
-        check("re-run init succeeds", cp2.returncode == 0, cp2.stderr[-300:])
-        text2 = gi.read_text(encoding="utf-8")
-        check("re-run does not duplicate the marked block", text2.count(begin) == 1, str(text2.count(begin)))
-        check("re-run leaves the .gitignore byte-identical", text2 == text)
-
-        # (c) a pre-existing SUT .gitignore is preserved; our block is appended after it.
-        seeded = tmp / "seeded"
-        seeded.mkdir()
-        own_lines = "node_modules/\n*.log\n/build/\n"
-        (seeded / ".gitignore").write_text(own_lines, encoding="utf-8")
-        cp3 = run_init(seeded)
-        check("seeded init succeeds", cp3.returncode == 0, cp3.stderr[-300:])
-        seeded_text = (seeded / ".gitignore").read_text(encoding="utf-8")
-        check(
-            "SUT's own .gitignore lines are intact",
-            all(line in seeded_text for line in ("node_modules/", "*.log", "/build/")),
-            seeded_text,
-        )
-        check("BUGate block is appended (marker present, once)", seeded_text.count(begin) == 1, seeded_text)
-        check(
-            "BUGate block comes after the SUT's own lines",
-            seeded_text.index("node_modules/") < seeded_text.index(begin),
-            seeded_text,
-        )
-        # re-running against the seeded repo is still a no-op.
-        run_init(seeded)
-        check(
-            "seeded re-run does not duplicate the block",
-            (seeded / ".gitignore").read_text(encoding="utf-8").count(begin) == 1,
-        )
-
-
-def scenario_codex_agents_installed() -> None:
-    print("S6 vendor contents + Codex agents/skills: new role runtime, links, refresh-ours")
-    names = {"brief-gate.toml", "testability-gate.toml", "inventory-gate.toml"}
-    with tempfile.TemporaryDirectory() as td:
-        sut = Path(td) / "sut"
-        sut.mkdir()
-        cp = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(sut)],
-            capture_output=True, text=True,
-        )
-        check("init succeeds", cp.returncode == 0, cp.stderr[-300:])
-        agents_dir = sut / ".codex" / "agents"
-        present = {p.name for p in agents_dir.glob("*.toml")} if agents_dir.is_dir() else set()
-        check("all three gate agents installed", names <= present, str(present))
-        brief = (agents_dir / "brief-gate.toml").read_text(encoding="utf-8") if (agents_dir / "brief-gate.toml").exists() else ""
-        check(
-            "agent references the skill vendor-agnostically via .agents/skills/bugate",
-            ".agents/skills/bugate/SKILL.md" in brief and ".shared/skills/bugate/SKILL.md" not in brief,
-            brief,
-        )
-        # The official Codex path resolves the reference, and the legacy bridge
-        # stays in place for older clients during the migration window.
-        check(
-            "the referenced SKILL.md resolves through the installed .agents symlink",
-            (sut / ".agents" / "skills" / "bugate" / "SKILL.md").exists(),
-        )
-        check(
-            "legacy .codex skill bridge still resolves",
-            (sut / ".codex" / "skills" / "bugate" / "SKILL.md").exists(),
-        )
-        check(
-            "full-check skill resolves for Claude, Codex, and legacy Codex paths",
-            all((sut / runtime / "skills" / "bugate-full-check" / "SKILL.md").exists()
-                for runtime in (".claude", ".agents", ".codex")),
-        )
-        check(
-            "role-governance scripts are vendored",
-            all((sut / ".bugate" / "scripts" / name).is_file() for name in (
-                "role_governance.py",
-                "check_role_evidence.py",
-            )),
-        )
-        role_bin = sut / ".bugate" / "bin" / "bugate-role"
-        check(
-            "bugate-role bin is vendored and executable",
-            role_bin.is_file() and os.access(role_bin, os.X_OK),
-            str(role_bin),
-        )
-        check(
-            "all three shipped skills are vendored",
-            all((sut / ".bugate" / ".shared" / "skills" / skill / "SKILL.md").is_file()
-                for skill in ("bugate", "bugate-full-check", "bugate-import")),
-        )
-        # refresh-ours: a SUT-owned agent survives a re-run; ours are refreshed, not duplicated.
-        (agents_dir / "sut-own.toml").write_text('name = "sut-own"\n', encoding="utf-8")
-        cp2 = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(sut)],
-            capture_output=True, text=True,
-        )
-        check("re-run succeeds", cp2.returncode == 0, cp2.stderr[-300:])
-        after = {p.name for p in agents_dir.glob("*.toml")}
-        check("SUT's own agent is preserved on re-run", "sut-own.toml" in after, str(after))
-        check("our agents are not duplicated", after == names | {"sut-own.toml"}, str(after))
-        check(
-            "re-run leaves one canonical SessionStart entry with both owned commands",
-            len(json.loads((sut / ".codex" / "hooks.json").read_text(encoding="utf-8"))["hooks"]["SessionStart"]) == 1,
-        )
-        # dry-run writes nothing.
-        dry = Path(td) / "dry"
-        dry.mkdir()
-        subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "bugate_init.py"), str(dry), "--dry-run"],
-            capture_output=True, text=True,
-        )
-        check("dry-run installs no codex agents", not (dry / ".codex" / "agents").exists())
-        check("dry-run installs no skill links", not (dry / ".agents" / "skills").exists())
-
-
-def main() -> int:
-    for scenario in (
-        scenario_scaffold_hygiene,
-        scenario_root_snippet_contract,
-        scenario_wired_hook_inert_without_config,
-        scenario_merge_refreshes_stale_wiring,
-        scenario_gitignore_backstop,
-        scenario_codex_agents_installed,
-    ):
-        scenario()
-    if FAILURES:
-        print(f"\ninit scaffold acceptance: FAIL ({len(FAILURES)})")
-        for failure in FAILURES:
-            print(f"  - {failure}")
-        return 1
-    print("\ninit scaffold acceptance: PASS (all scenarios)")
-    return 0
+    def test_workspace_skill_links_and_gate_agents_match_projection(self) -> None:
+        target = self.repo()
+        self.install(target)
+        lock = json.loads((target / ".bugate/bugate.lock.json").read_bytes())
+        expected = {
+            item["target_path"]: item
+            for item in lock["installed_projection"]
+            if item["scope"] == "workspace"
+        }
+        for relative, item in expected.items():
+            with self.subTest(path=relative):
+                path = target / relative
+                if item["type"] == "symlink":
+                    self.assertTrue(path.is_symlink())
+                    self.assertEqual(os.readlink(path), item["target"])
+                    self.assertTrue((path / "SKILL.md").is_file())
+                else:
+                    self.assertEqual(
+                        contract.sha256_file(path), item["sha256"]
+                    )
+                    self.assertEqual(
+                        f"{stat.S_IMODE(os.lstat(path).st_mode):04o}", item["mode"]
+                    )
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    unittest.main(verbosity=2)

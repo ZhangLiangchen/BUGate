@@ -194,6 +194,40 @@ def run(
     )
 
 
+def codex_auth_command() -> list[str]:
+    """Probe the same configured Codex model and effort as peer dispatch."""
+
+    command = ["codex", "exec", "--sandbox", "read-only"]
+    model = os.environ.get("SDTD_CODEX_MODEL", "").strip()
+    effort = os.environ.get("SDTD_CODEX_REASONING_EFFORT", "").strip()
+    if model:
+        command += ["--model", model]
+    if effort:
+        command += ["-c", f'model_reasoning_effort="{effort}"']
+    command.append("-")
+    return command
+
+
+def claude_auth_command() -> list[str]:
+    """Probe the same configured Claude model and effort as peer dispatch."""
+
+    command = ["claude", "-p"]
+    model = os.environ.get("SDTD_CLAUDE_MODEL", "").strip()
+    effort = os.environ.get("SDTD_CLAUDE_EFFORT", "").strip()
+    if model:
+        command += ["--model", model]
+    if effort:
+        command += ["--effort", effort]
+    command += [
+        "--permission-mode",
+        "dontAsk",
+        "--output-format",
+        "text",
+        "Reply exactly: ok",
+    ]
+    return command
+
+
 def add(checks: list[Check], name: str, ok: bool, detail: str, warn: bool = False) -> None:
     status = "PASS" if ok else ("WARN" if warn else "FAIL")
     checks.append(Check(name, status, compact(detail)))
@@ -213,6 +247,107 @@ def outcome_matches(
 ) -> bool:
     """Require both the expected process status and its BUGate semantic signal."""
     return result.returncode == returncode and (marker is None or marker in result.stdout)
+
+
+def verify_imported_installed_state(
+    checks: list[Check],
+    root: Path,
+    engine: Path,
+    layout: str,
+    *,
+    timeout: int = 60,
+) -> None:
+    """Fail closed unless an imported engine has a healthy lock-based install.
+
+    Core checkouts and unpacked release roots are capability surfaces, not
+    imported installations, so they intentionally have no installed lock.  An
+    imported workspace, however, must be verified by the updater shipped by
+    the selected vendored engine before any other capability probe runs.
+    """
+
+    if layout != "imported":
+        return
+
+    try:
+        vendor_dir = engine.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        add(
+            checks,
+            "Imported installed-state verification",
+            False,
+            f"selected engine is outside the imported workspace: engine={engine}; workspace={root}",
+        )
+        return
+
+    updater = engine / "bin/bugate-update"
+    command = [
+        str(updater),
+        "verify",
+        str(root),
+        "--vendor-dir",
+        vendor_dir,
+        "--json",
+    ]
+    try:
+        result = run(command, root, cwd=root, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        add(
+            checks,
+            "Imported installed-state verification",
+            False,
+            f"updater verify could not run: {exc.__class__.__name__}: {exc}",
+        )
+        return
+
+    try:
+        payload = json.loads(result.stdout)
+    except (json.JSONDecodeError, TypeError) as exc:
+        add(
+            checks,
+            "Imported installed-state verification",
+            False,
+            (
+                f"exit={result.returncode}/0; updater verify emitted invalid JSON "
+                f"({exc.__class__.__name__})"
+            ),
+        )
+        return
+
+    if not isinstance(payload, dict):
+        add(
+            checks,
+            "Imported installed-state verification",
+            False,
+            f"exit={result.returncode}/0; updater verify JSON root is not an object",
+        )
+        return
+
+    expected = {
+        "decision": "GO",
+        "status": "passed",
+        "installed_kind": "locked",
+        "lock_based": True,
+        "recovery_required": False,
+    }
+    fields_ok = (
+        all(payload.get(key) == value for key, value in expected.items())
+        and payload.get("lock_based") is True
+        and payload.get("recovery_required") is False
+    )
+    ok = result.returncode == 0 and fields_ok
+    add(
+        checks,
+        "Imported installed-state verification",
+        ok,
+        (
+            f"exit={result.returncode}/0; decision={payload.get('decision')!r}/'GO'; "
+            f"status={payload.get('status')!r}/'passed'; "
+            f"installed_kind={payload.get('installed_kind')!r}/'locked'; "
+            f"lock_based={payload.get('lock_based')!r}/True; "
+            f"recovery_required={payload.get('recovery_required')!r}/False; "
+            f"vendor_dir={vendor_dir}"
+        ),
+    )
 
 
 def build_probe_profile(
@@ -1483,6 +1618,37 @@ if __name__ == "__main__":
         )
 
 
+def print_report(
+    args: argparse.Namespace,
+    root: Path,
+    engine: Path,
+    layout: str,
+    checks: list[Check],
+) -> int:
+    """Render one final report and return its fail-closed exit status."""
+
+    print("# BUGate Full Check")
+    print()
+    print(f"- Mode: `{args.mode}`")
+    print(f"- Layout: `{layout}`")
+    print(f"- Workspace: `{root}`")
+    print(f"- Engine: `{engine}`")
+    print()
+    print("| Check | Status | Detail |")
+    print("|---|---|---|")
+    for check in checks:
+        print(f"| {check.name} | {check.status} | {check.detail.replace('|', '/')} |")
+
+    failures = [check for check in checks if check.status == "FAIL"]
+    warnings = [check for check in checks if check.status == "WARN"]
+    print()
+    if failures:
+        print(f"Result: FAIL ({len(failures)} failed, {len(warnings)} warning).")
+        return 1
+    print(f"Result: PASS ({len(warnings)} warning).")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1496,6 +1662,23 @@ def main() -> int:
 
     root, engine, layout = find_roots(Path.cwd().resolve())
     checks: list[Check] = []
+
+    # An imported full-check is meaningful only for a verified, lock-based
+    # installation.  Run this before compilation, runtime, Memory, or any
+    # synthetic capability probe so a stale/tampered/recovery-required install
+    # cannot produce a misleading partial green report.
+    verify_imported_installed_state(
+        checks,
+        root,
+        engine,
+        layout,
+        timeout=min(args.timeout_seconds, 60),
+    )
+    if any(check.status == "FAIL" for check in checks):
+        # Do not execute a stale, tampered, or recovery-required vendored kit.
+        # The updater verify command above is the sole imported preflight; once
+        # it fails, even compilation would execute untrusted target bytes.
+        return print_report(args, root, engine, layout, checks)
 
     def eng(rel: str) -> str:
         """Engine-relative path as string (works from any cwd in both layouts)."""
@@ -1533,7 +1716,7 @@ def main() -> int:
         add(checks, "Codex version", result.returncode == 0, result.stdout)
         if args.mode == "full":
             result = run(
-                ["codex", "exec", "--sandbox", "read-only", "-"],
+                codex_auth_command(),
                 root,
                 input_text="Reply exactly: ok\n",
                 timeout=args.timeout_seconds,
@@ -1553,7 +1736,7 @@ def main() -> int:
         add(checks, "Claude version", result.returncode == 0, result.stdout)
         if args.mode == "full":
             result = run(
-                ["claude", "-p", "--permission-mode", "dontAsk", "--output-format", "text", "Reply exactly: ok"],
+                claude_auth_command(),
                 root,
                 timeout=args.timeout_seconds,
             )
@@ -1828,26 +2011,7 @@ def main() -> int:
             )
         )
 
-    print("# BUGate Full Check")
-    print()
-    print(f"- Mode: `{args.mode}`")
-    print(f"- Layout: `{layout}`")
-    print(f"- Workspace: `{root}`")
-    print(f"- Engine: `{engine}`")
-    print()
-    print("| Check | Status | Detail |")
-    print("|---|---|---|")
-    for check in checks:
-        print(f"| {check.name} | {check.status} | {check.detail.replace('|', '/')} |")
-
-    failures = [check for check in checks if check.status == "FAIL"]
-    warnings = [check for check in checks if check.status == "WARN"]
-    print()
-    if failures:
-        print(f"Result: FAIL ({len(failures)} failed, {len(warnings)} warning).")
-        return 1
-    print(f"Result: PASS ({len(warnings)} warning).")
-    return 0
+    return print_report(args, root, engine, layout, checks)
 
 
 if __name__ == "__main__":

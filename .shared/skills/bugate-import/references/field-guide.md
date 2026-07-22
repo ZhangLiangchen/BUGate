@@ -130,9 +130,16 @@ v0.3.1 kit gaps found in the field are listed at the end.
 - Use `bin/bugate-role run --role ... -- <command>` to create each role process.
   SessionStart can report identity, but a hook child cannot export variables to
   its parent. Desktop needs a fresh launch/session with the intended env.
-- Re-running the importer upgrades BUGate-owned scripts/hooks and preserves
-  SUT-owned hooks. Re-trust the changed Codex hook hash; before re-trust, report
-  file/re-vendor acceptance only, not active runtime enforcement.
+- **Updater correction (v0.4.2+):** historical rerun-importer upgrade advice is
+  retired. `bugate_init.py` is fresh-install-only. Bootstrap an exact v0.3.x or
+  pre-lock v0.4.x baseline from an unpacked release, then use the vendored
+  `bugate-update` `status`/`plan`/`apply`/`verify`/`rollback` flow. Offline mode
+  requires both archive and checksum; conflicts stay `NO-GO` without a broad
+  force/adopt escape. Engine update preserves profiles, role evidence, Memory,
+  and SUT-owned hooks; profile migration is a separate explicit commit. See
+  `updating-bugate.md`, including its 128-entry history limit and SHA-256
+  threat model. Re-trust Codex only on an actual Codex hook byte change, and
+  start a new agent session after any hook change before claiming enforcement.
 - Never edit `00_role_evidence/**` directly or delete it to reset. Profile or
   pre-code drift restarts from designer acceptance/handoff; implementation
   drift restarts from implementer handoff/reviewer acceptance. Append a

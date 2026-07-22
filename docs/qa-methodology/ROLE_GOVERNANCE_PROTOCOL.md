@@ -190,3 +190,21 @@ separate OS accounts, containers, managed runners, or role-scoped server
 credentials. Hooks also cannot intercept arbitrary shell redirection or an
 external editor; supported agent tools, orchestrators, and Core mutators are
 enforced, while stronger filesystem isolation belongs to a managed runner.
+
+## 8. Amendment — imported updater boundary (2026-07-22)
+
+Section 7's sentence that re-running the importer refreshes an existing
+installation is preserved as the frozen v0.4.0 record, but is superseded for
+v0.4.2 and later compatible releases. `bugate_init.py` is fresh-install-only.
+An exact v0.3.x or pre-lock v0.4.x installation bootstraps from an unpacked
+release; an installation with the updater uses vendored `status` → `plan` →
+`apply` → `verify`, with rollback by explicit transaction ID. See the
+[Imported-mode updater contract](IMPORTED_UPDATER_CONTRACT.md) and the vendored
+`bugate-import/references/updating-bugate.md` runbook.
+
+The updater may replace role-governance-capable engine/hook files, but it never
+activates governance, edits a profile/Memory/role evidence, or manufactures a
+lifecycle receipt. Engine update and profile migration remain separately
+reviewed, separately reversible commits. Codex Desktop re-trust is required
+only when its hook bytes actually change; any hook change requires a new agent
+session before the new enforcement surface may be claimed active.

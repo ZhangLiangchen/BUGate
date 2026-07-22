@@ -168,3 +168,18 @@ implementer handoff/reviewer acceptance 重启。rerun importer 会刷新 vendor
 真实操作者。强身份隔离需要独立 OS 账号、容器、managed runner 或按角色发放的
 服务端凭据。Hook 也无法拦截任意 shell 重定向或外部编辑器；支持的 agent tool、
 orchestrator 与 Core mutator 会被强制治理，更强的文件系统隔离属于 managed runner。
+
+## 8. 修正案——imported updater 边界（2026-07-22）
+
+§7 中“重跑 importer 刷新已有安装”的句子作为冻结的 v0.4.0 历史记录保留，但自
+v0.4.2 及后续兼容 release 起已被取代。`bugate_init.py` 只用于首次安装。精确匹配的
+v0.3.x 或 pre-lock v0.4.x 安装从解压 release bootstrap；已有 updater 的安装使用
+vendored `status` → `plan` → `apply` → `verify`，并只按明确 transaction ID 回滚。
+详见 [Imported-mode 更新器契约](IMPORTED_UPDATER_CONTRACT.zh-CN.md) 与 vendored
+`bugate-import/references/updating-bugate.zh-CN.md` 操作手册。
+
+更新器可以替换支持 role governance 的 engine/hook 文件，但绝不激活 governance、
+编辑 profile/Memory/role evidence 或制造 lifecycle receipt。Engine update 与 profile
+migration 必须分别审查、分别提交、分别可回滚。只有 Codex hook bytes 实际变化时才
+要求 Codex Desktop re-trust；任一 hook 变化都要求新开 agent session，完成前不得声称
+新的 enforcement surface 已激活。

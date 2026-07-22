@@ -2,7 +2,8 @@
 
 - **Status:** accepted (2026-07-03, human-ratified via CHARTER-BUGATE-001 and
   the signed K/W/C disposal review); amended by CHARTER A4 (2026-07-06) to
-  retire the maintainer SUT-mount exception.
+  retire the maintainer SUT-mount exception and by CHARTER A5 / the
+  imported-updater contract (2026-07-22) to supersede rerun-installer upgrades.
 - **Authority:** [`CHARTER.md`](../../CHARTER.md) (CHARTER-BUGATE-001 §2, §5)
 - **Companions:** ADR-BUGATE-001
   ([`BUGATE_PLATFORM_DECOUPLING_ADR.md`](BUGATE_PLATFORM_DECOUPLING_ADR.md)),
@@ -11,7 +12,8 @@
   ([`BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md`](BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md),
   machine-level memory-bus hosting) and CHARTER Amendment A1 / ADR-BUGATE-004
   ([`BUGATE_DESUT_CALIBRATION_ADR.md`](BUGATE_DESUT_CALIBRATION_ADR.md), the
-  de-SUT calibration).
+  de-SUT calibration), plus the normative
+  [`IMPORTED_UPDATER_CONTRACT.md`](IMPORTED_UPDATER_CONTRACT.md).
 
 ## 1. Context — the error being corrected
 
@@ -138,3 +140,33 @@ clients by default; self-hosting is an explicit operator decision.
 - **Delete the profile evidence/skill source keys** (suspected Mode-B reach) —
   rejected on audit: the binding is declarative and mode-independent; only its
   wording was host-inverted.
+
+## 8. Amendment — first-class imported updates (2026-07-22)
+
+The §6 statement that an engine upgrade is a rerun of the installer is retained
+as the historical consequence of the 2026-07-03 correction. It is no longer the
+operational contract. BUGate v0.4.2 introduces a first-class imported updater,
+and CHARTER A5 supersedes that sentence as follows:
+
+- `bugate_init.py` owns fresh imported installation only. It must not serve as
+  re-import, scaffold refresh, or an independent second upgrade implementation.
+- Exact supported v0.3.x and pre-lock v0.4.x installations enter the update
+  chain through `bugate_update.py` in an unpacked release. Lock-based installs
+  then use vendored `status`/`plan`/`apply`/`verify` and explicit transaction
+  rollback. Detection is manifest- and hook-shape-based, never best effort.
+- `plan` is zero-write; `apply` is a journaled, ownership-limited transaction.
+  There is no broad force. Local managed drift, mixed layout, non-standard
+  hooks, stale rollback state, or the 128-entry descriptor-safe history limit
+  fail closed rather than discarding evidence or overwriting newer state.
+- Archive/checksum and manifest SHA-256 checks provide tamper-evident integrity,
+  not publisher identity. A consistently malicious archive/checksum pair is
+  outside that guarantee.
+- The engine update does not edit the profile, role receipts, acceptance
+  artifacts, Memory data, or SUT-owned surfaces. Profile migration/governance
+  activation is a second explicit action and commit. Codex re-trust is
+  conditional on actual Codex hook-byte change; any hook change requires a new
+  agent session before activation is claimed.
+
+The normative details are in
+[`IMPORTED_UPDATER_CONTRACT.md`](IMPORTED_UPDATER_CONTRACT.md); the vendored
+operator path is `.shared/skills/bugate-import/references/updating-bugate.md`.

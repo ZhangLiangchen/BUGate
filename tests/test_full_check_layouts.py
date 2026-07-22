@@ -9,12 +9,14 @@ the full-check treat the workspace root as the BUGate engine.
 from __future__ import annotations
 
 import importlib.util
+import io
+import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 
 
@@ -29,6 +31,14 @@ ROLE_FLOW_FILES = (
     "scripts/memory_bus.py",
     "scripts/check_bugate_v13_semantics.py",
 )
+IMPORTED_VERIFY_PASS = {
+    "schema_version": 1,
+    "decision": "GO",
+    "status": "passed",
+    "installed_kind": "locked",
+    "lock_based": True,
+    "recovery_required": False,
+}
 
 
 def check(label: str, ok: bool, detail: str = "") -> None:
@@ -68,7 +78,54 @@ def seed_engine(engine: Path, module_name: str):
         path = engine / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"# engine role-flow command: {relative}\n", encoding="utf-8")
+    updater = engine / "bin/bugate-update"
+    updater.parent.mkdir(parents=True, exist_ok=True)
+    updater.write_text(
+        """#!/usr/bin/env python3
+import json
+import os
+import pathlib
+import sys
+
+log = os.environ.get("FULL_CHECK_FIXTURE_UPDATER_LOG")
+if log:
+    pathlib.Path(log).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+sys.stdout.write(os.environ.get("FULL_CHECK_FIXTURE_UPDATER_JSON", "{}"))
+raise SystemExit(int(os.environ.get("FULL_CHECK_FIXTURE_UPDATER_EXIT", "0")))
+""",
+        encoding="utf-8",
+    )
+    updater.chmod(0o755)
     return load_module(script, module_name)
+
+
+def run_imported_verify_fixture(
+    module,
+    root: Path,
+    engine: Path,
+    layout: str,
+    base: Path,
+    label: str,
+    *,
+    payload: str | dict[str, object] = IMPORTED_VERIFY_PASS,
+    returncode: int = 0,
+) -> tuple[list[object], Path]:
+    log = base / f"{label}.updater-argv.json"
+    rendered = payload if isinstance(payload, str) else json.dumps(payload)
+    checks: list[object] = []
+    with bugate_env(
+        FULL_CHECK_FIXTURE_UPDATER_LOG=str(log),
+        FULL_CHECK_FIXTURE_UPDATER_JSON=rendered,
+        FULL_CHECK_FIXTURE_UPDATER_EXIT=str(returncode),
+    ):
+        module.verify_imported_installed_state(
+            checks,
+            root,
+            engine,
+            layout,
+            timeout=10,
+        )
+    return checks, log
 
 
 def load_module(script: Path, module_name: str):
@@ -125,6 +182,16 @@ def scenario_core_layout(base: Path) -> None:
     check("core layout", layout == "core", layout)
     check("core workspace", root == engine.resolve(), str(root))
     check("core engine", resolved_engine == engine.resolve(), str(resolved_engine))
+    install_checks, updater_log = run_imported_verify_fixture(
+        module,
+        root,
+        resolved_engine,
+        layout,
+        base,
+        "core",
+    )
+    check("core does not require an installed lock", install_checks == [])
+    check("core does not invoke bugate-update", not updater_log.exists())
     check_role_flow_paths(module, resolved_engine, root, "core")
 
 
@@ -142,6 +209,26 @@ def scenario_imported_collision(base: Path) -> None:
     check("collision stays imported", layout == "imported", layout)
     check("collision workspace", root == workspace.resolve(), str(root))
     check("collision engine", resolved_engine == engine.resolve(), str(resolved_engine))
+    install_checks, updater_log = run_imported_verify_fixture(
+        module,
+        root,
+        resolved_engine,
+        layout,
+        base,
+        "default-imported",
+    )
+    check(
+        "default imported lock verification passes",
+        len(install_checks) == 1 and install_checks[0].status == "PASS",
+        str([(item.name, item.status) for item in install_checks]),
+    )
+    updater_argv = json.loads(updater_log.read_text(encoding="utf-8"))
+    check(
+        "default imported verify uses actual vendored updater",
+        updater_argv
+        == ["verify", str(root), "--vendor-dir", ".bugate", "--json"],
+        str(updater_argv),
+    )
     check_role_flow_paths(module, resolved_engine, root, "collision")
 
 
@@ -162,6 +249,32 @@ def scenario_custom_vendor_and_project_override(base: Path) -> None:
     check("project override layout", layout == "imported", layout)
     check("project override workspace", root == workspace.resolve(), str(root))
     check("script-owned custom engine", resolved_engine == engine.resolve(), str(resolved_engine))
+    install_checks, updater_log = run_imported_verify_fixture(
+        module,
+        root,
+        resolved_engine,
+        layout,
+        base,
+        "custom-imported",
+    )
+    check(
+        "custom imported lock verification passes",
+        len(install_checks) == 1 and install_checks[0].status == "PASS",
+        str([(item.name, item.status) for item in install_checks]),
+    )
+    updater_argv = json.loads(updater_log.read_text(encoding="utf-8"))
+    check(
+        "custom imported verify passes engine-relative vendor dir",
+        updater_argv
+        == [
+            "verify",
+            str(root),
+            "--vendor-dir",
+            "vendor/bugate-kit",
+            "--json",
+        ],
+        str(updater_argv),
+    )
     check_role_flow_paths(module, resolved_engine, root, "custom vendor")
 
 
@@ -402,6 +515,143 @@ def scenario_real_peer_probe_uses_one_isolated_environment(base: Path) -> None:
     )
 
 
+def scenario_auth_probes_honor_configured_peer_models(base: Path) -> None:
+    engine = base / "auth-model-engine"
+    module = seed_engine(engine, "bugate_full_check_auth_models")
+    with bugate_env(
+        SDTD_CODEX_MODEL="synthetic-codex-model",
+        SDTD_CODEX_REASONING_EFFORT="high",
+        SDTD_CLAUDE_MODEL="synthetic-claude-model",
+        SDTD_CLAUDE_EFFORT="medium",
+    ):
+        codex = module.codex_auth_command()
+        claude = module.claude_auth_command()
+    check(
+        "Codex auth probe uses configured peer model and effort",
+        codex[-1] == "-"
+        and codex[codex.index("--model") + 1] == "synthetic-codex-model"
+        and 'model_reasoning_effort="high"' in codex,
+        str(codex),
+    )
+    check(
+        "Claude auth probe uses configured peer model and effort",
+        claude[claude.index("--model") + 1] == "synthetic-claude-model"
+        and claude[claude.index("--effort") + 1] == "medium"
+        and claude[-1] == "Reply exactly: ok",
+        str(claude),
+    )
+
+
+def scenario_imported_installed_verify_fails_closed(base: Path) -> None:
+    print("S8 imported installed-state verification rejects every non-contract result")
+    workspace = base / "verify-negative"
+    mark_workspace(workspace)
+    engine = workspace / ".bugate"
+    module = seed_engine(engine, "full_check_verify_negative_fixture")
+
+    no_go = dict(IMPORTED_VERIFY_PASS)
+    no_go.update(
+        {
+            "decision": "NO-GO",
+            "status": "failed",
+            "installed_kind": "conflict",
+            "lock_based": False,
+        }
+    )
+    no_go_checks, _ = run_imported_verify_fixture(
+        module,
+        workspace.resolve(),
+        engine.resolve(),
+        "imported",
+        base,
+        "verify-no-go",
+        payload=no_go,
+    )
+    check(
+        "updater NO-GO is a full-check failure",
+        len(no_go_checks) == 1
+        and no_go_checks[0].status == "FAIL"
+        and "decision='NO-GO'/'GO'" in no_go_checks[0].detail,
+        str([(item.status, item.detail) for item in no_go_checks]),
+    )
+
+    invalid_checks, _ = run_imported_verify_fixture(
+        module,
+        workspace.resolve(),
+        engine.resolve(),
+        "imported",
+        base,
+        "verify-invalid-json",
+        payload="not-json",
+    )
+    check(
+        "invalid updater JSON is a full-check failure",
+        len(invalid_checks) == 1
+        and invalid_checks[0].status == "FAIL"
+        and "invalid JSON" in invalid_checks[0].detail,
+        str([(item.status, item.detail) for item in invalid_checks]),
+    )
+
+    nonzero_checks, _ = run_imported_verify_fixture(
+        module,
+        workspace.resolve(),
+        engine.resolve(),
+        "imported",
+        base,
+        "verify-nonzero",
+        payload=IMPORTED_VERIFY_PASS,
+        returncode=7,
+    )
+    check(
+        "nonzero updater verify is a full-check failure",
+        len(nonzero_checks) == 1
+        and nonzero_checks[0].status == "FAIL"
+        and "exit=7/0" in nonzero_checks[0].detail,
+        str([(item.status, item.detail) for item in nonzero_checks]),
+    )
+
+    executed: list[str] = []
+    original_find = module.find_roots
+    original_verify = module.verify_imported_installed_state
+    original_run = module.run
+    original_argv = sys.argv[:]
+
+    def fail_preflight(checks, *_args, **_kwargs) -> None:
+        checks.append(
+            module.Check(
+                "Imported installed-state verification",
+                "FAIL",
+                "synthetic tampered installed state",
+            )
+        )
+
+    def forbidden_probe(*_args, **_kwargs):
+        executed.append("vendored-probe")
+        raise AssertionError("vendored probe ran after imported preflight failed")
+
+    try:
+        module.find_roots = lambda _start: (
+            workspace.resolve(),
+            engine.resolve(),
+            "imported",
+        )
+        module.verify_imported_installed_state = fail_preflight
+        module.run = forbidden_probe
+        sys.argv = [str(engine / "run_full_check.py"), "--mode", "smoke"]
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = module.main()
+    finally:
+        module.find_roots = original_find
+        module.verify_imported_installed_state = original_verify
+        module.run = original_run
+        sys.argv = original_argv
+    check("failed imported preflight exits nonzero immediately", exit_code == 1)
+    check("failed imported preflight executes no vendored probe", executed == [])
+    check("failed imported preflight renders only its failure", "Python compile" not in output.getvalue())
+    check("failed imported preflight reports final FAIL", "Result: FAIL" in output.getvalue())
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="bugate-full-check-layouts.") as td:
         base = Path(td)
@@ -412,6 +662,8 @@ def main() -> int:
         scenario_negative_checks_require_markers(base)
         scenario_hardening_probe_isolates_required_profile(base)
         scenario_real_peer_probe_uses_one_isolated_environment(base)
+        scenario_auth_probes_honor_configured_peer_models(base)
+        scenario_imported_installed_verify_fails_closed(base)
     if FAILURES:
         print(f"\nfull-check layout acceptance: FAIL ({len(FAILURES)})")
         for failure in FAILURES:
