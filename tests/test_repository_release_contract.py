@@ -71,6 +71,19 @@ class RepositoryReleaseContractTests(unittest.TestCase):
                 for asset in expected_assets:
                     self.assertIn(asset, text)
 
+    def test_updater_release_gate_is_provider_neutral(self) -> None:
+        version = updater_version()
+        for suffix in ("", ".zh-CN"):
+            path = ROOT / f"docs/releases/v{version}{suffix}.md"
+            with self.subTest(path=path.name):
+                text = " ".join(path.read_text(encoding="utf-8").split()).lower()
+                self.assertIn("--full-check-mode smoke --full-check-archive both", text)
+                self.assertRegex(text, r"same-provider|同源")
+                self.assertRegex(text, r"newly spawned|新建")
+                self.assertIn("placeholder", text)
+                self.assertNotIn("required for the exact release archives", text)
+                self.assertNotIn("必须完成的 real codex/claude/memory", text)
+
     def test_codex_default_prompt_routes_existing_installs_to_the_updater(self) -> None:
         plugin = json.loads(
             (ROOT / ".codex-plugin/plugin.json").read_text(encoding="utf-8")
