@@ -253,11 +253,11 @@ lock/updater pair，因此只用一次已解包 v0.4.2 或更高 release 里的 
 updater。把这份已验证、位于 SUT 仓外的解包 release 保留到 rollback 窗口结束：
 
 ```bash
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py plan . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py status . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py plan . --vendor-dir .bugate
 # 完整复核 plan，只有 Decision: GO 才能写入。
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bugate
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py apply . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bugate
 ```
 
 只有 `.bugate/bugate.lock.json` 与 executable `.bugate/bin/bugate-update` 同时存在
@@ -266,9 +266,9 @@ python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bu
 
 ```bash
 .bugate/bin/bugate-update status
-.bugate/bin/bugate-update plan --to 0.4.2
+.bugate/bin/bugate-update plan --to 0.4.3
 # 只 apply 已复核且为 GO 的 plan。
-.bugate/bin/bugate-update apply --to 0.4.2
+.bugate/bin/bugate-update apply --to 0.4.3
 .bugate/bin/bugate-update verify
 ```
 
@@ -278,11 +278,11 @@ python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bu
 
 ```bash
 .bugate/bin/bugate-update plan \
-  --archive /outside/bugate-0.4.2.tar.gz \
-  --checksums /outside/bugate-0.4.2.SHA256SUMS
+  --archive /outside/bugate-0.4.3.tar.gz \
+  --checksums /outside/bugate-0.4.3.SHA256SUMS
 .bugate/bin/bugate-update apply \
-  --archive /outside/bugate-0.4.2.tar.gz \
-  --checksums /outside/bugate-0.4.2.SHA256SUMS
+  --archive /outside/bugate-0.4.3.tar.gz \
+  --checksums /outside/bugate-0.4.3.SHA256SUMS
 .bugate/bin/bugate-update verify
 ```
 
@@ -293,7 +293,7 @@ lock 与 vendored launcher；因此要按 rollback 后仍存在的入口选择 v
 
 ```bash
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+BOOTSTRAP=/outside/bugate-0.4.3/scripts/bugate_update.py
 if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
   .bugate/bin/bugate-update verify
 else

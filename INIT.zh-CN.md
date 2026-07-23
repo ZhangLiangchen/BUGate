@@ -9,9 +9,10 @@
 > 在 BUGate 发布 packaged console-script 前，文档里的 `bugate init` shorthand
 > 指 `python3 scripts/bugate_init.py`。
 >
-> 当前正式版本是 **v0.4.2**。tar/zip archive 随附
-> `bugate-0.4.2.SHA256SUMS`；导入模式必须在解压前校验所选 archive（见
-> `IMPORT_PROMPT.zh-CN.md`）。
+> 当前 checkout 的 release 版本线是 **v0.4.3**。只有 annotated tag 与 GitHub
+> Release 已公开且仅公开 tar、zip、`bugate-0.4.3.SHA256SUMS` 三项资产，并且所选
+> archive 校验通过后，才把它视为当前已发布版本；在此之前，当前已发布回退版本仍是
+> v0.4.2（见 `IMPORT_PROMPT.zh-CN.md`）。
 
 ---
 
@@ -45,11 +46,11 @@ BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 
   位于仓外、已验证的 release 保留到 rollback 窗口结束：
 
   ```bash
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py plan . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py status . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py plan . --vendor-dir .bugate
   # 完整复核，并要求 Decision: GO。
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bugate
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py apply . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bugate
   ```
 
 - **Lock-based import：** 只有 `.bugate/bugate.lock.json` 与 executable
@@ -58,13 +59,13 @@ BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 
 
   ```bash
   .bugate/bin/bugate-update status
-  .bugate/bin/bugate-update plan --to 0.4.2
+  .bugate/bin/bugate-update plan --to 0.4.3
   # 完整复核，并要求 Decision: GO。
-  .bugate/bin/bugate-update apply --to 0.4.2
+  .bugate/bin/bugate-update apply --to 0.4.3
   .bugate/bin/bugate-update verify
   # 仅用于有意撤销一个已提交 transaction：
   .bugate/bin/bugate-update rollback --transaction <transaction-id>
-  BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+  BOOTSTRAP=/outside/bugate-0.4.3/scripts/bugate_update.py
   if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
     .bugate/bin/bugate-update verify
   else
@@ -78,8 +79,8 @@ BUGate 只有一种使用形态 —— 导入（规范规则：`CHARTER.md` §2 
   recovery 与 `verify`；禁止手工复制 launcher 回去。
 
 离线更新时，`plan` 与 `apply` 都必须同时传匹配的 archive 和 checksum：
-`--archive /outside/bugate-0.4.2.tar.gz --checksums
-/outside/bugate-0.4.2.SHA256SUMS`。`status`、`plan`、`verify` 都是只读的；
+`--archive /outside/bugate-0.4.3.tar.gz --checksums
+/outside/bugate-0.4.3.SHA256SUMS`。`status`、`plan`、`verify` 都是只读的；
 `plan` 与 `apply --dry-run` 对目标零持久写入。managed local change、未知 hook
 shape、type/mode drift 或混合 legacy layout 会令 plan `NO-GO`；没有宽泛
 `--force`，也不能退回 installer。无关 dirty files 保持不动，只报告 warning。

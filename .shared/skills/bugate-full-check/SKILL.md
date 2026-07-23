@@ -55,7 +55,10 @@ dedicated `project:bugate-full-check` namespace: unset and
 wrong-role negatives, synthetic human-acceptance record, strict handoffs,
 exact-ID acceptances in distinct sessions, Layer 4 hook controls, guarded
 implementation handoff, reviewer acceptance, post-run, completion, and strict
-final verification. It skips only real model peer dispatch.
+final verification. It also forces one strict-Memory publication outage and
+requires exact recovery: the six normal lifecycle events plus the
+state-preserving `evidence_recovery` receipt produce seven exact anchors in the
+formal smoke route. It skips only real model peer dispatch.
 
 For the full post-install audit, including real Codex and Claude peer dispatch:
 

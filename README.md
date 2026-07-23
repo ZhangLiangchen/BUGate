@@ -318,11 +318,11 @@ verified unpacked release outside the SUT repo until the rollback window is
 closed:
 
 ```bash
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py plan . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py status . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py plan . --vendor-dir .bugate
 # Review the complete plan and require Decision: GO before mutation.
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bugate
-python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py apply . --vendor-dir .bugate
+python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bugate
 ```
 
 Only an installation with both `.bugate/bugate.lock.json` and executable
@@ -332,9 +332,9 @@ evidence:
 
 ```bash
 .bugate/bin/bugate-update status
-.bugate/bin/bugate-update plan --to 0.4.2
+.bugate/bin/bugate-update plan --to 0.4.3
 # Apply only the reviewed GO plan.
-.bugate/bin/bugate-update apply --to 0.4.2
+.bugate/bin/bugate-update apply --to 0.4.3
 .bugate/bin/bugate-update verify
 ```
 
@@ -345,11 +345,11 @@ rejected before target writes):
 
 ```bash
 .bugate/bin/bugate-update plan \
-  --archive /outside/bugate-0.4.2.tar.gz \
-  --checksums /outside/bugate-0.4.2.SHA256SUMS
+  --archive /outside/bugate-0.4.3.tar.gz \
+  --checksums /outside/bugate-0.4.3.SHA256SUMS
 .bugate/bin/bugate-update apply \
-  --archive /outside/bugate-0.4.2.tar.gz \
-  --checksums /outside/bugate-0.4.2.SHA256SUMS
+  --archive /outside/bugate-0.4.3.tar.gz \
+  --checksums /outside/bugate-0.4.3.SHA256SUMS
 .bugate/bin/bugate-update verify
 ```
 
@@ -361,7 +361,7 @@ retained, verified unpacked v0.4.2-or-later updater:
 
 ```bash
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+BOOTSTRAP=/outside/bugate-0.4.3/scripts/bugate_update.py
 if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
   .bugate/bin/bugate-update verify
 else

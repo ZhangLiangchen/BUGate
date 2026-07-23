@@ -961,8 +961,8 @@ class RealUpdaterAcceptanceTests(unittest.TestCase):
             and isinstance(record["metadata"].get("role_transition"), dict)
         }
         expected_events = [
-            "evidence_recovery",
             "human_acceptance",
+            "evidence_recovery",
             "designer_handoff",
             "implementer_acceptance",
             "implementer_handoff",
@@ -970,10 +970,37 @@ class RealUpdaterAcceptanceTests(unittest.TestCase):
             "reviewer_completion",
         ]
         self.assertEqual(len(transitions), 7)
-        self.assertCountEqual(
+        ordered_transitions = list(transitions.values())
+        self.assertEqual(
             expected_events,
-            [str(transition.get("event") or "") for transition in transitions.values()],
+            [str(transition.get("event") or "") for transition in ordered_transitions],
         )
+        expected_phases = [
+            "pre_code",
+            "pre_code",
+            "pre_code",
+            "implementation",
+            "implementation",
+            "post_run",
+            "post_run",
+        ]
+        self.assertEqual(
+            expected_phases,
+            [str(transition.get("phase") or "") for transition in ordered_transitions],
+        )
+        lineage_ids = set()
+        for sequence, transition in enumerate(ordered_transitions):
+            lineage = transition.get("lineage")
+            self.assertIsInstance(lineage, dict)
+            lineage_ids.add(str(lineage.get("lineage_id") or ""))
+            self.assertEqual(lineage.get("expected_sequence"), sequence)
+            self.assertEqual(lineage.get("expected_revision"), sequence)
+            self.assertEqual(
+                lineage.get("expected_head_sha256"),
+                transition.get("previous_receipt_sha256"),
+            )
+        self.assertEqual(len(lineage_ids), 1)
+        self.assertRegex(next(iter(lineage_ids)), r"\A[0-9a-f]{64}\Z")
         for identity in sorted(transitions):
             trace = [
                 (method, path)

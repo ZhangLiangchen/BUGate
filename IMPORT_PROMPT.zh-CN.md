@@ -28,16 +28,20 @@ BUGate core 文件。
   **测试框架的家目录**,且之后的 agent 会话必须以**该目录**为项目根打开——
   hook 从会话工作区加载,开在父目录(monorepo 根)的会话不会加载任何守卫。
   importer 在目标不是 git 顶层时会发出警告;把该警告转达给用户。
-- BUGate 版本：若设置了 `BUGATE_VERSION` 就使用它，否则使用 `0.4.2`。
+- BUGate 目标 release 版本线：若设置了 `BUGATE_VERSION` 就使用它，否则使用
+  `0.4.3`。只有该公开 tag/Release 及其资产通过 checksum 校验后，默认值才可用；
+  在此之前必须显式选择已发布的 v0.4.2 回退版本，不能把 source branch 文案当作
+  release 权威。
 - Vendor 目录：若设置了 `BUGATE_VENDOR_DIR` 就使用它，否则使用 `.bugate`。
 - 安装路径：只读检测。不能用用户记忆的版本替代 installed layout 证据；只要
   vendor path 以任何形态存在，就绝不能运行 `bugate_init.py`。
 - 首次安装可有意使用 BUGate development checkout。legacy bootstrap 必须使用
-  带 canonical/legacy manifests 的正式已解包 v0.4.2 release。若
+  带 canonical/legacy manifests 的正式已解包 v0.4.2 或更高 release。若
   `BUGATE_ENGINE_DIR` 不是适用来源，就在 SUT 仓外下载 GitHub Release。
-- v0.4.2 release 只有三个资产：`bugate-0.4.2.tar.gz`、
-  `bugate-0.4.2.zip` 与 `bugate-0.4.2.SHA256SUMS`。checksum asset 是
-  必需项；必须在解压前校验所选 archive。
+- 公开 v0.4.3 tag/Release 存在后，只有它恰好包含三项资产时才成为权威：
+  `bugate-0.4.3.tar.gz`、`bugate-0.4.3.zip` 与
+  `bugate-0.4.3.SHA256SUMS`。checksum asset 是必需项；必须在解压前校验所选
+  archive。在此之前显式使用已发布的 v0.4.2 回退版本。
 
 ### 必须执行的流程
 
@@ -70,12 +74,12 @@ BUGate core 文件。
 2. **仅在需要时于 SUT 仓外获取 BUGate kit**
    - `locked-in-repo-update` 跳过第 2–3 步：vendored updater 会解析显式指定的
      target release，或接受离线 archive/checksum 对。
-   - 首次安装与 legacy bootstrap 需要已解包 v0.4.2 release。
+   - 首次安装与 legacy bootstrap 需要正式已解包 v0.4.2 或更高 release。
    - 如果 `BUGATE_ENGINE_DIR` 可用，继续使用。
    - 否则执行等价步骤：
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.4.3}"
      BUGATE_TMP="$(mktemp -d)"
      BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
      BUGATE_SUMS="bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -164,14 +168,14 @@ BUGate core 文件。
    python3 "$BOOTSTRAP" verify "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
    ```
 
-   这是一条只用于 v0.4.2 release 携带的 exact supported v0.3.x 与 pre-lock layout
+   这是一条用于 v0.4.2 或更高 release 持续携带的 exact supported v0.3.x 与 pre-lock layout
    的一次性桥接。`status`/`plan` 为 `NO-GO` 时，不得手工复制文件、运行 importer
    或猜测版本。
 
    **Lock+launcher 仓内更新**（`BUGATE_ROUTE=locked-in-repo-update`）：
 
    ```bash
-   BUGATE_VERSION="${BUGATE_VERSION:-0.4.2}"
+   BUGATE_VERSION="${BUGATE_VERSION:-0.4.3}"
    BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
    UPDATER="$BUGATE_VENDOR_DIR/bin/bugate-update"
    "$UPDATER" status
@@ -191,11 +195,11 @@ BUGate core 文件。
 
    ```bash
    "$UPDATER" plan \
-     --archive /outside/bugate-0.4.2.tar.gz \
-     --checksums /outside/bugate-0.4.2.SHA256SUMS
+     --archive /outside/bugate-0.4.3.tar.gz \
+     --checksums /outside/bugate-0.4.3.SHA256SUMS
    "$UPDATER" apply \
-     --archive /outside/bugate-0.4.2.tar.gz \
-     --checksums /outside/bugate-0.4.2.SHA256SUMS
+     --archive /outside/bugate-0.4.3.tar.gz \
+     --checksums /outside/bugate-0.4.3.SHA256SUMS
    "$UPDATER" verify
    ```
 
@@ -203,11 +207,11 @@ BUGate core 文件。
 
    ```bash
    python3 "$BOOTSTRAP" plan "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
-     --archive /outside/bugate-0.4.2.tar.gz \
-     --checksums /outside/bugate-0.4.2.SHA256SUMS
+     --archive /outside/bugate-0.4.3.tar.gz \
+     --checksums /outside/bugate-0.4.3.SHA256SUMS
    python3 "$BOOTSTRAP" apply "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
-     --archive /outside/bugate-0.4.2.tar.gz \
-     --checksums /outside/bugate-0.4.2.SHA256SUMS
+     --archive /outside/bugate-0.4.3.tar.gz \
+     --checksums /outside/bugate-0.4.3.SHA256SUMS
    python3 "$BOOTSTRAP" verify "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
    ```
 
@@ -219,7 +223,7 @@ BUGate core 文件。
    路径：
 
    ```bash
-   BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+   BOOTSTRAP=/outside/bugate-0.4.3/scripts/bugate_update.py
    "$BUGATE_VENDOR_DIR/bin/bugate-update" rollback \
      --transaction <32-hex-transaction-id>
    if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \
@@ -427,7 +431,7 @@ BUGate core 文件。
   新建 human acceptance、designer handoff、implementer acceptance；post-run
   前还需要 implementer handoff 与 reviewer acceptance。
 
-  升级已有导入仓只能使用 v0.4.2 外部 bootstrap updater（v0.3.x 或 pre-lock
+  升级已有导入仓只能使用 v0.4.2 或更高外部 bootstrap updater（v0.3.x 或 pre-lock
   v0.4.0/v0.4.1），或在 lock+launcher 同时存在时使用 vendored
   `bugate-update`，按第 4 步执行 status → plan → 人工复核后的 apply →
   verify。`bugate_init.py` 仅首次安装。engine transaction 保留 profile，因此

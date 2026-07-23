@@ -7,9 +7,11 @@ testability → inventory/oracle map → readable cases → adversarial review �
 execution report → knowledge update) *before* any test implementation is
 generated.
 
-Current distribution version: **v0.4.2**. Its release assets are
-`bugate-0.4.2.tar.gz`, `bugate-0.4.2.zip`, and
-`bugate-0.4.2.SHA256SUMS`; verify the selected archive before extraction.
+Current distribution release line: **v0.4.3**. It becomes authoritative only
+after the annotated tag and GitHub Release expose exactly
+`bugate-0.4.3.tar.gz`, `bugate-0.4.3.zip`, and
+`bugate-0.4.3.SHA256SUMS`, and the selected archive verifies. Until then, the
+current published fallback remains v0.4.2.
 
 **Runtime contract**
 
@@ -76,7 +78,7 @@ external or scratch repo. Bash wrappers live in `bin/`.
 | Capability | Stage | Script | Key flags | Notes |
 |---|---|---|---|---|
 | Fresh imported-mode installation | distribution | `bugate_init.py` | `<target>`, `--vendor-dir`, `--dry-run` | Creates the initial projection/config/profile/installed lock only when the vendor path is absent. `--dry-run` previews without target or machine-state writes. An existing path fails closed and points to `bugate-update`; re-running init is not an upgrade path. |
-| Bootstrap a supported v0.3.x/pre-lock installation | distribution | unpacked v0.4.2 `scripts/bugate_update.py` | `status|plan|apply|verify`, `<target>`, `--vendor-dir`, source flags below | Exact release-generated legacy/pre-lock manifest match only; unknown/mixed layout, non-standard hook wiring, or managed drift is `NO-GO`. A successful apply installs the in-repo updater and first authoritative lock. |
+| Bootstrap a supported v0.3.x/pre-lock installation | distribution | unpacked v0.4.2-or-later `scripts/bugate_update.py` | `status|plan|apply|verify`, `<target>`, `--vendor-dir`, source flags below | Exact release-generated legacy/pre-lock manifest match only; unknown/mixed layout, non-standard hook wiring, or managed drift is `NO-GO`. A successful apply installs the in-repo updater and first authoritative lock. |
 | Inspect installed/recovery state | distribution | `bin/bugate-update status` | `[target]`, `--vendor-dir`, `--json` | Read-only. Reports recognized kind/version, recovery state, warnings, and `GO`/`NO-GO`; it never repairs. |
 | Build a reproducible update plan | distribution | `bin/bugate-update plan` | `[target]`, `--to VERSION`, `--archive`, `--checksums`, `--vendor-dir`, `--json` | Read-only and zero persistent target writes. Remote mode requires explicit semver (no `latest`); offline mode requires the matching archive **and** checksum asset. Classifies every managed path/hook/profile result and reports rollback, Codex re-trust, new-session flags, and `GO`/`NO-GO`. |
 | Apply or dry-run one reviewed transaction | distribution | `bin/bugate-update apply` | plan source flags plus `--plan <json>`, `--dry-run`, `--json` | Rebuilds/revalidates the plan and rejects stale base state. `--dry-run` is zero-write. Real apply performs recovery/backup/journaling and writes only the owned projection; no broad `--force`. Local managed changes/conflicts fail closed, while unrelated dirty files are warnings. |

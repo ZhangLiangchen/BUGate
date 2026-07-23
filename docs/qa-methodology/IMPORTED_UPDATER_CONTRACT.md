@@ -528,8 +528,10 @@ For the updater/archive release gate, "imported smoke/full-check" means running
 the archive-native acceptance with
 `--full-check-mode smoke --full-check-archive both`. This mode is not a shallow
 binary check: it exercises installed-state verification, the strict
-six-transition Memory contract, bootstrap/apply, idempotence, rollback/reapply,
-and the post-check ownership-preservation oracles on both tar and zip. The
+recovery-augmented Memory contract (six normal lifecycle events plus one
+state-preserving `evidence_recovery` receipt, seven exact anchors in the formal
+smoke route), bootstrap/apply, idempotence, rollback/reapply, and the post-check
+ownership-preservation oracles on both tar and zip. The
 separate `--full-check-mode full` audits an operator machine's optional
 heterogeneous Codex+Claude runtime. Its real result must be reported, but one
 provider's account or network outage does not invalidate an otherwise verified
