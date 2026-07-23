@@ -36,6 +36,7 @@ ENGINE_SENTINELS = (
 ROLE_FLOW_ENGINE_FILES = {
     "orchestrator": Path("scripts/sdtd_orchestrator.py"),
     "role_cli": Path("scripts/role_governance.py"),
+    "role_lineage": Path("scripts/role_lineage.py"),
     "role_hook": Path("scripts/check_role_evidence.py"),
     "physical_guard": Path("scripts/check_bugate.py"),
     "memory_bus": Path("scripts/memory_bus.py"),
@@ -772,7 +773,7 @@ sut_profile: synthetic-full-check
         "03b_adversarial_cases.yaml": """gate: adversarial_cases
 gate_status: passed
 sut_profile: synthetic-full-check
-dispatch_mode: not_required
+dispatch_mode: fallback_placeholder
 adversarial_cases:
   - id: ADV-001
     risk: Duplicate synthetic input could obscure the single-outcome oracle.
@@ -900,9 +901,12 @@ def run_role_governance_flow(
 
     with tempfile.TemporaryDirectory(prefix="bugate-role-flow.") as tmp:
         ws, artifact_dir, implementation = build_role_workspace(Path(tmp))
+        memory_home = Path(tmp) / "memory-home"
+        memory_home.mkdir(mode=0o700)
         evidence_dir = artifact_dir / "00_role_evidence"
         profile = ws / "bugate.profile.yaml"
         nonce = Path(tmp).name.replace("bugate-role-flow.", "")
+        role_namespace = f"{ROLE_FLOW_NAMESPACE}:{nonce}"
         designer_session = f"designer-{nonce}"
         implementer_session = f"implementer-{nonce}"
         reviewer_session = f"reviewer-{nonce}"
@@ -911,7 +915,9 @@ def run_role_governance_flow(
             "BUGATE_ENGINE_ROOT": str(engine),
             "BUGATE_VENDOR_DIR": "",
             "BUGATE_PROFILE": "",
-            "MEMORY_BUS_PROJECT_TAG": ROLE_FLOW_NAMESPACE,
+            "MEMORY_BUS_PROJECT_TAG": role_namespace,
+            "MCP_MEMORY_BASE_DIR": str(memory_home),
+            "BUGATE_MEMORY_HOME": str(memory_home),
         }
         orchestrator = [sys.executable, str(paths["orchestrator"]), str(artifact_dir)]
         role_cli = [sys.executable, str(paths["role_cli"])]
@@ -957,6 +963,41 @@ def run_role_governance_flow(
             expected_files=tuple((artifact_dir / name, True) for name in PRECODE_NAMES),
         )
         if not initialized:
+            return
+
+        status = run(
+            [*role_cli, "lineage-status", str(artifact_dir), "--json"],
+            ws,
+            env=designer_env,
+            timeout=30,
+        )
+        try:
+            lineage_id = str(json.loads(status.stdout)["lineage_id"])
+        except (json.JSONDecodeError, KeyError, TypeError):
+            lineage_id = ""
+        result = run(
+            [
+                *role_cli,
+                "lineage-init",
+                str(artifact_dir),
+                "--lineage-id",
+                lineage_id,
+            ],
+            ws,
+            env=designer_env,
+            timeout=60,
+        )
+        lineage_initialized = command_contract(
+            checks,
+            "Role lineage explicit init",
+            result,
+            expected_code=0,
+            marker='"integrity_state": "aligned"',
+            expected_files=((evidence_dir / "chain.json", True),),
+            extra_ok=bool(lineage_id) and not role_receipts(evidence_dir),
+            extra_detail="sequence=0; receipt_count=0",
+        )
+        if not lineage_initialized:
             return
 
         precode_payload = json.dumps(
@@ -1046,7 +1087,7 @@ def run_role_governance_flow(
             result,
             expected_code=2,
             marker="required human acceptance receipt is missing",
-            expected_files=((evidence_dir / "chain.json", False),),
+            expected_files=((evidence_dir / "chain.json", True),),
             extra_ok=not role_receipts(evidence_dir),
             extra_detail="receipt_count=0",
         )
@@ -1070,8 +1111,12 @@ def run_role_governance_flow(
             "Strict Memory negative (no local acceptance on outage)",
             result,
             expected_code=2,
-            marker="strict Memory transition failed before local receipt publication",
-            expected_files=((evidence_dir / "chain.json", False),),
+            # The outage may be observed by deterministic root/predecessor
+            # verification or by transition prepare.  Both are strict-Memory
+            # fail-closed boundaries; exit/state/receipt checks below prevent
+            # this broader stable marker from becoming a false green.
+            marker="BUGate role governance BLOCKED: strict Memory",
+            expected_files=((evidence_dir / "chain.json", True),),
             extra_ok=not role_receipts(evidence_dir),
             extra_detail="receipt_count=0; unavailable endpoint isolated to child process",
         )
@@ -1079,32 +1124,40 @@ def run_role_governance_flow(
         result = run(
             [
                 *role_cli,
-                "approve",
+                "recover",
                 str(artifact_dir),
-                "--approved-by",
-                "synthetic-full-check-record",
+                "--lineage-id",
+                lineage_id,
+                "--expected-head",
+                "EMPTY",
             ],
             ws,
             env=designer_env,
-            timeout=max(60, timeout),
+            timeout=60,
         )
-        chain = role_chain(evidence_dir)
-        human_ok = command_contract(
+        recovered_receipts = role_receipts(evidence_dir)
+        recovered_events = [str(item.get("event") or "") for item in recovered_receipts]
+        recovered_chain = role_chain(evidence_dir)
+        recovered = command_contract(
             checks,
-            "Synthetic human acceptance record (strict Memory)",
+            "Strict Memory outage recovery resumes acceptance",
             result,
             expected_code=0,
-            marker='"event": "human_acceptance"',
+            marker='"event": "evidence_recovery"',
             expected_files=((evidence_dir / "chain.json", True),),
             extra_ok=(
-                chain.get("sequence") == 1
-                and chain.get("state") == "ready_for_designer_handoff"
+                len(recovered_receipts) == 2
+                and recovered_events == ["human_acceptance", "evidence_recovery"]
+                and recovered_chain.get("sequence") == 2
+                and recovered_chain.get("state") == "ready_for_designer_handoff"
             ),
             extra_detail=(
-                f"sequence={chain.get('sequence', 0)}; state={chain.get('state', '<missing>')}"
+                f"events={','.join(recovered_events) or '<none>'}; "
+                f"sequence={recovered_chain.get('sequence', 0)}; "
+                "original acceptance resumed before state-preserving recovery receipt"
             ),
         )
-        if not human_ok:
+        if not recovered:
             return
 
         result = run(
@@ -1135,7 +1188,7 @@ def run_role_governance_flow(
             expected_files=((evidence_dir / "chain.json", True),),
             extra_ok=(
                 bool(designer_memory_id)
-                and chain.get("sequence") == 2
+                and chain.get("sequence") == 3
                 and chain.get("state") == "awaiting_implementer_acceptance"
             ),
             extra_detail=(
@@ -1186,8 +1239,8 @@ def run_role_governance_flow(
             expected_code=2,
             marker="implementer acceptance missing",
             expected_files=((implementation, False),),
-            extra_ok=role_chain(evidence_dir).get("sequence") == 2,
-            extra_detail="chain_sequence=2",
+            extra_ok=role_chain(evidence_dir).get("sequence") == 3,
+            extra_detail="chain_sequence=3",
         )
 
         implementer_env = role_environment(
@@ -1215,10 +1268,10 @@ def run_role_governance_flow(
             marker="required Memory mode accepts only the handoff's exact Memory ID",
             expected_files=((implementation, False),),
             extra_ok=(
-                role_chain(evidence_dir).get("sequence") == 2
+                role_chain(evidence_dir).get("sequence") == 3
                 and not latest_role_receipt(evidence_dir, "implementer_acceptance")
             ),
-            extra_detail="chain_sequence=2; acceptance_receipt=absent",
+            extra_detail="chain_sequence=3; acceptance_receipt=absent",
         )
         same_session_env = role_environment(
             base_env, "implementer", designer_session
@@ -1244,8 +1297,8 @@ def run_role_governance_flow(
             expected_code=2,
             marker="handoff and acceptance must use distinct session IDs",
             expected_files=((implementation, False),),
-            extra_ok=role_chain(evidence_dir).get("sequence") == 2,
-            extra_detail="chain_sequence=2",
+            extra_ok=role_chain(evidence_dir).get("sequence") == 3,
+            extra_detail="chain_sequence=3",
         )
 
         result = run(
@@ -1271,7 +1324,7 @@ def run_role_governance_flow(
             marker='"event": "implementer_acceptance"',
             expected_files=((evidence_dir / "chain.json", True),),
             extra_ok=(
-                chain.get("sequence") == 3
+                chain.get("sequence") == 4
                 and chain.get("state") == "implementation_unlocked"
             ),
             extra_detail=(
@@ -1368,10 +1421,10 @@ if __name__ == "__main__":
             marker="does not match guarded_path_regex",
             expected_files=((helper, True),),
             extra_ok=(
-                role_chain(evidence_dir).get("sequence") == 3
+                role_chain(evidence_dir).get("sequence") == 4
                 and not latest_role_receipt(evidence_dir, "implementer_handoff")
             ),
-            extra_detail="chain_sequence=3; handoff_receipt=absent",
+            extra_detail="chain_sequence=4; handoff_receipt=absent",
         )
 
         result = run(
@@ -1404,7 +1457,7 @@ if __name__ == "__main__":
             expected_files=((implementation, True),),
             extra_ok=(
                 bool(implementer_memory_id)
-                and chain.get("sequence") == 4
+                and chain.get("sequence") == 5
                 and chain.get("state") == "awaiting_reviewer_acceptance"
             ),
             extra_detail=(
@@ -1450,8 +1503,8 @@ if __name__ == "__main__":
                 (artifact_dir / "05_knowledge_update.md", False),
                 (artifact_dir / "self_healing.json", False),
             ),
-            extra_ok=role_chain(evidence_dir).get("sequence") == 4,
-            extra_detail="chain_sequence=4",
+            extra_ok=role_chain(evidence_dir).get("sequence") == 5,
+            extra_detail="chain_sequence=5",
         )
 
         result = run(
@@ -1477,7 +1530,7 @@ if __name__ == "__main__":
             marker='"event": "reviewer_acceptance"',
             expected_files=((evidence_dir / "chain.json", True),),
             extra_ok=(
-                chain.get("sequence") == 5
+                chain.get("sequence") == 6
                 and chain.get("state") == "post_run_active"
             ),
             extra_detail=(
@@ -1504,8 +1557,8 @@ if __name__ == "__main__":
                 (artifact_dir / "05_knowledge_update.md", True),
                 (artifact_dir / "self_healing.json", True),
             ),
-            extra_ok=role_chain(evidence_dir).get("sequence") == 5,
-            extra_detail="chain_sequence=5",
+            extra_ok=role_chain(evidence_dir).get("sequence") == 6,
+            extra_detail="chain_sequence=6",
         )
         if not postrun_ok:
             return
@@ -1568,7 +1621,7 @@ if __name__ == "__main__":
             expected_code=0,
             marker='"event": "reviewer_completion"',
             expected_files=((evidence_dir / "chain.json", True),),
-            extra_ok=(chain.get("sequence") == 6 and chain.get("state") == "closed"),
+            extra_ok=(chain.get("sequence") == 7 and chain.get("state") == "closed"),
             extra_detail=(
                 f"sequence={chain.get('sequence', 0)}; state={chain.get('state', '<missing>')}"
             ),
@@ -1591,6 +1644,7 @@ if __name__ == "__main__":
         events = [str(item.get("event") or "") for item in receipts]
         expected_events = [
             "human_acceptance",
+            "evidence_recovery",
             "designer_handoff",
             "implementer_acceptance",
             "implementer_handoff",
@@ -1605,7 +1659,7 @@ if __name__ == "__main__":
             marker="PASS: role evidence is valid",
             expected_files=((evidence_dir / "chain.json", True),),
             extra_ok=(
-                len(receipts) == 6
+                len(receipts) == 7
                 and events == expected_events
                 and role_chain(evidence_dir).get("state") == "closed"
                 and all((item.get("memory") or {}).get("memory_id") for item in receipts)

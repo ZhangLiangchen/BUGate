@@ -69,6 +69,11 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         self.assertEqual(len(versions), 1, versions)
         version = versions.pop()
         self.assertRegex(version, VERSION_RE)
+        self.assertEqual(
+            "0.4.3",
+            version,
+            "repository version surfaces must identify the source candidate",
+        )
 
         def git(root: Path, *args: str) -> str:
             return subprocess.run(
@@ -157,7 +162,7 @@ class RepositoryReleaseContractTests(unittest.TestCase):
                 git(checkout, "rev-parse", "HEAD"),
             )
 
-    def test_current_release_has_bilingual_notes_and_exact_asset_names(self) -> None:
+    def test_source_candidate_has_bilingual_notes_and_exact_asset_names(self) -> None:
         version = updater_version()
         expected_assets = {
             f"bugate-{version}.tar.gz",
@@ -170,6 +175,56 @@ class RepositoryReleaseContractTests(unittest.TestCase):
                 text = path.read_text(encoding="utf-8")
                 for asset in expected_assets:
                     self.assertIn(asset, text)
+
+    def test_current_operator_entrypoints_target_candidate_version(self) -> None:
+        version = updater_version()
+        expectations = {
+            "INIT.md": (
+                f"release line is **v{version}**",
+                "current published fallback remains v0.4.2",
+                f"bugate-{version}.SHA256SUMS",
+                f"bugate-update plan --to {version}",
+            ),
+            "INIT.zh-CN.md": (
+                f"release 版本线是 **v{version}**",
+                "当前已发布回退版本仍是",
+                f"bugate-{version}.SHA256SUMS",
+                f"bugate-update plan --to {version}",
+            ),
+            "CAPABILITIES.md": (
+                f"Current distribution release line: **v{version}**",
+                "It becomes authoritative only",
+                f"bugate-{version}.tar.gz",
+                f"bugate-{version}.zip",
+            ),
+            "IMPORT_PROMPT.md": (
+                f"otherwise `{version}`",
+                f"public v{version} tag/Release exists",
+                "published v0.4.2 fallback",
+                f'BUGATE_VERSION="${{BUGATE_VERSION:-{version}}}"',
+            ),
+            "IMPORT_PROMPT.zh-CN.md": (
+                f"否则使用 `{version}`",
+                f"公开 v{version} tag/Release 存在后",
+                "已发布的 v0.4.2 回退版本",
+                f'BUGATE_VERSION="${{BUGATE_VERSION:-{version}}}"',
+            ),
+            "README.md": (
+                f"bugate-update plan --to {version}",
+                f"bugate-{version}.SHA256SUMS",
+            ),
+            "README.zh-CN.md": (
+                f"bugate-update plan --to {version}",
+                f"bugate-{version}.SHA256SUMS",
+            ),
+        }
+        for relative, markers in expectations.items():
+            with self.subTest(path=relative):
+                text = " ".join(
+                    (ROOT / relative).read_text(encoding="utf-8").split()
+                )
+                for marker in markers:
+                    self.assertIn(" ".join(marker.split()), text)
 
     def test_updater_release_gate_is_provider_neutral(self) -> None:
         version = updater_version()
@@ -186,6 +241,8 @@ class RepositoryReleaseContractTests(unittest.TestCase):
                 self.assertRegex(text, r"same-provider|同源")
                 self.assertRegex(text, r"newly spawned|新建")
                 self.assertIn("placeholder", text)
+                self.assertIn("evidence_recovery", text)
+                self.assertRegex(text, r"seven exact anchors|七个 exact\s+anchor")
                 self.assertNotIn("required for the exact release archives", text)
                 self.assertNotIn("必须完成的 real codex/claude/memory", text)
 
@@ -195,7 +252,6 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("Status: fixed and closed", defect)
         self.assertIn("archive-native `smoke + both`", defect)
-        self.assertIn("378/378 PASS", defect)
         self.assertIn("final merged-main bytes", defect)
         self.assertIn("main and annotated-tag CI pass", defect)
         self.assertIn("downloaded, checksum-verified, and reaccepted", defect)

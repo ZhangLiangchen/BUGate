@@ -9,9 +9,11 @@
 > Until BUGate ships a packaged console-script, prose shorthand `bugate init`
 > means `python3 scripts/bugate_init.py`.
 >
-> The current release is **v0.4.2**. Its tar and zip archives are accompanied
-> by `bugate-0.4.2.SHA256SUMS`; imported-mode adoption must verify the selected
-> archive before extraction (see `IMPORT_PROMPT.md`).
+> This checkout's release line is **v0.4.3**. Treat it as the current published
+> release only after the annotated tag and GitHub Release expose exactly the
+> tar, zip, and `bugate-0.4.3.SHA256SUMS` assets and the selected archive
+> verifies. Until then, the current published fallback remains v0.4.2 (see
+> `IMPORT_PROMPT.md`).
 
 ---
 
@@ -49,11 +51,11 @@ entry point:
   the rollback window closes:
 
   ```bash
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py status . --vendor-dir .bugate
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py plan . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py status . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py plan . --vendor-dir .bugate
   # Require a reviewed Decision: GO.
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py apply . --vendor-dir .bugate
-  python3 /outside/bugate-0.4.2/scripts/bugate_update.py verify . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py apply . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bugate
   ```
 
 - **Lock-based import:** use the installed interface only when both
@@ -63,13 +65,13 @@ entry point:
 
   ```bash
   .bugate/bin/bugate-update status
-  .bugate/bin/bugate-update plan --to 0.4.2
+  .bugate/bin/bugate-update plan --to 0.4.3
   # Require a reviewed Decision: GO.
-  .bugate/bin/bugate-update apply --to 0.4.2
+  .bugate/bin/bugate-update apply --to 0.4.3
   .bugate/bin/bugate-update verify
   # Only for an intentional reversal of a committed transaction:
   .bugate/bin/bugate-update rollback --transaction <transaction-id>
-  BOOTSTRAP=/outside/bugate-0.4.2/scripts/bugate_update.py
+  BOOTSTRAP=/outside/bugate-0.4.3/scripts/bugate_update.py
   if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
     .bugate/bin/bugate-update verify
   else
@@ -84,8 +86,8 @@ entry point:
   `verify`; never copy the launcher back manually.
 
 For an offline update, pass the matching archive and checksum asset together to
-both `plan` and `apply`: `--archive /outside/bugate-0.4.2.tar.gz --checksums
-/outside/bugate-0.4.2.SHA256SUMS`. `status`, `plan`, and `verify` are read-only;
+both `plan` and `apply`: `--archive /outside/bugate-0.4.3.tar.gz --checksums
+/outside/bugate-0.4.3.SHA256SUMS`. `status`, `plan`, and `verify` are read-only;
 `plan` and `apply --dry-run` make zero persistent target writes. A managed
 local change, unknown hook shape, type/mode drift, or mixed legacy layout makes
 the plan `NO-GO`; there is no broad `--force` and no installer fallback.
@@ -216,7 +218,7 @@ bin/memory-service-note --agent <a> --type finding --msg "..."
 bin/promote-memory ...                                  # promote a finding to status:confirmed
 ```
 
-Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT_TAG` (default `project:bugate`). The service is **machine-level** (ADR-BUGATE-003): one instance per machine with its data home at `~/.bugate/memory-bus/` (override `BUGATE_MEMORY_HOME`; the service's own `MCP_MEMORY_BASE_DIR` wins), shared by every governed repo and isolated per project by the namespace tag — a governed repo only declares its namespace in its profile and does NOT scaffold a local service dir. A legacy in-repo `.memory_bus/` is still read as a deprecated fallback. Optional macOS hardening: `bin/memory-bus-install-launchd` (RunAtLoad + KeepAlive; `--uninstall` to remove). The memory bus is a **required core component**: `bugate init` / `bin/memory-bus-*` **auto-install** the machine-level service once when absent and **self-heal** (restart) on an anomaly. Ordinary recall/notes/Stop and every edit remain best-effort/local; with Wave 7 `memory_mode: required`, a transient outage intentionally blocks only the next handoff/acceptance/completion transition and publishes no unlocking receipt. Set `BUGATE_MEMORY_NO_INSTALL=1` to skip auto-install on locked-down/offline machines.
+Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT_TAG` (default `project:bugate`). The service is **machine-level** (ADR-BUGATE-003): one instance per machine with its data home at `~/.bugate/memory-bus/` (override `BUGATE_MEMORY_HOME`; the service's own `MCP_MEMORY_BASE_DIR` wins), shared by every governed repo and isolated per project by the namespace tag — a governed repo only declares its namespace in its profile and does NOT scaffold a local service dir. A legacy in-repo `.memory_bus/` is still read as a deprecated fallback. Optional macOS hardening: `bin/memory-bus-install-launchd` (RunAtLoad + KeepAlive; `--uninstall` to remove). The memory bus is a **required core component**: `bugate init` / `bin/memory-bus-*` **auto-install** the machine-level service once when absent and **self-heal** (restart) on an anomaly. Ordinary recall/notes/Stop and every edit remain best-effort/local; with Wave 7 `memory_mode: required`, a transient outage blocks the next strict operator or transition boundary—including lineage probe/init/adopt/recover and approve/handoff/accept/complete—and no completed local unlock publication is produced. Set `BUGATE_MEMORY_NO_INSTALL=1` to skip auto-install on locked-down/offline machines.
 
 ### c) Auditable lifecycle-role governance (Wave 7)
 
@@ -243,7 +245,7 @@ Namespace comes from the SUT profile (`memory.namespace`) or `MEMORY_BUS_PROJECT
   post-run. See [the operating sequence in README](README.md#wave-7-auditable-lifecycle-roles-v040)
   and the [normative protocol](docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md).
 
-Normal edits verify only the local hash chain; strict Memory failures block the
+Normal edits verify only the local registry/hash chain; strict Memory failures block the
 next transition and can be retried idempotently after recovery. Profile or
 pre-code drift restarts from human/designer evidence; implementation drift
 restarts from implementer handoff/reviewer acceptance. Evidence is append-only:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import base64
 import hashlib
 import json
 import os
@@ -84,13 +85,92 @@ def role_receipt(
     return receipt
 
 
+def lineage_key() -> dict[str, object]:
+    return {
+        "schema": mb.ROLE_LINEAGE_KEY_SCHEMA,
+        "namespace": "project:strict-fixture",
+        "uc": "UC-STRICT-001",
+        "artifact_dir": "usecases/UC-STRICT-001",
+    }
+
+
+def evidence_envelope(path: str, parsed: dict[str, object]) -> dict[str, object]:
+    raw = canonical(parsed)
+    return {
+        "path": path,
+        "mode": 0o600,
+        "bytes_sha256": sha256(raw),
+        "bytes_base64": base64.b64encode(raw).decode("ascii"),
+        "parsed": copy.deepcopy(parsed),
+    }
+
+
+def checkpoint_payload(
+    *,
+    root_id: str,
+    key: dict[str, object] | None = None,
+) -> dict[str, object]:
+    key = copy.deepcopy(key or lineage_key())
+    lineage_id = sha256(canonical(key))
+    receipt_hash = "b" * 64
+    previous_receipt_hash = "a" * 64
+    receipt = {
+        "schema": "bugate.role-evidence/v1",
+        "event": "designer_handoff",
+        "sequence": 2,
+        "uc": str(key["uc"]),
+        "artifact_dir": str(key["artifact_dir"]),
+        "previous_receipt_sha256": previous_receipt_hash,
+        "receipt_sha256": receipt_hash,
+        "resulting_state": "awaiting_implementer_acceptance",
+    }
+    chain = {
+        "schema": "bugate.role-chain/v1",
+        "state": "awaiting_implementer_acceptance",
+        "sequence": 2,
+        "head_sha256": receipt_hash,
+        "latest_receipts": {
+            "designer_handoff": (
+                "usecases/UC-STRICT-001/00_role_evidence/receipts/"
+                f"000002-designer-handoff-{receipt_hash}.json"
+            )
+        },
+    }
+    return {
+        "schema": mb.ROLE_LINEAGE_CHECKPOINT_SCHEMA,
+        "lineage_key": key,
+        "lineage_id": lineage_id,
+        "lineage_root_id": root_id,
+        "sequence": 2,
+        "previous_checkpoint_id": "c" * 64,
+        "previous_receipt_sha256": previous_receipt_hash,
+        "receipt_sha256": receipt_hash,
+        "resulting_state": "awaiting_implementer_acceptance",
+        "registry_revision": 2,
+        "receipt_envelope": evidence_envelope(
+            (
+                "usecases/UC-STRICT-001/00_role_evidence/receipts/"
+                f"000002-designer-handoff-{receipt_hash}.json"
+            ),
+            receipt,
+        ),
+        "chain_envelope": evidence_envelope(
+            "usecases/UC-STRICT-001/00_role_evidence/chain.json",
+            chain,
+        ),
+    }
+
+
 class FakeMemoryState:
     def __init__(self) -> None:
         self.records: dict[str, dict[str, object]] = {}
         self.calls: list[tuple[str, str]] = []
+        self.request_bodies: list[tuple[str, str, dict[str, object]]] = []
         self.post_success_false = False
         self.put_success_false = False
         self.omit_post_id = False
+        self.post_id_override: str | None = None
+        self.store_under_post_id_override = False
         self.http_failure: dict[str, int] = {}
         self.delay_get_seconds = 0.0
         self.lock = threading.Lock()
@@ -136,6 +216,14 @@ class FakeMemoryHandler(BaseHTTPRequestHandler):
             return path, False
         return path, True
 
+    def _record_body(
+        self, method: str, path: str, payload: dict[str, object]
+    ) -> None:
+        with self.state.lock:
+            self.state.request_bodies.append(
+                (method, path, copy.deepcopy(payload))
+            )
+
     def do_GET(self) -> None:  # noqa: N802
         path, proceed = self._begin("GET")
         if not proceed:
@@ -165,22 +253,28 @@ class FakeMemoryHandler(BaseHTTPRequestHandler):
             self._send(404, {"detail": "not found"})
             return
         payload = self._body()
+        self._record_body("POST", path, payload)
         if self.state.post_success_false:
             self._send(200, {"success": False, "message": "injected store failure"})
             return
         content = str(payload.get("content") or "")
         exact_id = sha256(content.encode("utf-8"))
+        stored_id = (
+            self.state.post_id_override
+            if self.state.store_under_post_id_override and self.state.post_id_override
+            else exact_id
+        )
         with self.state.lock:
-            if exact_id not in self.state.records:
-                self.state.records[exact_id] = {
+            if stored_id not in self.state.records:
+                self.state.records[stored_id] = {
                     "content": content,
-                    "content_hash": exact_id,
+                    "content_hash": stored_id,
                     "tags": copy.deepcopy(payload.get("tags") or []),
                     "memory_type": payload.get("memory_type"),
                     "metadata": copy.deepcopy(payload.get("metadata") or {}),
                     "created_at_iso": "2026-07-20T00:00:00Z",
                 }
-            record = copy.deepcopy(self.state.records[exact_id])
+            record = copy.deepcopy(self.state.records[stored_id])
         if self.state.omit_post_id:
             self._send(200, {"success": True, "message": "stored but ID omitted"})
             return
@@ -189,8 +283,11 @@ class FakeMemoryHandler(BaseHTTPRequestHandler):
             {
                 "success": True,
                 "message": "stored",
-                "content_hash": exact_id,
-                "memory": record,
+                "content_hash": self.state.post_id_override or exact_id,
+                "memory": {
+                    **record,
+                    "content_hash": self.state.post_id_override or exact_id,
+                },
             },
         )
 
@@ -204,6 +301,7 @@ class FakeMemoryHandler(BaseHTTPRequestHandler):
             return
         exact_id = unquote(path[len(prefix) :])
         payload = self._body()
+        self._record_body("PUT", path, payload)
         if self.state.put_success_false:
             self._send(
                 200,
@@ -243,6 +341,37 @@ class FakeMemoryServer(ThreadingHTTPServer):
 
 
 @contextmanager
+def isolated_memory_env(url: str):
+    keys = (
+        "MEMORY_BUS_URL",
+        "MEMORY_BUS_PROJECT_TAG",
+        "MCP_MEMORY_BASE_DIR",
+        "BUGATE_MEMORY_HOME",
+        "MCP_API_KEY_AGENT",
+        "MCP_API_KEY_HUMAN",
+        "MCP_API_KEY",
+    )
+    old = {key: os.environ.get(key) for key in keys}
+    with TemporaryDirectory(prefix="bugate-strict-memory-home-") as tmp:
+        memory_home = Path(tmp) / "memory-home"
+        memory_home.mkdir(mode=0o700)
+        os.environ["MEMORY_BUS_URL"] = url
+        os.environ["MEMORY_BUS_PROJECT_TAG"] = "project:strict-fixture"
+        os.environ["MCP_MEMORY_BASE_DIR"] = str(memory_home)
+        os.environ["BUGATE_MEMORY_HOME"] = str(memory_home)
+        for key in ("MCP_API_KEY_AGENT", "MCP_API_KEY_HUMAN", "MCP_API_KEY"):
+            os.environ.pop(key, None)
+        try:
+            yield memory_home
+        finally:
+            for key, value in old.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+
+@contextmanager
 def fake_memory_service():
     state = FakeMemoryState()
     server = FakeMemoryServer(state)
@@ -250,25 +379,15 @@ def fake_memory_service():
         target=lambda: server.serve_forever(poll_interval=0.01), daemon=True
     )
     thread.start()
-    old = {
-        key: os.environ.get(key)
-        for key in ("MEMORY_BUS_URL", "MEMORY_BUS_PROJECT_TAG", "MCP_API_KEY_AGENT")
-    }
-    os.environ["MEMORY_BUS_URL"] = f"http://127.0.0.1:{server.server_port}"
-    os.environ["MEMORY_BUS_PROJECT_TAG"] = "project:strict-fixture"
-    mb._PREPARED_ROLE_TRANSITIONS.clear()
-    try:
-        yield state
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
+    with isolated_memory_env(f"http://127.0.0.1:{server.server_port}"):
         mb._PREPARED_ROLE_TRANSITIONS.clear()
-        for key, value in old.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
+        try:
+            yield state
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+            mb._PREPARED_ROLE_TRANSITIONS.clear()
 
 
 @contextmanager
@@ -277,21 +396,8 @@ def unavailable_service():
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()
-    old_url = os.environ.get("MEMORY_BUS_URL")
-    old_namespace = os.environ.get("MEMORY_BUS_PROJECT_TAG")
-    os.environ["MEMORY_BUS_URL"] = f"http://127.0.0.1:{port}"
-    os.environ["MEMORY_BUS_PROJECT_TAG"] = "project:strict-fixture"
-    try:
+    with isolated_memory_env(f"http://127.0.0.1:{port}"):
         yield
-    finally:
-        if old_url is None:
-            os.environ.pop("MEMORY_BUS_URL", None)
-        else:
-            os.environ["MEMORY_BUS_URL"] = old_url
-        if old_namespace is None:
-            os.environ.pop("MEMORY_BUS_PROJECT_TAG", None)
-        else:
-            os.environ["MEMORY_BUS_PROJECT_TAG"] = old_namespace
 
 
 class StrictMemoryHandoffTests(unittest.TestCase):
@@ -306,6 +412,320 @@ class StrictMemoryHandoffTests(unittest.TestCase):
         )
         self.assertEqual(receipt["receipt_sha256"], finalized["receipt_sha256"])
         return prepared, receipt
+
+    def test_http_404_is_not_found_but_outage_remains_a_bus_error(self):
+        self.assertTrue(issubclass(mb.MemoryHTTPError, mb.MemoryBusError))
+        self.assertTrue(issubclass(mb.MemoryNotFound, mb.MemoryBusError))
+        with fake_memory_service() as state:
+            with self.assertRaises(mb.MemoryNotFound) as missing:
+                mb.get_memory_exact("0" * 64)
+            self.assertEqual(404, missing.exception.status_code)
+
+            state.http_failure["GET"] = 503
+            with self.assertRaises(mb.MemoryHTTPError) as failed:
+                mb.get_memory_exact("1" * 64)
+            self.assertEqual(503, failed.exception.status_code)
+            self.assertNotIsInstance(failed.exception, mb.MemoryNotFound)
+
+        with unavailable_service():
+            with self.assertRaises(mb.MemoryBusError) as unavailable:
+                mb.get_memory_exact("2" * 64, timeout=0.05)
+            self.assertNotIsInstance(unavailable.exception, mb.MemoryHTTPError)
+            self.assertNotIsInstance(unavailable.exception, mb.MemoryNotFound)
+
+    def test_lineage_root_is_deterministic_idempotent_and_never_uses_put(self):
+        with fake_memory_service() as state:
+            key = lineage_key()
+            expected_lineage_id = sha256(canonical(key))
+            expected_payload = {
+                "schema": mb.ROLE_LINEAGE_ROOT_SCHEMA,
+                "lineage_key": key,
+                "lineage_id": expected_lineage_id,
+            }
+            expected_content = canonical(expected_payload).decode("utf-8")
+            expected_root_id = sha256(expected_content.encode("utf-8"))
+
+            self.assertIsNone(mb.probe_role_lineage_root(key))
+            first = mb.ensure_role_lineage_root(key)
+            probed = mb.probe_role_lineage_root(key)
+            second = mb.ensure_role_lineage_root(key)
+
+            self.assertEqual(expected_lineage_id, first["lineage_id"])
+            self.assertEqual(expected_root_id, first["lineage_root_id"])
+            self.assertEqual(expected_payload, first["payload"])
+            self.assertEqual(first, probed)
+            self.assertEqual(first, second)
+            self.assertEqual(1, len(state.records))
+            self.assertEqual(expected_content, state.records[expected_root_id]["content"])
+            self.assertEqual(
+                expected_root_id,
+                state.records[expected_root_id]["content_hash"],
+            )
+            self.assertEqual(0, sum(method == "PUT" for method, _ in state.calls))
+            post_bodies = [
+                body
+                for method, path, body in state.request_bodies
+                if method == "POST" and path == "/api/memories"
+            ]
+            self.assertEqual(2, len(post_bodies))
+            self.assertTrue(all(body["content"] == expected_content for body in post_bodies))
+            for body in post_bodies:
+                tags = [str(tag) for tag in body["tags"]]
+                self.assertFalse(any("UC-STRICT" in tag for tag in tags))
+                self.assertFalse(any(expected_lineage_id in tag for tag in tags))
+                self.assertFalse(any("usecases/" in tag for tag in tags))
+
+    def test_lineage_root_rejects_wrong_hash_payload_and_outage(self):
+        with fake_memory_service() as state:
+            key = lineage_key()
+            state.post_id_override = "f" * 64
+            with self.assertRaisesRegex(mb.MemoryBusError, "content hash|identity"):
+                mb.ensure_role_lineage_root(key)
+
+        with fake_memory_service() as state:
+            key = lineage_key()
+            root = mb.ensure_role_lineage_root(key)
+            exact_id = str(root["lineage_root_id"])
+            state.records[exact_id]["content"] = canonical(
+                {**root["payload"], "lineage_id": "e" * 64}
+            ).decode("utf-8")
+            with self.assertRaisesRegex(mb.MemoryBusError, "content|payload|lineage"):
+                mb.probe_role_lineage_root(key)
+
+        with unavailable_service():
+            with self.assertRaises(mb.MemoryBusError):
+                mb.probe_role_lineage_root(lineage_key())
+
+    def test_lineage_identity_rejects_absolute_path_like_namespace_and_uc(self):
+        invalid = (
+            ("/private/project", "UC-1"),
+            ("project:/private/project", "UC-1"),
+            (r"C:\private\project", "UC-1"),
+            ("project:strict-fixture /private/project", "UC-1"),
+            (r"project:C:\private\project", "UC-1"),
+            ("file:///private/project", "UC-1"),
+            ("project:file:///private/project", "UC-1"),
+            ("project:strict-fixture", "/private/UC-1"),
+            ("project:strict-fixture", "C:/private/UC-1"),
+            ("project:strict-fixture", "UC scope /private/UC-1"),
+            ("project:strict-fixture", "FILE:///private/UC-1"),
+        )
+        with fake_memory_service() as state:
+            for namespace, uc in invalid:
+                with self.subTest(namespace=namespace, uc=uc):
+                    key = lineage_key()
+                    key["namespace"] = namespace
+                    key["uc"] = uc
+                    calls_before = list(state.calls)
+                    with self.assertRaisesRegex(mb.MemoryBusError, "absolute path"):
+                        mb.ensure_role_lineage_root(key)
+                    self.assertEqual(calls_before, state.calls)
+
+            for artifact_dir in (
+                "C:/private/usecase",
+                "C:\\private\\usecase",
+                "file:/private/usecase",
+                "file:///private/usecase",
+            ):
+                with self.subTest(artifact_dir=artifact_dir):
+                    key = lineage_key()
+                    key["artifact_dir"] = artifact_dir
+                    calls_before = list(state.calls)
+                    with self.assertRaisesRegex(
+                        mb.MemoryBusError, "workspace-relative|POSIX"
+                    ):
+                        mb.ensure_role_lineage_root(key)
+                    self.assertEqual(calls_before, state.calls)
+
+    def test_checkpoint_schema_rejects_extension_fields_before_http(self):
+        with fake_memory_service() as state:
+            key = lineage_key()
+            root = mb.ensure_role_lineage_root(key)
+            payload = checkpoint_payload(
+                key=key,
+                root_id=str(root["lineage_root_id"]),
+            )
+            payload["unexpected"] = {"sut_specific": "must-not-be-accepted"}
+            calls_before = list(state.calls)
+            with self.assertRaisesRegex(mb.MemoryBusError, "unexpected"):
+                mb.create_role_lineage_checkpoint(payload)
+            self.assertEqual(calls_before, state.calls)
+
+    def test_checkpoint_sequence_requires_exact_predecessor_shape_before_http(self):
+        with fake_memory_service() as state:
+            key = lineage_key()
+            root = mb.ensure_role_lineage_root(key)
+            payload = checkpoint_payload(
+                key=key,
+                root_id=str(root["lineage_root_id"]),
+            )
+            calls_before = list(state.calls)
+
+            first_with_predecessor = copy.deepcopy(payload)
+            first_with_predecessor["sequence"] = 1
+            first_receipt = first_with_predecessor["receipt_envelope"]["parsed"]
+            first_receipt["sequence"] = 1
+            first_with_predecessor["receipt_envelope"] = evidence_envelope(
+                str(payload["receipt_envelope"]["path"]), first_receipt
+            )
+            first_chain = first_with_predecessor["chain_envelope"]["parsed"]
+            first_chain["sequence"] = 1
+            first_with_predecessor["chain_envelope"] = evidence_envelope(
+                str(payload["chain_envelope"]["path"]), first_chain
+            )
+            with self.assertRaisesRegex(mb.MemoryBusError, "first checkpoint"):
+                mb.create_role_lineage_checkpoint(first_with_predecessor)
+
+            later_without_predecessor = copy.deepcopy(payload)
+            later_without_predecessor["previous_checkpoint_id"] = ""
+            later_without_predecessor["previous_receipt_sha256"] = ""
+            later_receipt = later_without_predecessor["receipt_envelope"]["parsed"]
+            later_receipt["previous_receipt_sha256"] = ""
+            later_without_predecessor["receipt_envelope"] = evidence_envelope(
+                str(payload["receipt_envelope"]["path"]), later_receipt
+            )
+            with self.assertRaisesRegex(mb.MemoryBusError, "non-root checkpoint"):
+                mb.create_role_lineage_checkpoint(later_without_predecessor)
+
+            self.assertEqual(calls_before, state.calls)
+
+    def test_checkpoint_receipt_envelope_binds_exact_lineage_identity(self):
+        with fake_memory_service() as state:
+            key = lineage_key()
+            root = mb.ensure_role_lineage_root(key)
+            payload = checkpoint_payload(
+                key=key,
+                root_id=str(root["lineage_root_id"]),
+            )
+            wrong = copy.deepcopy(payload)
+            receipt = wrong["receipt_envelope"]["parsed"]
+            receipt["uc"] = "UC-DIFFERENT"
+            wrong["receipt_envelope"] = evidence_envelope(
+                str(payload["receipt_envelope"]["path"]), receipt
+            )
+            calls_before = list(state.calls)
+            with self.assertRaisesRegex(
+                mb.MemoryBusError, "receipt envelope mismatch for uc"
+            ):
+                mb.create_role_lineage_checkpoint(wrong)
+
+            wrong_receipt_schema = copy.deepcopy(payload)
+            receipt = wrong_receipt_schema["receipt_envelope"]["parsed"]
+            receipt["schema"] = "not.role-evidence/v1"
+            wrong_receipt_schema["receipt_envelope"] = evidence_envelope(
+                str(payload["receipt_envelope"]["path"]), receipt
+            )
+            with self.assertRaisesRegex(mb.MemoryBusError, "receipt.*schema"):
+                mb.create_role_lineage_checkpoint(wrong_receipt_schema)
+
+            wrong_chain_schema = copy.deepcopy(payload)
+            chain = wrong_chain_schema["chain_envelope"]["parsed"]
+            chain["schema"] = "not.role-chain/v1"
+            wrong_chain_schema["chain_envelope"] = evidence_envelope(
+                str(payload["chain_envelope"]["path"]), chain
+            )
+            with self.assertRaisesRegex(mb.MemoryBusError, "chain.*schema"):
+                mb.create_role_lineage_checkpoint(wrong_chain_schema)
+
+            for envelope_name in ("receipt_envelope", "chain_envelope"):
+                with self.subTest(envelope=envelope_name):
+                    outside = copy.deepcopy(payload)
+                    outside[envelope_name]["path"] = (
+                        "elsewhere/receipts/outside.json"
+                        if envelope_name == "receipt_envelope"
+                        else "elsewhere/chain.json"
+                    )
+                    with self.assertRaisesRegex(
+                        mb.MemoryBusError, "artifact directory|evidence path"
+                    ):
+                        mb.create_role_lineage_checkpoint(outside)
+            self.assertEqual(calls_before, state.calls)
+
+    def test_immutable_checkpoint_roundtrip_and_never_uses_put(self):
+        with fake_memory_service() as state:
+            key = lineage_key()
+            root = mb.ensure_role_lineage_root(key)
+            payload = checkpoint_payload(
+                key=key,
+                root_id=str(root["lineage_root_id"]),
+            )
+            before = len(state.calls)
+            created = mb.create_role_lineage_checkpoint(payload)
+            checkpoint_id = str(created["checkpoint_id"])
+            fetched = mb.get_role_lineage_checkpoint(checkpoint_id)
+            verified = mb.verify_role_lineage_checkpoint(
+                state.records[checkpoint_id],
+                payload,
+                exact_id=checkpoint_id,
+            )
+
+            self.assertEqual(payload, created["payload"])
+            self.assertEqual(created, fetched)
+            self.assertEqual(created, verified)
+            self.assertEqual(
+                sha256(canonical(payload)),
+                checkpoint_id,
+            )
+            self.assertEqual(
+                [("POST", "/api/memories"), ("GET", f"/api/memories/{checkpoint_id}")],
+                state.calls[before:before + 2],
+            )
+            self.assertEqual(0, sum(method == "PUT" for method, _ in state.calls))
+            checkpoint_posts = [
+                body
+                for method, path, body in state.request_bodies
+                if method == "POST"
+                and path == "/api/memories"
+                and body.get("metadata", {}).get("schema")
+                == mb.MEMORY_LINEAGE_CHECKPOINT_SCHEMA
+            ]
+            self.assertEqual(1, len(checkpoint_posts))
+            self.assertEqual(
+                canonical(payload).decode("utf-8"),
+                checkpoint_posts[0]["content"],
+            )
+            tags = [str(tag) for tag in checkpoint_posts[0]["tags"]]
+            self.assertFalse(any("UC-STRICT" in tag for tag in tags))
+            self.assertFalse(any(str(payload["receipt_sha256"]) in tag for tag in tags))
+            self.assertFalse(any("usecases/" in tag for tag in tags))
+
+    def test_checkpoint_rejects_wrong_hash_payload_404_and_outage(self):
+        with fake_memory_service() as state:
+            key = lineage_key()
+            root = mb.ensure_role_lineage_root(key)
+            payload = checkpoint_payload(
+                key=key,
+                root_id=str(root["lineage_root_id"]),
+            )
+            broken = copy.deepcopy(payload)
+            broken["receipt_envelope"]["bytes_sha256"] = "0" * 64
+            posts_before = sum(method == "POST" for method, _ in state.calls)
+            with self.assertRaisesRegex(mb.MemoryBusError, "bytes_sha256"):
+                mb.create_role_lineage_checkpoint(broken)
+            self.assertEqual(
+                posts_before,
+                sum(method == "POST" for method, _ in state.calls),
+            )
+
+            state.post_id_override = "f" * 64
+            with self.assertRaisesRegex(mb.MemoryBusError, "content hash|identity"):
+                mb.create_role_lineage_checkpoint(payload)
+            state.post_id_override = None
+
+            created = mb.create_role_lineage_checkpoint(payload)
+            checkpoint_id = str(created["checkpoint_id"])
+            state.records[checkpoint_id]["content"] = canonical(
+                {**payload, "registry_revision": 999}
+            ).decode("utf-8")
+            with self.assertRaisesRegex(mb.MemoryBusError, "content|hash|payload"):
+                mb.get_role_lineage_checkpoint(checkpoint_id)
+
+            with self.assertRaises(mb.MemoryNotFound):
+                mb.get_role_lineage_checkpoint("0" * 64)
+
+        with unavailable_service():
+            with self.assertRaises(mb.MemoryBusError):
+                mb.get_role_lineage_checkpoint("1" * 64)
 
     def test_required_happy_path_put_preserves_metadata_and_exact_verifies(self):
         with fake_memory_service() as state:
@@ -443,6 +863,30 @@ class StrictMemoryHandoffTests(unittest.TestCase):
             with self.assertRaises(mb.MemoryBusError):
                 mb.get_memory_exact(str(prepared["memory_id"]), timeout=0.02)
 
+    def test_transition_rejects_non_content_address_even_when_post_and_get_collude(self):
+        with fake_memory_service() as state:
+            payload = transition()
+            expected_content = mb._role_memory_content(
+                "project:strict-fixture", payload
+            )
+            expected_id = sha256(expected_content.encode("utf-8"))
+            arbitrary_id = "f" * 64
+            self.assertNotEqual(expected_id, arbitrary_id)
+            state.post_id_override = arbitrary_id
+            state.store_under_post_id_override = True
+
+            with self.assertRaisesRegex(
+                mb.MemoryBusError, "content hash|content address|identity"
+            ):
+                mb.prepare_role_transition(payload, strict=True)
+
+            self.assertEqual(expected_content, state.records[arbitrary_id]["content"])
+            self.assertEqual(arbitrary_id, state.records[arbitrary_id]["content_hash"])
+            self.assertEqual(
+                [("POST", "/api/memories")],
+                state.calls,
+            )
+
     def test_unavailable_strict_fails_but_ordinary_commands_remain_best_effort(self):
         with unavailable_service():
             with self.assertRaises(mb.MemoryBusError):
@@ -531,10 +975,10 @@ class StrictMemoryHandoffTests(unittest.TestCase):
         with TemporaryDirectory(prefix="bugate-role-memory-integration-") as tmp:
             root = Path(tmp)
             os.environ["BUGATE_PROJECT_ROOT"] = str(root)
-            fixture = Fixture(root, memory_mode="required")
             rg.verify_precode_semantics = lambda ctx: None
             try:
                 with fake_memory_service() as state:
+                    fixture = Fixture(root, memory_mode="required")
                     with role_env("designer", "designer-session"):
                         rg.approve(fixture.artifact, approved_by="qa-owner")
                         before = rg.load_chain(rg.load_context(fixture.artifact))["sequence"]
@@ -551,10 +995,39 @@ class StrictMemoryHandoffTests(unittest.TestCase):
                         chain = rg.load_chain(rg.load_context(fixture.artifact))
                         self.assertEqual(before, chain["sequence"])
                         self.assertNotIn("designer_handoff", chain["latest_receipts"])
-                        handoff = rg.handoff(
+                        pending = rg.status_data(fixture.artifact)
+                        self.assertEqual("recovery_pending", pending["integrity_state"])
+                        recovered = rg.recover(
                             fixture.artifact,
-                            phase="pre_code",
-                            to_role="implementer",
+                            lineage_id=pending["lineage_id"],
+                            expected_head=pending["registry_head_sha256"],
+                        )
+                        receipts = rg.verify_chain(rg.load_context(fixture.artifact))
+                        self.assertEqual(
+                            [
+                                "human_acceptance",
+                                "designer_handoff",
+                                "evidence_recovery",
+                            ],
+                            [receipt["event"] for receipt in receipts],
+                        )
+                        handoff = receipts[1]
+                        recovery_receipt = recovered["recovery_receipt"]
+                        self.assertEqual(
+                            "awaiting_implementer_acceptance",
+                            recovery_receipt["resulting_state"],
+                        )
+                        self.assertEqual(
+                            handoff["receipt_sha256"],
+                            recovery_receipt["previous_receipt_sha256"],
+                        )
+                        after_recovery = rg.status_data(fixture.artifact)
+                        self.assertTrue(after_recovery["ok"], after_recovery)
+                        self.assertEqual("aligned", after_recovery["integrity_state"])
+                        self.assertEqual(3, after_recovery["registry_sequence"])
+                        self.assertEqual(
+                            recovery_receipt["receipt_sha256"],
+                            after_recovery["registry_head_sha256"],
                         )
                     with role_env("implementer", "implementer-session"):
                         accepted = rg.accept(

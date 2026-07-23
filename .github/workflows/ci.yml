@@ -5,7 +5,7 @@ on:
   pull_request:
 
 env:
-  BUGATE_RELEASE_VERSION: "0.4.2"
+  BUGATE_RELEASE_VERSION: "0.4.3"
 
 jobs:
   gate:

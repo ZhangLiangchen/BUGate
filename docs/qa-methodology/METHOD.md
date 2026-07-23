@@ -3,7 +3,7 @@ title: "零领域知识 QA 的 AI 辅助自动化测试方法论"
 subtitle: "业务理解审计与缺陷发现的双层流程"
 version: 1.1
 date: 2026-05-11
-last_updated: 2026-07-20
+last_updated: 2026-07-23
 applicability: SUT-无关（适用于满足最小输入条件的任意被测系统）
 companion: SOP.md
 changelog:
@@ -21,6 +21,10 @@ changelog:
   2026-07-20 (additive, 对齐 BUGate v0.4.0):
     - Wave 7 从可选路径隔离升级为 designer / implementer / reviewer 可审计生命周期，并明确区分 Wave 1 peer review
     - 新增 strict Memory 锚定、hash-linked receipt、独立 session、drift 重新上锁与安全边界
+  2026-07-23 (additive, 对齐 BUGate v0.4.3):
+    - 为 Wave 7 增加确定性 lineage identity、machine registry 与独立 integrity state
+    - 把真实首次使用、legacy adoption、registered-history recovery 分为显式 operator 决策
+    - 明确 required/best-effort durability、updater ownership 与本地威胁边界
 ---
 
 # 零领域知识 QA 的 AI 辅助自动化测试方法论
@@ -452,6 +456,18 @@ designer pre-code --auto
 
 每个 UC 的 `00_role_evidence/` 保存 append-only receipt 与最小 `chain.json`。Receipt 链接前序 hash，并快照 profile、pre-code 工件、实现文件与 post-run 证据。角色转换边界通过 Memory Service 的 exact content hash 严格验证；每次普通编辑只在本地验 receipt/hash，不请求 Memory Service。Profile、pre-code 工件或实现文件发生 drift 后会自动重新上锁，必须追加新 generation，禁止删除 evidence 来 reset。
 
+BUGate v0.4.3 进一步修复“删除证据即可重新变成新 UC”的完整性缺口。每个受治理 UC 的 lineage identity 只由 effective Memory namespace、resolved UC token 与 canonical workspace-relative artifact path 构成，并以 canonical JSON 的 SHA-256 得到 `lineage_id`。独立于 workspace 的 machine registry 位于 effective Memory home 下的 `role-lineage.sqlite3`，记录已接受的 head、sequence、lifecycle state、revision、Memory mode、strict root/checkpoint 与唯一 active transaction。它使“本地目录为空”不再等价于“从未存在过历史”。
+
+Lineage integrity 与 lifecycle state 是两个正交维度。`uninitialized`、`aligned`、`migration_required`、`history_missing`、`history_diverged`、`recovery_pending`、`registry_unavailable` 描述历史是否可信；`awaiting_human_acceptance`、`implementation_unlocked`、`post_run_active`、`closed` 等仍描述业务生命周期。只有 `aligned` 才能发布普通 lifecycle event。一个 integrity failure 不能被解释成 phase reset，也不能靠删目录降级成 `uninitialized`。
+
+首次使用、历史迁移和恢复必须由 operator 显式区分：真实新 UC 先运行 `lineage-status --json`，确认 exact ID 后执行 `lineage-init`；已有非空且完整验证的 pre-v0.4.3 chain 使用 `lineage-adopt --expected-head <exact-head>`，且重写 receipt 数为零；已经注册但本地缺失、分歧或存在未完成 transaction 时，使用 `recover --expected-head <head-or-EMPTY>`。`EMPTY` 只表示 sequence-zero 的 expected head，不是抹除既有历史的指令。
+
+首次初始化本身也是 intent-first、crash-recoverable saga，而不是 registry 建立前的无日志窗口。它按 `pending` → `root_absence_verified` → `root_verified` → `registry_initialized` → `chain_written` → `completed` 推进；required 与 best-effort 都使用同一 journal，后者明确绑定 no-remote-root 边界。Intent 建立后中断会显示 `recovery_pending` + `active_initialization`，必须用相同 exact ID 重跑 `lineage-init` 继续，而不是运行 `recover`。只有初始 probe 发现已有 strict root 时，才 abort 尚未创建 root/lineage 的 intent 并改报 `migration_required`。Recovery 在 validation/write preflight 后先 claim active source，或创建并 claim pending `recovery_restore`，随后才恢复 committed predecessor。对于 active lifecycle transaction，它再从原 stage（包括 checkpoint 已验证、可 CAS 的阶段）完成**同一笔**原 publication；registry 在同一个 SQLite transaction 中 terminalize claimed source（restore 为 `aborted`、lifecycle 为 `completed`）并安装唯一 canonical-bound、pending 的 `evidence_recovery` successor，因此不会出现 `aligned` 但没有 recovery audit 的 crash gap。若 active source 已是 `evidence_recovery`，retry 直接继续同一 transaction，不得安装第二个 successor 或制造重复的 N+1 lifecycle/recovery receipt。
+
+`memory_mode: required` 为确定性 root 与每个正 sequence 建立 immutable checkpoint，可在 registry 与 Memory history 尚存时重建本地证据。显式提供 trusted archive 只选择候选 bytes；retained strict checkpoint 仍必须可用且保持权威，每个 archive envelope 都要在任何写入前与其精确一致，因此 archive 不是 strict Memory 不可用或分歧时的离线回退。`best_effort` 仍使用 registry 做删除检测与 publication CAS，但本地历史丢失后必须提供独立保留、可信的 recovery archive。Best-effort lifecycle publication 仍可能尝试 transition Memory call，只是容忍失败且不创建 remote root/checkpoint。普通 `status`、hook 与 per-edit preflight 始终只查本地 registry/chain，Memory HTTP 请求数为零；只有显式 operator 命令和 lifecycle transition 才可能访问 Memory。
+
+这些机制是 tamper/drift detection，不是身份认证。Hook 无法拦截任意 shell/editor 删除；同一 OS user 同时删除 workspace evidence、machine registry 与整个 Memory home 超出本地威胁边界。Imported updater 也只更新 engine projection：它不编辑 profile/namespace/evidence/registry/Memory，不执行 init/adopt/recover；updater 成功不等于任何 UC 已接受 lineage migration。
+
 Wave 7 还保留一个独立的路径策略 `agent_roles`：
 
 | 机制 | 解决什么 | 配置 |
@@ -693,14 +709,14 @@ imported-sut-test-repo/
     └── scripts/                       # 方法论示意工具（如确定性合并）；核心未发布同名脚本
 ```
 
-### 10.2 Wave 7 角色治理与路径隔离（已发布机制）
+### 10.2 Wave 7 角色治理、lineage 与路径隔离
 
 Core 默认 `role_governance.mode: off`，因此不挂 SUT profile 的自开发不会被锁死。Imported repo 显式选择 `required` 后，由两类 hook 共同执行：
 
 - `check_bugate.py` 证明 pre-code 工件已过门；
 - `check_role_evidence.py` 证明当前 phase 角色/session 和本地 receipt 链有效。
 
-Layer 4 只在 designer handoff 已被不同 session 的 implementer 接受后解锁；04/05 只在 implementer handoff 已被 reviewer 接受后开放。`check_role_evidence.py` 对每次受治理编辑只做本地 hash/chain/drift 验证，strict Memory 请求只发生在 `approve` / `handoff` / `accept` / `complete` 转换边界。对 `00_role_evidence/**` 的直接 agent-tool 编辑一律拒绝。
+Layer 4 只在 designer handoff 已被不同 session 的 implementer 接受后解锁；04/05 只在 implementer handoff 已被 reviewer 接受后开放。`check_role_evidence.py` 对每次受治理编辑只做本地 registry/hash/chain/drift 验证，不发 Memory HTTP 请求。Strict Memory 请求发生在 `approve` / `handoff` / `accept` / `complete` 转换边界，以及显式的 `lineage-status`（仅 required + local `uninitialized` 时探测 root）、`lineage-init`、`lineage-adopt`、`recover` 操作。对 `00_role_evidence/**` 的直接 agent-tool 编辑一律拒绝。
 
 `scripts/check_agent_role_paths.py` 仍是独立的**路径访问策略**：当前角色来自 `BUGATE_AGENT_ROLE`，禁读/禁写正则由 active profile 的 `agent_roles` 提供，Core 不内置 SUT 路径。Claude 保持两组 matcher：`Edit|Write` 调用写门，`Read|Edit|Write` 单独调用路径隔离；Codex `apply_patch` 上的四个 guard 都必须通过。
 
@@ -729,13 +745,15 @@ agent_roles:
 1. 接入 BUGate 引擎（导入模式：通过 `scripts/bugate_init.py <sut-repo>`、plugin 或 vendor / 子模块进入 SUT 测试仓）。真实 SUT 的工作区根 = 自 CWD 向上最近的 `bugate.config.yaml`；BUGate core 本身保持纯净，只运行模板门、临时构造 fixture 与 installer 对外部/scratch 仓的验收。
 2. 写一个 SUT profile（键契约见 `references/profile-schema.md`；`scripts/bugate_init.py` 会为导入仓脚手架同形状文件），设置 `artifact_dir`/`artifact_dir_template`、`guarded_path_regex`、Memory namespace，并显式选择 `role_governance.mode`。`agent_roles` 只在需要路径隔离时配置。
 3. 启用 required 治理时，分别通过 `bin/bugate-role run --role designer|implementer|reviewer -- <agent-command>` 启动三个独立会话。Hook 子进程无法把环境变量 export 回父进程；Desktop 必须从带角色环境的进程启动或重开会话。
-4. 先单独运行 `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init`（复杂用例加 `--full-sdtd` 一并生成 01a/01b/02a），再单独运行 `... <artifact_dir> --auto`。`--init --auto` 不是合法的日常入口。
-5. 逐层跑门：`check_bugate_brief_semantics.py` / `check_bugate_layer2_semantics.py` / `check_bugate_inventory_semantics.py`，再 `check_bugate_v13_semantics.py <artifact_dir> --scope pre-code`。
-6. 需要双 agent 互审时跑 `sdtd_multiview_cli_bridge.py` / `sdtd_adversarial_cli_bridge.py`。Peer 子进程会清除父会话的角色/session/receipt 身份，不会被当成 Wave 7 actor。
-7. 03B 经真实人工接受后，designer 使用 `bugate-role approve` 记录决定，再 handoff；implementer 和 reviewer 各自在新 session 用 exact Memory ID accept。已记录 human-acceptance receipt 后不要重跑会重生成 03B 的 `--auto`。
-8. reviewer acceptance 后跑 `self_healing_mvp.py` + `generate_sdtd_reports.py` 或 orchestrator post-run 产出 04/05，最后用 `bugate-role complete` 记录命令、exit code 与 evidence hash。
-9. 保持 runtime hook 表面一致：`check_bugate.py` 和 `check_role_evidence.py` 共同保护写入，`check_agent_role_paths.py` 单独保护路径读写。Codex hook hash 变化后必须 re-trust，未 re-trust 时不得声称 Wave 7 已激活。
-10. （可选）把 §1–§9 的 9-Wave 方法论工作产物放在 `.ai/` 下作为分析中间件，最终收敛到 01–05 gate 产物栈。
+4. 先单独运行 `python3 scripts/sdtd_orchestrator.py <artifact_dir> --init`（复杂用例加 `--full-sdtd` 一并生成 01a/01b/02a）。启用 required 治理的真实新 UC 随后必须运行 `bin/bugate-role lineage-status <artifact_dir> --json`；确认它确实是 `uninitialized` 并复制 exact `lineage_id` 后，显式运行 `lineage-init`。首次 init 前 `lineage-status` 非零是预期，不得因此跳过判断。
+5. 若该 UC 已有非空 pre-v0.4.3 chain，禁止 `lineage-init`；在完整验证后用 exact head 执行 `lineage-adopt`。若 JSON 显示 `recovery_pending` + `active_initialization`，用相同 exact ID 重跑 `lineage-init`；若 registry 已存在但历史缺失/分歧，或显示 active publication/recovery transaction，则按 registry expected head 执行 `recover`。只有 integrity 为 `aligned` 后才继续普通 lifecycle publication。
+6. 再单独运行 `python3 scripts/sdtd_orchestrator.py <artifact_dir> --auto`；`--init --auto` 不是合法的日常入口。
+7. 逐层跑门：`check_bugate_brief_semantics.py` / `check_bugate_layer2_semantics.py` / `check_bugate_inventory_semantics.py`，再 `check_bugate_v13_semantics.py <artifact_dir> --scope pre-code`。
+8. 需要双 agent 互审时跑 `sdtd_multiview_cli_bridge.py` / `sdtd_adversarial_cli_bridge.py`。Peer 子进程会清除父会话的角色/session/receipt 身份，不会被当成 Wave 7 actor。
+9. 03B 经真实人工接受后，designer 使用 `bugate-role approve` 记录决定，再 handoff；implementer 和 reviewer 各自在新 session 用 exact Memory ID accept。已记录 human-acceptance receipt 后不要重跑会重生成 03B 的 `--auto`。
+10. reviewer acceptance 后跑 `self_healing_mvp.py` + `generate_sdtd_reports.py` 或 orchestrator post-run 产出 04/05，最后用 `bugate-role complete` 记录命令、exit code 与 evidence hash。
+11. 保持 runtime hook 表面一致：`check_bugate.py` 和 `check_role_evidence.py` 共同保护写入，`check_agent_role_paths.py` 单独保护路径读写。Codex hook hash 变化后必须 re-trust，未 re-trust 时不得声称 Wave 7 已激活。
+12. （可选）把 §1–§9 的 9-Wave 方法论工作产物放在 `.ai/` 下作为分析中间件，最终收敛到 01–05 gate 产物栈。
 
 ---
 

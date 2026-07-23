@@ -67,6 +67,16 @@ SECRET_PATTERNS = (
     re.compile(br"gh[pousr]_[A-Za-z0-9]{20,}"),
     re.compile(br"sk-[A-Za-z0-9]{20,}"),
 )
+EXPECTED_STRICT_MEMORY_ROUTE = (
+    ("human_acceptance", "pre_code"),
+    ("evidence_recovery", "pre_code"),
+    ("designer_handoff", "pre_code"),
+    ("implementer_acceptance", "implementation"),
+    ("implementer_handoff", "implementation"),
+    ("reviewer_acceptance", "post_run"),
+    ("reviewer_completion", "post_run"),
+)
+EXPECTED_STRICT_MEMORY_EVENTS = tuple(item[0] for item in EXPECTED_STRICT_MEMORY_ROUTE)
 
 
 class AcceptanceError(RuntimeError):
@@ -80,6 +90,86 @@ class ArgumentError(AcceptanceError):
 class JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         raise ArgumentError(message)
+
+
+def _validate_strict_transition_records(
+    records: Iterable[Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
+    """Bind archive smoke to the exact recovery-augmented strict role chain."""
+
+    indexed: list[tuple[int, Mapping[str, Any]]] = []
+    for record in records:
+        metadata = record.get("metadata")
+        transition = (
+            metadata.get("role_transition")
+            if isinstance(metadata, Mapping)
+            else None
+        )
+        if isinstance(transition, Mapping):
+            lineage = transition.get("lineage")
+            sequence = lineage.get("expected_sequence") if isinstance(lineage, Mapping) else None
+            if type(sequence) is not int:
+                raise AcceptanceError(
+                    "imported smoke strict Memory expected sequence is invalid"
+                )
+            indexed.append((sequence, transition))
+
+    indexed.sort(key=lambda item: item[0])
+    if [item[0] for item in indexed] != list(range(len(EXPECTED_STRICT_MEMORY_ROUTE))):
+        raise AcceptanceError(
+            "imported smoke strict Memory transition sequence set mismatch"
+        )
+    transitions = [item[1] for item in indexed]
+
+    route = tuple((item.get("event"), item.get("phase")) for item in transitions)
+    if route != EXPECTED_STRICT_MEMORY_ROUTE:
+        raise AcceptanceError(
+            "imported smoke strict Memory transition event/phase route mismatch"
+        )
+
+    lineage_id = ""
+    transition_hashes: set[str] = set()
+    for sequence, transition in enumerate(transitions):
+        if transition.get("schema") != "bugate.role-transition/v1":
+            raise AcceptanceError("imported smoke strict Memory transition schema mismatch")
+        lineage = transition.get("lineage")
+        if not isinstance(lineage, Mapping) or (
+            lineage.get("schema") != "bugate.role-lineage-precondition/v1"
+        ):
+            raise AcceptanceError("imported smoke strict Memory lineage precondition is missing")
+        current_lineage_id = lineage.get("lineage_id")
+        if not isinstance(current_lineage_id, str) or (
+            HEX_DIGEST.fullmatch(current_lineage_id) is None
+        ):
+            raise AcceptanceError("imported smoke strict Memory lineage ID is invalid")
+        if not lineage_id:
+            lineage_id = current_lineage_id
+        elif current_lineage_id != lineage_id:
+            raise AcceptanceError("imported smoke strict Memory transitions diverged by lineage ID")
+        if type(lineage.get("expected_revision")) is not int or (
+            lineage.get("expected_revision") != sequence
+        ):
+            raise AcceptanceError(
+                "imported smoke strict Memory sequence/revision precondition mismatch"
+            )
+        previous_head = transition.get("previous_receipt_sha256")
+        expected_head = lineage.get("expected_head_sha256")
+        if not isinstance(previous_head, str) or not isinstance(expected_head, str):
+            raise AcceptanceError("imported smoke strict Memory expected head is invalid")
+        if expected_head != previous_head:
+            raise AcceptanceError("imported smoke strict Memory expected head mismatch")
+        if (sequence == 0 and previous_head) or (
+            sequence > 0 and HEX_DIGEST.fullmatch(previous_head) is None
+        ):
+            raise AcceptanceError("imported smoke strict Memory predecessor head is invalid")
+        transition_hash = transition.get("transition_sha256")
+        if not isinstance(transition_hash, str) or (
+            HEX_DIGEST.fullmatch(transition_hash) is None
+            or transition_hash in transition_hashes
+        ):
+            raise AcceptanceError("imported smoke strict Memory transition hash is invalid")
+        transition_hashes.add(transition_hash)
+    return transitions
 
 
 def _sha256(path: Path) -> str:
@@ -969,6 +1059,7 @@ def _run_imported_full_check(
     required = [
         "| Imported installed-state verification | PASS |",
         "Strict Memory exact-ID verification and closed chain | PASS",
+        "receipt_count=7; exact_anchors=7",
         "Result: PASS",
     ]
     if mode == "full":
@@ -990,23 +1081,15 @@ def _run_imported_full_check(
         with server.state.lock:
             records = copy.deepcopy(server.state.records)
             calls = list(server.state.calls)
-        transitions = [
-            value
-            for value in records.values()
-            if isinstance(value.get("metadata"), dict)
-            and isinstance(value["metadata"].get("role_transition"), dict)
-        ]
-        if len(transitions) != 6:
-            raise AcceptanceError(
-                "imported smoke did not close six strict Memory transitions"
-            )
+        transitions = _validate_strict_transition_records(records.values())
         memory_call_count: int | None = len(calls)
         transition_evidence = "synthetic_memory_server_records"
     else:
         # The real Memory service is intentionally not enumerated or copied
         # into this release report.  The full-check PASS row above is the
-        # evidence that its exact-ID six-receipt flow closed successfully.
-        transitions = [None] * 6
+        # evidence that its exact-ID recovery-augmented seven-receipt flow
+        # closed successfully.
+        transitions = [None] * len(EXPECTED_STRICT_MEMORY_EVENTS)
         memory_call_count = None
         transition_evidence = "real_full_check_pass_row"
     return {
@@ -1015,6 +1098,7 @@ def _run_imported_full_check(
         "runtime": "real_codex_claude_memory" if mode == "full" else "synthetic_ci_runtime",
         "exit_code": completed.returncode,
         "strict_memory_transition_count": len(transitions),
+        "strict_memory_transition_events": list(EXPECTED_STRICT_MEMORY_EVENTS),
         "memory_call_count": memory_call_count,
         "transition_evidence": transition_evidence,
         "result": "PASS",

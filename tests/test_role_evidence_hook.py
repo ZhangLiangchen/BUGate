@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import http.server
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +25,41 @@ from test_role_governance import PRECODE, Fixture, fake_memory, role_env  # noqa
 HOOK = ROOT / "scripts" / "check_role_evidence.py"
 
 
-def run_hook(root: Path, payload: dict, *, role: str = "", session: str = "") -> subprocess.CompletedProcess[str]:
+class _MemoryTrapServer(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, server_address: tuple[str, int]) -> None:
+        super().__init__(server_address, _MemoryTrapHandler)
+        self.calls: list[tuple[str, str, bytes]] = []
+
+
+class _MemoryTrapHandler(http.server.BaseHTTPRequestHandler):
+    def _record(self) -> None:
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length) if length else b""
+        self.server.calls.append((self.command, self.path, body))  # type: ignore[attr-defined]
+        self.send_response(204)
+        self.end_headers()
+
+    do_DELETE = _record
+    do_GET = _record
+    do_HEAD = _record
+    do_PATCH = _record
+    do_POST = _record
+    do_PUT = _record
+
+    def log_message(self, _format: str, *_args: object) -> None:
+        return
+
+
+def run_hook(
+    root: Path,
+    payload: dict,
+    *,
+    role: str = "",
+    session: str = "",
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["BUGATE_PROJECT_ROOT"] = str(root)
     env.pop("BUGATE_PROFILE", None)
@@ -34,6 +71,8 @@ def run_hook(root: Path, payload: dict, *, role: str = "", session: str = "") ->
         env["BUGATE_SESSION_ID"] = session
     else:
         env.pop("BUGATE_SESSION_ID", None)
+    if extra_env:
+        env.update(extra_env)
     return subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps(payload),
@@ -57,21 +96,99 @@ def codex(path: str) -> dict:
 class RoleEvidenceHookTests(unittest.TestCase):
     def setUp(self):
         self.tmp_ctx = tempfile.TemporaryDirectory(prefix="bugate-role-hook-")
+        self.extra_tmp_contexts: list[tempfile.TemporaryDirectory[str]] = []
         self.root = Path(self.tmp_ctx.name)
-        self.fx = Fixture(self.root)
         self.old_project = os.environ.get("BUGATE_PROJECT_ROOT")
         self.old_profile = os.environ.pop("BUGATE_PROFILE", None)
+        self.old_memory_homes = {
+            key: os.environ.get(key)
+            for key in ("MCP_MEMORY_BASE_DIR", "BUGATE_MEMORY_HOME")
+        }
         os.environ["BUGATE_PROJECT_ROOT"] = str(self.root)
+        memory_home = self.root / "memory-home"
+        memory_home.mkdir(mode=0o700)
+        os.environ["MCP_MEMORY_BASE_DIR"] = str(memory_home)
+        os.environ["BUGATE_MEMORY_HOME"] = str(memory_home)
         self.original_prepare = rg._memory_prepare
         self.original_verify = rg._memory_verify
+        self.original_lineage_root = rg._memory_ensure_lineage_root
+        self.original_lineage_probe = rg._memory_probe_lineage_root
+        self.original_checkpoint_create = rg._memory_create_checkpoint
+        self.original_checkpoint_get = rg._memory_get_checkpoint
         self.original_semantics = rg.verify_precode_semantics
+        self.fake_roots: dict[str, dict] = {}
+        self.fake_checkpoints: dict[str, dict] = {}
+
+        def fake_root(_ctx, key):
+            payload = {
+                "schema": "bugate.role-lineage-root/v1",
+                "lineage_key": key.as_dict(),
+                "lineage_id": key.lineage_id,
+            }
+            exact_id = rg.sha256_bytes(rg.canonical_json(payload))
+            value = {
+                "namespace": key.namespace,
+                "lineage_id": key.lineage_id,
+                "lineage_root_id": exact_id,
+                "memory_id": exact_id,
+                "content_sha256": exact_id,
+                "payload": payload,
+                "status": "verified",
+            }
+            self.fake_roots[key.lineage_id] = value
+            return json.loads(json.dumps(value))
+
+        def fake_root_probe(_ctx, key):
+            value = self.fake_roots.get(key.lineage_id)
+            return json.loads(json.dumps(value)) if value is not None else None
+
+        def fake_checkpoint(_ctx, payload):
+            exact_id = rg.sha256_bytes(rg.canonical_json(payload))
+            value = {
+                "namespace": payload["lineage_key"]["namespace"],
+                "lineage_id": payload["lineage_id"],
+                "lineage_root_id": payload["lineage_root_id"],
+                "checkpoint_id": exact_id,
+                "memory_id": exact_id,
+                "content_sha256": exact_id,
+                "sequence": payload["sequence"],
+                "registry_revision": payload["registry_revision"],
+                "resulting_state": payload["resulting_state"],
+                "payload": json.loads(json.dumps(payload)),
+                "status": "verified",
+            }
+            self.fake_checkpoints[exact_id] = value
+            return json.loads(json.dumps(value))
+
         rg._memory_prepare = fake_memory
         rg._memory_verify = lambda ctx, receipt: None
+        rg._memory_ensure_lineage_root = fake_root
+        rg._memory_probe_lineage_root = fake_root_probe
+        rg._memory_create_checkpoint = fake_checkpoint
+        rg._memory_get_checkpoint = lambda _ctx, checkpoint_id: json.loads(
+            json.dumps(self.fake_checkpoints[checkpoint_id])
+        )
         rg.verify_precode_semantics = lambda ctx: None
+        self.fx = Fixture(self.root)
+
+    def use_required_fixture(self) -> None:
+        extra = tempfile.TemporaryDirectory(prefix="bugate-role-hook-required-")
+        self.extra_tmp_contexts.append(extra)
+        self.root = Path(extra.name)
+        memory_home = self.root / "memory-home"
+        memory_home.mkdir(mode=0o700)
+        os.environ["BUGATE_PROJECT_ROOT"] = str(self.root)
+        os.environ["MCP_MEMORY_BASE_DIR"] = str(memory_home)
+        os.environ["BUGATE_MEMORY_HOME"] = str(memory_home)
+        self.fx = Fixture(self.root, memory_mode="required")
 
     def tearDown(self):
         rg._memory_prepare = self.original_prepare
         rg._memory_verify = self.original_verify
+        rg._memory_ensure_lineage_root = self.original_lineage_root
+        rg._memory_probe_lineage_root = self.original_lineage_probe
+        rg._memory_create_checkpoint = self.original_checkpoint_create
+        rg._memory_get_checkpoint = self.original_checkpoint_get
         rg.verify_precode_semantics = self.original_semantics
         if self.old_project is None:
             os.environ.pop("BUGATE_PROJECT_ROOT", None)
@@ -79,8 +196,15 @@ class RoleEvidenceHookTests(unittest.TestCase):
             os.environ["BUGATE_PROJECT_ROOT"] = self.old_project
         if self.old_profile is not None:
             os.environ["BUGATE_PROFILE"] = self.old_profile
+        for key, value in self.old_memory_homes.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         os.environ.pop("BUGATE_AGENT_ROLE", None)
         os.environ.pop("BUGATE_SESSION_ID", None)
+        for extra in reversed(self.extra_tmp_contexts):
+            extra.cleanup()
         self.tmp_ctx.cleanup()
 
     def test_precode_unset_wrong_role_and_both_payload_shapes(self):
@@ -207,7 +331,7 @@ class RoleEvidenceHookTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn(target, result.stderr)
         evidence_dir = self.fx.artifact / "00_role_evidence"
-        evidence_dir.mkdir()
+        evidence_dir.mkdir(exist_ok=True)
         (self.root / "evidence-alias").symlink_to(evidence_dir, target_is_directory=True)
         for payload in (claude("evidence-alias/chain.json"), codex("evidence-alias/chain.json")):
             alias = run_hook(
@@ -254,6 +378,225 @@ class RoleEvidenceHookTests(unittest.TestCase):
         drift = run_hook(self.root, codex(target), role="implementer", session="i-1")
         self.assertEqual(2, drift.returncode)
         self.assertIn("profile hash/path drifted", drift.stderr)
+
+    def test_deleted_valid_lineage_blocks_hook_without_memory_http_or_state_writes(self):
+        target = "tests/test_UC-001.py"
+        with role_env("designer", "d-deletion"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            handoff = rg.handoff(
+                self.fx.artifact,
+                phase="pre_code",
+                to_role="implementer",
+            )
+        with role_env("implementer", "i-deletion"):
+            acceptance = rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=handoff["receipt_sha256"],
+            )
+
+        context = rg.load_context(self.fx.artifact)
+        key = rg._lineage_key(context)
+        registry = rg.lineage_registry.LineageRegistry()
+        record_before = registry.require_lineage(key)
+        chain_path = self.fx.artifact / "00_role_evidence" / "chain.json"
+        chain_before = json.loads(chain_path.read_bytes())
+        self.assertEqual("aligned", rg.status_data(self.fx.artifact)["integrity_state"])
+        self.assertEqual(acceptance["receipt_sha256"], chain_before["head_sha256"])
+        self.assertEqual(chain_before["head_sha256"], record_before.head_sha256)
+        self.assertEqual(chain_before["sequence"], record_before.sequence)
+
+        evidence_dir = chain_path.parent
+        shutil.rmtree(evidence_dir)
+        workspace_after_deletion = {
+            path.relative_to(self.root).as_posix(): path.read_bytes()
+            for path in sorted(self.root.rglob("*"))
+            if path.is_file() and not path.is_symlink()
+        }
+        memory_home = Path(os.environ["BUGATE_MEMORY_HOME"])
+        registry_bytes_after_deletion = {
+            path.relative_to(memory_home).as_posix(): path.read_bytes()
+            for path in sorted(memory_home.rglob("*"))
+            if path.is_file() and not path.is_symlink()
+        }
+
+        server = _MemoryTrapServer(("127.0.0.1", 0))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        memory_url = f"http://127.0.0.1:{server.server_port}"
+        try:
+            with urllib.request.urlopen(f"{memory_url}/trap-armed", timeout=2) as response:
+                self.assertEqual(204, response.status)
+            self.assertEqual([("GET", "/trap-armed", b"")], server.calls)
+            server.calls.clear()
+
+            blocked = run_hook(
+                self.root,
+                codex(target),
+                role="implementer",
+                session="i-deletion",
+                extra_env={
+                    "MEMORY_BUS_URL": memory_url,
+                    "MCP_API_KEY_AGENT": "synthetic-memory-trap-token",
+                },
+            )
+            self.assertEqual(2, blocked.returncode, blocked.stderr)
+            self.assertIn("integrity_state=history_missing", blocked.stderr)
+            self.assertEqual(
+                0,
+                len(server.calls),
+                f"PreToolUse must remain local-only, got {server.calls!r}",
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertFalse(evidence_dir.exists(), "hook must not recreate deleted evidence")
+        workspace_after_hook = {
+            path.relative_to(self.root).as_posix(): path.read_bytes()
+            for path in sorted(self.root.rglob("*"))
+            if path.is_file() and not path.is_symlink()
+        }
+        self.assertEqual(workspace_after_deletion, workspace_after_hook)
+        self.assertEqual(
+            registry_bytes_after_deletion,
+            {
+                path.relative_to(memory_home).as_posix(): path.read_bytes()
+                for path in sorted(memory_home.rglob("*"))
+                if path.is_file() and not path.is_symlink()
+            },
+        )
+        record_after = rg.lineage_registry.LineageRegistry().require_lineage(key)
+        self.assertEqual(record_before, record_after)
+        self.assertEqual(acceptance["receipt_sha256"], record_after.head_sha256)
+
+    def test_exact_checkpoint_drift_blocks_hook_without_memory_http(self):
+        self.use_required_fixture()
+        target = "tests/test_UC-001.py"
+        with role_env("designer", "d-exact-drift"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            handoff = rg.handoff(
+                self.fx.artifact,
+                phase="pre_code",
+                to_role="implementer",
+            )
+        with role_env("implementer", "i-exact-drift"):
+            rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=handoff["memory"]["memory_id"],
+            )
+        context = rg.load_context(self.fx.artifact)
+        key = rg._lineage_key(context)
+        registry = rg.lineage_registry.LineageRegistry()
+        record_before = registry.require_lineage(key)
+        active_before = registry.list_active_transactions(key)
+        evidence = self.fx.artifact / "00_role_evidence"
+        older_receipt = sorted((evidence / "receipts").glob("*.json"))[0]
+        older_receipt.write_text(
+            json.dumps(json.loads(older_receipt.read_bytes()), separators=(",", ":")),
+            encoding="utf-8",
+        )
+        os.chmod(evidence / "chain.json", 0o666)
+        mutated_receipt = older_receipt.read_bytes()
+        mutated_chain_mode = (evidence / "chain.json").stat().st_mode & 0o7777
+
+        server = _MemoryTrapServer(("127.0.0.1", 0))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        memory_url = f"http://127.0.0.1:{server.server_port}"
+        try:
+            blocked = run_hook(
+                self.root,
+                codex(target),
+                role="implementer",
+                session="i-exact-drift",
+                extra_env={
+                    "MEMORY_BUS_URL": memory_url,
+                    "MCP_API_KEY_AGENT": "synthetic-memory-trap-token",
+                },
+            )
+            self.assertEqual(2, blocked.returncode, blocked.stderr)
+            self.assertIn("integrity_state=history_diverged", blocked.stderr)
+            self.assertEqual([], server.calls)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(mutated_receipt, older_receipt.read_bytes())
+        self.assertEqual(
+            mutated_chain_mode,
+            (evidence / "chain.json").stat().st_mode & 0o7777,
+        )
+        self.assertEqual(record_before, registry.require_lineage(key))
+        self.assertEqual(active_before, registry.list_active_transactions(key))
+
+    def test_receipt_directory_symlink_blocks_hook_without_memory_http_or_writes(self):
+        self.use_required_fixture()
+        target = "tests/test_UC-001.py"
+        with role_env("designer", "d-symlink-store"):
+            rg.approve(self.fx.artifact, approved_by="qa-owner")
+            handoff = rg.handoff(
+                self.fx.artifact,
+                phase="pre_code",
+                to_role="implementer",
+            )
+        with role_env("implementer", "i-symlink-store"):
+            rg.accept(
+                self.fx.artifact,
+                phase="implementation",
+                handoff_id=handoff["memory"]["memory_id"],
+            )
+        context = rg.load_context(self.fx.artifact)
+        key = rg._lineage_key(context)
+        registry = rg.lineage_registry.LineageRegistry()
+        record_before = registry.require_lineage(key)
+        active_before = registry.list_active_transactions(key)
+        receipts = self.fx.artifact / "00_role_evidence" / "receipts"
+
+        with tempfile.TemporaryDirectory(prefix="bugate-role-external-receipts-") as outside:
+            external = Path(outside) / "receipts"
+            receipts.rename(external)
+            receipts.symlink_to(external, target_is_directory=True)
+            external_before = {
+                path.name: path.read_bytes()
+                for path in sorted(external.glob("*.json"))
+            }
+            server = _MemoryTrapServer(("127.0.0.1", 0))
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            memory_url = f"http://127.0.0.1:{server.server_port}"
+            try:
+                blocked = run_hook(
+                    self.root,
+                    codex(target),
+                    role="implementer",
+                    session="i-symlink-store",
+                    extra_env={
+                        "MEMORY_BUS_URL": memory_url,
+                        "MCP_API_KEY_AGENT": "synthetic-memory-trap-token",
+                    },
+                )
+                self.assertEqual(2, blocked.returncode, blocked.stderr)
+                self.assertIn("integrity_state=history_diverged", blocked.stderr)
+                self.assertIn("symlink", blocked.stderr)
+                self.assertEqual([], server.calls)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+            self.assertEqual(
+                external_before,
+                {
+                    path.name: path.read_bytes()
+                    for path in sorted(external.glob("*.json"))
+                },
+            )
+            self.assertTrue(receipts.is_symlink())
+            self.assertEqual(record_before, registry.require_lineage(key))
+            self.assertEqual(active_before, registry.list_active_transactions(key))
 
     def test_lexical_phase_symlink_escapes_fail_closed_for_both_hook_shapes(self):
         notes = self.root / "notes.txt"
@@ -1001,6 +1344,11 @@ class RoleEvidenceHookTests(unittest.TestCase):
         shared_log = self.root / "runlogs" / "shared.log"
         shared_log.parent.mkdir()
         shared_log.write_text("shared fixture run\n", encoding="utf-8")
+        second_identity = rg.lineage_identity(second_artifact)
+        rg.lineage_init(
+            second_artifact,
+            lineage_id=second_identity["lineage_id"],
+        )
 
         def reach_reviewer(artifact: Path, implementation: Path, token: str) -> None:
             with role_env("designer", f"d-{token}"):

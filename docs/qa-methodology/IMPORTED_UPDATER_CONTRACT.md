@@ -96,8 +96,9 @@ surface. This includes `bugate.config.yaml`, `bugate.profile.yaml`,
 `docs/usecases/**`, `00_role_evidence/**`, human acceptance artifacts, SUT
 tests/evidence/wrappers/operating rules, `AGENTS.md`, `CLAUDE.md`, SUT-owned
 hooks/skills/agents, non-marked `.gitignore` content, Memory data/namespace,
-or product and environment material. Unrelated dirty files are reported as a
-warning only and are not an update conflict.
+the machine-level `role-lineage.sqlite3` registry, or product and environment
+material. Unrelated dirty files are reported as a warning only and are not an
+update conflict.
 
 Unknown files under a managed directory remain unknown: the updater must not
 recursively remove them. A directory is removed only when it is manifest-owned,
@@ -444,17 +445,37 @@ profile patch. It must not edit a profile during `plan` or `apply`, turn
 `mode: off` into `required`, manufacture human acceptance/handoff/receipt
 evidence, modify `00_role_evidence/**`, or change `memory.namespace`.
 
+The v0.4.3 lineage amendment adds another independent operator
+boundary. The updater may install lineage-capable engine files, but it never
+creates or edits the machine-level lineage registry, never publishes a
+deterministic lineage root/checkpoint, and never runs `bugate-role
+lineage-init`, `lineage-adopt`, or `recover`. A successful engine
+`apply`/`verify` is therefore **not** acceptance of per-UC lineage migration.
+After the engine update is reviewed and committed, the operator must run
+`bugate-role lineage-status <artifact-dir> --json` for each governed UC and
+separately confirm the exact initialization, adoption, or recovery route. The
+updater's profile-compatibility `migration_available`/`migration_required`
+result and `bugate-role`'s history-integrity `migration_required` state are
+different signals and must not be conflated.
+
 An optional profile-migration command defaults to check/plan. A write, if ever
 provided, is a separately named explicit action with its own reviewable diff
 and is not inside an engine transaction. Recommended adoption is therefore two
 separately reversible commits: update the vendor engine while preserving the
 legacy profile, then review and deliberately enable strict role governance.
 
-The updater neither reconstructs, clears, migrates, nor writes Memory Bus data.
+The updater neither reconstructs, clears, migrates, nor writes Memory Bus data
+or lineage registry data.
 It may perform a read-only health check. Memory downtime is reported separately:
 it cannot relabel a successfully persisted engine update as a fully accepted
 strict-role transition. Required Memory transitions fail closed only when the
 operator later activates and verifies that governance.
+
+Updater rollback restores only its manifest-owned engine transaction. It does
+not undo a separately accepted profile change, lineage adoption, registry
+record, Memory root/checkpoint, or lifecycle receipt. Those operations need
+their own compatibility review and recovery record; they must never be hidden
+inside an updater transaction.
 
 ## 9. Archive safety and threat model
 
@@ -496,12 +517,21 @@ recorded commands, exit codes, and test counts:
 4. unit, integration, negative, concurrency, crash-recovery, and failure-
    injection coverage for every transaction stage and ownership boundary.
 
+For a lineage-capable release, ownership-preservation acceptance additionally
+snapshots the effective Memory home and proves that updater plan/apply/verify/
+rollback do not create or change `role-lineage.sqlite3`, lineage roots,
+checkpoints, profiles, namespaces, or role evidence. Installing the command
+surface is not a substitute for separately exercising its SUT-neutral lineage
+init/adopt/recovery contract.
+
 For the updater/archive release gate, "imported smoke/full-check" means running
 the archive-native acceptance with
 `--full-check-mode smoke --full-check-archive both`. This mode is not a shallow
 binary check: it exercises installed-state verification, the strict
-six-transition Memory contract, bootstrap/apply, idempotence, rollback/reapply,
-and the post-check ownership-preservation oracles on both tar and zip. The
+recovery-augmented Memory contract (six normal lifecycle events plus one
+state-preserving `evidence_recovery` receipt, seven exact anchors in the formal
+smoke route), bootstrap/apply, idempotence, rollback/reapply, and the post-check
+ownership-preservation oracles on both tar and zip. The
 separate `--full-check-mode full` audits an operator machine's optional
 heterogeneous Codex+Claude runtime. Its real result must be reported, but one
 provider's account or network outage does not invalidate an otherwise verified

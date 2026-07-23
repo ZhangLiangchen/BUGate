@@ -26,6 +26,7 @@ FAILURES: list[str] = []
 ROLE_FLOW_FILES = (
     "scripts/sdtd_orchestrator.py",
     "scripts/role_governance.py",
+    "scripts/role_lineage.py",
     "scripts/check_role_evidence.py",
     "scripts/check_bugate.py",
     "scripts/memory_bus.py",

@@ -351,6 +351,93 @@ class ReleaseAssetAcceptanceContractTests(unittest.TestCase):
         self.assertEqual(real.full_check_archive, "both")
         self.assertEqual(real.full_check_timeout, 1800)
 
+    def _strict_transition_records(self) -> list[dict[str, object]]:
+        events = (
+            ("human_acceptance", "pre_code"),
+            ("evidence_recovery", "pre_code"),
+            ("designer_handoff", "pre_code"),
+            ("implementer_acceptance", "implementation"),
+            ("implementer_handoff", "implementation"),
+            ("reviewer_acceptance", "post_run"),
+            ("reviewer_completion", "post_run"),
+        )
+        lineage_id = "1" * 64
+        records: list[dict[str, object]] = []
+        for sequence, (event, phase) in enumerate(events):
+            expected_head = "" if sequence == 0 else f"{sequence:x}" * 64
+            records.append(
+                {
+                    "metadata": {
+                        "role_transition": {
+                            "schema": "bugate.role-transition/v1",
+                            "event": event,
+                            "phase": phase,
+                            "previous_receipt_sha256": expected_head,
+                            "transition_sha256": f"{sequence + 8:x}" * 64,
+                            "lineage": {
+                                "schema": "bugate.role-lineage-precondition/v1",
+                                "lineage_id": lineage_id,
+                                "expected_head_sha256": expected_head,
+                                "expected_sequence": sequence,
+                                "expected_revision": sequence,
+                            },
+                        }
+                    }
+                }
+            )
+        return records
+
+    def test_strict_memory_contract_accepts_recovery_augmented_seven_event_chain(self) -> None:
+        transitions = acceptance._validate_strict_transition_records(
+            reversed(self._strict_transition_records())
+        )
+        self.assertEqual(
+            [transition["event"] for transition in transitions],
+            [
+                "human_acceptance",
+                "evidence_recovery",
+                "designer_handoff",
+                "implementer_acceptance",
+                "implementer_handoff",
+                "reviewer_acceptance",
+                "reviewer_completion",
+            ],
+        )
+        self.assertEqual(
+            [transition["lineage"]["expected_sequence"] for transition in transitions],
+            list(range(7)),
+        )
+
+    def test_strict_memory_contract_rejects_missing_reordered_or_diverged_lineage(self) -> None:
+        cases = {
+            "missing": self._strict_transition_records()[:-1],
+            "event_order_diverged": self._strict_transition_records(),
+            "phase_diverged": self._strict_transition_records(),
+            "revision_diverged": self._strict_transition_records(),
+            "head_diverged": self._strict_transition_records(),
+            "lineage_diverged": self._strict_transition_records(),
+        }
+        cases["event_order_diverged"][1]["metadata"]["role_transition"][
+            "event"
+        ] = "designer_handoff"
+        cases["phase_diverged"][2]["metadata"]["role_transition"][
+            "phase"
+        ] = "implementation"
+        cases["revision_diverged"][3]["metadata"]["role_transition"]["lineage"][
+            "expected_revision"
+        ] = 99
+        cases["head_diverged"][4]["metadata"]["role_transition"]["lineage"][
+            "expected_head_sha256"
+        ] = "f" * 64
+        cases["lineage_diverged"][5]["metadata"]["role_transition"]["lineage"][
+            "lineage_id"
+        ] = "2" * 64
+
+        for label, records in cases.items():
+            with self.subTest(label=label):
+                with self.assertRaises(acceptance.AcceptanceError):
+                    acceptance._validate_strict_transition_records(records)
+
 
 if __name__ == "__main__":
     unittest.main()

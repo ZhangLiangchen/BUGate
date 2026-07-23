@@ -44,7 +44,33 @@ Give the agent the requirement evidence and UC name, then follow this chain.
    Required mode initializes pre-code and selected optional modeling artifacts,
    not reviewer-owned 04/05.
 
-2. Run the full pre-code chain, still as designer:
+2. Establish the UC's lineage before any normal lifecycle publication:
+
+   ```bash
+   .bugate/bin/bugate-role lineage-status docs/usecases/<UC> --json
+
+   # Genuine first use only; copy the exact ID from the status output.
+   .bugate/bin/bugate-role lineage-init docs/usecases/<UC> \
+     --lineage-id <exact-lineage-id>
+   ```
+
+   Before the first init, exit 2 with `integrity_state: uninitialized` is the
+   expected read-only result. Confirm that this is truly a new UC; a normal
+   publisher never makes that decision. If a non-empty pre-v0.4.3 chain exists,
+   use exact `lineage-adopt`, not init. If a registered chain is missing,
+   diverged, or has an incomplete transaction, recover it first. The decision
+   table and exact commands are in §4. Continue only at `aligned`.
+
+   Initialization persists its intent before any Memory request and advances
+   `pending` -> `root_absence_verified` -> `root_verified` ->
+   `registry_initialized` -> `chain_written` -> `completed`. If JSON status
+   shows `recovery_pending` with `active_initialization`, rerun the same exact
+   `lineage-init`; it resumes that intent and normal publishers remain blocked.
+   Do not send this state to `recover`. A strict root found during the initial
+   pending probe closes the pre-root/pre-lineage intent and reports
+   `migration_required` instead.
+
+3. Run the full pre-code chain, still as designer:
 
    ```bash
    python3 .bugate/scripts/sdtd_orchestrator.py docs/usecases/<UC> --auto
@@ -55,7 +81,7 @@ Give the agent the requirement evidence and UC name, then follow this chain.
    subprocesses do not inherit the designer's lifecycle identity. Steps stop at
    the first failure; 03B remains `pending` for human review.
 
-3. **Human checkpoint:** a real human reviews the divergence/adversarial
+4. **Human checkpoint:** a real human reviews the divergence/adversarial
    evidence and explicitly sets 03B to `gate_status: passed`. The agent must not
    make or impersonate that decision. The designer records the already-made
    decision and creates the strict Memory handoff:
@@ -70,7 +96,7 @@ Give the agent the requirement evidence and UC name, then follow this chain.
    Do not rerun pre-code `--auto` after this receipt. Use the designer-handoff
    receipt's exact Memory `memory_id` next.
 
-4. In a **new implementer session**, accept and implement Layer 4:
+5. In a **new implementer session**, accept and implement Layer 4:
 
    ```bash
    .bugate/bin/bugate-role accept docs/usecases/<UC> \
@@ -87,7 +113,7 @@ Give the agent the requirement evidence and UC name, then follow this chain.
      --implementation-file <guarded-test-file>
    ```
 
-5. In a **new reviewer session**, accept the second exact Memory ID, run the
+6. In a **new reviewer session**, accept the second exact Memory ID, run the
    tests, and generate 04/05:
 
    ```bash
@@ -118,6 +144,10 @@ Give the agent the requirement evidence and UC name, then follow this chain.
 |---|---|
 | UC artifact status | `python3 .bugate/scripts/sdtd_orchestrator.py docs/usecases/<UC>` |
 | Role-chain status | `.bugate/bin/bugate-role status docs/usecases/<UC> [--json]` |
+| Lineage identity/integrity status | `.bugate/bin/bugate-role lineage-status docs/usecases/<UC> --json` |
+| Confirmed first use | `.bugate/bin/bugate-role lineage-init docs/usecases/<UC> --lineage-id <exact-id>` |
+| Adopt verified legacy chain | `.bugate/bin/bugate-role lineage-adopt docs/usecases/<UC> --lineage-id <exact-id> --expected-head <exact-head>` |
+| Recover registered history | `.bugate/bin/bugate-role recover docs/usecases/<UC> --lineage-id <exact-id> --expected-head <head-or-EMPTY> [--archive <trusted-archive>]` |
 | Local receipt verification | `.bugate/bin/bugate-role verify docs/usecases/<UC> --phase <phase>` |
 | Local + strict Memory verification | `... verify ... --strict-memory` |
 | One-shot capability self-check | `python3 .bugate/.shared/skills/bugate-full-check/scripts/run_full_check.py --mode smoke` |
@@ -127,6 +157,11 @@ The orchestrator prints one lifecycle status: `BLOCKED`,
 `READY_FOR_HUMAN_ACCEPTANCE`, `READY_FOR_DESIGNER_HANDOFF`,
 `IMPLEMENTATION_UNLOCKED`, `READY_FOR_REVIEWER_HANDOFF`, `POST_RUN_ACTIVE`, or
 `CLOSED`. Treat it as state, not permission to skip the next command.
+
+Lineage integrity is a separate axis: `uninitialized`, `aligned`,
+`migration_required`, `history_missing`, `history_diverged`,
+`recovery_pending`, or `registry_unavailable`. Only `aligned` admits a normal
+lifecycle publication; an integrity result never rewinds the lifecycle.
 
 Peer-dispatch knobs (`SDTD_CLI_*`) remain profile/repo-owned. They are preserved
 for peer subprocesses while lifecycle role/session/receipt identity is removed.
@@ -141,20 +176,74 @@ for peer subprocesses while lifecycle role/session/receipt identity is removed.
 ## 4. Migration, drift, and boundaries
 
 - A v0.3.x profile without `role_governance` remains unchanged. Enabling
-  `required` does not grandfather passed UCs: create current human acceptance,
-  handoff, and acceptance receipts.
+  `required` does not grandfather passed UCs. First establish/adopt each UC's
+  lineage; then create current human acceptance, handoff, and acceptance
+  receipts. A successful updater `apply`/`verify` installs engine files only;
+  it never accepts lineage migration or edits the profile, namespace,
+  `00_role_evidence/**`, machine registry, or Memory home.
+
+| Integrity result | Required operator route |
+|---|---|
+| `uninitialized` | Confirm true first use, copy the exact ID, and run `lineage-init`. |
+| `aligned` | Continue the current lifecycle. |
+| `migration_required` with a verified non-empty legacy chain | Run `lineage-adopt` with the exact chain head; it rewrites zero receipts. |
+| `migration_required` with only an existing strict root | Restore trusted pre-loss evidence before adoption/restoration; never initialize over the root. |
+| `recovery_pending` with `active_initialization` | Rerun `lineage-init` with the same exact ID; it resumes the initialization journal. |
+| `history_missing`, `history_diverged`, or `recovery_pending` with an active publication/recovery transaction | Run `recover` with the exact registry head. `EMPTY` means only the sequence-zero expected head. |
+| `registry_unavailable` | Stop writes and repair the registry or explicit root-probe failure before reclassifying. |
+
+```bash
+.bugate/bin/bugate-role lineage-adopt docs/usecases/<UC> \
+  --lineage-id <exact-lineage-id> --expected-head <exact-chain-head>
+
+.bugate/bin/bugate-role recover docs/usecases/<UC> \
+  --lineage-id <exact-lineage-id> --expected-head <exact-head-or-EMPTY> \
+  [--archive <trusted-recovery-archive>]
+```
+
+- Under `memory_mode: required`, deterministic roots and immutable checkpoints
+  are exact-verified and can reconstruct missing local evidence while registry
+  and Memory history survive. An explicitly supplied trusted archive selects
+  candidate bytes, but retained strict checkpoints remain mandatory and
+  authoritative; every archive envelope must exactly match them before any
+  write. It is not an offline fallback for unavailable or divergent strict
+  Memory. Under `best_effort`, the registry still detects
+  deletion and serializes publishers, but lost local history requires an
+  independently retained trusted `bugate.role-recovery-archive/v1` passed with
+  `--archive`. Best-effort lifecycle publication may still attempt transition
+  Memory calls, but it tolerates their failure and creates no root/checkpoint.
+  After validation/preflight, recovery claims the active source or creates and
+  claims a pending `recovery_restore` before target writes. It restores the
+  committed predecessor and resumes an original transaction through its durable
+  stage—including a verified checkpoint ready for CAS. One SQLite transaction
+  then terminalizes that restore/lifecycle source and installs the sole pending
+  `evidence_recovery` successor. There is no aligned/no-audit crash gap; if the
+  active source is already `evidence_recovery`, retry resumes it directly
+  instead of installing another or manufacturing a duplicate receipt. A dead recovery
+  claimant may be taken over only after a liveness check and exact-token CAS.
+  A durable best-effort unanchored marker is preserved without retrying HTTP.
 - Same-role/same-session acceptance, a non-exact Memory ID, missing receipt, or
   direct edits to `00_role_evidence/**` are blocked.
 - Profile/pre-code drift restarts from designer acceptance/handoff;
   implementation drift restarts from implementer handoff/reviewer acceptance.
   Append a superseding generation; never delete evidence to reset.
-- Ordinary edits verify local hashes and do not call Memory. A Memory outage
-  blocks the next transition before a local unlock receipt is published.
+- Ordinary `status`, hooks, and per-edit preflight verify the local registry,
+  receipt chain, and hashes with zero Memory HTTP requests. `lineage-status` is
+  an explicit operator diagnostic and probes the deterministic root only when
+  required Memory plus local state appears `uninitialized`. Required-mode init,
+  adoption, and recovery, plus lifecycle transitions, can also be explicit
+  network boundaries; a strict Memory outage leaves them non-zero without a
+  completed local unlock publication. Once an initialization intent exists,
+  failure is instead visible as `recovery_pending` and exact `lineage-init`
+  resumes it.
 - These controls provide declarations, session separation, hash linkage,
-  Memory anchors, and tamper/drift detection, not non-repudiable identity.
-  Hooks cannot intercept arbitrary shell redirection or external editors;
-  stronger isolation requires OS accounts, containers, managed runners, or
-  role-scoped credentials.
+  registry/Memory anchors, and tamper/drift detection, not non-repudiable
+  identity. Hooks cannot intercept arbitrary shell redirection, recursive
+  deletion, or external editors; stronger isolation requires OS accounts,
+  containers, managed runners, protected backups, or role-scoped credentials.
+  A same-OS-user actor who deletes workspace evidence, the machine registry,
+  and the complete Memory home is outside the local boundary. History lost
+  before deterministic anchoring cannot be inferred from an empty directory.
 
 ## 5. Where the deeper docs live
 
