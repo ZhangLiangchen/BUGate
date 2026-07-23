@@ -180,7 +180,10 @@ class FreshInstallerTests(unittest.TestCase):
             manifest_path.read_bytes(), contract.canonical_json_bytes(manifest)
         )
         self.assertEqual(lock_path.read_bytes(), contract.installed_lock_bytes(lock))
-        contract.validate_current_release_manifest(manifest, expected_version="0.4.2")
+        contract.validate_current_release_manifest(
+            manifest,
+            expected_version=bugate_init._installer_version(),
+        )
         contract.validate_installed_lock(
             lock,
             release_manifest=manifest,

@@ -122,7 +122,7 @@ def build_functional_release(
 
     updater_path = release_root / "scripts/bugate_update.py"
     updater = updater_path.read_text(encoding="utf-8")
-    old_literal = 'UPDATER_VERSION = "0.4.2"'
+    old_literal = 'UPDATER_VERSION = "0.4.3"'
     if updater.count(old_literal) != 1:
         raise AssertionError("temporary release expected one updater version literal")
     updater_path.write_text(
@@ -954,14 +954,27 @@ class RealUpdaterAcceptanceTests(unittest.TestCase):
         with server.state.lock:
             records = copy.deepcopy(server.state.records)
             calls = list(server.state.calls)
-        transition_ids = {
-            identity
+        transitions = {
+            identity: record["metadata"]["role_transition"]
             for identity, record in records.items()
             if isinstance(record.get("metadata"), dict)
             and isinstance(record["metadata"].get("role_transition"), dict)
         }
-        self.assertEqual(len(transition_ids), 6)
-        for identity in sorted(transition_ids):
+        expected_events = [
+            "evidence_recovery",
+            "human_acceptance",
+            "designer_handoff",
+            "implementer_acceptance",
+            "implementer_handoff",
+            "reviewer_acceptance",
+            "reviewer_completion",
+        ]
+        self.assertEqual(len(transitions), 7)
+        self.assertCountEqual(
+            expected_events,
+            [str(transition.get("event") or "") for transition in transitions.values()],
+        )
+        for identity in sorted(transitions):
             trace = [
                 (method, path)
                 for method, path, call_identity in calls

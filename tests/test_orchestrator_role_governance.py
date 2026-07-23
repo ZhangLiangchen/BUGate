@@ -79,6 +79,8 @@ class ImportedFixture:
     def __init__(self, base: Path, *, mode: str | None = "required") -> None:
         self.root = base / "governed-sut-tests"
         self.root.mkdir(parents=True)
+        self.memory_home = base / "memory-home"
+        self.memory_home.mkdir(mode=0o700)
         self.profile = self.root / "bugate.profile.yaml"
         self.artifact = self.root / "usecases" / "UC-ORCH"
         self.implementation = self.root / "tests" / "test_UC-ORCH.py"
@@ -163,6 +165,8 @@ class ImportedFixture:
                 "BUGATE_PROFILE": str(self.profile),
                 "MEMORY_BUS_URL": self.memory_url,
                 "MEMORY_BUS_PROJECT_TAG": "project:orchestrator-fixture",
+                "MCP_MEMORY_BASE_DIR": str(self.memory_home),
+                "BUGATE_MEMORY_HOME": str(self.memory_home),
                 "NO_PROXY": "127.0.0.1,localhost",
                 "no_proxy": "127.0.0.1,localhost",
                 "PYTHONDONTWRITEBYTECODE": "1",
@@ -198,11 +202,35 @@ class ImportedFixture:
         )
 
     def init(self, *, role: str | None, session: str | None) -> subprocess.CompletedProcess[str]:
-        return self.run(
+        initialized = self.run(
             [sys.executable, ORCHESTRATOR, self.artifact, "--init"],
             role=role,
             session=session,
         )
+        if initialized.returncode != 0 or role != "designer":
+            return initialized
+        status = self.run(
+            [sys.executable, ROLE_CLI, "lineage-status", self.artifact, "--json"],
+            role=role,
+            session=session,
+        )
+        try:
+            lineage_id = str(json.loads(status.stdout)["lineage_id"])
+        except (json.JSONDecodeError, KeyError, TypeError):
+            return status
+        established = self.run(
+            [
+                sys.executable,
+                ROLE_CLI,
+                "lineage-init",
+                self.artifact,
+                "--lineage-id",
+                lineage_id,
+            ],
+            role=role,
+            session=session,
+        )
+        return initialized if established.returncode == 0 else established
 
     def write_accepted_precode(self) -> None:
         """Replace init templates with a small, semantically accepted UC stack."""
@@ -484,7 +512,9 @@ class OrchestratorRoleGovernanceTests(unittest.TestCase):
         )
         self.assert_blocked(no_human)
         self.assertIn("required human acceptance receipt is missing", no_human.stderr)
-        self.assertFalse((fixture.artifact / "00_role_evidence").exists())
+        evidence_dir = fixture.artifact / "00_role_evidence"
+        self.assertTrue((evidence_dir / "chain.json").is_file())
+        self.assertEqual([], list((evidence_dir / "receipts").glob("*.json")))
 
         human = self.role_receipt(
             fixture,

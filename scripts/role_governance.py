@@ -11,6 +11,8 @@ local receipt is published when the strict backend is unavailable.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import copy
 import hashlib
 import json
@@ -44,11 +46,14 @@ from bugate_core import (  # noqa: E402
     read_text,
     required_precode_artifacts,
 )
+import role_lineage as lineage_registry  # noqa: E402
 
 
 ROLE_SCHEMA = "bugate.role-evidence/v1"
 CHAIN_SCHEMA = "bugate.role-chain/v1"
 TRANSITION_SCHEMA = "bugate.role-transition/v1"
+LINEAGE_PRECONDITION_SCHEMA = "bugate.role-lineage-precondition/v1"
+RECOVERY_ARCHIVE_SCHEMA = "bugate.role-recovery-archive/v1"
 PHASES = ("pre_code", "implementation", "post_run")
 BUGATE_ROLES = {"builder", "designer", "implementer", "reviewer", "human", "agent"}
 LIFECYCLE_ROLES = {"designer", "implementer", "reviewer"}
@@ -79,6 +84,7 @@ EVENT_STATES = {
     "reviewer_acceptance": "post_run_active",
     "reviewer_completion": "closed",
 }
+RECOVERY_EVENT = "evidence_recovery"
 INITIAL_STATE = "awaiting_human_acceptance"
 POSTRUN_NAMES = {"04_execution_report.md", "05_knowledge_update.md"}
 PRECODE_PREFIX_RE = re.compile(r"^(?:01|02|03)(?:[ab])?[_-]", re.I)
@@ -94,6 +100,10 @@ class RoleGovernanceError(RuntimeError):
 
 class RoleConfigError(RoleGovernanceError):
     """The role_governance contract is malformed."""
+
+
+class _MemoryCheckpointNotFound(RoleGovernanceError):
+    """Typed exact-checkpoint absence; outages and auth failures never use it."""
 
 
 @dataclass(frozen=True)
@@ -122,6 +132,24 @@ class GovernanceResult:
     state: str
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class LineageIntegrity:
+    """Local/registry alignment, deliberately separate from lifecycle state."""
+
+    integrity_state: str
+    lifecycle_state: str
+    lineage_key: lineage_registry.LineageKey
+    lineage_id: str
+    registry: lineage_registry.LineageRegistry | None
+    record: lineage_registry.LineageRecord | None
+    active_transaction: lineage_registry.TransactionRecord | None
+    chain: dict[str, Any] | None
+    receipts: tuple[dict[str, Any], ...]
+    local_error: str = ""
+    registry_error: str = ""
+    active_initialization: lineage_registry.InitializationRecord | None = None
 
 
 def utc_now() -> str:
@@ -766,9 +794,197 @@ def _receipt_dir(ctx: GovernanceContext) -> Path:
     return ctx.evidence_dir / "receipts"
 
 
-def _atomic_json(path: Path, data: dict[str, Any], *, replace: bool) -> None:
+def _local_evidence_structure_error(ctx: GovernanceContext) -> str:
+    """Reject local evidence aliases before any JSON read follows them."""
+
+    artifact = ctx.artifact_dir
+    evidence = ctx.evidence_dir
+    try:
+        relative = evidence.relative_to(artifact)
+    except ValueError:
+        return "role evidence path is outside the governed artifact directory"
+    if not relative.parts:
+        return "role evidence path must be below the governed artifact directory"
+
+    artifact_real = artifact.resolve()
+
+    def containment_error(path: Path, label: str) -> str:
+        try:
+            Path(os.path.realpath(path)).relative_to(artifact_real)
+        except (OSError, ValueError):
+            return f"role evidence {label} realpath escapes the artifact directory"
+        return ""
+
+    current = artifact
+    for part in relative.parts:
+        current = current / part
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            return ""
+        except OSError as exc:
+            return f"cannot lstat role evidence directory: {exc}"
+        if stat.S_ISLNK(info.st_mode):
+            return "role evidence directory must not be a symlink"
+        if not stat.S_ISDIR(info.st_mode):
+            return "role evidence path must be a directory"
+        escaped = containment_error(current, "directory")
+        if escaped:
+            return escaped
+
+    chain_path = _chain_path(ctx)
+    try:
+        chain_info = chain_path.lstat()
+    except FileNotFoundError:
+        chain_info = None
+    except OSError as exc:
+        return f"cannot lstat role evidence chain: {exc}"
+    if chain_info is not None:
+        if stat.S_ISLNK(chain_info.st_mode):
+            return "role evidence chain.json must not be a symlink"
+        if not stat.S_ISREG(chain_info.st_mode):
+            return "role evidence chain.json must be a regular file"
+        escaped = containment_error(chain_path, "chain.json")
+        if escaped:
+            return escaped
+
+    receipt_dir = _receipt_dir(ctx)
+    try:
+        receipt_dir_info = receipt_dir.lstat()
+    except FileNotFoundError:
+        return ""
+    except OSError as exc:
+        return f"cannot lstat role receipt directory: {exc}"
+    if stat.S_ISLNK(receipt_dir_info.st_mode):
+        return "role receipt directory must not be a symlink"
+    if not stat.S_ISDIR(receipt_dir_info.st_mode):
+        return "role receipt path must be a directory"
+    escaped = containment_error(receipt_dir, "receipt directory")
+    if escaped:
+        return escaped
+    try:
+        with os.scandir(receipt_dir) as entries:
+            for entry in entries:
+                if not entry.name.endswith(".json"):
+                    continue
+                if entry.is_symlink() or not entry.is_file(follow_symlinks=False):
+                    return f"role receipt {entry.name} must be a regular non-symlink file"
+                escaped = containment_error(Path(entry.path), f"receipt {entry.name}")
+                if escaped:
+                    return escaped
+    except OSError as exc:
+        return f"cannot inspect role receipt directory: {exc}"
+    return ""
+
+
+def _required_checkpoint_local_error(
+    ctx: GovernanceContext,
+    record: lineage_registry.LineageRecord,
+    checkpoint_payloads: tuple[bytes, ...],
+    receipt_paths: list[Path],
+) -> str:
+    """Compare every local receipt and current chain to one DB snapshot."""
+
+    chain_path = _chain_path(ctx)
+    if record.sequence == 0:
+        try:
+            info = chain_path.lstat()
+            body = chain_path.read_bytes()
+        except OSError as exc:
+            return f"required sequence-zero chain cannot be verified exactly: {exc}"
+        if body != _json_bytes(_empty_chain()) or stat.S_IMODE(info.st_mode) != 0o600:
+            return "required sequence-zero chain bytes/mode diverge from initialization"
+        return ""
+    if len(checkpoint_payloads) != record.sequence:
+        return "required checkpoint history is absent or incomplete in registry snapshot"
+    if len(receipt_paths) != record.sequence:
+        return "required local receipt history is incomplete"
+
+    checkpoints: list[dict[str, Any]] = []
+    for expected_sequence, payload in enumerate(checkpoint_payloads, 1):
+        try:
+            checkpoint = json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return f"required checkpoint[{expected_sequence}] payload is invalid: {exc}"
+        if not isinstance(checkpoint, dict) or checkpoint.get("sequence") != expected_sequence:
+            return f"required checkpoint[{expected_sequence}] payload is not exact"
+        checkpoints.append(checkpoint)
+
+    comparisons: list[tuple[str, dict[str, Any], Path, str]] = []
+    for expected_sequence, (checkpoint, receipt_path) in enumerate(
+        zip(checkpoints, receipt_paths), 1
+    ):
+        envelope = checkpoint.get("receipt_envelope")
+        if not isinstance(envelope, dict):
+            return f"required checkpoint[{expected_sequence}] receipt envelope is absent"
+        comparisons.append(
+            (
+                f"receipt[{expected_sequence}]",
+                envelope,
+                receipt_path,
+                workspace_rel(receipt_path, ctx.root),
+            )
+        )
+    chain_envelope = checkpoints[-1].get("chain_envelope")
+    if not isinstance(chain_envelope, dict):
+        return "required current checkpoint chain envelope is absent"
+    comparisons.append(
+        ("chain", chain_envelope, chain_path, workspace_rel(chain_path, ctx.root))
+    )
+
+    for label, envelope, actual_path, expected_path in comparisons:
+        if envelope.get("path") != expected_path:
+            return f"local {label} path diverges from retained checkpoint"
+        encoded = envelope.get("bytes_base64")
+        mode = envelope.get("mode")
+        if not isinstance(encoded, str) or isinstance(mode, bool) or not isinstance(mode, int):
+            return f"required checkpoint {label} envelope is malformed"
+        try:
+            expected_body = base64.b64decode(encoded.encode("ascii"), validate=True)
+            info = actual_path.lstat()
+            actual_body = actual_path.read_bytes()
+        except (OSError, UnicodeEncodeError, ValueError, binascii.Error) as exc:
+            return f"local {label} cannot be compared to retained checkpoint: {exc}"
+        if actual_body != expected_body or stat.S_IMODE(info.st_mode) != mode:
+            return f"local {label} bytes/mode diverge from retained checkpoint"
+    return ""
+
+
+def _json_bytes(data: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    ).encode("utf-8")
+
+
+def _fsync_directory(path: Path) -> None:
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        directory_fd = os.open(path, flags)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError:
+        # The durable SQLite journal still makes an interrupted publication
+        # detectable on filesystems that do not implement directory fsync.
+        pass
+
+
+def _atomic_bytes(
+    path: Path,
+    body: bytes,
+    *,
+    replace: bool,
+    mode: int = 0o600,
+) -> None:
+    """Publish bytes atomically; append-only publication never replaces a peer.
+
+    The old existence-check followed by ``os.replace`` had a TOCTOU window in
+    which two writers could both replace the same receipt.  A same-directory
+    hard link gives POSIX no-replace semantics: exactly one link can win.
+    """
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    body = (json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
     if path.exists() and not replace:
         if path.read_bytes() == body:
             return
@@ -776,22 +992,33 @@ def _atomic_json(path: Path, data: dict[str, Any], *, replace: bool) -> None:
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     tmp = Path(tmp_name)
     try:
+        os.fchmod(fd, mode)
         with os.fdopen(fd, "wb") as handle:
             handle.write(body)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp, path)
-        try:
-            dir_fd = os.open(path.parent, os.O_RDONLY)
+        if replace:
+            os.replace(tmp, path)
+        else:
             try:
-                os.fsync(dir_fd)
+                os.link(tmp, path, follow_symlinks=False)
+            except FileExistsError:
+                if path.is_file() and path.read_bytes() == body:
+                    return
+                raise RoleGovernanceError(
+                    f"append-only role receipt already exists: {path}"
+                )
             finally:
-                os.close(dir_fd)
-        except OSError:
-            pass
+                if tmp.exists():
+                    tmp.unlink()
+        _fsync_directory(path.parent)
     finally:
         if tmp.exists():
             tmp.unlink()
+
+
+def _atomic_json(path: Path, data: dict[str, Any], *, replace: bool) -> None:
+    _atomic_bytes(path, _json_bytes(data), replace=replace)
 
 
 def _empty_chain() -> dict[str, Any]:
@@ -814,12 +1041,18 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def load_chain(ctx: GovernanceContext) -> dict[str, Any]:
+def load_chain(
+    ctx: GovernanceContext,
+    *,
+    allow_uninitialized: bool = False,
+) -> dict[str, Any]:
     path = _chain_path(ctx)
     if not path.exists():
         if _receipt_dir(ctx).exists() and any(_receipt_dir(ctx).glob("*.json")):
             raise RoleGovernanceError("role receipts exist without chain.json")
-        return _empty_chain()
+        if allow_uninitialized:
+            return _empty_chain()
+        raise RoleGovernanceError("role evidence chain.json is missing")
     return _read_json(path)
 
 
@@ -831,6 +1064,8 @@ _TRANSITION_OPTIONAL_FIELDS = (
     "accepted_handoff_receipt_sha256",
     "implementation_files",
     "run",
+    "lineage",
+    "recovery",
 )
 
 
@@ -855,6 +1090,311 @@ def _transition_from_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         if key in receipt:
             transition[key] = receipt[key]
     return transition
+
+
+def _validate_lineage_precondition(value: Any, path: Path) -> None:
+    if not isinstance(value, dict):
+        raise RoleGovernanceError(f"invalid lineage precondition in {path.name}")
+    required = {
+        "schema",
+        "lineage_id",
+        "expected_head_sha256",
+        "expected_sequence",
+        "expected_revision",
+        "previous_checkpoint_memory_id",
+        "receipt_created_at",
+    }
+    if set(value) != required or value.get("schema") != LINEAGE_PRECONDITION_SCHEMA:
+        raise RoleGovernanceError(f"invalid lineage precondition schema in {path.name}")
+    lineage_id = str(value.get("lineage_id") or "")
+    if not re.fullmatch(r"[0-9a-f]{64}", lineage_id):
+        raise RoleGovernanceError(f"invalid lineage ID in {path.name}")
+    expected_head = str(value.get("expected_head_sha256") or "")
+    if expected_head and not re.fullmatch(r"[0-9a-f]{64}", expected_head):
+        raise RoleGovernanceError(f"invalid expected lineage head in {path.name}")
+    if (
+        isinstance(value.get("expected_sequence"), bool)
+        or not isinstance(value.get("expected_sequence"), int)
+        or value["expected_sequence"] < 0
+        or isinstance(value.get("expected_revision"), bool)
+        or not isinstance(value.get("expected_revision"), int)
+        or value["expected_revision"] < 0
+    ):
+        raise RoleGovernanceError(f"invalid lineage sequence/revision in {path.name}")
+    checkpoint = str(value.get("previous_checkpoint_memory_id") or "")
+    if checkpoint and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,255}", checkpoint):
+        raise RoleGovernanceError(f"invalid previous checkpoint ID in {path.name}")
+    if not isinstance(value.get("receipt_created_at"), str) or not value["receipt_created_at"]:
+        raise RoleGovernanceError(f"invalid lineage receipt timestamp in {path.name}")
+
+
+def _required_receipt_hash(value: Any, field: str, path: Path) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise RoleGovernanceError(
+            f"{field} requires an exact receipt SHA-256 in {path.name}"
+        )
+    return value
+
+
+def _validate_snapshot_item(
+    value: Any,
+    path: Path,
+    label: str,
+    *,
+    gate: bool | None,
+) -> str:
+    """Validate the immutable shape emitted by ``_snapshot``."""
+
+    allowed_shapes = (
+        ({"path", "sha256"}, {"path", "sha256", "gate_status"})
+        if gate is None
+        else (
+            ({"path", "sha256", "gate_status"},)
+            if gate
+            else ({"path", "sha256"},)
+        )
+    )
+    if not isinstance(value, dict) or set(value) not in allowed_shapes:
+        raise RoleGovernanceError(f"{label} snapshot schema is invalid in {path.name}")
+    item_path = value.get("path")
+    if not isinstance(item_path, str) or not item_path:
+        raise RoleGovernanceError(f"{label} snapshot path is invalid in {path.name}")
+    relative = Path(item_path)
+    if (
+        relative.is_absolute()
+        or relative.as_posix() != item_path
+        or relative.as_posix() in {"", "."}
+        or ".." in relative.parts
+        or "\\" in item_path
+    ):
+        raise RoleGovernanceError(f"{label} snapshot path is unsafe in {path.name}")
+    digest = value.get("sha256")
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise RoleGovernanceError(f"{label} snapshot hash is invalid in {path.name}")
+    if "gate_status" in value:
+        status = value.get("gate_status")
+        if (
+            not isinstance(status, str)
+            or status != status.strip().lower()
+        ):
+            raise RoleGovernanceError(
+                f"{label} snapshot gate_status is invalid in {path.name}"
+            )
+    return item_path
+
+
+def _validate_snapshot_list(
+    value: Any,
+    path: Path,
+    label: str,
+    *,
+    gate: bool | None,
+    nonempty: bool = False,
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or (nonempty and not value):
+        qualifier = " non-empty" if nonempty else ""
+        raise RoleGovernanceError(
+            f"{label} must be a{qualifier} snapshot list in {path.name}"
+        )
+    paths = [
+        _validate_snapshot_item(item, path, label, gate=gate)
+        for item in value
+    ]
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        raise RoleGovernanceError(
+            f"{label} snapshots must have unique path-sorted entries in {path.name}"
+        )
+    return value
+
+
+def _expected_artifact_paths(
+    ctx: GovernanceContext,
+    names: Iterable[str],
+) -> list[str]:
+    return sorted(
+        workspace_rel(ctx.artifact_dir / str(name), ctx.root) for name in names
+    )
+
+
+def _validate_human_acceptance_anchor(value: Any, path: Path) -> None:
+    if not isinstance(value, dict) or set(value) != {
+        "required",
+        "receipt_sha256",
+        "artifact_sha256",
+    }:
+        raise RoleGovernanceError(
+            f"human acceptance reference schema is invalid in {path.name}"
+        )
+    required = value.get("required")
+    receipt_hash = value.get("receipt_sha256")
+    artifact_hash = value.get("artifact_sha256")
+    if not isinstance(required, bool):
+        raise RoleGovernanceError(
+            f"human acceptance reference required flag is invalid in {path.name}"
+        )
+    if required:
+        _required_receipt_hash(receipt_hash, "human acceptance reference", path)
+        _required_receipt_hash(artifact_hash, "human acceptance artifact", path)
+    elif receipt_hash != "" or artifact_hash != "":
+        raise RoleGovernanceError(
+            f"optional human acceptance reference must be empty in {path.name}"
+        )
+
+
+def _validate_event_receipt_contract(
+    receipt: dict[str, Any],
+    path: Path,
+) -> None:
+    """Validate event-owned fields without consulting mutable workspace state."""
+
+    event = str(receipt.get("event") or "")
+    actor = receipt["actor"]
+    canonical_route = {
+        "human_acceptance": ("pre_code", "human", "designer", "designer"),
+        "designer_handoff": ("pre_code", "designer", "implementer", "designer"),
+        "implementer_acceptance": (
+            "implementation",
+            "designer",
+            "implementer",
+            "implementer",
+        ),
+        "implementer_handoff": (
+            "implementation",
+            "implementer",
+            "reviewer",
+            "implementer",
+        ),
+        "reviewer_acceptance": (
+            "post_run",
+            "implementer",
+            "reviewer",
+            "reviewer",
+        ),
+        "reviewer_completion": ("post_run", "reviewer", "", "reviewer"),
+    }
+    if event in canonical_route:
+        phase, from_role, to_role, actor_role = canonical_route[event]
+        if (
+            receipt.get("phase") != phase
+            or receipt.get("from_role") != from_role
+            or receipt.get("to_role") != to_role
+            or actor.get("role") != actor_role
+        ):
+            raise RoleGovernanceError(
+                f"{event} lifecycle route is invalid in {path.name}"
+            )
+
+    if not isinstance(receipt.get("dispatch"), dict):
+        raise RoleGovernanceError(f"receipt dispatch must be an object in {path.name}")
+    if not isinstance(receipt.get("human_acceptance"), dict):
+        raise RoleGovernanceError(
+            f"receipt human_acceptance must be an object in {path.name}"
+        )
+
+    if event == "human_acceptance":
+        approved_by = receipt.get("approved_by")
+        if not isinstance(approved_by, str) or not approved_by.strip():
+            raise RoleGovernanceError(
+                f"human_acceptance requires approved_by in {path.name}"
+            )
+        if receipt.get("decision") != "accepted":
+            raise RoleGovernanceError(
+                f"human_acceptance requires decision=accepted in {path.name}"
+            )
+        if receipt.get("human_acceptance") != {"required": True}:
+            raise RoleGovernanceError(
+                f"human_acceptance event metadata is invalid in {path.name}"
+            )
+        if receipt.get("dispatch") != {}:
+            raise RoleGovernanceError(
+                f"human_acceptance dispatch must be empty in {path.name}"
+            )
+    elif event == "designer_handoff":
+        _validate_human_acceptance_anchor(receipt.get("human_acceptance"), path)
+    elif event in {"implementer_acceptance", "reviewer_acceptance"}:
+        _required_receipt_hash(
+            receipt.get("handoff_receipt_sha256"),
+            f"{event} handoff reference",
+            path,
+        )
+        if not isinstance(receipt.get("handoff_memory_id"), str):
+            raise RoleGovernanceError(
+                f"{event} requires a handoff Memory reference in {path.name}"
+            )
+        _validate_human_acceptance_anchor(receipt.get("human_acceptance"), path)
+    elif event == "implementer_handoff":
+        _required_receipt_hash(
+            receipt.get("accepted_handoff_receipt_sha256"),
+            "implementer_handoff accepted-handoff reference",
+            path,
+        )
+        _validate_snapshot_list(
+            receipt.get("implementation_files"),
+            path,
+            "implementer_handoff implementation",
+            gate=False,
+            nonempty=True,
+        )
+        _validate_human_acceptance_anchor(receipt.get("human_acceptance"), path)
+    elif event == "reviewer_completion":
+        run = receipt.get("run")
+        if not isinstance(run, dict) or set(run) != {
+            "command_summary",
+            "exit_code",
+            "evidence",
+            "gate_status",
+        }:
+            raise RoleGovernanceError(
+                f"reviewer_completion requires a canonical run record in {path.name}"
+            )
+        evidence = run.get("evidence")
+        if (
+            not isinstance(run.get("command_summary"), str)
+            or not run["command_summary"].strip()
+            or isinstance(run.get("exit_code"), bool)
+            or not isinstance(run.get("exit_code"), int)
+            or run.get("gate_status") not in {"passed", "failed"}
+        ):
+            raise RoleGovernanceError(
+                f"reviewer_completion run record values are invalid in {path.name}"
+            )
+        _validate_snapshot_list(
+            evidence,
+            path,
+            "reviewer_completion run evidence",
+            gate=False,
+            nonempty=True,
+        )
+        if receipt.get("dispatch") != {} or receipt.get("human_acceptance") != {}:
+            raise RoleGovernanceError(
+                f"reviewer_completion provenance fields must be empty in {path.name}"
+            )
+        expected_state = (
+            "closed" if run["gate_status"] == "passed" else "post_run_active"
+        )
+        if receipt.get("resulting_state") != expected_state or (
+            run["gate_status"] == "passed" and run["exit_code"] != 0
+        ):
+            raise RoleGovernanceError(
+                f"reviewer_completion run/result lifecycle is invalid in {path.name}"
+            )
+    elif event == RECOVERY_EVENT:
+        if (
+            receipt.get("from_role") != "agent"
+            or receipt.get("to_role") != ""
+            or actor.get("role") != "agent"
+        ):
+            raise RoleGovernanceError(
+                f"evidence_recovery lifecycle route is invalid in {path.name}"
+            )
+        if (
+            receipt.get("artifacts") != []
+            or receipt.get("dispatch") != {}
+            or receipt.get("human_acceptance") != {}
+        ):
+            raise RoleGovernanceError(
+                f"evidence_recovery provenance fields must be empty in {path.name}"
+            )
 
 
 def _validate_receipt_contract(receipt: dict[str, Any], path: Path) -> None:
@@ -885,16 +1425,36 @@ def _validate_receipt_contract(receipt: dict[str, Any], path: Path) -> None:
         raise RoleGovernanceError(
             f"receipt schema fields missing in {path.name}: {', '.join(missing)}"
         )
+    sequence = receipt.get("sequence")
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
+        raise RoleGovernanceError(f"invalid receipt sequence in {path.name}")
+    previous_hash = receipt.get("previous_receipt_sha256")
+    if not isinstance(previous_hash, str) or (
+        previous_hash and not re.fullmatch(r"[0-9a-f]{64}", previous_hash)
+    ):
+        raise RoleGovernanceError(f"invalid previous receipt hash in {path.name}")
+    supplied_hash = receipt.get("receipt_sha256")
+    if not isinstance(supplied_hash, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", supplied_hash
+    ):
+        raise RoleGovernanceError(f"invalid receipt hash in {path.name}")
     event = receipt.get("event")
-    if event not in EVENT_STATES:
+    if event not in EVENT_STATES and event != RECOVERY_EVENT:
         raise RoleGovernanceError(f"unknown role receipt event in {path.name}: {event!r}")
     if receipt.get("phase") not in PHASES:
         raise RoleGovernanceError(f"invalid receipt phase in {path.name}")
     actor = receipt.get("actor")
     if not isinstance(actor, dict) or set(actor) != {"role", "runtime", "session_id"}:
         raise RoleGovernanceError(f"invalid receipt actor schema in {path.name}")
-    if actor.get("role") not in LIFECYCLE_ROLES:
+    allowed_actor_roles = BUGATE_ROLES if event == RECOVERY_EVENT else LIFECYCLE_ROLES
+    if actor.get("role") not in allowed_actor_roles:
         raise RoleGovernanceError(f"invalid lifecycle actor in {path.name}")
+    runtime = actor.get("runtime")
+    session_id = actor.get("session_id")
+    if not isinstance(runtime, str) or runtime not in {"codex", "claude", "unknown"}:
+        raise RoleGovernanceError(f"invalid lifecycle actor runtime in {path.name}")
+    if not isinstance(session_id, str):
+        raise RoleGovernanceError(f"invalid lifecycle actor session in {path.name}")
     profile = receipt.get("profile")
     valid_profile_fields = (
         {"path", "sha256"},
@@ -904,21 +1464,520 @@ def _validate_receipt_contract(receipt: dict[str, Any], path: Path) -> None:
         raise RoleGovernanceError(f"invalid receipt profile schema in {path.name}")
     if not all(isinstance(value, str) and value for value in profile.values()):
         raise RoleGovernanceError(f"invalid receipt profile values in {path.name}")
-    artifacts = receipt.get("artifacts")
-    if not isinstance(artifacts, list) or artifacts != sorted(
-        artifacts, key=lambda item: str(item.get("path") or "") if isinstance(item, dict) else ""
+    profile_path = profile.get("path")
+    profile_digest = profile.get("sha256")
+    if (
+        not isinstance(profile_path, str)
+        or Path(profile_path).is_absolute()
+        or Path(profile_path).as_posix() != profile_path
+        or profile_path in {"", "."}
+        or ".." in Path(profile_path).parts
+        or "\\" in profile_path
+        or not isinstance(profile_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", profile_digest) is None
+        or (
+            "effective_config_sha256" in profile
+            and re.fullmatch(
+                r"[0-9a-f]{64}", profile["effective_config_sha256"]
+            )
+            is None
+        )
     ):
-        raise RoleGovernanceError(f"receipt artifacts must be a path-sorted list: {path.name}")
+        raise RoleGovernanceError(f"invalid receipt profile snapshot in {path.name}")
+    artifacts = receipt.get("artifacts")
+    _validate_snapshot_list(
+        artifacts,
+        path,
+        "receipt artifact",
+        gate=None,
+    )
+    if "lineage" in receipt:
+        _validate_lineage_precondition(receipt["lineage"], path)
+        lineage_value = receipt["lineage"]
+        if (
+            lineage_value["expected_sequence"] != sequence - 1
+            or lineage_value["expected_head_sha256"] != previous_hash
+            or lineage_value["receipt_created_at"] != receipt.get("created_at")
+        ):
+            raise RoleGovernanceError(
+                f"receipt lineage predecessor does not match receipt in {path.name}"
+            )
+    memory_anchor = receipt.get("memory")
+    if not isinstance(memory_anchor, dict):
+        raise RoleGovernanceError(f"invalid receipt Memory anchor in {path.name}")
+    if event == RECOVERY_EVENT:
+        recovery = receipt.get("recovery")
+        if not isinstance(recovery, dict) or set(recovery) != {
+            "source",
+            "recovered_head_sha256",
+            "recovered_sequence",
+            "preserved_lifecycle_state",
+        }:
+            raise RoleGovernanceError(f"invalid recovery receipt schema in {path.name}")
+        recovered_sequence = recovery.get("recovered_sequence")
+        recovered_head = recovery.get("recovered_head_sha256")
+        if (
+            not isinstance(recovery.get("source"), str)
+            or not recovery["source"]
+            or isinstance(recovered_sequence, bool)
+            or not isinstance(recovered_sequence, int)
+            or recovered_sequence < 0
+            or not isinstance(recovered_head, str)
+            or (recovered_sequence == 0 and recovered_head != "")
+            or (
+                recovered_sequence > 0
+                and re.fullmatch(r"[0-9a-f]{64}", recovered_head) is None
+            )
+            or not isinstance(recovery.get("preserved_lifecycle_state"), str)
+            or not recovery["preserved_lifecycle_state"]
+        ):
+            raise RoleGovernanceError(f"invalid recovery receipt values in {path.name}")
+        if receipt.get("resulting_state") != recovery.get("preserved_lifecycle_state"):
+            raise RoleGovernanceError(
+                f"recovery receipt changed lifecycle state in {path.name}"
+            )
+    _validate_event_receipt_contract(receipt, path)
     transition = _transition_from_receipt(receipt)
     transition_hash = sha256_bytes(canonical_json(transition))
     if receipt.get("transition_sha256") != transition_hash:
         raise RoleGovernanceError(f"transition hash mismatch: {path.name}")
     state = receipt.get("resulting_state")
-    allowed_states = {EVENT_STATES[event]}
-    if event == "reviewer_completion":
-        allowed_states.add("post_run_active")
+    if event == RECOVERY_EVENT:
+        allowed_states = {str((receipt.get("recovery") or {}).get("preserved_lifecycle_state") or "")}
+    else:
+        allowed_states = {EVENT_STATES[event]}
+        if event == "reviewer_completion":
+            allowed_states.add("post_run_active")
     if state not in allowed_states:
         raise RoleGovernanceError(f"invalid resulting state for {event}: {state!r}")
+
+
+def _exact_prior_event_receipt(
+    prior_by_hash: dict[str, dict[str, Any]],
+    reference: Any,
+    *,
+    event: str,
+    label: str,
+    path: Path,
+) -> dict[str, Any]:
+    receipt = prior_by_hash.get(str(reference or ""))
+    if receipt is None:
+        raise RoleGovernanceError(
+            f"{label} must reference an earlier exact receipt in {path.name}"
+        )
+    if receipt.get("event") != event:
+        raise RoleGovernanceError(
+            f"{label} references {receipt.get('event')!r}, not {event!r}, in {path.name}"
+        )
+    return receipt
+
+
+def _human_artifact_hash(receipt: dict[str, Any], path: Path) -> str:
+    artifacts = receipt.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise RoleGovernanceError(
+            f"human acceptance reference has no artifact snapshot in {path.name}"
+        )
+    if len(artifacts) == 1:
+        value = artifacts[0]
+        digest = value.get("sha256") if isinstance(value, dict) else None
+        return _required_receipt_hash(digest, "human acceptance artifact", path)
+    return sha256_bytes(canonical_json(artifacts))
+
+
+def _verify_profile_snapshot_path(
+    ctx: GovernanceContext,
+    receipt: dict[str, Any],
+    path: Path,
+) -> None:
+    expected = workspace_rel(ctx.profile_path, ctx.root)
+    if receipt.get("profile", {}).get("path") != expected:
+        raise RoleGovernanceError(
+            f"receipt profile path does not match the active profile in {path.name}"
+        )
+
+
+def _verify_human_acceptance_inventory(
+    ctx: GovernanceContext,
+    receipt: dict[str, Any],
+    path: Path,
+) -> None:
+    expected = _expected_artifact_paths(
+        ctx, ctx.policy["human_acceptance_artifacts"]
+    )
+    artifacts = receipt["artifacts"]
+    actual = [item["path"] for item in artifacts]
+    if actual != expected or any(
+        item.get("gate_status") != "passed" for item in artifacts
+    ):
+        raise RoleGovernanceError(
+            f"human_acceptance artifact inventory must exactly match passed profile provenance in {path.name}"
+        )
+    _verify_profile_snapshot_path(ctx, receipt, path)
+
+
+def _verify_designer_handoff_inventory(
+    ctx: GovernanceContext,
+    receipt: dict[str, Any],
+    path: Path,
+) -> None:
+    artifacts = receipt["artifacts"]
+    by_path = {item["path"]: item for item in artifacts}
+    required_paths = _expected_artifact_paths(
+        ctx, required_precode_artifacts(ctx.config)
+    )
+    if as_bool(ctx.config.get("require_multiview")):
+        required_paths.append(
+            workspace_rel(
+                ctx.artifact_dir / "00_multiview" / "divergence_report.md",
+                ctx.root,
+            )
+        )
+        required_paths.sort()
+    missing = [name for name in required_paths if name not in by_path]
+    not_passed = [
+        name
+        for name in required_paths
+        if name in by_path and by_path[name].get("gate_status") != "passed"
+    ]
+    if missing or not_passed:
+        detail = ", ".join(missing + not_passed)
+        raise RoleGovernanceError(
+            f"designer_handoff requires every configured passed pre-code artifact snapshot in {path.name}: {detail}"
+        )
+
+    dispatch = receipt.get("dispatch")
+    if (
+        not isinstance(dispatch, dict)
+        or set(dispatch) != {"multiview", "adversarial"}
+        or any(value not in DISPATCH_MODES for value in dispatch.values())
+        or (
+            as_bool(ctx.config.get("require_multiview"))
+            and dispatch.get("multiview") == "not_required"
+        )
+        or (
+            "03b_adversarial_cases.yaml"
+            in required_precode_artifacts(ctx.config)
+            and dispatch.get("adversarial") == "not_required"
+        )
+    ):
+        raise RoleGovernanceError(
+            f"designer_handoff dispatch provenance conflicts with the active profile in {path.name}"
+        )
+    _verify_profile_snapshot_path(ctx, receipt, path)
+
+
+def _verify_designer_human_reference(
+    ctx: GovernanceContext,
+    handoff: dict[str, Any],
+    *,
+    prior_by_hash: dict[str, dict[str, Any]],
+    latest_by_event: dict[str, dict[str, Any]],
+    path: Path,
+) -> None:
+    anchor = handoff["human_acceptance"]
+    configured_required = bool(ctx.policy["human_acceptance_artifacts"])
+    if anchor.get("required") != configured_required:
+        raise RoleGovernanceError(
+            f"designer_handoff human acceptance requirement conflicts with the active profile in {path.name}"
+        )
+    if not configured_required:
+        return
+    human = _exact_prior_event_receipt(
+        prior_by_hash,
+        anchor.get("receipt_sha256"),
+        event="human_acceptance",
+        label="designer_handoff human acceptance reference",
+        path=path,
+    )
+    latest_human = latest_by_event.get("human_acceptance")
+    if latest_human is None or latest_human.get("receipt_sha256") != human.get(
+        "receipt_sha256"
+    ):
+        raise RoleGovernanceError(
+            f"designer_handoff must reference the latest prior human acceptance in {path.name}"
+        )
+    if anchor.get("artifact_sha256") != _human_artifact_hash(human, path):
+        raise RoleGovernanceError(
+            f"designer_handoff human artifact reference diverges in {path.name}"
+        )
+    _verify_human_acceptance_inventory(ctx, human, path)
+    if handoff.get("profile") != human.get("profile"):
+        raise RoleGovernanceError(
+            f"designer_handoff profile diverges from human acceptance in {path.name}"
+        )
+
+
+def _verify_reviewer_completion_provenance(
+    ctx: GovernanceContext,
+    receipt: dict[str, Any],
+    acceptance: dict[str, Any],
+    path: Path,
+) -> None:
+    if receipt.get("actor") != acceptance.get("actor"):
+        raise RoleGovernanceError(
+            f"reviewer_completion actor/session diverges from reviewer acceptance in {path.name}"
+        )
+    if receipt.get("profile") != acceptance.get("profile"):
+        raise RoleGovernanceError(
+            f"reviewer_completion profile diverges from reviewer acceptance in {path.name}"
+        )
+    evidence = receipt["run"]["evidence"]
+    artifacts = receipt["artifacts"]
+    by_path = {item["path"]: item for item in artifacts}
+    report_paths = _expected_artifact_paths(ctx, sorted(POSTRUN_NAMES))
+    if any(name not in by_path for name in report_paths):
+        raise RoleGovernanceError(
+            f"reviewer_completion is missing required 04/05 report snapshots in {path.name}"
+        )
+    reports = [by_path[name] for name in report_paths]
+    if any(set(item) != {"path", "sha256", "gate_status"} for item in reports):
+        raise RoleGovernanceError(
+            f"reviewer_completion 04/05 report snapshot schema is invalid in {path.name}"
+        )
+    expected_artifacts = sorted(reports + evidence, key=lambda item: item["path"])
+    if artifacts != expected_artifacts:
+        raise RoleGovernanceError(
+            f"reviewer_completion artifacts must exactly bind 04/05 reports and run evidence in {path.name}"
+        )
+    if receipt["run"]["gate_status"] == "passed" and any(
+        item.get("gate_status") != "passed" for item in reports
+    ):
+        raise RoleGovernanceError(
+            f"closed reviewer_completion requires passed 04/05 reports in {path.name}"
+        )
+
+
+def _require_exact_acceptance_actor(
+    acceptance: dict[str, Any],
+    actor: dict[str, str],
+    *,
+    transition: str,
+) -> None:
+    """Reject role/session/runtime drift before a successor is journaled."""
+
+    if acceptance.get("actor") != actor:
+        raise RoleGovernanceError(
+            f"{transition} actor role/session/runtime must exactly match its acceptance"
+        )
+
+
+def _verify_acceptance_reference(
+    ctx: GovernanceContext,
+    receipt: dict[str, Any],
+    *,
+    expected_event: str,
+    prior_by_hash: dict[str, dict[str, Any]],
+    latest_by_event: dict[str, dict[str, Any]],
+    path: Path,
+) -> dict[str, Any]:
+    event = str(receipt["event"])
+    handoff = _exact_prior_event_receipt(
+        prior_by_hash,
+        receipt.get("handoff_receipt_sha256"),
+        event=expected_event,
+        label=f"{event} handoff reference",
+        path=path,
+    )
+    latest_handoff = latest_by_event.get(expected_event)
+    if latest_handoff is None or latest_handoff.get("receipt_sha256") != handoff.get(
+        "receipt_sha256"
+    ):
+        raise RoleGovernanceError(
+            f"{event} must reference the latest prior {expected_event} in {path.name}"
+        )
+    for field in ("profile", "artifacts", "dispatch", "human_acceptance"):
+        if receipt.get(field) != handoff.get(field):
+            raise RoleGovernanceError(
+                f"{event} {field} diverges from its exact handoff reference in {path.name}"
+            )
+    if (
+        receipt.get("from_role") != handoff.get("from_role")
+        or receipt.get("to_role") != handoff.get("to_role")
+    ):
+        raise RoleGovernanceError(
+            f"{event} role route diverges from its exact handoff reference in {path.name}"
+        )
+    memory = handoff.get("memory")
+    expected_memory_id = (
+        str(memory.get("memory_id") or "") if isinstance(memory, dict) else ""
+    )
+    if receipt.get("handoff_memory_id") != expected_memory_id:
+        raise RoleGovernanceError(
+            f"{event} Memory ID diverges from its exact handoff reference in {path.name}"
+        )
+    if ctx.policy["require_distinct_sessions"] and (
+        receipt.get("actor", {}).get("session_id")
+        == handoff.get("actor", {}).get("session_id")
+    ):
+        raise RoleGovernanceError(
+            f"{event} requires a session distinct from its handoff in {path.name}"
+        )
+    if expected_event == "designer_handoff":
+        _verify_designer_human_reference(
+            ctx,
+            handoff,
+            prior_by_hash=prior_by_hash,
+            latest_by_event=latest_by_event,
+            path=path,
+        )
+    return handoff
+
+
+def _verify_lifecycle_graph_edge(
+    ctx: GovernanceContext,
+    receipt: dict[str, Any],
+    path: Path,
+    *,
+    predecessor_state: str,
+    predecessor_hash: str,
+    prior_by_hash: dict[str, dict[str, Any]],
+    latest_by_event: dict[str, dict[str, Any]],
+) -> str:
+    """Validate one semantic edge over already hash-verified prior receipts."""
+
+    event = str(receipt["event"])
+    resulting_state = str(receipt["resulting_state"])
+    actor = receipt["actor"]
+    actor_session = actor["session_id"]
+    if event != RECOVERY_EVENT and (
+        actor_session != actor_session.strip()
+        or (ctx.policy["session_id_required"] and not actor_session)
+    ):
+        raise RoleGovernanceError(
+            f"{event} requires a canonical non-empty actor session in {path.name}"
+        )
+    if event == "human_acceptance":
+        _verify_human_acceptance_inventory(ctx, receipt, path)
+        return resulting_state
+    if event == "designer_handoff":
+        _verify_designer_handoff_inventory(ctx, receipt, path)
+        _verify_designer_human_reference(
+            ctx,
+            receipt,
+            prior_by_hash=prior_by_hash,
+            latest_by_event=latest_by_event,
+            path=path,
+        )
+        return resulting_state
+    if event == "implementer_acceptance":
+        if predecessor_state != "awaiting_implementer_acceptance":
+            raise RoleGovernanceError(
+                "implementer_acceptance lifecycle predecessor must be "
+                f"awaiting_implementer_acceptance in {path.name}"
+            )
+        _verify_acceptance_reference(
+            ctx,
+            receipt,
+            expected_event="designer_handoff",
+            prior_by_hash=prior_by_hash,
+            latest_by_event=latest_by_event,
+            path=path,
+        )
+        return resulting_state
+    if event == "implementer_handoff":
+        if predecessor_state not in {
+            "implementation_unlocked",
+            "awaiting_reviewer_acceptance",
+            "post_run_active",
+            "closed",
+        }:
+            raise RoleGovernanceError(
+                f"implementer_handoff lifecycle predecessor is invalid in {path.name}"
+            )
+        designer_handoff = _exact_prior_event_receipt(
+            prior_by_hash,
+            receipt.get("accepted_handoff_receipt_sha256"),
+            event="designer_handoff",
+            label="implementer_handoff accepted-handoff reference",
+            path=path,
+        )
+        latest_designer = latest_by_event.get("designer_handoff")
+        acceptance = latest_by_event.get("implementer_acceptance")
+        if (
+            latest_designer is None
+            or latest_designer.get("receipt_sha256")
+            != designer_handoff.get("receipt_sha256")
+            or acceptance is None
+            or acceptance.get("handoff_receipt_sha256")
+            != designer_handoff.get("receipt_sha256")
+        ):
+            raise RoleGovernanceError(
+                f"implementer_handoff requires the latest accepted designer handoff in {path.name}"
+            )
+        _verify_designer_human_reference(
+            ctx,
+            designer_handoff,
+            prior_by_hash=prior_by_hash,
+            latest_by_event=latest_by_event,
+            path=path,
+        )
+        if receipt.get("human_acceptance") != designer_handoff.get(
+            "human_acceptance"
+        ):
+            raise RoleGovernanceError(
+                f"implementer_handoff human reference diverges in {path.name}"
+            )
+        if receipt.get("actor") != acceptance.get("actor"):
+            raise RoleGovernanceError(
+                f"implementer_handoff actor/session diverges from implementer acceptance in {path.name}"
+            )
+        for field in ("profile", "dispatch"):
+            if receipt.get(field) != designer_handoff.get(field):
+                raise RoleGovernanceError(
+                    f"implementer_handoff {field} diverges from accepted designer handoff in {path.name}"
+                )
+        expected_artifacts = sorted(
+            designer_handoff["artifacts"] + receipt["implementation_files"],
+            key=lambda item: item["path"],
+        )
+        if receipt.get("artifacts") != expected_artifacts:
+            raise RoleGovernanceError(
+                f"implementer_handoff artifacts diverge from accepted pre-code plus implementation snapshots in {path.name}"
+            )
+        return resulting_state
+    if event == "reviewer_acceptance":
+        if predecessor_state != "awaiting_reviewer_acceptance":
+            raise RoleGovernanceError(
+                "reviewer_acceptance lifecycle predecessor must be "
+                f"awaiting_reviewer_acceptance in {path.name}"
+            )
+        _verify_acceptance_reference(
+            ctx,
+            receipt,
+            expected_event="implementer_handoff",
+            prior_by_hash=prior_by_hash,
+            latest_by_event=latest_by_event,
+            path=path,
+        )
+        return resulting_state
+    if event == "reviewer_completion":
+        acceptance = latest_by_event.get("reviewer_acceptance")
+        if predecessor_state != "post_run_active" or acceptance is None:
+            raise RoleGovernanceError(
+                f"reviewer_completion requires a prior active reviewer acceptance in {path.name}"
+            )
+        _verify_reviewer_completion_provenance(
+            ctx,
+            receipt,
+            acceptance,
+            path,
+        )
+        return resulting_state
+    if event == RECOVERY_EVENT:
+        recovery = receipt["recovery"]
+        if (
+            recovery.get("recovered_head_sha256") != predecessor_hash
+            or recovery.get("recovered_sequence") != receipt["sequence"] - 1
+            or recovery.get("preserved_lifecycle_state") != predecessor_state
+            or resulting_state != predecessor_state
+            or receipt.get("phase") != _recovery_phase(predecessor_state)
+        ):
+            raise RoleGovernanceError(
+                f"evidence_recovery predecessor reference/lifecycle diverges in {path.name}"
+            )
+        return predecessor_state
+    raise RoleGovernanceError(f"unsupported lifecycle event in {path.name}: {event}")
 
 
 def verify_chain(ctx: GovernanceContext) -> list[dict[str, Any]]:
@@ -941,6 +2000,9 @@ def verify_chain(ctx: GovernanceContext) -> list[dict[str, Any]]:
     receipts: list[dict[str, Any]] = []
     previous = ""
     latest: dict[str, str] = {}
+    prior_by_hash: dict[str, dict[str, Any]] = {}
+    latest_by_event: dict[str, dict[str, Any]] = {}
+    lifecycle_state = INITIAL_STATE
     for expected, path in enumerate(paths, 1):
         receipt = _read_json(path)
         _validate_receipt_contract(receipt, path)
@@ -952,6 +2014,19 @@ def verify_chain(ctx: GovernanceContext) -> list[dict[str, Any]]:
             raise RoleGovernanceError(
                 f"receipt artifact_dir does not match active context: {path.name}"
             )
+        lineage_value = receipt.get("lineage")
+        if isinstance(lineage_value, dict):
+            expected_lineage = lineage_registry.lineage_id(
+                lineage_registry.build_lineage_key(
+                    _memory_namespace(ctx),
+                    ctx.uc,
+                    expected_artifact_dir,
+                )
+            )
+            if lineage_value.get("lineage_id") != expected_lineage:
+                raise RoleGovernanceError(
+                    f"receipt lineage ID does not match active context: {path.name}"
+                )
         if receipt.get("schema") != ROLE_SCHEMA or receipt.get("sequence") != expected:
             raise RoleGovernanceError(f"invalid receipt schema/sequence: {path.name}")
         actual = receipt_sha256(receipt)
@@ -963,21 +2038,188 @@ def verify_chain(ctx: GovernanceContext) -> list[dict[str, Any]]:
         expected_prefix = f"{expected:06d}-{event.replace('_', '-')}-{actual}.json"
         if path.name != expected_prefix:
             raise RoleGovernanceError(f"receipt filename/hash mismatch: {path.name}")
+        lifecycle_state = _verify_lifecycle_graph_edge(
+            ctx,
+            receipt,
+            path,
+            predecessor_state=lifecycle_state,
+            predecessor_hash=previous,
+            prior_by_hash=prior_by_hash,
+            latest_by_event=latest_by_event,
+        )
         latest[event] = workspace_rel(path, ctx.root)
         previous = actual
+        prior_by_hash[actual] = receipt
+        latest_by_event[event] = receipt
         receipts.append(receipt)
     if chain["head_sha256"] != previous:
         raise RoleGovernanceError("chain head hash does not match the latest receipt")
     if chain["latest_receipts"] != latest:
         raise RoleGovernanceError("chain latest_receipts does not match receipt history")
-    expected_state = (
-        str(receipts[-1].get("resulting_state") or EVENT_STATES.get(receipts[-1]["event"], INITIAL_STATE))
-        if receipts
-        else INITIAL_STATE
-    )
-    if chain["state"] != expected_state:
+    if chain["state"] != lifecycle_state:
         raise RoleGovernanceError("chain state does not match the latest transition")
     return receipts
+
+
+def _lineage_key(ctx: GovernanceContext) -> lineage_registry.LineageKey:
+    return lineage_registry.build_lineage_key(
+        _memory_namespace(ctx),
+        ctx.uc,
+        workspace_rel(ctx.artifact_dir, ctx.root),
+    )
+
+
+def lineage_identity(artifact_dir: str | Path) -> dict[str, Any]:
+    """Return the deterministic operator confirmation value without mutation."""
+
+    ctx = load_context(artifact_dir)
+    key = _lineage_key(ctx)
+    return {"lineage_key": key.as_dict(), "lineage_id": key.lineage_id}
+
+
+def _lineage_integrity(ctx: GovernanceContext) -> LineageIntegrity:
+    key = _lineage_key(ctx)
+    chain_path = _chain_path(ctx)
+    structure_error = _local_evidence_structure_error(ctx)
+    receipt_paths = []
+    chain: dict[str, Any] | None = None
+    receipts: tuple[dict[str, Any], ...] = ()
+    local_error = structure_error
+    if not structure_error and _receipt_dir(ctx).exists():
+        receipt_paths = sorted(_receipt_dir(ctx).glob("*.json"))
+    if not structure_error and chain_path.exists():
+        try:
+            verified = verify_chain(ctx)
+            chain = load_chain(ctx)
+            receipts = tuple(verified)
+        except RoleGovernanceError as exc:
+            local_error = str(exc)
+    elif not structure_error and receipt_paths:
+        local_error = "role receipts exist without chain.json"
+
+    has_local_history = bool(receipt_paths) or bool(
+        chain and isinstance(chain.get("sequence"), int) and chain["sequence"] > 0
+    )
+    try:
+        registry = lineage_registry.LineageRegistry()
+    except lineage_registry.RegistryNotFoundError:
+        state = "migration_required" if has_local_history else "uninitialized"
+        lifecycle = str(chain.get("state") or INITIAL_STATE) if chain else INITIAL_STATE
+        return LineageIntegrity(
+            state,
+            lifecycle,
+            key,
+            key.lineage_id,
+            None,
+            None,
+            None,
+            chain,
+            receipts,
+            local_error=local_error,
+        )
+    except lineage_registry.RoleLineageError as exc:
+        lifecycle = str(chain.get("state") or INITIAL_STATE) if chain else INITIAL_STATE
+        return LineageIntegrity(
+            "registry_unavailable",
+            lifecycle,
+            key,
+            key.lineage_id,
+            None,
+            None,
+            None,
+            chain,
+            receipts,
+            local_error=local_error,
+            registry_error=str(exc),
+        )
+
+    try:
+        snapshot = registry.get_integrity_snapshot(key)
+        record = snapshot.record
+        active = snapshot.active_transaction
+        active_initialization = snapshot.active_initialization
+        local_sequence = int(chain["sequence"]) if chain is not None else None
+        local_head = str(chain["head_sha256"]) if chain is not None else None
+        state = lineage_registry.classify_integrity(
+            record,
+            local_sequence=local_sequence,
+            local_head_sha256=local_head,
+            has_local_history=has_local_history,
+            active_transaction=active,
+            active_initialization=active_initialization,
+        )
+        if record is not None and state == "aligned":
+            if chain is None:
+                state = "history_missing"
+            elif chain.get("state") != record.lifecycle_state:
+                state = "history_diverged"
+                local_error = "local lifecycle state does not match lineage registry"
+            elif record.memory_mode != ctx.policy["memory_mode"]:
+                state = "history_diverged"
+                local_error = "profile memory_mode does not match adopted lineage"
+            elif record.memory_mode == "required":
+                exact_error = _required_checkpoint_local_error(
+                    ctx,
+                    record,
+                    snapshot.checkpoint_payloads,
+                    receipt_paths,
+                )
+                if exact_error:
+                    state = "history_diverged"
+                    local_error = exact_error
+        if record is not None and local_error and state != "recovery_pending":
+            missing_tokens = ("missing", "without chain.json", "receipt count")
+            state = (
+                "history_missing"
+                if any(token in local_error for token in missing_tokens)
+                else "history_diverged"
+            )
+        lifecycle = (
+            record.lifecycle_state
+            if record is not None
+            else (str(chain.get("state") or INITIAL_STATE) if chain else INITIAL_STATE)
+        )
+        return LineageIntegrity(
+            state,
+            lifecycle,
+            key,
+            key.lineage_id,
+            registry,
+            record,
+            active,
+            chain,
+            receipts,
+            local_error=local_error,
+            active_initialization=active_initialization,
+        )
+    except lineage_registry.RoleLineageError as exc:
+        lifecycle = str(chain.get("state") or INITIAL_STATE) if chain else INITIAL_STATE
+        return LineageIntegrity(
+            "registry_unavailable",
+            lifecycle,
+            key,
+            key.lineage_id,
+            registry,
+            None,
+            None,
+            chain,
+            receipts,
+            local_error=local_error,
+            registry_error=str(exc),
+        )
+
+
+def _require_aligned_lineage(ctx: GovernanceContext) -> LineageIntegrity:
+    integrity = _lineage_integrity(ctx)
+    if integrity.integrity_state != "aligned":
+        detail = integrity.local_error or integrity.registry_error
+        suffix = f": {detail}" if detail else ""
+        raise RoleGovernanceError(
+            f"integrity_state={integrity.integrity_state}; lifecycle publication is blocked{suffix}"
+        )
+    if integrity.registry is None or integrity.record is None or integrity.chain is None:
+        raise RoleGovernanceError("integrity_state=registry_unavailable; lineage authority is absent")
+    return integrity
 
 
 def _latest(receipts: Iterable[dict[str, Any]], event: str) -> dict[str, Any] | None:
@@ -1153,6 +2395,232 @@ def _memory_verify(ctx: GovernanceContext, receipt: dict[str, Any]) -> None:
         raise RoleGovernanceError(f"strict Memory verification failed: {exc}") from exc
 
 
+def _memory_ensure_lineage_root(
+    ctx: GovernanceContext,
+    key: lineage_registry.LineageKey,
+) -> dict[str, Any]:
+    try:
+        import memory_bus  # type: ignore
+
+        loader = getattr(memory_bus, "load_local_env", None)
+        if callable(loader):
+            loader()
+        ensure = _memory_function(memory_bus, ("ensure_role_lineage_root",))
+        if ensure is None:
+            raise RuntimeError("strict lineage-root Memory adapter is unavailable")
+        result = ensure(key.as_dict(), lineage_id=key.lineage_id)
+        if not isinstance(result, dict):
+            raise RuntimeError("lineage-root Memory adapter returned no result")
+        if result.get("lineage_id") != key.lineage_id:
+            raise RuntimeError("lineage-root Memory adapter changed lineage identity")
+        return result
+    except Exception as exc:
+        raise RoleGovernanceError(f"strict Memory lineage root failed: {exc}") from exc
+
+
+def _memory_probe_lineage_root(
+    ctx: GovernanceContext,
+    key: lineage_registry.LineageKey,
+) -> dict[str, Any] | None:
+    try:
+        import memory_bus  # type: ignore
+
+        loader = getattr(memory_bus, "load_local_env", None)
+        if callable(loader):
+            loader()
+        probe = _memory_function(memory_bus, ("probe_role_lineage_root",))
+        if probe is None:
+            raise RuntimeError("strict lineage-root probe is unavailable")
+        result = probe(key.as_dict(), lineage_id=key.lineage_id)
+        if result is None:
+            return None
+        if not isinstance(result, dict) or result.get("lineage_id") != key.lineage_id:
+            raise RuntimeError("exact lineage root is mismatched")
+        return result
+    except Exception as exc:
+        raise RoleGovernanceError(f"strict Memory lineage root verification failed: {exc}") from exc
+
+
+def _memory_create_checkpoint(
+    ctx: GovernanceContext,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        import memory_bus  # type: ignore
+
+        loader = getattr(memory_bus, "load_local_env", None)
+        if callable(loader):
+            loader()
+        create = _memory_function(memory_bus, ("create_role_lineage_checkpoint",))
+        if create is None:
+            raise RuntimeError("strict lineage-checkpoint Memory adapter is unavailable")
+        result = create(payload)
+        if not isinstance(result, dict) or not str(result.get("checkpoint_id") or ""):
+            raise RuntimeError("lineage checkpoint did not return an exact ID")
+        if result.get("payload") != payload:
+            raise RuntimeError("lineage checkpoint payload changed during exact verification")
+        return result
+    except Exception as exc:
+        raise RoleGovernanceError(f"strict Memory lineage checkpoint failed: {exc}") from exc
+
+
+def _memory_get_checkpoint(
+    ctx: GovernanceContext,
+    checkpoint_id: str,
+) -> dict[str, Any]:
+    try:
+        import memory_bus  # type: ignore
+
+        loader = getattr(memory_bus, "load_local_env", None)
+        if callable(loader):
+            loader()
+        getter = _memory_function(memory_bus, ("get_role_lineage_checkpoint",))
+        if getter is None:
+            raise RuntimeError("strict lineage-checkpoint exact GET is unavailable")
+        result = getter(checkpoint_id)
+        if not isinstance(result, dict) or result.get("checkpoint_id") != checkpoint_id:
+            raise RuntimeError("lineage checkpoint exact ID mismatch")
+        return result
+    except Exception as exc:
+        not_found = getattr(locals().get("memory_bus"), "MemoryNotFound", None)
+        if isinstance(not_found, type) and isinstance(exc, not_found):
+            raise _MemoryCheckpointNotFound(
+                "strict Memory lineage checkpoint is absent"
+            ) from exc
+        raise RoleGovernanceError(
+            f"strict Memory lineage checkpoint exact verification failed: {exc}"
+        ) from exc
+
+
+def _memory_probe_checkpoint(
+    ctx: GovernanceContext,
+    checkpoint_id: str,
+) -> dict[str, Any] | None:
+    """Exact-GET a deterministic checkpoint; only Memory's typed 404 is absent."""
+
+    try:
+        return _memory_get_checkpoint(ctx, checkpoint_id)
+    except (_MemoryCheckpointNotFound, KeyError):
+        # KeyError is accepted only from the in-process synthetic adapter used
+        # by unit fixtures.  The production adapter maps only a typed HTTP 404
+        # to _MemoryCheckpointNotFound; auth/outage failures remain fatal.
+        return None
+    except Exception as exc:
+        raise RoleGovernanceError(
+            f"strict Memory lineage checkpoint probe failed: {exc}"
+        ) from exc
+
+
+def _verify_checkpoint_result(
+    result: dict[str, Any],
+    expected_payload: dict[str, Any],
+    *,
+    checkpoint_id: str,
+    label: str,
+) -> None:
+    if (
+        result.get("checkpoint_id") != checkpoint_id
+        or result.get("memory_id") not in (None, "", checkpoint_id)
+        or result.get("content_sha256") not in (None, "", checkpoint_id)
+        or result.get("payload") != expected_payload
+    ):
+        raise RoleGovernanceError(f"{label} exact checkpoint does not match canonical payload")
+
+
+def _verify_strict_lineage_predecessor(
+    ctx: GovernanceContext,
+    registry: lineage_registry.LineageRegistry,
+    key: lineage_registry.LineageKey,
+    record: lineage_registry.LineageRecord,
+) -> None:
+    """Verify the deterministic root and exact committed predecessor after pending."""
+
+    if record.memory_mode != "required":
+        return
+    expected_root_payload = {
+        "schema": "bugate.role-lineage-root/v1",
+        "lineage_key": key.as_dict(),
+        "lineage_id": key.lineage_id,
+    }
+    expected_root_id = sha256_bytes(canonical_json(expected_root_payload))
+    if record.root_memory_id != expected_root_id:
+        raise RoleGovernanceError(
+            "strict lineage registry root is not the deterministic lineage root"
+        )
+    root = _memory_probe_lineage_root(ctx, key)
+    if root is None:
+        raise RoleGovernanceError("strict Memory deterministic lineage root is absent")
+    if (
+        root.get("lineage_id") != key.lineage_id
+        or root.get("lineage_root_id") != expected_root_id
+        or root.get("memory_id") not in (None, "", expected_root_id)
+        or root.get("content_sha256") not in (None, "", expected_root_id)
+        or root.get("payload") != expected_root_payload
+    ):
+        raise RoleGovernanceError("strict Memory deterministic lineage root diverged")
+
+    if record.sequence == 0:
+        if record.head_sha256 or record.checkpoint_memory_id:
+            raise RoleGovernanceError(
+                "strict empty lineage has an unexpected head or predecessor checkpoint"
+            )
+        return
+    if not record.head_sha256 or not record.checkpoint_memory_id:
+        raise RoleGovernanceError("strict lineage predecessor checkpoint is missing")
+    retained = registry.get_checkpoint_payload(
+        record.checkpoint_memory_id,
+        lineage=key,
+    )
+    if retained is None:
+        raise RoleGovernanceError(
+            "strict lineage registry did not retain the predecessor checkpoint"
+        )
+    try:
+        expected_checkpoint = json.loads(retained.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RoleGovernanceError(
+            "strict lineage registry predecessor checkpoint is invalid"
+        ) from exc
+    if not isinstance(expected_checkpoint, dict) or canonical_json(expected_checkpoint) != retained:
+        raise RoleGovernanceError(
+            "strict lineage registry predecessor checkpoint is non-canonical"
+        )
+    checkpoint = _memory_get_checkpoint(ctx, record.checkpoint_memory_id)
+    _verify_checkpoint_result(
+        checkpoint,
+        expected_checkpoint,
+        checkpoint_id=record.checkpoint_memory_id,
+        label="strict predecessor",
+    )
+    checks = {
+        "lineage_key": key.as_dict(),
+        "lineage_id": key.lineage_id,
+        "lineage_root_id": record.root_memory_id,
+        "sequence": record.sequence,
+        "receipt_sha256": record.head_sha256,
+        "resulting_state": record.lifecycle_state,
+        "registry_revision": record.revision,
+    }
+    if any(expected_checkpoint.get(field) != value for field, value in checks.items()):
+        raise RoleGovernanceError(
+            "strict predecessor checkpoint does not match registry head/sequence/state"
+        )
+
+
+def _journal_error(category: str, exc: BaseException) -> str:
+    """Return a path-free, one-line machine diagnostic safe for the registry."""
+
+    safe_category = re.sub(r"[^a-z0-9_]+", "_", category.strip().lower()).strip("_")
+    safe_type = re.sub(r"[^A-Za-z0-9_]+", "_", type(exc).__name__).strip("_")
+    return f"{safe_category or 'operation'}:{safe_type or 'Exception'}"
+
+
+def _failure_point(name: str, ctx: GovernanceContext, tx_id: str) -> None:
+    """Stable no-op seam used by crash-window acceptance tests."""
+
+    del name, ctx, tx_id
+
+
 def _idempotency_payload(base: dict[str, Any]) -> str:
     value = copy.deepcopy(base)
     for key in (
@@ -1168,6 +2636,158 @@ def _idempotency_payload(base: dict[str, Any]) -> str:
     return sha256_bytes(canonical_json(value))
 
 
+def _checkpoint_envelope(
+    ctx: GovernanceContext,
+    path: Path,
+    body: bytes,
+    parsed: dict[str, Any],
+    *,
+    mode: int = 0o600,
+) -> dict[str, Any]:
+    return {
+        "path": workspace_rel(path, ctx.root),
+        "mode": mode,
+        "bytes_sha256": sha256_bytes(body),
+        "bytes_base64": base64.b64encode(body).decode("ascii"),
+        "parsed": copy.deepcopy(parsed),
+    }
+
+
+def _receipt_from_transition(
+    transition: dict[str, Any],
+    memory_public: dict[str, Any],
+    resulting_state: str,
+) -> dict[str, Any]:
+    lineage = transition.get("lineage")
+    created_at = (
+        str(lineage.get("receipt_created_at") or "")
+        if isinstance(lineage, dict)
+        else ""
+    )
+    if not created_at:
+        raise RoleGovernanceError("lineage transition is missing receipt_created_at")
+    receipt = {
+        key: copy.deepcopy(value)
+        for key, value in transition.items()
+        if key not in {"schema", "transition_sha256"}
+    }
+    receipt.update(
+        {
+            "schema": ROLE_SCHEMA,
+            "sequence": int(lineage["expected_sequence"]) + 1,
+            "created_at": created_at,
+            "transition_sha256": transition["transition_sha256"],
+            "memory": copy.deepcopy(memory_public),
+            "resulting_state": resulting_state,
+        }
+    )
+    receipt["receipt_sha256"] = receipt_sha256(receipt)
+    return receipt
+
+
+def _new_chain(
+    ctx: GovernanceContext,
+    previous: dict[str, Any],
+    receipt_path: Path,
+    receipt: dict[str, Any],
+    state: str,
+) -> dict[str, Any]:
+    latest = dict(previous["latest_receipts"])
+    latest[str(receipt["event"])] = workspace_rel(receipt_path, ctx.root)
+    return {
+        "schema": CHAIN_SCHEMA,
+        "state": state,
+        "sequence": receipt["sequence"],
+        "head_sha256": receipt["receipt_sha256"],
+        "latest_receipts": latest,
+    }
+
+
+def _transition_for_publication(
+    ctx: GovernanceContext,
+    key: lineage_registry.LineageKey,
+    record: lineage_registry.LineageRecord,
+    base: dict[str, Any],
+) -> dict[str, Any]:
+    receipt_created_at = utc_now()
+    transition = {
+        "schema": TRANSITION_SCHEMA,
+        "event": str(base["event"]),
+        "uc": ctx.uc,
+        "artifact_dir": workspace_rel(ctx.artifact_dir, ctx.root),
+        "phase": base["phase"],
+        "from_role": base.get("from_role", ""),
+        "to_role": base.get("to_role", ""),
+        "actor": base["actor"],
+        "profile": base["profile"],
+        "artifacts": base.get("artifacts", []),
+        "dispatch": base.get("dispatch", {}),
+        "human_acceptance": base.get("human_acceptance", {}),
+        "previous_receipt_sha256": record.head_sha256,
+        "idempotency_sha256": _idempotency_payload(base),
+        "lineage": {
+            "schema": LINEAGE_PRECONDITION_SCHEMA,
+            "lineage_id": key.lineage_id,
+            "expected_head_sha256": record.head_sha256,
+            "expected_sequence": record.sequence,
+            "expected_revision": record.revision,
+            "previous_checkpoint_memory_id": record.checkpoint_memory_id,
+            "receipt_created_at": receipt_created_at,
+        },
+    }
+    for field in (
+        "approved_by",
+        "decision",
+        "handoff_receipt_sha256",
+        "handoff_memory_id",
+        "accepted_handoff_receipt_sha256",
+        "implementation_files",
+        "run",
+        "recovery",
+    ):
+        if field in base:
+            transition[field] = copy.deepcopy(base[field])
+    transition["transition_sha256"] = sha256_bytes(canonical_json(transition))
+    return transition
+
+
+def _validate_publication_candidate(
+    ctx: GovernanceContext,
+    receipts: list[dict[str, Any]],
+    transition: dict[str, Any],
+    state: str,
+) -> None:
+    """Prove a candidate is verifier-acceptable before any durable journal."""
+
+    event = str(transition.get("event") or "candidate")
+    path = Path(f"unpublished-{event}-candidate.json")
+    candidate = _receipt_from_transition(transition, {}, state)
+    _validate_receipt_contract(candidate, path)
+
+    prior_by_hash: dict[str, dict[str, Any]] = {}
+    latest_by_event: dict[str, dict[str, Any]] = {}
+    for receipt in receipts:
+        receipt_hash = str(receipt["receipt_sha256"])
+        prior_by_hash[receipt_hash] = receipt
+        latest_by_event[str(receipt["event"])] = receipt
+    predecessor_state = (
+        str(receipts[-1]["resulting_state"]) if receipts else INITIAL_STATE
+    )
+    resulting_state = _verify_lifecycle_graph_edge(
+        ctx,
+        candidate,
+        path,
+        predecessor_state=predecessor_state,
+        predecessor_hash=str(transition.get("previous_receipt_sha256") or ""),
+        prior_by_hash=prior_by_hash,
+        latest_by_event=latest_by_event,
+    )
+    if resulting_state != state:
+        raise RoleGovernanceError(
+            "unpublished lifecycle candidate does not preserve its target state"
+        )
+
+
 def _publish(ctx: GovernanceContext, base: dict[str, Any], state: str) -> dict[str, Any]:
     if _transition_lock_key(ctx) not in set(
         getattr(_TRANSITION_LOCK_STATE, "keys", set())
@@ -1175,113 +2795,185 @@ def _publish(ctx: GovernanceContext, base: dict[str, Any], state: str) -> dict[s
         raise RoleGovernanceError(
             "role transition publication requires the per-UC transition lock"
         )
-    receipts = verify_chain(ctx)
+    integrity = _require_aligned_lineage(ctx)
+    receipts = list(integrity.receipts)
     event = str(base["event"])
     idem = _idempotency_payload(base)
     prior = _latest(receipts, event)
-    chain = load_chain(ctx)
+    chain = integrity.chain
+    record = integrity.record
+    registry = integrity.registry
+    assert chain is not None and record is not None and registry is not None
     if (
         prior
         and prior.get("idempotency_sha256") == idem
         and prior.get("receipt_sha256") == chain["head_sha256"]
     ):
         return prior
-    transition = {
-        "schema": TRANSITION_SCHEMA,
-        "event": event,
-        "uc": ctx.uc,
-        "artifact_dir": workspace_rel(ctx.artifact_dir, ctx.root),
-        "phase": base["phase"],
-        "from_role": base.get("from_role", ""),
-        "to_role": base.get("to_role", ""),
-        "actor": base["actor"],
-        "profile": base["profile"],
-        "artifacts": base.get("artifacts", []),
-        "dispatch": base.get("dispatch", {}),
-        "human_acceptance": base.get("human_acceptance", {}),
-        "previous_receipt_sha256": chain["head_sha256"],
-        "idempotency_sha256": idem,
-    }
-    for key in (
-        "approved_by",
-        "decision",
-        "handoff_receipt_sha256",
-        "handoff_memory_id",
-        "accepted_handoff_receipt_sha256",
-        "implementation_files",
-        "run",
-    ):
-        if key in base:
-            transition[key] = base[key]
-    transition_hash = sha256_bytes(canonical_json(transition))
-    prepared = _memory_prepare(ctx, {**transition, "transition_sha256": transition_hash})
-    memory_public = {k: v for k, v in prepared.items() if not k.startswith("_")}
-    receipt = {
-        "schema": ROLE_SCHEMA,
-        "event": event,
-        "sequence": chain["sequence"] + 1,
-        "uc": ctx.uc,
-        "artifact_dir": workspace_rel(ctx.artifact_dir, ctx.root),
-        "phase": base["phase"],
-        "from_role": base.get("from_role", ""),
-        "to_role": base.get("to_role", ""),
-        "actor": base["actor"],
-        "created_at": utc_now(),
-        "profile": base["profile"],
-        "artifacts": base.get("artifacts", []),
-        "dispatch": base.get("dispatch", {}),
-        "human_acceptance": base.get("human_acceptance", {}),
-        "previous_receipt_sha256": chain["head_sha256"],
-        "transition_sha256": transition_hash,
-        "idempotency_sha256": idem,
-        "memory": memory_public,
-        "resulting_state": state,
-    }
-    for key in (
-        "approved_by",
-        "decision",
-        "handoff_receipt_sha256",
-        "handoff_memory_id",
-        "accepted_handoff_receipt_sha256",
-        "implementation_files",
-        "run",
-    ):
-        if key in base:
-            receipt[key] = base[key]
-    receipt["receipt_sha256"] = receipt_sha256(receipt)
-    finalized_memory = _memory_finalize(
+    transition = _transition_for_publication(
         ctx,
-        prepared,
-        receipt["receipt_sha256"],
-        {**transition, "transition_sha256": transition_hash},
+        integrity.lineage_key,
+        record,
+        base,
     )
-    finalized_public = {
-        key: value for key, value in finalized_memory.items() if not key.startswith("_")
-    }
-    if finalized_public != receipt["memory"]:
-        # A best-effort finalize failure is part of the durable audit result.
-        # Strict mode has already raised before this point; the failed
-        # best-effort binding cannot authenticate the pre-finalize hash, so the
-        # local receipt is safely re-hashed with its explicit failure marker.
-        receipt["memory"] = finalized_public
-        receipt["receipt_sha256"] = receipt_sha256(receipt)
-    filename = (
-        f"{receipt['sequence']:06d}-{event.replace('_', '-')}-"
-        f"{receipt['receipt_sha256']}.json"
-    )
-    receipt_path = _receipt_dir(ctx) / filename
-    _atomic_json(receipt_path, receipt, replace=False)
-    latest = dict(chain["latest_receipts"])
-    latest[event] = workspace_rel(receipt_path, ctx.root)
-    new_chain = {
-        "schema": CHAIN_SCHEMA,
-        "state": state,
-        "sequence": receipt["sequence"],
-        "head_sha256": receipt["receipt_sha256"],
-        "latest_receipts": latest,
-    }
-    _atomic_json(_chain_path(ctx), new_chain, replace=True)
-    return receipt
+    _validate_publication_candidate(ctx, receipts, transition, state)
+    tx: lineage_registry.TransactionRecord | None = None
+    try:
+        tx = registry.begin_pending(
+            integrity.lineage_key,
+            event=event,
+            expected_head_sha256=record.head_sha256,
+            expected_sequence=record.sequence,
+            expected_revision=record.revision,
+            expected_checkpoint_memory_id=record.checkpoint_memory_id,
+            target_lifecycle_state=state,
+            transition_payload=transition,
+        )
+        _verify_strict_lineage_predecessor(
+            ctx,
+            registry,
+            integrity.lineage_key,
+            record,
+        )
+        prepared = _memory_prepare(ctx, transition)
+        _failure_point("after_memory_prepare_http", ctx, tx.tx_id)
+        transition_memory_id = str(prepared.get("memory_id") or "")
+        stage_kwargs: dict[str, Any] = {}
+        if transition_memory_id:
+            stage_kwargs["transition_memory_id"] = transition_memory_id
+        tx = registry.update_stage(
+            tx.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_PENDING,
+            new_stage=lineage_registry.TX_STAGE_MEMORY_PREPARED,
+            **stage_kwargs,
+        )
+        _failure_point("after_memory_transition", ctx, tx.tx_id)
+
+        memory_public = {
+            key: value for key, value in prepared.items() if not key.startswith("_")
+        }
+        receipt = _receipt_from_transition(transition, memory_public, state)
+        finalized_memory = _memory_finalize(
+            ctx,
+            prepared,
+            receipt["receipt_sha256"],
+            transition,
+        )
+        _failure_point("after_memory_finalize_http", ctx, tx.tx_id)
+        finalized_public = {
+            key: value
+            for key, value in finalized_memory.items()
+            if not key.startswith("_")
+        }
+        if finalized_public != receipt["memory"]:
+            receipt["memory"] = finalized_public
+            receipt["receipt_sha256"] = receipt_sha256(receipt)
+        filename = (
+            f"{receipt['sequence']:06d}-{event.replace('_', '-')}-"
+            f"{receipt['receipt_sha256']}.json"
+        )
+        receipt_path = _receipt_dir(ctx) / filename
+        receipt_body = _json_bytes(receipt)
+        new_chain = _new_chain(ctx, chain, receipt_path, receipt, state)
+        chain_body = _json_bytes(new_chain)
+        tx = registry.update_stage(
+            tx.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_MEMORY_PREPARED,
+            new_stage=lineage_registry.TX_STAGE_RECEIPT_BOUND,
+            target_head_sha256=receipt["receipt_sha256"],
+            receipt_path=workspace_rel(receipt_path, ctx.root),
+            receipt_bytes=receipt_body,
+            receipt_mode=0o600,
+            receipt_sha256=receipt["receipt_sha256"],
+        )
+        _failure_point("after_receipt_bind", ctx, tx.tx_id)
+        tx = registry.update_stage(
+            tx.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_RECEIPT_BOUND,
+            new_stage=lineage_registry.TX_STAGE_MEMORY_FINALIZED,
+        )
+
+        if ctx.policy["memory_mode"] == "required":
+            checkpoint_payload = {
+                "schema": "bugate.role-lineage-checkpoint/v1",
+                "lineage_key": integrity.lineage_key.as_dict(),
+                "lineage_id": integrity.lineage_id,
+                "lineage_root_id": record.root_memory_id,
+                "sequence": receipt["sequence"],
+                "previous_checkpoint_id": record.checkpoint_memory_id,
+                "previous_receipt_sha256": receipt["previous_receipt_sha256"],
+                "receipt_sha256": receipt["receipt_sha256"],
+                "resulting_state": state,
+                "registry_revision": record.revision + 1,
+                "receipt_envelope": _checkpoint_envelope(
+                    ctx, receipt_path, receipt_body, receipt
+                ),
+                "chain_envelope": _checkpoint_envelope(
+                    ctx, _chain_path(ctx), chain_body, new_chain
+                ),
+            }
+            checkpoint = _memory_create_checkpoint(ctx, checkpoint_payload)
+            _failure_point("after_checkpoint_http", ctx, tx.tx_id)
+            tx = registry.update_stage(
+                tx.tx_id,
+                expected_stage=lineage_registry.TX_STAGE_MEMORY_FINALIZED,
+                new_stage=lineage_registry.TX_STAGE_CHECKPOINT_VERIFIED,
+                checkpoint_memory_id=checkpoint["checkpoint_id"],
+                checkpoint_payload=checkpoint_payload,
+            )
+            _failure_point("after_checkpoint", ctx, tx.tx_id)
+            tx = registry.update_stage(
+                tx.tx_id,
+                expected_stage=lineage_registry.TX_STAGE_CHECKPOINT_VERIFIED,
+                new_stage=lineage_registry.TX_STAGE_READY_FOR_CAS,
+            )
+        else:
+            tx = registry.update_stage(
+                tx.tx_id,
+                expected_stage=lineage_registry.TX_STAGE_MEMORY_FINALIZED,
+                new_stage=lineage_registry.TX_STAGE_READY_FOR_CAS,
+            )
+
+        committed = registry.compare_and_swap_head(
+            tx.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_READY_FOR_CAS,
+        )
+        tx = committed.transaction
+        _failure_point("after_registry_cas", ctx, tx.tx_id)
+        _atomic_bytes(receipt_path, receipt_body, replace=False, mode=0o600)
+        _failure_point("after_receipt_write", ctx, tx.tx_id)
+        tx = registry.update_stage(
+            tx.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_REGISTRY_COMMITTED,
+            new_stage=lineage_registry.TX_STAGE_RECEIPT_WRITTEN,
+        )
+        _failure_point("before_chain_replace", ctx, tx.tx_id)
+        _atomic_bytes(_chain_path(ctx), chain_body, replace=True, mode=0o600)
+        _failure_point("after_chain_replace", ctx, tx.tx_id)
+        tx = registry.update_stage(
+            tx.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_RECEIPT_WRITTEN,
+            new_stage=lineage_registry.TX_STAGE_CHAIN_REPLACED,
+        )
+        registry.complete(tx.tx_id)
+        return receipt
+    except Exception as exc:
+        if tx is not None:
+            try:
+                current = registry.get_transaction(tx.tx_id)
+                if current is not None and current.status in lineage_registry.ACTIVE_TX_STATUSES:
+                    registry.mark_incomplete(
+                        current.tx_id,
+                        expected_stage=current.stage,
+                        error=_journal_error("publish_failed", exc),
+                    )
+            except Exception:
+                pass
+        if isinstance(exc, RoleGovernanceError):
+            raise
+        if isinstance(exc, lineage_registry.RoleLineageError):
+            raise RoleGovernanceError(f"lineage transaction failed: {exc}") from exc
+        raise
 
 
 def _human_acceptance_ref(
@@ -1317,6 +3009,1345 @@ def _human_acceptance_ref(
     }
 
 
+def _require_exact_lineage_id(ctx: GovernanceContext, supplied: str) -> lineage_registry.LineageKey:
+    key = _lineage_key(ctx)
+    if supplied.strip() != key.lineage_id:
+        raise RoleGovernanceError(
+            f"exact lineage ID mismatch: expected {key.lineage_id}, got {supplied.strip() or '<missing>'}"
+        )
+    return key
+
+
+@_serialized_transition
+def lineage_init(
+    artifact_dir: str | Path,
+    *,
+    lineage_id: str,
+) -> dict[str, Any]:
+    """Explicitly assert true first use; no lifecycle publisher may do this."""
+
+    ctx = load_context(artifact_dir)
+    if ctx.mode == "off":
+        raise RoleGovernanceError("role governance is off for this profile")
+    key = _require_exact_lineage_id(ctx, lineage_id)
+    integrity = _lineage_integrity(ctx)
+    if integrity.local_error:
+        raise RoleGovernanceError(
+            f"lineage-init refuses malformed local evidence: {integrity.local_error}"
+        )
+    if integrity.chain is not None and integrity.chain != _empty_chain():
+        raise RoleGovernanceError("lineage-init refuses non-empty local history")
+
+    registry = integrity.registry or lineage_registry.LineageRegistry(create=True)
+    intent = integrity.active_initialization
+    if intent is None:
+        if integrity.integrity_state != "uninitialized":
+            raise RoleGovernanceError(
+                "lineage-init requires integrity_state=uninitialized or its exact "
+                f"recovery_pending intent, got {integrity.integrity_state}"
+            )
+        intent = registry.begin_initialization(
+            key,
+            lifecycle_state=INITIAL_STATE,
+            memory_mode=ctx.policy["memory_mode"],
+        )
+        _failure_point("after_lineage_init_intent", ctx, intent.init_id)
+    elif (
+        intent.key != key
+        or intent.lifecycle_state != INITIAL_STATE
+        or intent.memory_mode != ctx.policy["memory_mode"]
+    ):
+        raise RoleGovernanceError(
+            "lineage-init active initialization does not match the exact lineage contract"
+        )
+
+    if intent.stage == lineage_registry.INIT_STAGE_PENDING:
+        existing_root = None
+        if ctx.policy["memory_mode"] == "required":
+            existing_root = _memory_probe_lineage_root(ctx, key)
+        _failure_point("after_lineage_init_root_absence_probe", ctx, intent.init_id)
+        if existing_root is not None:
+            registry.abort_initialization(intent.init_id, error="root_preexisting")
+            raise RoleGovernanceError(
+                "lineage-init refuses an existing deterministic strict Memory root; "
+                "integrity_state=migration_required and explicit operator recovery/adoption "
+                "is required"
+            )
+        intent = registry.mark_initialization_root_absence_verified(intent.init_id)
+        _failure_point("after_lineage_init_root_absence_journal", ctx, intent.init_id)
+
+    if intent.stage == lineage_registry.INIT_STAGE_ROOT_ABSENCE_VERIFIED:
+        root_memory_id = ""
+        if ctx.policy["memory_mode"] == "required":
+            root = _memory_ensure_lineage_root(ctx, key)
+            expected_payload = {
+                "schema": "bugate.role-lineage-root/v1",
+                "lineage_key": key.as_dict(),
+                "lineage_id": key.lineage_id,
+            }
+            expected_id = sha256_bytes(canonical_json(expected_payload))
+            if (
+                root.get("lineage_id") != key.lineage_id
+                or root.get("lineage_root_id") != expected_id
+                or root.get("memory_id") not in (None, "", expected_id)
+                or root.get("content_sha256") not in (None, "", expected_id)
+                or root.get("payload") != expected_payload
+            ):
+                raise RoleGovernanceError(
+                    "lineage-init strict Memory root does not match deterministic identity"
+                )
+            root_memory_id = expected_id
+        _failure_point("after_lineage_init_root_http", ctx, intent.init_id)
+        intent = registry.bind_initialization_root(
+            intent.init_id,
+            root_memory_id=root_memory_id,
+        )
+        _failure_point("after_lineage_init_root_bind", ctx, intent.init_id)
+
+    if intent.stage == lineage_registry.INIT_STAGE_ROOT_VERIFIED:
+        record = registry.commit_initialization(intent.init_id)
+        _failure_point("after_lineage_init_registry_commit", ctx, intent.init_id)
+        intent = registry.get_initialization(intent.init_id)
+        if intent is None:  # pragma: no cover - same durable registry.
+            raise RoleGovernanceError("lineage initialization journal disappeared")
+
+    if intent.stage == lineage_registry.INIT_STAGE_REGISTRY_INITIALIZED:
+        empty_body = _json_bytes(_empty_chain())
+        _atomic_bytes(_chain_path(ctx), empty_body, replace=False, mode=0o600)
+        if (
+            _chain_path(ctx).read_bytes() != empty_body
+            or stat.S_IMODE(_chain_path(ctx).stat().st_mode) != 0o600
+        ):
+            raise RoleGovernanceError(
+                "lineage-init empty chain bytes or mode failed exact verification"
+            )
+        _failure_point("after_lineage_init_chain_write", ctx, intent.init_id)
+        intent = registry.mark_initialization_chain_written(intent.init_id)
+        _failure_point("after_lineage_init_chain_journal", ctx, intent.init_id)
+
+    if intent.stage == lineage_registry.INIT_STAGE_CHAIN_WRITTEN:
+        registry.complete_initialization(intent.init_id)
+
+    record = registry.require_lineage(key)
+    empty = _empty_chain()
+    if load_chain(ctx) != empty:
+        raise RoleGovernanceError("lineage-init completed without the exact empty chain")
+    return {
+        "ok": True,
+        "integrity_state": "aligned",
+        "lifecycle_state": INITIAL_STATE,
+        "lineage_id": record.lineage_id,
+        "lineage_key": record.key.as_dict(),
+        "registry_head_sha256": record.head_sha256,
+        "registry_sequence": record.sequence,
+        "registry_revision": record.revision,
+        "lineage_root_memory_id": record.root_memory_id,
+    }
+
+
+def _adoption_checkpoint_payloads(
+    ctx: GovernanceContext,
+    key: lineage_registry.LineageKey,
+    root_memory_id: str,
+    receipts: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    latest: dict[str, str] = {}
+    previous_checkpoint = ""
+    current_chain_path = _chain_path(ctx)
+    current_chain_body = current_chain_path.read_bytes()
+    current_chain_mode = stat.S_IMODE(current_chain_path.lstat().st_mode)
+    if current_chain_mode != 0o600:
+        raise RoleGovernanceError(
+            "lineage-adopt requires legacy chain.json mode 0600"
+        )
+    for receipt in receipts:
+        event = str(receipt["event"])
+        receipt_path = _receipt_dir(ctx) / (
+            f"{receipt['sequence']:06d}-{event.replace('_', '-')}-"
+            f"{receipt['receipt_sha256']}.json"
+        )
+        receipt_body = receipt_path.read_bytes()
+        receipt_mode = stat.S_IMODE(receipt_path.lstat().st_mode)
+        if receipt_mode != 0o600:
+            raise RoleGovernanceError(
+                f"lineage-adopt requires legacy receipt mode 0600: {receipt_path.name}"
+            )
+        latest[event] = workspace_rel(receipt_path, ctx.root)
+        chain = {
+            "schema": CHAIN_SCHEMA,
+            "state": receipt["resulting_state"],
+            "sequence": receipt["sequence"],
+            "head_sha256": receipt["receipt_sha256"],
+            "latest_receipts": dict(latest),
+        }
+        is_current_head = int(receipt["sequence"]) == len(receipts)
+        chain_body = current_chain_body if is_current_head else _json_bytes(chain)
+        chain_mode = current_chain_mode if is_current_head else 0o600
+        payload = {
+            "schema": "bugate.role-lineage-checkpoint/v1",
+            "lineage_key": key.as_dict(),
+            "lineage_id": key.lineage_id,
+            "lineage_root_id": root_memory_id,
+            "sequence": receipt["sequence"],
+            "previous_checkpoint_id": previous_checkpoint,
+            "previous_receipt_sha256": receipt["previous_receipt_sha256"],
+            "receipt_sha256": receipt["receipt_sha256"],
+            "resulting_state": receipt["resulting_state"],
+            "registry_revision": 0,
+            "receipt_envelope": _checkpoint_envelope(
+                ctx, receipt_path, receipt_body, receipt, mode=receipt_mode
+            ),
+            "chain_envelope": _checkpoint_envelope(
+                ctx, current_chain_path, chain_body, chain, mode=chain_mode
+            ),
+        }
+        payloads.append(payload)
+        previous_checkpoint = sha256_bytes(canonical_json(payload))
+    return payloads
+
+
+@_serialized_transition
+def lineage_adopt(
+    artifact_dir: str | Path,
+    *,
+    lineage_id: str,
+    expected_head: str,
+) -> dict[str, Any]:
+    """Adopt a verified legacy v1 chain without rewriting one receipt byte."""
+
+    ctx = load_context(artifact_dir)
+    if ctx.mode == "off":
+        raise RoleGovernanceError("role governance is off for this profile")
+    key = _require_exact_lineage_id(ctx, lineage_id)
+    integrity = _lineage_integrity(ctx)
+    if integrity.integrity_state != "migration_required":
+        raise RoleGovernanceError(
+            "lineage-adopt requires integrity_state=migration_required, got "
+            f"{integrity.integrity_state}"
+        )
+    receipts = verify_chain(ctx)
+    chain = load_chain(ctx)
+    if not receipts or chain["sequence"] < 1:
+        raise RoleGovernanceError("lineage-adopt requires a non-empty legacy chain")
+    if expected_head.strip() != chain["head_sha256"]:
+        raise RoleGovernanceError(
+            "lineage-adopt expected head mismatch; no registry row was created"
+        )
+
+    root_memory_id = ""
+    checkpoint_memory_id = ""
+    checkpoint_payload: dict[str, Any] | None = None
+    checkpoint_history: list[dict[str, Any]] = []
+    if ctx.policy["memory_mode"] == "required":
+        checkpoint_history = _adoption_checkpoint_payloads(
+            ctx,
+            key,
+            lineage_registry.lineage_root_id(key),
+            receipts,
+        )
+        for receipt in receipts:
+            _memory_verify(ctx, receipt)
+        root = _memory_ensure_lineage_root(ctx, key)
+        root_memory_id = str(root["lineage_root_id"])
+        if root_memory_id != lineage_registry.lineage_root_id(key):
+            raise RoleGovernanceError(
+                "strict Memory lineage root differs from prevalidated adoption payloads"
+            )
+        for payload in checkpoint_history:
+            created = _memory_create_checkpoint(ctx, payload)
+            checkpoint_memory_id = str(created["checkpoint_id"])
+            checkpoint_payload = payload
+    registry = lineage_registry.LineageRegistry(create=True)
+    record = registry.adopt(
+        key,
+        lifecycle_state=str(chain["state"]),
+        sequence=int(chain["sequence"]),
+        head_sha256=str(chain["head_sha256"]),
+        memory_mode=ctx.policy["memory_mode"],
+        root_memory_id=root_memory_id,
+        checkpoint_memory_id=checkpoint_memory_id,
+        checkpoint_payload=checkpoint_payload,
+        checkpoint_history=checkpoint_history or None,
+    )
+    return {
+        "ok": True,
+        "integrity_state": "aligned",
+        "lifecycle_state": record.lifecycle_state,
+        "lineage_id": record.lineage_id,
+        "registry_head_sha256": record.head_sha256,
+        "registry_sequence": record.sequence,
+        "registry_revision": record.revision,
+        "checkpoint_memory_id": record.checkpoint_memory_id,
+        "receipts_rewritten": 0,
+    }
+
+
+def _decode_recovery_envelope(envelope: Any, label: str) -> tuple[Path, bytes, int, dict[str, Any]]:
+    if not isinstance(envelope, dict) or set(envelope) != {
+        "path",
+        "mode",
+        "bytes_sha256",
+        "bytes_base64",
+        "parsed",
+    }:
+        raise RoleGovernanceError(f"invalid {label} envelope schema")
+    path_value = envelope.get("path")
+    if not isinstance(path_value, str):
+        raise RoleGovernanceError(f"invalid {label} envelope path")
+    path = Path(path_value)
+    if path.is_absolute() or path.as_posix() != path_value or ".." in path.parts:
+        raise RoleGovernanceError(f"unsafe {label} envelope path")
+    mode = envelope.get("mode")
+    if isinstance(mode, bool) or not isinstance(mode, int) or not 0 <= mode <= 0o7777:
+        raise RoleGovernanceError(f"invalid {label} envelope mode")
+    if mode != 0o600:
+        raise RoleGovernanceError(f"{label} envelope mode must be 0600")
+    encoded = envelope.get("bytes_base64")
+    if not isinstance(encoded, str) or not encoded:
+        raise RoleGovernanceError(f"invalid {label} envelope bytes")
+    try:
+        raw = base64.b64decode(encoded.encode("ascii"), validate=True)
+    except Exception as exc:
+        raise RoleGovernanceError(f"invalid {label} envelope base64") from exc
+    if base64.b64encode(raw).decode("ascii") != encoded:
+        raise RoleGovernanceError(f"non-canonical {label} envelope base64")
+    if envelope.get("bytes_sha256") != sha256_bytes(raw):
+        raise RoleGovernanceError(f"{label} envelope byte hash mismatch")
+    try:
+        parsed = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RoleGovernanceError(f"{label} envelope is not UTF-8 JSON") from exc
+    if not isinstance(parsed, dict) or parsed != envelope.get("parsed"):
+        raise RoleGovernanceError(f"{label} envelope parsed JSON mismatch")
+    if raw != _json_bytes(parsed):
+        raise RoleGovernanceError(f"{label} envelope has non-canonical exact bytes")
+    return path, raw, mode, parsed
+
+
+def _validate_recovery_history(
+    ctx: GovernanceContext,
+    receipt_envelopes: list[dict[str, Any]],
+    chain_envelope: dict[str, Any],
+    *,
+    expected_head: str,
+    expected_sequence: int,
+) -> tuple[list[tuple[Path, bytes, int, dict[str, Any]]], tuple[Path, bytes, int, dict[str, Any]]]:
+    decoded_receipts = [
+        _decode_recovery_envelope(value, f"receipt[{index}]")
+        for index, value in enumerate(receipt_envelopes, 1)
+    ]
+    decoded_chain = _decode_recovery_envelope(chain_envelope, "chain")
+    if len(decoded_receipts) != expected_sequence:
+        raise RoleGovernanceError(
+            "recovery history receipt count does not match registry sequence"
+        )
+    expected_artifact = workspace_rel(ctx.artifact_dir, ctx.root)
+    previous = ""
+    latest: dict[str, str] = {}
+    prior_by_hash: dict[str, dict[str, Any]] = {}
+    latest_by_event: dict[str, dict[str, Any]] = {}
+    lifecycle_state = INITIAL_STATE
+    for expected, (path, raw, _mode, receipt) in enumerate(decoded_receipts, 1):
+        _validate_receipt_contract(receipt, path)
+        if receipt.get("sequence") != expected or receipt.get("schema") != ROLE_SCHEMA:
+            raise RoleGovernanceError("recovery receipt sequence/schema mismatch")
+        if receipt.get("uc") != ctx.uc or receipt.get("artifact_dir") != expected_artifact:
+            raise RoleGovernanceError("recovery receipt belongs to another lineage context")
+        actual = receipt_sha256(receipt)
+        if receipt.get("receipt_sha256") != actual:
+            raise RoleGovernanceError("recovery receipt semantic hash mismatch")
+        if receipt.get("previous_receipt_sha256") != previous:
+            raise RoleGovernanceError("recovery receipt chain link mismatch")
+        expected_path = _receipt_dir(ctx) / (
+            f"{expected:06d}-{receipt['event'].replace('_', '-')}-{actual}.json"
+        )
+        if path != Path(workspace_rel(expected_path, ctx.root)):
+            raise RoleGovernanceError("recovery receipt path/filename mismatch")
+        if json.loads(raw) != receipt:
+            raise RoleGovernanceError("recovery receipt bytes changed during validation")
+        event = str(receipt["event"])
+        lifecycle_state = _verify_lifecycle_graph_edge(
+            ctx,
+            receipt,
+            path,
+            predecessor_state=lifecycle_state,
+            predecessor_hash=previous,
+            prior_by_hash=prior_by_hash,
+            latest_by_event=latest_by_event,
+        )
+        latest[event] = path.as_posix()
+        previous = actual
+        prior_by_hash[actual] = receipt
+        latest_by_event[event] = receipt
+    chain_path, _chain_raw, _chain_mode, chain = decoded_chain
+    if chain_path != Path(workspace_rel(_chain_path(ctx), ctx.root)):
+        raise RoleGovernanceError("recovery chain path mismatch")
+    if set(chain) != {"schema", "state", "sequence", "head_sha256", "latest_receipts"}:
+        raise RoleGovernanceError("recovery chain has a non-minimal schema")
+    if (
+        chain.get("schema") != CHAIN_SCHEMA
+        or chain.get("sequence") != expected_sequence
+        or chain.get("head_sha256") != expected_head
+        or previous != expected_head
+        or chain.get("latest_receipts") != latest
+    ):
+        raise RoleGovernanceError("recovery chain does not match exact registry head")
+    if chain.get("state") != lifecycle_state:
+        raise RoleGovernanceError("recovery chain lifecycle state mismatch")
+    return decoded_receipts, decoded_chain
+
+
+def _checkpoint_recovery_history(
+    ctx: GovernanceContext,
+    record: lineage_registry.LineageRecord,
+) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
+    if record.memory_mode != "required":
+        raise RoleGovernanceError(
+            "best_effort lineage has no strict checkpoint history; provide --archive"
+        )
+    if _memory_probe_lineage_root(ctx, record.key) is None:
+        raise RoleGovernanceError("strict Memory lineage root is absent")
+    if record.sequence == 0:
+        empty = _empty_chain()
+        body = _json_bytes(empty)
+        return [], _checkpoint_envelope(ctx, _chain_path(ctx), body, empty), "strict_memory"
+    if not record.checkpoint_memory_id:
+        raise RoleGovernanceError("required lineage registry is missing its checkpoint head")
+    expected_sequence = record.sequence
+    checkpoint_id = record.checkpoint_memory_id
+    reverse_receipts: list[dict[str, Any]] = []
+    latest_chain: dict[str, Any] | None = None
+    seen: set[str] = set()
+    while expected_sequence > 0:
+        if not checkpoint_id or checkpoint_id in seen:
+            raise RoleGovernanceError("checkpoint lineage is truncated or cyclic")
+        seen.add(checkpoint_id)
+        result = _memory_get_checkpoint(ctx, checkpoint_id)
+        payload = result.get("payload")
+        if not isinstance(payload, dict):
+            raise RoleGovernanceError("checkpoint exact GET omitted canonical payload")
+        if (
+            payload.get("lineage_id") != record.lineage_id
+            or payload.get("lineage_key") != record.key.as_dict()
+            or payload.get("lineage_root_id") != record.root_memory_id
+            or payload.get("sequence") != expected_sequence
+        ):
+            raise RoleGovernanceError("checkpoint lineage identity/sequence mismatch")
+        reverse_receipts.append(copy.deepcopy(payload["receipt_envelope"]))
+        if latest_chain is None:
+            latest_chain = copy.deepcopy(payload["chain_envelope"])
+        checkpoint_id = str(payload.get("previous_checkpoint_id") or "")
+        expected_sequence -= 1
+    if checkpoint_id:
+        raise RoleGovernanceError("checkpoint lineage has an unexpected predecessor")
+    assert latest_chain is not None
+    return list(reversed(reverse_receipts)), latest_chain, "strict_memory"
+
+
+def _archive_recovery_history(
+    archive: Path,
+    *,
+    lineage_id: str,
+    expected_head: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
+    value = _read_json(archive)
+    if set(value) != {
+        "schema",
+        "lineage_id",
+        "expected_head_sha256",
+        "receipt_envelopes",
+        "chain_envelope",
+    } or value.get("schema") != RECOVERY_ARCHIVE_SCHEMA:
+        raise RoleGovernanceError("operator recovery archive schema is invalid")
+    if value.get("lineage_id") != lineage_id or value.get("expected_head_sha256") != expected_head:
+        raise RoleGovernanceError("operator recovery archive lineage/head mismatch")
+    receipts = value.get("receipt_envelopes")
+    chain = value.get("chain_envelope")
+    if not isinstance(receipts, list) or not isinstance(chain, dict):
+        raise RoleGovernanceError("operator recovery archive envelopes are invalid")
+    return copy.deepcopy(receipts), copy.deepcopy(chain), "operator_archive"
+
+
+def _local_predecessor_recovery_history(
+    ctx: GovernanceContext,
+    receipts: tuple[dict[str, Any], ...],
+    chain: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
+    """Capture an already verified best-effort predecessor for tx replay."""
+
+    paths = sorted(_receipt_dir(ctx).glob("*.json")) if _receipt_dir(ctx).exists() else []
+    if len(paths) != len(receipts):
+        raise RoleGovernanceError("local predecessor receipt count changed during recovery")
+    envelopes = [
+        _checkpoint_envelope(
+            ctx,
+            path,
+            path.read_bytes(),
+            receipt,
+            mode=stat.S_IMODE(path.stat().st_mode),
+        )
+        for path, receipt in zip(paths, receipts)
+    ]
+    chain_path = _chain_path(ctx)
+    return (
+        envelopes,
+        _checkpoint_envelope(
+            ctx,
+            chain_path,
+            chain_path.read_bytes(),
+            chain,
+            mode=stat.S_IMODE(chain_path.stat().st_mode),
+        ),
+        "local_predecessor",
+    )
+
+
+def _preflight_recovery_writes(
+    ctx: GovernanceContext,
+    receipts: list[tuple[Path, bytes, int, dict[str, Any]]],
+    chain: tuple[Path, bytes, int, dict[str, Any]],
+) -> None:
+    expected_paths = {path for path, _raw, _mode, _parsed in receipts}
+    if ctx.evidence_dir.exists() and ctx.evidence_dir.is_symlink():
+        raise RoleGovernanceError("recovery refuses a symlink role-evidence directory")
+    if _receipt_dir(ctx).exists() and _receipt_dir(ctx).is_symlink():
+        raise RoleGovernanceError("recovery refuses a symlink receipt directory")
+    existing = (
+        sorted(_receipt_dir(ctx).glob("*.json")) if _receipt_dir(ctx).exists() else []
+    )
+    for path in existing:
+        rel = Path(workspace_rel(path, ctx.root))
+        if rel not in expected_paths:
+            raise RoleGovernanceError("recovery found an unexpected existing receipt")
+    for rel, raw, _mode, _parsed in receipts:
+        target = ctx.root / rel
+        if target.is_symlink():
+            raise RoleGovernanceError("recovery refuses a symlink receipt target")
+        if target.exists() and (not target.is_file() or target.read_bytes() != raw):
+            raise RoleGovernanceError(
+                "recovery existing receipt byte conflict; no target writes performed"
+            )
+    chain_rel, _raw, _mode, _parsed = chain
+    chain_target = ctx.root / chain_rel
+    if chain_target.is_symlink():
+        raise RoleGovernanceError("recovery refuses a symlink chain target")
+    if chain_target.exists() and not chain_target.is_file():
+        raise RoleGovernanceError("recovery chain target is not a regular file")
+
+
+def _apply_recovery_history(
+    ctx: GovernanceContext,
+    receipts: list[tuple[Path, bytes, int, dict[str, Any]]],
+    chain: tuple[Path, bytes, int, dict[str, Any]],
+    *,
+    tx_id: str,
+) -> None:
+    for rel, raw, mode, _parsed in receipts:
+        target = ctx.root / rel
+        _atomic_bytes(target, raw, replace=False, mode=mode)
+        os.chmod(target, mode, follow_symlinks=False)
+        _failure_point("recovery_receipt_write", ctx, tx_id)
+    chain_rel, chain_raw, chain_mode, _parsed = chain
+    target_chain = ctx.root / chain_rel
+    _atomic_bytes(target_chain, chain_raw, replace=True, mode=chain_mode)
+    os.chmod(target_chain, chain_mode, follow_symlinks=False)
+    _failure_point("recovery_chain_replace", ctx, tx_id)
+
+
+def _recovery_phase(lifecycle_state: str) -> str:
+    if lifecycle_state in {"implementation_unlocked", "awaiting_reviewer_acceptance"}:
+        return "implementation"
+    if lifecycle_state in {"post_run_active", "closed"}:
+        return "post_run"
+    return "pre_code"
+
+
+def _transaction_transition(
+    transaction: lineage_registry.TransactionRecord,
+) -> dict[str, Any]:
+    raw = transaction.transition_payload
+    if raw is None:
+        raise RoleGovernanceError("recovery transaction has no durable transition")
+    try:
+        transition = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RoleGovernanceError("recovery transition is not canonical JSON") from exc
+    if not isinstance(transition, dict) or canonical_json(transition) != raw:
+        raise RoleGovernanceError("recovery transition bytes are not canonical")
+    supplied_hash = str(transition.get("transition_sha256") or "")
+    unhashed = copy.deepcopy(transition)
+    unhashed.pop("transition_sha256", None)
+    if supplied_hash != sha256_bytes(canonical_json(unhashed)):
+        raise RoleGovernanceError("recovery transition semantic hash mismatch")
+    lineage = transition.get("lineage")
+    if not isinstance(lineage, dict):
+        raise RoleGovernanceError("recovery transition is missing lineage precondition")
+    checks = {
+        "lineage_id": transaction.lineage_id,
+        "expected_head_sha256": transaction.expected_head_sha256,
+        "expected_sequence": transaction.expected_sequence,
+        "expected_revision": transaction.expected_revision,
+        "previous_checkpoint_memory_id": transaction.expected_checkpoint_memory_id,
+    }
+    if any(lineage.get(field) != value for field, value in checks.items()):
+        raise RoleGovernanceError("recovery transition lineage precondition diverged")
+    if (
+        transition.get("schema") != TRANSITION_SCHEMA
+        or transition.get("event") != transaction.event
+    ):
+        raise RoleGovernanceError("recovery transition schema/event diverged")
+    return transition
+
+
+def _transaction_receipt(
+    ctx: GovernanceContext,
+    transaction: lineage_registry.TransactionRecord,
+) -> tuple[Path, bytes, dict[str, Any]]:
+    if (
+        not transaction.receipt_path
+        or transaction.receipt_bytes is None
+        or transaction.receipt_mode is None
+        or not transaction.receipt_sha256
+    ):
+        raise RoleGovernanceError("recovery transaction lacks an exact receipt journal")
+    relative_path = Path(transaction.receipt_path)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise RoleGovernanceError("recovery transaction receipt path is unsafe")
+    target = ctx.root / relative_path
+    try:
+        receipt = json.loads(transaction.receipt_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RoleGovernanceError("recovery transaction receipt is not JSON") from exc
+    if not isinstance(receipt, dict) or _json_bytes(receipt) != transaction.receipt_bytes:
+        raise RoleGovernanceError("recovery transaction receipt bytes are non-canonical")
+    _validate_receipt_contract(receipt, target)
+    transition = _transaction_transition(transaction)
+    receipt_transition = copy.deepcopy(transition)
+    receipt_transition.pop("transition_sha256", None)
+    expected_name = (
+        f"{transaction.target_sequence:06d}-{transaction.event.replace('_', '-')}-"
+        f"{transaction.receipt_sha256}.json"
+    )
+    if (
+        target.parent != _receipt_dir(ctx)
+        or target.name != expected_name
+        or receipt.get("receipt_sha256") != transaction.receipt_sha256
+        or receipt_sha256(receipt) != transaction.receipt_sha256
+        or receipt.get("sequence") != transaction.target_sequence
+        or receipt.get("previous_receipt_sha256") != transaction.expected_head_sha256
+        or receipt.get("resulting_state") != transaction.target_lifecycle_state
+        or _transition_from_receipt(receipt) != receipt_transition
+    ):
+        raise RoleGovernanceError("recovery transaction receipt journal diverged")
+    return target, transaction.receipt_bytes, receipt
+
+
+def _transaction_chain(
+    ctx: GovernanceContext,
+    transaction: lineage_registry.TransactionRecord,
+    receipt_path: Path,
+    receipt: dict[str, Any],
+) -> tuple[bytes, int, dict[str, Any]]:
+    current = load_chain(ctx)
+    if (
+        current.get("sequence") == transaction.target_sequence
+        and current.get("head_sha256") == transaction.target_head_sha256
+        and current.get("state") == transaction.target_lifecycle_state
+    ):
+        candidate = current
+    elif (
+        current.get("sequence") == transaction.expected_sequence
+        and current.get("head_sha256") == transaction.expected_head_sha256
+    ):
+        candidate = _new_chain(
+            ctx,
+            current,
+            receipt_path,
+            receipt,
+            transaction.target_lifecycle_state,
+        )
+    else:
+        raise RoleGovernanceError(
+            "recovery local chain matches neither transaction predecessor nor target"
+        )
+    body = _json_bytes(candidate)
+    mode = 0o600
+    if transaction.checkpoint_payload is not None:
+        try:
+            checkpoint = json.loads(transaction.checkpoint_payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RoleGovernanceError(
+                "recovery transaction checkpoint journal is not JSON"
+            ) from exc
+        if (
+            not isinstance(checkpoint, dict)
+            or canonical_json(checkpoint) != transaction.checkpoint_payload
+            or sha256_bytes(transaction.checkpoint_payload)
+            != transaction.checkpoint_memory_id
+        ):
+            raise RoleGovernanceError(
+                "recovery transaction checkpoint journal is non-canonical"
+            )
+        checkpoint_checks = {
+            "schema": "bugate.role-lineage-checkpoint/v1",
+            "lineage_id": transaction.lineage_id,
+            "sequence": transaction.target_sequence,
+            "previous_checkpoint_id": transaction.expected_checkpoint_memory_id,
+            "previous_receipt_sha256": transaction.expected_head_sha256,
+            "receipt_sha256": transaction.receipt_sha256,
+            "resulting_state": transaction.target_lifecycle_state,
+            "registry_revision": transaction.expected_revision + 1,
+        }
+        if any(checkpoint.get(field) != value for field, value in checkpoint_checks.items()):
+            raise RoleGovernanceError(
+                "recovery transaction checkpoint precondition diverged"
+            )
+        receipt_rel, checkpoint_receipt, checkpoint_receipt_mode, parsed_receipt = (
+            _decode_recovery_envelope(
+                checkpoint.get("receipt_envelope"),
+                "transaction checkpoint receipt",
+            )
+        )
+        if (
+            receipt_rel != Path(workspace_rel(receipt_path, ctx.root))
+            or checkpoint_receipt != transaction.receipt_bytes
+            or checkpoint_receipt_mode != transaction.receipt_mode
+            or parsed_receipt != receipt
+        ):
+            raise RoleGovernanceError(
+                "recovery transaction checkpoint receipt envelope diverged"
+            )
+        rel, checkpoint_body, checkpoint_mode, parsed = _decode_recovery_envelope(
+            checkpoint.get("chain_envelope"),
+            "transaction checkpoint chain",
+        )
+        if rel != Path(workspace_rel(_chain_path(ctx), ctx.root)):
+            raise RoleGovernanceError("recovery transaction checkpoint chain path diverged")
+        if checkpoint_body != body or parsed != candidate:
+            raise RoleGovernanceError("recovery transaction checkpoint chain bytes diverged")
+        mode = checkpoint_mode
+    return body, mode, candidate
+
+
+def _checkpoint_payload_for_transaction(
+    ctx: GovernanceContext,
+    key: lineage_registry.LineageKey,
+    record: lineage_registry.LineageRecord,
+    transaction: lineage_registry.TransactionRecord,
+    receipt_path: Path,
+    receipt_body: bytes,
+    receipt: dict[str, Any],
+    chain_body: bytes,
+    chain: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema": "bugate.role-lineage-checkpoint/v1",
+        "lineage_key": key.as_dict(),
+        "lineage_id": key.lineage_id,
+        "lineage_root_id": record.root_memory_id,
+        "sequence": transaction.target_sequence,
+        "previous_checkpoint_id": transaction.expected_checkpoint_memory_id,
+        "previous_receipt_sha256": transaction.expected_head_sha256,
+        "receipt_sha256": transaction.receipt_sha256,
+        "resulting_state": transaction.target_lifecycle_state,
+        "registry_revision": transaction.expected_revision + 1,
+        "receipt_envelope": _checkpoint_envelope(
+            ctx,
+            receipt_path,
+            receipt_body,
+            receipt,
+            mode=transaction.receipt_mode or 0o600,
+        ),
+        "chain_envelope": _checkpoint_envelope(
+            ctx,
+            _chain_path(ctx),
+            chain_body,
+            chain,
+        ),
+    }
+
+
+def _resume_lifecycle_transaction(
+    ctx: GovernanceContext,
+    registry: lineage_registry.LineageRegistry,
+    key: lineage_registry.LineageKey,
+    record: lineage_registry.LineageRecord,
+    claim: lineage_registry.RecoveryClaim,
+) -> tuple[dict[str, Any], lineage_registry.TransactionRecord]:
+    """Replay one journaled event through exact local publication.
+
+    The claimed transaction deliberately remains active at ``chain_replaced``.
+    Recovery either completes an existing evidence-recovery event or atomically
+    hands an original/restore transaction to its evidence-recovery successor.
+    Ending the source here would recreate an aligned-without-audit crash gap.
+    """
+
+    token = claim.claim_token
+    transaction = claim.transaction
+    transition = _transaction_transition(transaction)
+    prepared: dict[str, Any] | None = None
+    pre_cas = (
+        lineage_registry.TX_STAGES.index(transaction.stage)
+        < lineage_registry.TX_STAGES.index(
+            lineage_registry.TX_STAGE_REGISTRY_COMMITTED
+        )
+    )
+    if pre_cas:
+        if (
+            record.head_sha256 != transaction.expected_head_sha256
+            or record.sequence != transaction.expected_sequence
+            or record.revision != transaction.expected_revision
+            or record.checkpoint_memory_id
+            != transaction.expected_checkpoint_memory_id
+        ):
+            raise RoleGovernanceError(
+                "recovery transaction predecessor no longer matches registry authority"
+            )
+        _verify_strict_lineage_predecessor(ctx, registry, key, record)
+
+    if transaction.stage == lineage_registry.TX_STAGE_PENDING:
+        prepared = _memory_prepare(ctx, transition)
+        _failure_point("after_memory_prepare_http", ctx, transaction.tx_id)
+        memory_id = str(prepared.get("memory_id") or "")
+        transaction = registry.mark_recovery_stage(
+            transaction.tx_id,
+            claim_token=token,
+            expected_stage=transaction.stage,
+            new_stage=lineage_registry.TX_STAGE_MEMORY_PREPARED,
+            **({"transition_memory_id": memory_id} if memory_id else {}),
+        )
+        _failure_point("after_memory_transition", ctx, transaction.tx_id)
+
+    if transaction.stage == lineage_registry.TX_STAGE_MEMORY_PREPARED:
+        if prepared is None:
+            if record.memory_mode == "best_effort" and not transaction.transition_memory_id:
+                # The empty ID is itself the durable decision that this event
+                # was unanchored.  An availability flip must not rewrite the
+                # receipt's Memory semantics during crash replay.
+                prepared = {
+                    "namespace": _memory_namespace(ctx),
+                    "memory_id": "",
+                    "verified_at": "",
+                    "status": "best_effort_unavailable",
+                }
+            else:
+                prepared = _memory_prepare(ctx, transition)
+        if str(prepared.get("memory_id") or "") != transaction.transition_memory_id:
+            raise RoleGovernanceError(
+                "recovery Memory transition exact ID differs from durable journal"
+            )
+        memory_public = {
+            field: value for field, value in prepared.items() if not field.startswith("_")
+        }
+        receipt = _receipt_from_transition(
+            transition,
+            memory_public,
+            transaction.target_lifecycle_state,
+        )
+        finalized = _memory_finalize(
+            ctx,
+            prepared,
+            receipt["receipt_sha256"],
+            transition,
+        )
+        _failure_point("after_memory_finalize_http", ctx, transaction.tx_id)
+        finalized_public = {
+            field: value for field, value in finalized.items() if not field.startswith("_")
+        }
+        if finalized_public != receipt["memory"]:
+            receipt["memory"] = finalized_public
+            receipt["receipt_sha256"] = receipt_sha256(receipt)
+        receipt_path = _receipt_dir(ctx) / (
+            f"{receipt['sequence']:06d}-{transaction.event.replace('_', '-')}-"
+            f"{receipt['receipt_sha256']}.json"
+        )
+        receipt_body = _json_bytes(receipt)
+        transaction = registry.mark_recovery_stage(
+            transaction.tx_id,
+            claim_token=token,
+            expected_stage=transaction.stage,
+            new_stage=lineage_registry.TX_STAGE_RECEIPT_BOUND,
+            target_head_sha256=receipt["receipt_sha256"],
+            receipt_path=workspace_rel(receipt_path, ctx.root),
+            receipt_bytes=receipt_body,
+            receipt_mode=0o600,
+            receipt_sha256=receipt["receipt_sha256"],
+        )
+        _failure_point("after_receipt_bind", ctx, transaction.tx_id)
+
+    if transaction.stage == lineage_registry.TX_STAGE_RECEIPT_BOUND:
+        transaction = registry.mark_recovery_stage(
+            transaction.tx_id,
+            claim_token=token,
+            expected_stage=transaction.stage,
+            new_stage=lineage_registry.TX_STAGE_MEMORY_FINALIZED,
+        )
+
+    if transaction.stage == lineage_registry.TX_STAGE_MEMORY_FINALIZED:
+        receipt_path, receipt_body, receipt = _transaction_receipt(ctx, transaction)
+        chain_body, _chain_mode, chain = _transaction_chain(
+            ctx,
+            transaction,
+            receipt_path,
+            receipt,
+        )
+        if record.memory_mode == "required":
+            payload = _checkpoint_payload_for_transaction(
+                ctx,
+                key,
+                record,
+                transaction,
+                receipt_path,
+                receipt_body,
+                receipt,
+                chain_body,
+                chain,
+            )
+            checkpoint_id = sha256_bytes(canonical_json(payload))
+            checkpoint = _memory_probe_checkpoint(ctx, checkpoint_id)
+            if checkpoint is None:
+                checkpoint = _memory_create_checkpoint(ctx, payload)
+            _failure_point("after_checkpoint_http", ctx, transaction.tx_id)
+            _verify_checkpoint_result(
+                checkpoint,
+                payload,
+                checkpoint_id=checkpoint_id,
+                label="recovery candidate",
+            )
+            transaction = registry.mark_recovery_stage(
+                transaction.tx_id,
+                claim_token=token,
+                expected_stage=transaction.stage,
+                new_stage=lineage_registry.TX_STAGE_CHECKPOINT_VERIFIED,
+                checkpoint_memory_id=checkpoint_id,
+                checkpoint_payload=payload,
+            )
+            _failure_point("after_checkpoint", ctx, transaction.tx_id)
+        else:
+            transaction = registry.mark_recovery_stage(
+                transaction.tx_id,
+                claim_token=token,
+                expected_stage=transaction.stage,
+                new_stage=lineage_registry.TX_STAGE_READY_FOR_CAS,
+            )
+
+    if transaction.stage == lineage_registry.TX_STAGE_CHECKPOINT_VERIFIED:
+        if transaction.checkpoint_payload is None:
+            raise RoleGovernanceError("verified checkpoint has no durable canonical payload")
+        expected_payload = json.loads(transaction.checkpoint_payload.decode("utf-8"))
+        checkpoint = _memory_get_checkpoint(ctx, transaction.checkpoint_memory_id)
+        _verify_checkpoint_result(
+            checkpoint,
+            expected_payload,
+            checkpoint_id=transaction.checkpoint_memory_id,
+            label="recovery verified",
+        )
+        transaction = registry.mark_recovery_stage(
+            transaction.tx_id,
+            claim_token=token,
+            expected_stage=transaction.stage,
+            new_stage=lineage_registry.TX_STAGE_READY_FOR_CAS,
+        )
+
+    if transaction.stage == lineage_registry.TX_STAGE_READY_FOR_CAS:
+        if record.memory_mode == "required":
+            if transaction.checkpoint_payload is None:
+                raise RoleGovernanceError("ready transaction lost its checkpoint payload")
+            expected_payload = json.loads(transaction.checkpoint_payload.decode("utf-8"))
+            checkpoint = _memory_get_checkpoint(ctx, transaction.checkpoint_memory_id)
+            _verify_checkpoint_result(
+                checkpoint,
+                expected_payload,
+                checkpoint_id=transaction.checkpoint_memory_id,
+                label="pre-CAS recovery",
+            )
+        committed = registry.compare_and_swap_head(
+            transaction.tx_id,
+            expected_stage=transaction.stage,
+            recovery_token=token,
+        )
+        transaction = committed.transaction
+        _failure_point("after_registry_cas", ctx, transaction.tx_id)
+
+    receipt_path, receipt_body, receipt = _transaction_receipt(ctx, transaction)
+    chain_body, chain_mode, _chain = _transaction_chain(
+        ctx,
+        transaction,
+        receipt_path,
+        receipt,
+    )
+    if transaction.stage == lineage_registry.TX_STAGE_REGISTRY_COMMITTED:
+        _atomic_bytes(
+            receipt_path,
+            receipt_body,
+            replace=False,
+            mode=transaction.receipt_mode or 0o600,
+        )
+        _failure_point("after_receipt_write", ctx, transaction.tx_id)
+        transaction = registry.mark_recovery_stage(
+            transaction.tx_id,
+            claim_token=token,
+            expected_stage=transaction.stage,
+            new_stage=lineage_registry.TX_STAGE_RECEIPT_WRITTEN,
+        )
+    if transaction.stage == lineage_registry.TX_STAGE_RECEIPT_WRITTEN:
+        _failure_point("before_chain_replace", ctx, transaction.tx_id)
+        _atomic_bytes(_chain_path(ctx), chain_body, replace=True, mode=chain_mode)
+        _failure_point("after_chain_replace", ctx, transaction.tx_id)
+        transaction = registry.mark_recovery_stage(
+            transaction.tx_id,
+            claim_token=token,
+            expected_stage=transaction.stage,
+            new_stage=lineage_registry.TX_STAGE_CHAIN_REPLACED,
+        )
+    if transaction.stage != lineage_registry.TX_STAGE_CHAIN_REPLACED:
+        raise RoleGovernanceError(
+            f"unsupported lifecycle recovery stage: {transaction.stage}"
+        )
+    return receipt, transaction
+
+
+def _release_recovery_claim(
+    registry: lineage_registry.LineageRegistry,
+    tx_id: str,
+    claim_token: str,
+    *,
+    category: str,
+    error: BaseException,
+) -> None:
+    """Best-effort release of exactly the still-owned recovery claim."""
+
+    try:
+        latest = registry.get_transaction(tx_id)
+        if (
+            latest is not None
+            and latest.status == lineage_registry.TX_STATUS_RECOVERING
+            and latest.recovery_token == claim_token
+        ):
+            registry.release_recovery(
+                tx_id,
+                claim_token=claim_token,
+                error=_journal_error(category, error),
+            )
+    except Exception:
+        # Preserve the original failure.  A claim that could not be released is
+        # itself durable and remains visible as recovery_pending.
+        pass
+
+
+def _recovery_publication_base(
+    ctx: GovernanceContext,
+    record: lineage_registry.LineageRecord,
+    *,
+    source: str,
+) -> dict[str, Any]:
+    return {
+        "event": RECOVERY_EVENT,
+        "phase": _recovery_phase(record.lifecycle_state),
+        "from_role": "agent",
+        "to_role": "",
+        "actor": {"role": "agent", "runtime": "unknown", "session_id": ""},
+        "profile": profile_snapshot(ctx),
+        "artifacts": [],
+        "dispatch": {},
+        "human_acceptance": {},
+        "recovery": {
+            "source": source,
+            "recovered_head_sha256": record.head_sha256,
+            "recovered_sequence": record.sequence,
+            "preserved_lifecycle_state": record.lifecycle_state,
+        },
+    }
+
+
+def _require_exact_local_lineage_head(
+    ctx: GovernanceContext,
+    record: lineage_registry.LineageRecord,
+) -> None:
+    receipts = verify_chain(ctx)
+    chain = load_chain(ctx)
+    if (
+        len(receipts) != record.sequence
+        or int(chain.get("sequence") or 0) != record.sequence
+        or str(chain.get("head_sha256") or "") != record.head_sha256
+        or str(chain.get("state") or "") != record.lifecycle_state
+    ):
+        raise RoleGovernanceError(
+            "recovered local history does not match the exact registry head"
+        )
+
+
+def _finish_recovery_successor(
+    ctx: GovernanceContext,
+    registry: lineage_registry.LineageRegistry,
+    key: lineage_registry.LineageKey,
+    record: lineage_registry.LineageRecord,
+    transaction: lineage_registry.TransactionRecord,
+    *,
+    claim: lineage_registry.RecoveryClaim | None = None,
+) -> dict[str, Any]:
+    """Claim, replay, and complete exactly one evidence-recovery successor."""
+
+    if transaction.event != RECOVERY_EVENT:
+        raise RoleGovernanceError(
+            "recovery successor transaction has an unexpected event"
+        )
+    if claim is None:
+        claim = registry.claim_recovery(
+            transaction.tx_id,
+            expected_stage=transaction.stage,
+        )
+    elif claim.transaction.tx_id != transaction.tx_id:
+        raise RoleGovernanceError("recovery successor claim belongs to another transaction")
+    try:
+        receipt, terminal = _resume_lifecycle_transaction(
+            ctx,
+            registry,
+            key,
+            record,
+            claim,
+        )
+        registry.complete(
+            terminal.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_CHAIN_REPLACED,
+            recovery_token=claim.claim_token,
+        )
+        return receipt
+    except Exception as exc:
+        _release_recovery_claim(
+            registry,
+            transaction.tx_id,
+            claim.claim_token,
+            category="recovery_successor_failed",
+            error=exc,
+        )
+        raise
+
+
+def _recovery_result(
+    ctx: GovernanceContext,
+    record: lineage_registry.LineageRecord,
+    receipt: dict[str, Any],
+) -> dict[str, Any]:
+    status = status_data(ctx.artifact_dir)
+    expected = {
+        "lineage_id": record.lineage_id,
+        "lifecycle_state": record.lifecycle_state,
+        "sequence": record.sequence,
+        "head_sha256": record.head_sha256,
+        "registry_sequence": record.sequence,
+        "registry_head_sha256": record.head_sha256,
+        "registry_revision": record.revision,
+        "receipt_count": record.sequence,
+    }
+    if (
+        status.get("ok") is not True
+        or status.get("integrity_state") != "aligned"
+        or status.get("active_transaction") is not None
+        or any(status.get(field) != value for field, value in expected.items())
+    ):
+        detail = str(status.get("error") or "status/registry values diverged")
+        raise RoleGovernanceError(
+            f"recovery final lineage-integrity verification failed: {detail}"
+        )
+    return {
+        "ok": True,
+        "integrity_state": status["integrity_state"],
+        "lifecycle_state": status["lifecycle_state"],
+        "lineage_id": status["lineage_id"],
+        "recovery_receipt": receipt,
+    }
+
+
+@_serialized_transition
+def recover(
+    artifact_dir: str | Path,
+    *,
+    lineage_id: str,
+    expected_head: str,
+    archive: str | Path | None = None,
+) -> dict[str, Any]:
+    """Restore an exact committed head, then append a state-preserving audit event."""
+
+    ctx = load_context(artifact_dir)
+    if ctx.mode == "off":
+        raise RoleGovernanceError("role governance is off for this profile")
+    key = _require_exact_lineage_id(ctx, lineage_id)
+    integrity = _lineage_integrity(ctx)
+    record = integrity.record
+    registry = integrity.registry
+    if record is None or registry is None:
+        raise RoleGovernanceError("recover requires an existing lineage registry record")
+    expected = "" if expected_head == "EMPTY" else expected_head.strip()
+    if expected != record.head_sha256:
+        raise RoleGovernanceError("recover expected head does not match registry head")
+    if integrity.integrity_state not in {
+        "history_missing",
+        "history_diverged",
+        "recovery_pending",
+    }:
+        raise RoleGovernanceError(
+            "recover requires history_missing, history_diverged, or recovery_pending"
+        )
+
+    active = integrity.active_transaction
+    active_pre_cas = active is not None and (
+        lineage_registry.TX_STAGES.index(active.stage)
+        < lineage_registry.TX_STAGES.index(
+            lineage_registry.TX_STAGE_REGISTRY_COMMITTED
+        )
+    )
+    exact_local_predecessor = (
+        integrity.chain is not None
+        and not integrity.local_error
+        and int(integrity.chain.get("sequence") or 0) == record.sequence
+        and str(integrity.chain.get("head_sha256") or "") == record.head_sha256
+        and str(integrity.chain.get("state") or "") == record.lifecycle_state
+    )
+    if (
+        archive is None
+        and record.memory_mode == "best_effort"
+        and active_pre_cas
+        and exact_local_predecessor
+    ):
+        receipt_envelopes, chain_envelope, source = (
+            _local_predecessor_recovery_history(
+                ctx,
+                integrity.receipts,
+                integrity.chain,
+            )
+        )
+    elif archive is not None:
+        receipt_envelopes, chain_envelope, source = _archive_recovery_history(
+            Path(archive), lineage_id=key.lineage_id, expected_head=record.head_sha256
+        )
+    else:
+        receipt_envelopes, chain_envelope, source = _checkpoint_recovery_history(ctx, record)
+    staged_receipts, staged_chain = _validate_recovery_history(
+        ctx,
+        receipt_envelopes,
+        chain_envelope,
+        expected_head=record.head_sha256,
+        expected_sequence=record.sequence,
+    )
+    if archive is not None and record.memory_mode == "required":
+        retained_receipts, retained_chain, _retained_source = (
+            _checkpoint_recovery_history(ctx, record)
+        )
+        if (
+            receipt_envelopes != retained_receipts
+            or chain_envelope != retained_chain
+        ):
+            raise RoleGovernanceError(
+                "operator recovery archive does not exactly match retained "
+                "strict checkpoint history"
+            )
+    _preflight_recovery_writes(ctx, staged_receipts, staged_chain)
+
+    if active is not None:
+        source_transaction = active
+        source_claim = registry.claim_recovery(
+            active.tx_id,
+            expected_stage=active.stage,
+        )
+        source_transaction = source_claim.transaction
+    else:
+        source_transaction = registry.begin_pending(
+            key,
+            event="recovery_restore",
+            expected_head_sha256=record.head_sha256,
+            expected_sequence=record.sequence,
+            expected_revision=record.revision,
+            expected_checkpoint_memory_id=record.checkpoint_memory_id,
+            target_lifecycle_state=record.lifecycle_state,
+            transition_payload={
+                "schema": "bugate.role-recovery-journal/v1",
+                "lineage_id": record.lineage_id,
+                "expected_head_sha256": record.head_sha256,
+                "expected_sequence": record.sequence,
+                "source": source,
+            },
+        )
+        source_claim = registry.claim_recovery(
+            source_transaction.tx_id,
+            expected_stage=lineage_registry.TX_STAGE_PENDING,
+        )
+        source_transaction = source_claim.transaction
+
+    try:
+        _apply_recovery_history(
+            ctx,
+            staged_receipts,
+            staged_chain,
+            tx_id=source_transaction.tx_id,
+        )
+
+        # A recovery successor is already the one durable audit event for this
+        # operation.  Resume it verbatim; never synthesize a second successor.
+        if source_transaction.event == RECOVERY_EVENT:
+            receipt = _finish_recovery_successor(
+                ctx,
+                registry,
+                key,
+                record,
+                source_transaction,
+                claim=source_claim,
+            )
+            final_record = registry.require_lineage(key)
+            _require_exact_local_lineage_head(ctx, final_record)
+            return _recovery_result(ctx, final_record, receipt)
+
+        if source_transaction.event == "recovery_restore":
+            recovered_record = record
+            if active is not None:
+                source = f"{source}+resumed_restore"
+        else:
+            _receipt, source_transaction = _resume_lifecycle_transaction(
+                ctx,
+                registry,
+                key,
+                record,
+                source_claim,
+            )
+            recovered_record = registry.require_lineage(key)
+            source = f"{source}+resumed_lifecycle_tx"
+
+        _require_exact_local_lineage_head(ctx, recovered_record)
+        base = _recovery_publication_base(ctx, recovered_record, source=source)
+        transition = _transition_for_publication(ctx, key, recovered_record, base)
+        handoff = registry.handoff_recovery_successor(
+            source_transaction.tx_id,
+            claim_token=source_claim.claim_token,
+            transition_payload=transition,
+        )
+        _failure_point(
+            "after_recovery_successor_handoff",
+            ctx,
+            handoff.successor_transaction.tx_id,
+        )
+    except Exception as exc:
+        _release_recovery_claim(
+            registry,
+            source_transaction.tx_id,
+            source_claim.claim_token,
+            category="recovery_failed",
+            error=exc,
+        )
+        raise
+
+    receipt = _finish_recovery_successor(
+        ctx,
+        registry,
+        key,
+        handoff.lineage,
+        handoff.successor_transaction,
+    )
+    final_record = registry.require_lineage(key)
+    _require_exact_local_lineage_head(ctx, final_record)
+    return _recovery_result(ctx, final_record, receipt)
+
+
 @_serialized_transition
 def approve(
     artifact_dir: str | Path,
@@ -1328,6 +4359,7 @@ def approve(
     ctx = load_context(artifact_dir)
     if ctx.mode == "off":
         raise RoleGovernanceError("role governance is off for this profile")
+    _require_aligned_lineage(ctx)
     actor = _actor(ctx, "pre_code", role=role, session_id=session_id)
     if not approved_by.strip():
         raise RoleGovernanceError("--approved-by is required and records an existing human decision")
@@ -1881,6 +4913,7 @@ def handoff(
     ctx = load_context(artifact_dir)
     if ctx.mode == "off":
         raise RoleGovernanceError("role governance is off for this profile")
+    _require_aligned_lineage(ctx)
     actor_role = os.environ.get("BUGATE_AGENT_ROLE", "").strip().lower()
     source_phase, target_phase = _phase_for_handoff(ctx, actor_role, to_role.lower())
     if phase not in {source_phase, target_phase}:
@@ -1901,6 +4934,11 @@ def handoff(
         accepted = _latest(receipts, "implementer_acceptance")
         if not accepted:
             raise RoleGovernanceError("implementer acceptance is required before handoff")
+        _require_exact_acceptance_actor(
+            accepted,
+            actor,
+            transition="implementer_handoff",
+        )
         artifacts = _precode_snapshot(ctx)
         impl = implementation_snapshot(ctx, implementation_files)
         artifacts = sorted(artifacts + impl, key=lambda item: item["path"])
@@ -1940,6 +4978,7 @@ def accept(
     ctx = load_context(artifact_dir)
     if ctx.mode == "off":
         raise RoleGovernanceError("role governance is off for this profile")
+    _require_aligned_lineage(ctx)
     if phase not in {"implementation", "post_run"}:
         raise RoleGovernanceError("accept --phase must be implementation or post_run")
     actor = _actor(ctx, phase, role=role, session_id=session_id)
@@ -2228,9 +5267,18 @@ def preflight(
         ctx = load_context(artifact_dir)
         if ctx.mode == "off":
             return GovernanceResult(True, "off", phase, INITIAL_STATE)
-        chain = load_chain(ctx)
-        chain_state = str(chain.get("state") or INITIAL_STATE)
+        integrity = _lineage_integrity(ctx)
+        chain_state = integrity.lifecycle_state
         errors: list[str] = []
+        allow_uninitialized_precode = (
+            integrity.integrity_state == "uninitialized" and phase == "pre_code"
+        )
+        if integrity.integrity_state != "aligned" and not allow_uninitialized_precode:
+            detail = integrity.local_error or integrity.registry_error
+            errors.append(
+                f"integrity_state={integrity.integrity_state}"
+                + (f": {detail}" if detail else "")
+            )
         role = os.environ.get("BUGATE_AGENT_ROLE", "").strip().lower()
         session = os.environ.get("BUGATE_SESSION_ID", "").strip()
         if not role:
@@ -2248,9 +5296,10 @@ def preflight(
                 "generation before further post-run writes"
             )
         try:
-            verify_chain(ctx)
-            if require_acceptance and phase in {"implementation", "post_run"}:
-                verify_evidence(ctx.artifact_dir, phase=phase)
+            if integrity.integrity_state == "aligned":
+                verify_chain(ctx)
+                if require_acceptance and phase in {"implementation", "post_run"}:
+                    verify_evidence(ctx.artifact_dir, phase=phase)
         except RoleGovernanceError as exc:
             errors.append(str(exc))
         if errors and ctx.mode == "required":
@@ -2305,8 +5354,19 @@ def complete(
     ctx = load_context(artifact_dir)
     if ctx.mode == "off":
         raise RoleGovernanceError("role governance is off for this profile")
+    _require_aligned_lineage(ctx)
     actor = _actor(ctx, phase, role=role, session_id=session_id)
     receipts = verify_evidence(ctx.artifact_dir, phase="post_run")
+    acceptance = _latest(receipts, "reviewer_acceptance")
+    if not acceptance:
+        raise RoleGovernanceError(
+            "reviewer acceptance is required before reviewer_completion"
+        )
+    _require_exact_acceptance_actor(
+        acceptance,
+        actor,
+        transition="reviewer_completion",
+    )
     if not run_command.strip():
         raise RoleGovernanceError("--run-command summary is required")
     if final_gate_status not in {"passed", "failed"}:
@@ -2322,12 +5382,20 @@ def complete(
     ]
     role_evidence_dirs = _role_evidence_dirs(ctx)
     evidence = []
+    evidence_identities: list[Path] = []
     for supplied in evidence_files:
         path = Path(supplied)
         path = _canonical_existing_path(
             path if path.is_absolute() else ctx.root / path
         )
         workspace_rel(path, ctx.root)
+        if any(
+            _same_existing_path(path, prior) for prior in evidence_identities
+        ):
+            raise RoleGovernanceError(
+                "reviewer completion evidence contains a duplicate filesystem identity"
+            )
+        evidence_identities.append(path)
         if any(_within(path, directory) for directory in role_evidence_dirs) or (
             _same_file_as_descendant(path, role_evidence_dirs)
         ):
@@ -2387,32 +5455,146 @@ def complete(
 def status_data(artifact_dir: str | Path) -> dict[str, Any]:
     try:
         ctx = load_context(artifact_dir)
-        chain = load_chain(ctx)
-        error = ""
-        try:
-            receipts = verify_chain(ctx) if ctx.mode != "off" else []
-            if ctx.mode != "off":
-                _verify_closed_completion(ctx, receipts)
-        except RoleGovernanceError as exc:
-            receipts = []
-            error = str(exc)
+        if ctx.mode == "off":
+            chain = load_chain(ctx, allow_uninitialized=True)
+            return {
+                "ok": True,
+                "mode": "off",
+                "memory_mode": ctx.policy["memory_mode"],
+                "integrity_state": "uninitialized",
+                "lifecycle_state": str(chain.get("state") or INITIAL_STATE),
+                "role": os.environ.get("BUGATE_AGENT_ROLE", ""),
+                "session_id": os.environ.get("BUGATE_SESSION_ID", ""),
+                "uc": ctx.uc,
+                "artifact_dir": workspace_rel(ctx.artifact_dir, ctx.root),
+                "state": str(chain.get("state") or INITIAL_STATE),
+                "sequence": int(chain.get("sequence") or 0),
+                "head_sha256": str(chain.get("head_sha256") or ""),
+                "latest_receipts": chain.get("latest_receipts", {}),
+                "receipt_count": 0,
+                "error": "",
+            }
+        integrity = _lineage_integrity(ctx)
+        chain = integrity.chain
+        record = integrity.record
+        error_parts: list[str] = []
+        if integrity.integrity_state != "aligned":
+            error_parts.append(f"integrity_state={integrity.integrity_state}")
+        if integrity.local_error:
+            error_parts.append(integrity.local_error)
+        if integrity.registry_error:
+            error_parts.append(integrity.registry_error)
+        if integrity.integrity_state == "aligned":
+            try:
+                _verify_closed_completion(ctx, list(integrity.receipts))
+            except RoleGovernanceError as exc:
+                error_parts.append(str(exc))
+        sequence = record.sequence if record is not None else int((chain or {}).get("sequence") or 0)
+        head = record.head_sha256 if record is not None else str((chain or {}).get("head_sha256") or "")
+        latest = (chain or {}).get("latest_receipts", {})
+        active = integrity.active_transaction
+        active_initialization = integrity.active_initialization
         return {
-            "ok": not error,
+            "ok": not error_parts and integrity.integrity_state == "aligned",
             "mode": ctx.mode,
             "memory_mode": ctx.policy["memory_mode"],
+            "integrity_state": integrity.integrity_state,
+            "lifecycle_state": integrity.lifecycle_state,
+            "lineage_id": integrity.lineage_id,
+            "lineage_key": integrity.lineage_key.as_dict(),
             "role": os.environ.get("BUGATE_AGENT_ROLE", ""),
             "session_id": os.environ.get("BUGATE_SESSION_ID", ""),
             "uc": ctx.uc,
             "artifact_dir": workspace_rel(ctx.artifact_dir, ctx.root),
-            "state": chain.get("state", "invalid"),
-            "sequence": chain.get("sequence", 0),
-            "head_sha256": chain.get("head_sha256", ""),
-            "latest_receipts": chain.get("latest_receipts", {}),
-            "receipt_count": len(receipts),
-            "error": error,
+            "state": integrity.lifecycle_state,
+            "sequence": sequence,
+            "head_sha256": head,
+            "registry_head_sha256": record.head_sha256 if record else "",
+            "registry_sequence": record.sequence if record else 0,
+            "registry_revision": record.revision if record else 0,
+            "lineage_root_memory_id": record.root_memory_id if record else "",
+            "checkpoint_memory_id": record.checkpoint_memory_id if record else "",
+            "latest_receipts": latest,
+            "receipt_count": len(integrity.receipts),
+            "active_transaction": (
+                {
+                    "tx_id": active.tx_id,
+                    "event": active.event,
+                    "status": active.status,
+                    "stage": active.stage,
+                    "expected_head_sha256": active.expected_head_sha256,
+                    "target_head_sha256": active.target_head_sha256,
+                }
+                if active is not None
+                else None
+            ),
+            "active_initialization": (
+                {
+                    "init_id": active_initialization.init_id,
+                    "status": active_initialization.status,
+                    "stage": active_initialization.stage,
+                    "lineage_id": active_initialization.lineage_id,
+                    "memory_mode": active_initialization.memory_mode,
+                }
+                if active_initialization is not None
+                else None
+            ),
+            "error": "; ".join(error_parts),
         }
+    except (RoleGovernanceError, lineage_registry.RoleLineageError) as exc:
+        return {
+            "ok": False,
+            "mode": "invalid",
+            "integrity_state": "registry_unavailable",
+            "error": str(exc),
+        }
+
+
+def lineage_status_data(artifact_dir: str | Path) -> dict[str, Any]:
+    """Augment local status with an explicit strict-Memory root probe.
+
+    Ordinary hooks and per-edit preflight remain registry/local-only.  This
+    operator command is intentionally allowed to perform the exact remote GET
+    needed to distinguish first use from a deleted machine registry while the
+    deterministic strict-Memory root still exists.
+    """
+
+    data = status_data(artifact_dir)
+    if (
+        data.get("mode") == "off"
+        or data.get("memory_mode") != "required"
+        or data.get("integrity_state") != "uninitialized"
+    ):
+        return data
+    try:
+        ctx = load_context(artifact_dir)
+        key = _lineage_key(ctx)
+        root = _memory_probe_lineage_root(ctx, key)
     except RoleGovernanceError as exc:
-        return {"ok": False, "mode": "invalid", "error": str(exc)}
+        updated = dict(data)
+        updated.update(
+            {
+                "ok": False,
+                "integrity_state": "registry_unavailable",
+                "error": f"strict Memory lineage-root probe failed: {exc}",
+            }
+        )
+        return updated
+    if root is None:
+        return data
+    updated = dict(data)
+    updated.update(
+        {
+            "ok": False,
+            "integrity_state": "migration_required",
+            "lineage_root_memory_id": str(root.get("lineage_root_id") or ""),
+            "error": (
+                "integrity_state=migration_required; deterministic strict Memory "
+                "root exists while the machine registry/local history is absent"
+            ),
+        }
+    )
+    return updated
 
 
 def _print_receipt(receipt: dict[str, Any]) -> None:
@@ -2433,7 +5615,9 @@ def _session_start(args: argparse.Namespace) -> int:
         if artifact:
             data = status_data(artifact)
             print(
-                f"UC={data.get('uc', '<unknown>')} state={data.get('state', '<invalid>')} "
+                f"UC={data.get('uc', '<unknown>')} "
+                f"integrity={data.get('integrity_state', '<invalid>')} "
+                f"lifecycle={data.get('lifecycle_state', '<invalid>')} "
                 f"sequence={data.get('sequence', 0)}"
             )
         if policy["mode"] == "required" and role == "<unset>":
@@ -2502,6 +5686,21 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("status")
     p.add_argument("artifact_dir")
     p.add_argument("--json", action="store_true")
+    p = sub.add_parser("lineage-status")
+    p.add_argument("artifact_dir")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("lineage-init")
+    p.add_argument("artifact_dir")
+    p.add_argument("--lineage-id", required=True)
+    p = sub.add_parser("lineage-adopt")
+    p.add_argument("artifact_dir")
+    p.add_argument("--lineage-id", required=True)
+    p.add_argument("--expected-head", required=True)
+    p = sub.add_parser("recover")
+    p.add_argument("artifact_dir")
+    p.add_argument("--lineage-id", required=True)
+    p.add_argument("--expected-head", required=True)
+    p.add_argument("--archive")
     p = sub.add_parser("verify")
     p.add_argument("artifact_dir")
     p.add_argument("--phase", choices=PHASES)
@@ -2548,18 +5747,51 @@ def main(argv: list[str] | None = None) -> int:
             return _session_start(args)
         if args.command_name == "run":
             return _run_role(args)
-        if args.command_name == "status":
-            data = status_data(args.artifact_dir)
+        if args.command_name in {"status", "lineage-status"}:
+            data = (
+                lineage_status_data(args.artifact_dir)
+                if args.command_name == "lineage-status"
+                else status_data(args.artifact_dir)
+            )
             if args.json:
                 print(json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2))
             else:
                 print(
                     f"role governance mode={data.get('mode')} UC={data.get('uc', '<unknown>')} "
-                    f"state={data.get('state', '<invalid>')} sequence={data.get('sequence', 0)}"
+                    f"integrity={data.get('integrity_state', '<invalid>')} "
+                    f"lifecycle={data.get('lifecycle_state', '<invalid>')} "
+                    f"sequence={data.get('sequence', 0)}"
                 )
                 if data.get("error"):
                     print(f"ERROR: {data['error']}", file=sys.stderr)
             return 0 if data.get("ok") else 2
+        if args.command_name == "lineage-init":
+            _print_receipt(
+                lineage_init(
+                    args.artifact_dir,
+                    lineage_id=args.lineage_id,
+                )
+            )
+            return 0
+        if args.command_name == "lineage-adopt":
+            _print_receipt(
+                lineage_adopt(
+                    args.artifact_dir,
+                    lineage_id=args.lineage_id,
+                    expected_head=args.expected_head,
+                )
+            )
+            return 0
+        if args.command_name == "recover":
+            _print_receipt(
+                recover(
+                    args.artifact_dir,
+                    lineage_id=args.lineage_id,
+                    expected_head=args.expected_head,
+                    archive=args.archive,
+                )
+            )
+            return 0
         if args.command_name == "verify":
             verify_evidence(
                 args.artifact_dir, phase=args.phase, strict_memory=args.strict_memory
@@ -2605,7 +5837,7 @@ def main(argv: list[str] | None = None) -> int:
             raise RoleGovernanceError(f"unsupported command: {args.command_name}")
         _print_receipt(receipt)
         return 0
-    except RoleGovernanceError as exc:
+    except (RoleGovernanceError, lineage_registry.RoleLineageError) as exc:
         print(f"BUGate role governance BLOCKED: {exc}", file=sys.stderr)
         return 2
 

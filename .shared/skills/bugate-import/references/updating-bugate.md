@@ -154,8 +154,12 @@ Do not run `apply` unless the final decision is `GO`. Review at least:
 The updater owns only the release-manifest projection. It does not write,
 delete, stage, commit, or format SUT tests, use-case artifacts,
 `00_role_evidence/**`, profiles/config, Memory data, SUT-owned hooks/skills,
-operating rules, or product/environment material. Unknown files inside a
-managed directory are not recursively deleted.
+operating rules, or product/environment material. It also never creates or
+edits the machine `role-lineage.sqlite3` registry under the effective Memory
+home (`MCP_MEMORY_BASE_DIR` → `BUGATE_MEMORY_HOME` →
+`~/.bugate/memory-bus`), deterministic Memory roots/checkpoints, or per-UC
+lineage transactions. Unknown files inside a managed directory are not
+recursively deleted.
 
 ### Conflict and adoption behavior
 
@@ -266,12 +270,13 @@ preserve the state and reports, stop, and use an explicitly reviewed archival/
 migration procedure from a later compatible release or escalate to BUGate
 maintainers.
 
-## 7. Profile migration is a separate action and commit
+## 7. Profile and role-lineage migration are separate actions
 
 Engine update and governance activation are not one transaction. The updater
 may report profile compatibility, but it never edits `bugate.config.yaml`, a
 profile, `memory.namespace`, human acceptance, role receipts, or
-`00_role_evidence/**`.
+`00_role_evidence/**`. It also never runs `lineage-init`, `lineage-adopt`, or
+`recover`, and never writes the machine lineage registry or Memory home.
 
 - If the plan reports blocking `migration_required`, make and validate the
   minimum profile-schema compatibility correction as its own reviewed change,
@@ -287,6 +292,68 @@ profile, `memory.namespace`, human acceptance, role receipts, or
 The two-commit boundary makes the engine update and governance adoption
 independently auditable and reversible. Engine rollback does not roll back a
 separate profile commit.
+
+### Distinguish the two `migration_required` states
+
+- Updater **profile** `migration_required` appears in `bugate-update plan` and
+  means the profile schema is incompatible with the target engine. It blocks
+  engine apply until the separately reviewed profile correction is complete.
+- Role-lineage **integrity** `migration_required` appears in
+  `bugate-role lineage-status` after a lineage-capable engine/profile is in
+  scope. It means local history exists without a registry row, or a strict
+  deterministic root proves prior lineage existence. Adoption then performs
+  the separate full non-empty-chain verification. It is not an updater conflict
+  and updater success cannot clear or accept it.
+
+After the engine projection is applied, verified, reviewed, and committed—and
+after any separately approved profile action makes required role governance
+applicable—classify every governed UC independently:
+
+```sh
+.bugate/bin/bugate-role lineage-status docs/usecases/<UC> --json
+
+# Genuine first use only; copy the exact ID from lineage-status.
+.bugate/bin/bugate-role lineage-init docs/usecases/<UC> \
+  --lineage-id <exact-lineage-id>
+
+# Verified non-empty pre-v0.4.3 chain; zero receipt rewrites.
+.bugate/bin/bugate-role lineage-adopt docs/usecases/<UC> \
+  --lineage-id <exact-lineage-id> --expected-head <exact-chain-head>
+
+# Registered missing/diverged history or an active publication/recovery transaction.
+.bugate/bin/bugate-role recover docs/usecases/<UC> \
+  --lineage-id <exact-lineage-id> --expected-head <exact-head-or-EMPTY> \
+  [--archive <trusted-recovery-archive>]
+```
+
+An initial non-zero `uninitialized` result is expected and read-only; confirm
+true first use before init. `aligned` needs no migration. A non-empty verified
+legacy chain uses adoption. A strict root with no trustworthy local history
+must remain blocked until pre-loss evidence is restored; do not initialize over
+it. Initialization writes its durable intent before any Memory request and
+advances `pending` -> `root_absence_verified` -> `root_verified` ->
+`registry_initialized` -> `chain_written` -> `completed`. If JSON status shows
+`recovery_pending` with `active_initialization`, rerun exact `lineage-init` to
+resume that intent; do not run `recover`. Registered `history_missing`,
+`history_diverged`, or `recovery_pending` with an active publication/recovery
+transaction uses exact recovery. Recovery resumes an original
+checkpoint-verified/ready-for-CAS publication through the same CAS and local
+publish. After validation/preflight it claims the active source, or creates and
+claims a pending `recovery_restore`, before target writes. One SQLite transaction
+then terminalizes that restore/lifecycle source and installs the sole pending
+`evidence_recovery` successor. There is no aligned/no-audit crash gap; an
+already-active `evidence_recovery` resumes directly, and retry creates no second
+successor or duplicate lifecycle/recovery sequence. Under best-effort Memory, local-history loss
+additionally requires an independently retained trusted archive; required
+Memory reconstructs from exact immutable checkpoints while registry and Memory
+history survive. An explicitly supplied archive selects candidate bytes only;
+retained strict checkpoints remain mandatory and authoritative, and every
+archive envelope must exactly match them before any write. It is not an offline
+fallback for unavailable or divergent strict Memory.
+
+Updater `apply`/`verify` may therefore be successful while one or more UCs are
+not yet `aligned`. Report those as two distinct outcomes; never label engine
+installation success as accepted lineage migration or active Wave 7 runtime.
 
 ## 8. SHA-256 threat model
 
@@ -312,8 +379,12 @@ Record:
 - hook changes, whether Codex re-trust was required/completed, and which new
   sessions were opened;
 - profile migration status and the separate commit/action, if any;
+- per-UC role-lineage `integrity_state` and the separately reviewed
+  init/adopt/recover action, if any;
 - rollback result when exercised and any remaining recovery/history limit.
 
 An update is not complete while `verify` is `NO-GO`, recovery is pending,
 required Codex re-trust/new sessions are outstanding, or a required profile
-migration has not been separately resolved.
+migration has not been separately resolved. Engine update success still does
+not assert per-UC lineage acceptance; any scope promising active required Wave
+7 governance remains incomplete until its governed UCs are `aligned`.

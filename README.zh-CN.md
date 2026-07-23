@@ -8,11 +8,12 @@
 
 BUGate 的定位、唯一规范使用方式（**导入模式**；打开本仓只是在开发 BUGate 本身）、命名与演进计划见 [`CHARTER.md`](CHARTER.md)（CHARTER-BUGATE-001）。
 
-**当前正式版本：v0.4.2。** 详见
-[release notes](docs/releases/v0.4.2.zh-CN.md)。GitHub Release 发布三个资产：
-`bugate-0.4.2.tar.gz`、`bugate-0.4.2.zip` 与
-`bugate-0.4.2.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
-并在解压前校验 SHA-256。
+**仓库 release line：v0.4.3。** 详见
+[release notes](docs/releases/v0.4.3.zh-CN.md)。版本文字本身不是发布证据；只有
+GitHub Release 已实际列出以下三个资产时，v0.4.3 才具有正式分发权威：
+`bugate-0.4.3.tar.gz`、`bugate-0.4.3.zip` 与
+`bugate-0.4.3.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
+并在解压前校验 SHA-256。在此条件满足前，当前已发布回退版本仍是 v0.4.2。
 
 ## 前 5 分钟（从这里开始）
 
@@ -223,7 +224,7 @@ Release asset，校验后在 SUT 仓外解包，再把 installer 指向一个尚
 的 SUT 自动化测试仓：
 
 ```bash
-BUGATE_VERSION=0.4.2
+BUGATE_VERSION=0.4.3
 BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -357,8 +358,8 @@ python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-ter
 从干净 BUGate checkout 构建 Phase 1 GitHub Release archive assets：
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.4.2
-(cd dist && shasum -a 256 -c bugate-0.4.2.SHA256SUMS)
+python3 scripts/build_release_archives.py --version 0.4.3
+(cd dist && shasum -a 256 -c bugate-0.4.3.SHA256SUMS)
 ```
 
 构建器会直接生成三个文件，默认拒绝 tracked 或未被 ignore 的 untracked dirt，
@@ -368,12 +369,12 @@ python3 scripts/build_release_archives.py --version 0.4.2
 输出：
 
 ```text
-dist/bugate-0.4.2.tar.gz
-dist/bugate-0.4.2.zip
-dist/bugate-0.4.2.SHA256SUMS
+dist/bugate-0.4.3.tar.gz
+dist/bugate-0.4.3.zip
+dist/bugate-0.4.3.SHA256SUMS
 ```
 
-把三个文件都附到 tag `v0.4.2` 的 GitHub Release。这些归档以一个版本化
+把三个文件都附到 tag `v0.4.3` 的 GitHub Release。这些归档以一个版本化
 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、
 hooks、scripts 与 bin wrappers。正式资产必须来自干净 release commit；开发态
 dirty-tree flag 不能用于正式发布。

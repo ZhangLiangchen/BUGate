@@ -22,7 +22,7 @@ SCRIPTS = ROOT / "scripts"
 BUILDER = SCRIPTS / "build_release_archives.py"
 CONTRACT = SCRIPTS / "bugate_install_contract.py"
 LEGACY = SCRIPTS / "bugate_legacy_manifest.py"
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 LEGACY_TAGS = ("v0.3.0", "v0.3.1", "v0.3.2", "v0.3.4", "v0.3.5", "v0.4.0", "v0.4.1")
 
 if str(SCRIPTS) not in sys.path:
@@ -321,7 +321,7 @@ class ReleaseArchiveTests(unittest.TestCase):
         self.assertIn(f"bugate-{VERSION}/untracked.txt", tar_names)
 
     def test_explicit_version_must_match_both_manifests(self) -> None:
-        result = self.run_builder("--version", "0.4.3")
+        result = self.run_builder("--version", "0.4.4")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("does not match both plugin manifests", result.stderr)
         self.assertFalse(self.dist.exists())
@@ -334,7 +334,7 @@ class ReleaseArchiveTests(unittest.TestCase):
 
     def test_plugin_manifest_mismatch_is_rejected(self) -> None:
         path = self.repo / ".claude-plugin/plugin.json"
-        path.write_text(json.dumps({"name": "bugate", "version": "0.4.3"}) + "\n")
+        path.write_text(json.dumps({"name": "bugate", "version": "0.4.4"}) + "\n")
         self.commit("make plugin versions inconsistent")
         result = self.run_builder()
         self.assertNotEqual(result.returncode, 0)
@@ -343,7 +343,7 @@ class ReleaseArchiveTests(unittest.TestCase):
 
     def test_updater_version_mismatch_is_rejected(self) -> None:
         (self.repo / "scripts/bugate_update.py").write_text(
-            'UPDATER_VERSION = "0.4.3"\n', encoding="utf-8"
+            'UPDATER_VERSION = "0.4.4"\n', encoding="utf-8"
         )
         self.commit("mismatch updater version")
         result = self.run_builder()

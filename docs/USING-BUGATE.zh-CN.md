@@ -34,7 +34,8 @@
   stale/drifted state fail-closed。禁止手删 journal/history。v1 updater 在
   descriptor-safe 的 128 条 history 上限处也会拒绝
   创建第 129 条 transaction。
-- Engine update 永不改 profile、role evidence、acceptance 或 Memory。完整
+- Engine update 永不改 profile、role evidence、acceptance、machine lineage registry
+  或 Memory，也绝不执行 lineage init/adopt/recover。完整
   BUGate-owned installed projection（含 lock/hooks）作为一个 commit，profile/
   governance migration 必须是独立显式 action 与 commit。
 - 只有 Codex hook bytes 实际变化时才 re-trust Codex Desktop。任一 hook 变化都要求
@@ -49,3 +50,18 @@ Archive/checksum SHA-256 是 tamper-evident integrity，不是 publisher identit
 CLI/Desktop 角色会话，以及 Codex hook re-trust。不要组合 `--init` 与
 `--auto`；03B 由人类设为 passed 后，应直接执行 `bugate-role approve` /
 `handoff`，不能再次生成 03B。
+
+从 v0.4.3 起，每个 required-mode UC 还拥有独立的 lineage-integrity
+门。脚手架后先运行 `lineage-status --json`；只有确认是新 UC 才显式
+`lineage-init`，verified 非空 legacy chain 用 exact head 执行 `lineage-adopt`，已注册
+但缺失、分歧或 transaction pending 的历史走 `recover`。Interrupted initialization
+是例外：JSON 状态会暴露 `active_initialization`，用相同 exact `lineage-init` 继续
+`pending` -> `root_absence_verified` -> `root_verified` ->
+`registry_initialized` -> `chain_written` -> `completed` 的 durable journal。只有
+`aligned` 才允许普通 lifecycle publication。Updater profile `migration_required` 与
+role-lineage integrity `migration_required` 是两个不同状态；updater 成功不证明 per-UC
+adoption 或 recovery。Validation/preflight 通过后，transaction recovery 会在 target
+write 前 claim active source 或 pending `recovery_restore`，按需完成原 lifecycle
+publication，并在原子 terminalize source 的同时安装唯一 pending
+`evidence_recovery` successor。已 active 的 successor 会直接继续，因此 retry 不会
+暴露 aligned/no-audit gap，也不会再安装 successor。

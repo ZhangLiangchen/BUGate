@@ -1,6 +1,6 @@
 {
   "name": "bugate",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Agentic QA governance kit / SDTD gate engine: pre-code gates, auditable lifecycle-role handoffs, first-class imported-mode updates, hash-linked evidence, strict Memory transitions, dual-runtime peer bridges, and physical write guards. Inert until the project carries a committed bugate.config.yaml.",
   "author": {
     "name": "BUGate maintainers"

@@ -39,7 +39,9 @@ When an imported profile enables Wave 7 role governance, each UC also owns
 `00_role_evidence/`: an append-only lifecycle receipt chain. It is governance
 evidence, not a new artifact layer and not the retired `00_orchestration/`
 directory. Agents must never edit it directly; only `bin/bugate-role` publishes
-its atomic receipts.
+its atomic receipts. Starting with v0.4.3, a machine-level lineage registry
+independently records whether that chain has history; deleting the directory is
+detected and never becomes an empty reset.
 
 ### Optional Full-SDTD modeling stages
 
@@ -79,6 +81,11 @@ current designer handoff accepted by an implementer in a distinct session; and
 post-run/04/05 require an implementer handoff accepted by a reviewer. Both
 `check_bugate.py` and `check_role_evidence.py` must pass. Profile, artifact,
 implementation, receipt, or chain drift re-locks the affected phase.
+After scaffolding a genuinely new UC, the operator must inspect
+`lineage-status --json` and explicitly confirm its exact ID with
+`lineage-init`; an existing non-empty pre-v0.4.3 chain uses exact
+`lineage-adopt` instead. A normal lifecycle publisher never manufactures this
+first-use/adoption decision.
 
 Wave 1 and Wave 7 are different. Wave 1 Codex/Claude peers independently
 cross-review inside the designer phase. They are read-only analysis workers and
@@ -113,6 +120,9 @@ guarded writes until then, jumping to code is rejected rather than helpful.
 - Adversarial core bridge: `python3 scripts/sdtd_adversarial_cli_bridge.py run-all <artifact_dir>`
 - Post-run reports: `python3 scripts/self_healing_mvp.py ...` then `python3 scripts/generate_sdtd_reports.py <artifact_dir> ... --write`
 - Role status/local verification: `bin/bugate-role status <artifact_dir>` and `bin/bugate-role verify <artifact_dir> --phase <pre_code|implementation|post_run>`
+- Explicit lineage identity/status: `bin/bugate-role lineage-status <artifact_dir> --json` (read-only; under required Memory it probes the deterministic root only when local state appears uninitialized)
+- Confirmed first use: `bin/bugate-role lineage-init <artifact_dir> --lineage-id <exact-id>`; verified legacy history: `lineage-adopt ... --lineage-id <exact-id> --expected-head <exact-head>`
+- Registered history recovery: `bin/bugate-role recover <artifact_dir> --lineage-id <exact-id> --expected-head <head-or-EMPTY> [--archive <trusted-recovery-archive>]`
 - Independent lifecycle session: `bin/bugate-role run --role <designer|implementer|reviewer> -- <codex-or-claude-command>`
 - Human-decision record and handoff chain: `bin/bugate-role approve ...`, `handoff ...`, `accept ...`, and `complete ...` (see the imported-mode guide; required Memory accepts the exact handoff Memory ID only)
 - Wave 8 quality: `python3 scripts/oracle_falsification.py --spec <spec.yaml> --gate` then `python3 scripts/generate_assertion_coverage_matrix.py --artifact-root <dir> --spec <spec.yaml> --mutation-result <result.json>` — declarative oracle falsification scoring + 5-state coverage matrix; reports `profile_required` without a spec.
@@ -144,10 +154,39 @@ OWN governance memory records under the core namespace via `--core`.
 
 Ordinary recall, notes, search, and Stop heartbeat are best-effort. Under
 `role_governance.memory_mode: required`, lifecycle transitions use strict
-Memory writes and exact-ID verification. Unavailability or any namespace,
-role, UC, phase, transition, or receipt mismatch blocks the transition before a
-local unlock receipt is published. Normal edits perform local receipt/hash
-verification only and never call Memory Service.
+Memory writes, deterministic lineage roots/checkpoints, and exact-ID
+verification. A failure after the durable publication journal is created leaves
+`recovery_pending` and no completed unlock publication; pre-journal validation
+or handoff verification failure creates no new pending transaction. Under
+`best_effort`, lifecycle publication may attempt transition Memory calls but
+tolerates their failure. The machine registry still detects deletion and
+serializes publication, but it creates no remote checkpoint; restoration after
+local loss requires a separately retained trusted recovery archive. Required
+recovery uses strict checkpoints by default. An explicitly supplied trusted
+archive selects the candidate bytes, but strict Memory history remains
+mandatory and authoritative: every archive envelope must exactly match the
+retained checkpoints before any write. It is not an offline fallback for
+unavailable or divergent strict Memory. Normal edits,
+ordinary `status`, and hooks perform local registry/receipt/hash verification
+only and never call Memory Service.
+
+First-use initialization has its own intent-first journal in both Memory modes:
+`pending` -> `root_absence_verified` -> `root_verified` ->
+`registry_initialized` -> `chain_written` -> `completed`. Once that intent
+exists, JSON status reports `recovery_pending` plus `active_initialization`, and
+the operator must rerun the same exact `lineage-init` to resume it; `recover` is
+for an active lifecycle/recovery transaction. A strict root found at the
+initial probe aborts the pre-root/pre-lineage intent and reports
+`migration_required`.
+Normal lifecycle publishers cannot bypass an active initialization. Recovery
+validates and preflights before creating a new journal, then claims either the
+active source or a pending `recovery_restore` before target writes. It resumes
+an already checkpoint-verified original publication through its own CAS/local
+publish when needed. One SQLite transaction then terminalizes that claimed
+restore/lifecycle source and installs the sole pending `evidence_recovery`
+successor. This prevents an aligned/no-audit crash gap; if the active source is
+already `evidence_recovery`, retry resumes it without installing another or
+creating a duplicate lifecycle/recovery event.
 
 See `docs/qa-methodology/EXPERIENCE_PROMOTION_PROTOCOL.md` for the full
 record / recall / promote protocol.
@@ -173,5 +212,14 @@ record / recall / promote protocol.
   auditable controls, not non-repudiable identity. Strong identity needs OS or
   container isolation, managed runners, or role-scoped server credentials.
   Hooks also cannot intercept arbitrary shell redirection or external editors.
+- The registry plus strict Memory detect evidence deletion; they do not
+  authenticate who deleted or restored it. An actor with the same OS-user
+  authority who deletes the workspace evidence, the machine registry, and the
+  complete Memory home is outside the local threat boundary. History lost
+  before deterministic anchoring cannot be inferred from an empty directory.
+- Engine update is separate from lineage migration. The imported updater never
+  edits profiles, namespaces, role evidence, the machine registry, or Memory,
+  and never runs lineage init/adopt/recover; updater success does not mean an
+  existing UC accepted lineage migration.
 - If source code is available, treat it as one possible evidence source, not as
   the only truth for black-box behavior.

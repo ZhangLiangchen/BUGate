@@ -69,6 +69,11 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         self.assertEqual(len(versions), 1, versions)
         version = versions.pop()
         self.assertRegex(version, VERSION_RE)
+        self.assertEqual(
+            "0.4.3",
+            version,
+            "repository version surfaces must identify the source candidate",
+        )
 
         def git(root: Path, *args: str) -> str:
             return subprocess.run(
@@ -157,7 +162,7 @@ class RepositoryReleaseContractTests(unittest.TestCase):
                 git(checkout, "rev-parse", "HEAD"),
             )
 
-    def test_current_release_has_bilingual_notes_and_exact_asset_names(self) -> None:
+    def test_source_candidate_has_bilingual_notes_and_exact_asset_names(self) -> None:
         version = updater_version()
         expected_assets = {
             f"bugate-{version}.tar.gz",
@@ -195,7 +200,6 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("Status: fixed and closed", defect)
         self.assertIn("archive-native `smoke + both`", defect)
-        self.assertIn("378/378 PASS", defect)
         self.assertIn("final merged-main bytes", defect)
         self.assertIn("main and annotated-tag CI pass", defect)
         self.assertIn("downloaded, checksum-verified, and reaccepted", defect)

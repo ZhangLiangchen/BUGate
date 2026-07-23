@@ -122,8 +122,8 @@ role_governance:
 | Field | Type | Default | Contract |
 |---|---|---|---|
 | `mode` | enum: `off` \| `advisory` \| `required` | `off` | `off` preserves v0.3.x behavior. `advisory` reports ordinary violations without blocking, but evidence-chain files still reject direct agent-tool edits. `required` fails closed on malformed config, missing/wrong identity, missing/invalid receipt, or drift. |
-| `memory_mode` | enum: `best_effort` \| `required` | `best_effort` | Controls role-transition anchors. `required` demands strict POST/exact-GET/bind/exact-GET success before a local receipt or chain advancement is published. It does not make ordinary recall, notes, Stop heartbeats, or per-edit checks strict. |
-| `evidence_dir` | relative path | `00_role_evidence` | Per-UC append-only receipt directory. Absolute paths, `..`, and `.` are invalid. Direct agent-tool edits are forbidden; only `bugate-role` may publish atomically. Do not use legacy `00_orchestration/`. |
+| `memory_mode` | enum: `best_effort` \| `required` | `best_effort` | Controls role-transition anchors and recovery durability. `required` demands strict transition POST/exact-GET/bind/exact-GET plus a deterministic lineage root and immutable checkpoint before registry/local advancement. `best_effort` still attempts transition Memory publication but tolerates its failure; it uses the local machine registry and CAS while creating no remote lineage checkpoint, so recovery after local-history loss needs a separately retained trusted archive. Ordinary recall, notes, Stop heartbeats, hooks, and per-edit checks remain best-effort/local-only. |
+| `evidence_dir` | relative path | `00_role_evidence` | Per-UC workspace-local append-only receipt directory. Absolute paths, `..`, and `.` are invalid. Direct agent-tool edits are forbidden; only `bugate-role` may publish atomically. The external machine registry/strict Memory checkpoints are independent authorities, not alternate evidence directories. Do not use legacy `00_orchestration/`. |
 | `session_id_required` | bool | `true` | Requires `BUGATE_SESSION_ID` for governed lifecycle actions. Values must be actual YAML booleans. |
 | `require_distinct_sessions` | bool | `true` | Rejects acceptance in the same session that produced its handoff. Same-role self-acceptance is always rejected. |
 | `human_acceptance_artifacts` | list[relative path] | `[03b_adversarial_cases.yaml]` | Artifacts whose already-made human acceptance must be recorded. `approve` requires their current `gate_status: passed`, records their hash, and never edits them. |
@@ -148,6 +148,119 @@ The canonical lifecycle is:
 human_acceptance -> designer_handoff -> implementer_acceptance
   -> implementer_handoff -> reviewer_acceptance -> reviewer_completion
 ```
+
+#### Durable lineage identity and integrity (v0.4.3 and later)
+
+Every enabled governed UC has a deterministic lineage key with exactly four
+fields:
+
+```json
+{
+  "schema": "bugate.role-lineage-key/v1",
+  "namespace": "<effective-memory-namespace>",
+  "uc": "<resolved-uc-token>",
+  "artifact_dir": "<canonical-workspace-relative-posix-path>"
+}
+```
+
+The `lineage_id` is the lowercase SHA-256 of UTF-8 canonical JSON (sorted keys,
+compact separators, no trailing newline). The namespace is the effective
+`memory.namespace`/legacy alias/env override. The UC is resolved in this order:
+an `artifact_dir_template` capture, an agreeing explicit `uc` or `use_case_id`,
+or the exact artifact-directory token. The artifact path is canonical and
+workspace-relative. Case and whitespace are not folded. Changing any identity
+input selects a different lineage; it is never an implicit rename or reset.
+
+The machine-level registry is `<effective-memory-home>/role-lineage.sqlite3`,
+where Memory home precedence is `MCP_MEMORY_BASE_DIR` → `BUGATE_MEMORY_HOME` →
+`~/.bugate/memory-bus`. It is outside the workspace and outside updater
+ownership. Read paths never create it. Explicit `lineage-init` or
+`lineage-adopt` creates/validates it and records lifecycle state, sequence,
+head, revision, `memory_mode`, strict root/checkpoint IDs, and the sole active
+transaction. v0.4.3 uses registry schema version 2, including the
+durable initialization journal, exact next-stage graph enforcement, and
+content-addressed root/checkpoint bindings.
+
+`bugate-role status --json` and `lineage-status --json` report integrity
+independently from lifecycle state (the default human `status` line prints the
+lifecycle state and emits integrity failure detail on stderr):
+
+| State | Meaning |
+|---|---|
+| `uninitialized` | No matching registry row and no local history; possible first use only, subject to explicit operator confirmation. |
+| `aligned` | Registry and verified local chain agree, with no active transaction. |
+| `migration_required` | Local history exists without a registry row, or explicit strict-root probing proves prior lineage existence. `lineage-adopt` separately requires and verifies a non-empty valid legacy chain. |
+| `history_missing` | Registered local chain/receipts are absent or incomplete. |
+| `history_diverged` | Local history/state or configured Memory mode disagrees with the registered lineage. |
+| `recovery_pending` | One durable initialization, publication, or recovery journal is incomplete. JSON status distinguishes `active_initialization` from `active_transaction`. |
+| `registry_unavailable` | A present registry is unsafe, unreadable, locked, or schema-invalid, the lineage context cannot be resolved, or an explicitly required strict-root probe cannot be safely validated. A simply absent registry maps to `uninitialized` or `migration_required`. |
+
+Only `aligned` may publish `approve`, `handoff`, `accept`, or `complete`.
+Ordinary `status`, hooks, and per-edit preflight remain local-only. Explicit
+operator `lineage-status` performs an exact strict-Memory root probe only when
+required Memory plus local state appears `uninitialized`; an existing root
+changes the result to non-zero `migration_required`. `lineage-init` repeats the
+probe and refuses an existing root.
+
+Operator routes are exact and fail closed:
+
+```sh
+bin/bugate-role lineage-status <artifact-dir> --json
+bin/bugate-role lineage-init <artifact-dir> --lineage-id <exact-lineage-id>
+bin/bugate-role lineage-adopt <artifact-dir> \
+  --lineage-id <exact-lineage-id> --expected-head <exact-chain-head>
+bin/bugate-role recover <artifact-dir> \
+  --lineage-id <exact-lineage-id> --expected-head <exact-head-or-EMPTY> \
+  [--archive <trusted-recovery-archive>]
+```
+
+`lineage-init` is for confirmed empty first use. `lineage-adopt` is for a
+verified non-empty legacy chain and rewrites zero receipts. `recover` is for a
+registered `history_missing` or `history_diverged` state, or
+`recovery_pending` with an active publication/recovery transaction;
+after complete validation/preflight it claims the active source or creates and
+claims a pending `recovery_restore`, restores the exact committed predecessor,
+and resumes any original lifecycle transaction. One SQLite transaction then
+terminalizes that restore/lifecycle source and installs one pending,
+state-preserving `evidence_recovery` successor. Required Memory reconstructs from immutable
+exact checkpoints by default. An explicitly supplied trusted archive selects
+candidate bytes only: retained strict checkpoints remain mandatory and
+authoritative, and every archive envelope must exactly equal that history
+before any write. It is not a fallback for unavailable or divergent strict
+Memory. Best-effort has no checkpoint, so missing,
+divergent, or otherwise unverifiable committed local history requires an
+independently retained `bugate.role-recovery-archive/v1` through `--archive`.
+An active pre-CAS best-effort publication may resume without an archive only
+when its exact committed predecessor remains locally verified; that path
+continues the journal rather than reconstructing lost history.
+
+There are two different `recovery_pending` routes. An interrupted first-use
+intent appears as `active_initialization` and must be resumed by rerunning the
+same exact `lineage-init`; `recover` handles `active_transaction`. The
+initialization journal advances through `pending` ->
+`root_absence_verified` -> `root_verified` -> `registry_initialized` ->
+`chain_written` -> `completed`. Required and best-effort both use this complete
+journal, but best-effort binds a no-remote-root boundary and creates no root or
+checkpoint. A strict root found during the initial pending probe aborts that
+pre-root/pre-lineage intent and reports `migration_required`; all other interruptions
+after intent creation remain `recovery_pending`. Normal lifecycle publishers
+are blocked while initialization is active.
+
+Publication recovery also preserves sequence identity. If the original
+transaction has an exact receipt and verified checkpoint ready for registry
+CAS, recovery completes that same transaction and its local receipt/chain
+publication. In the same SQLite transaction, the registry terminalizes the
+claimed source (`recovery_restore` as `aborted`, lifecycle as `completed`) and
+installs the sole canonical-bound, pending `evidence_recovery` successor, so no
+aligned/no-audit crash gap exists. If the active transaction is already
+`evidence_recovery`, retry resumes it directly instead of installing another
+or inventing a duplicate lifecycle/recovery event.
+
+If unanchored pre-v0.4.3 history was already lost, an empty directory cannot
+prove or reconstruct it. Restore trusted evidence or keep migration blocked.
+The updater installs engine files only: it never initializes/adopts/recovers a
+lineage or edits the registry, profile, namespace, evidence, or Memory home.
+Engine update success is not lineage migration acceptance.
 
 Receipts under `<artifact-dir>/<evidence_dir>/receipts/` are append-only and
 hash-linked; `chain.json` holds only schema/state/sequence/head and latest-event
@@ -282,7 +395,8 @@ profile.
 |---|---|---|---|
 | `MEMORY_BUS_PROJECT_TAG` | str | unset (falls back to config `memory.namespace`, then `project:bugate`) | Highest-priority override for the Memory Service project namespace/tag. |
 | `MEMORY_BUS_URL` | URL | `http://localhost:8000` (`DEFAULT_URL`) | Base URL of the local `mcp-memory-service` HTTP API; trailing slash stripped. Also set programmatically from the `--url` CLI flag. |
-| `BUGATE_MEMORY_HOME` | path | unset (falls back to `~/.bugate/memory-bus`; the service's own `MCP_MEMORY_BASE_DIR` outranks it) | System-level bus data home where the service keeps `sqlite_vec.db`, `client.env`, `backups/`. Wrappers and clients resolve it identically; clients load `client.env` from here first, then fall back (deprecated, stderr hint) to the workspace `.memory_bus/client.env`. |
+| `MCP_MEMORY_BASE_DIR` | absolute path | unset | Highest-priority machine Memory home used by the service and role-lineage registry. Relative paths fail closed. The registry leaf is `role-lineage.sqlite3`; read paths do not create it. |
+| `BUGATE_MEMORY_HOME` | absolute path | unset (falls back to `~/.bugate/memory-bus`; `MCP_MEMORY_BASE_DIR` outranks it) | System-level bus data home where the service keeps `sqlite_vec.db`, `client.env`, `backups/`, and BUGate keeps the independent `role-lineage.sqlite3` registry. Wrappers and clients resolve it identically; clients load `client.env` from here first, then fall back (deprecated, stderr hint) to the workspace `.memory_bus/client.env`. Relative registry homes fail closed. |
 | `MCP_API_KEY_AGENT` | token | unset (then tries `MCP_API_KEY_HUMAN`, then `MCP_API_KEY`; if all unset, no auth header) | First-choice bearer/API-key token for Memory Service auth (sent as `Authorization: Bearer` and `X-API-Key`). |
 | `MCP_API_KEY_HUMAN` | token | unset | Second-choice Memory Service auth token, used if `MCP_API_KEY_AGENT` is unset. |
 | `MCP_API_KEY` | token | unset | Last-resort Memory Service auth token, used if both `MCP_API_KEY_AGENT` and `MCP_API_KEY_HUMAN` are unset. |
@@ -290,10 +404,16 @@ profile.
 
 Ordinary `session-start`, `stop`, note, search, and recent operations are
 best-effort. Role transitions under `memory_mode: required` use strict exact-ID
-operations and fail before local publication when the service is unavailable,
-times out, rejects a write, cannot return the exact ID, or returns mismatched
-namespace/role/UC/phase/transition/receipt metadata. Per-edit hook checks never
-contact Memory.
+operations and fail before a completed local publication when the service is
+unavailable, times out, rejects a write, cannot return the exact ID, or returns
+mismatched lineage/namespace/role/UC/phase/transition/receipt/checkpoint
+metadata. Once the lifecycle-publication journal exists, an interrupted attempt
+remains visible as `recovery_pending`; a failure before that journal's creation
+creates no new pending transaction. First-use initialization instead persists
+its own intent before any Memory request and resumes that journal through exact
+`lineage-init`. Per-edit hook checks never contact Memory; only the explicit
+operator `lineage-status`/`lineage-init` first-use check probes the deterministic
+strict root.
 
 ### SDTD multi-view CLI bridge
 

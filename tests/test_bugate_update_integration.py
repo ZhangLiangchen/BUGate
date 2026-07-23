@@ -32,7 +32,7 @@ import bugate_update_engine as engine  # noqa: E402
 import bugate_update_source as source  # noqa: E402
 
 
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 VENDOR_DIR = ".bugate"
 LEGACY_TAG = "v0.3.2"
 LEGACY_MATRIX_TAGS = (
@@ -220,6 +220,14 @@ class ImportedUpdateIntegrationTests(unittest.TestCase):
         self.release_root.mkdir()
         self.project.mkdir()
         self.home.mkdir()
+        self.memory_home_trap = self.base / "memory-home-trap"
+        self.memory_home_trap.mkdir(mode=0o700)
+        _write(
+            self.memory_home_trap / "role-lineage.sqlite3",
+            b"synthetic operator-owned lineage registry bytes\n",
+            0o600,
+        )
+        self.memory_home_before = _tree_snapshot(self.memory_home_trap)
         self.memory_requests: list[tuple[str, str, bytes]] = []
         self.memory_server = http.server.ThreadingHTTPServer(
             ("127.0.0.1", 0), _MemoryTrapHandler
@@ -532,8 +540,8 @@ class ImportedUpdateIntegrationTests(unittest.TestCase):
             environment.pop(name, None)
         environment["MEMORY_BUS_URL"] = self.memory_url
         environment["MEMORY_BUS_PROJECT_TAG"] = "project:updater-memory-trap"
-        environment["MCP_MEMORY_BASE_DIR"] = str(self.base / "memory-home-trap")
-        environment["BUGATE_MEMORY_HOME"] = str(self.base / "memory-home-trap")
+        environment["MCP_MEMORY_BASE_DIR"] = str(self.memory_home_trap)
+        environment["BUGATE_MEMORY_HOME"] = str(self.memory_home_trap)
         completed = subprocess.run(
             [
                 sys.executable,
@@ -582,8 +590,8 @@ class ImportedUpdateIntegrationTests(unittest.TestCase):
             environment.pop(name, None)
         environment["MEMORY_BUS_URL"] = self.memory_url
         environment["MEMORY_BUS_PROJECT_TAG"] = "project:updater-memory-trap"
-        environment["MCP_MEMORY_BASE_DIR"] = str(self.base / "memory-home-trap")
-        environment["BUGATE_MEMORY_HOME"] = str(self.base / "memory-home-trap")
+        environment["MCP_MEMORY_BASE_DIR"] = str(self.memory_home_trap)
+        environment["BUGATE_MEMORY_HOME"] = str(self.memory_home_trap)
         completed = subprocess.run(
             [
                 str(self.project / VENDOR_DIR / "bin/bugate-update"),
@@ -756,9 +764,10 @@ class ImportedUpdateIntegrationTests(unittest.TestCase):
             [],
             "engine update must not call, probe, rebuild, or migrate Memory",
         )
-        self.assertFalse(
-            (self.base / "memory-home-trap").exists(),
-            "engine update must not create machine-level Memory state",
+        self.assertEqual(
+            self.memory_home_before,
+            _tree_snapshot(self.memory_home_trap),
+            "engine update must not modify profile-independent Memory or lineage state",
         )
 
     def test_supported_legacy_tag_transaction_matrix(self) -> None:

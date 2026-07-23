@@ -120,7 +120,14 @@ def kernel_transition_lock_is_contended(artifact: Path) -> bool:
 
 
 class Fixture:
-    def __init__(self, tmp: Path, *, mode: str = "required", memory_mode: str = "best_effort"):
+    def __init__(
+        self,
+        tmp: Path,
+        *,
+        mode: str = "required",
+        memory_mode: str = "best_effort",
+        initialize_lineage: bool = True,
+    ):
         self.root = tmp
         self.artifact = tmp / "usecases" / "UC-001"
         self.artifact.mkdir(parents=True)
@@ -171,6 +178,9 @@ class Fixture:
         (tmp / "tests").mkdir()
         self.implementation = tmp / "tests" / "test_UC-001.py"
         self.outside_implementation = tmp / "tests" / "helper.py"
+        if mode != "off" and initialize_lineage:
+            identity = rg.lineage_identity(self.artifact)
+            rg.lineage_init(self.artifact, lineage_id=identity["lineage_id"])
 
 
 class RoleGovernanceTests(unittest.TestCase):
@@ -179,17 +189,79 @@ class RoleGovernanceTests(unittest.TestCase):
         self.tmp = Path(self.tmp_ctx.name)
         self.old_project = os.environ.get("BUGATE_PROJECT_ROOT")
         self.old_profile = os.environ.pop("BUGATE_PROFILE", None)
+        self.old_memory_homes = {
+            key: os.environ.get(key)
+            for key in ("MCP_MEMORY_BASE_DIR", "BUGATE_MEMORY_HOME")
+        }
+        memory_home = self.tmp / "memory-home"
+        memory_home.mkdir(mode=0o700)
+        os.environ["MCP_MEMORY_BASE_DIR"] = str(memory_home)
+        os.environ["BUGATE_MEMORY_HOME"] = str(memory_home)
         os.environ["BUGATE_PROJECT_ROOT"] = str(self.tmp)
         self.original_prepare = rg._memory_prepare
         self.original_verify = rg._memory_verify
+        self.original_lineage_root = rg._memory_ensure_lineage_root
+        self.original_lineage_probe = rg._memory_probe_lineage_root
+        self.original_checkpoint_create = rg._memory_create_checkpoint
+        self.original_checkpoint_get = rg._memory_get_checkpoint
         self.original_semantics = rg.verify_precode_semantics
+        self.fake_checkpoints: dict[str, dict] = {}
+        self.fake_lineage_roots: dict[str, dict] = {}
+
+        def fake_lineage_root(ctx, key):
+            payload = {
+                "schema": "bugate.role-lineage-root/v1",
+                "lineage_key": key.as_dict(),
+                "lineage_id": key.lineage_id,
+            }
+            exact_id = rg.sha256_bytes(rg.canonical_json(payload))
+            result = {
+                "namespace": key.namespace,
+                "lineage_id": key.lineage_id,
+                "lineage_root_id": exact_id,
+                "memory_id": exact_id,
+                "payload": payload,
+                "status": "verified",
+            }
+            self.fake_lineage_roots[key.lineage_id] = result
+            return result
+
+        def fake_lineage_probe(ctx, key):
+            del ctx
+            value = self.fake_lineage_roots.get(key.lineage_id)
+            return json.loads(json.dumps(value)) if value is not None else None
+
+        def fake_checkpoint(ctx, payload):
+            exact_id = rg.sha256_bytes(rg.canonical_json(payload))
+            result = {
+                "namespace": payload["lineage_key"]["namespace"],
+                "lineage_id": payload["lineage_id"],
+                "lineage_root_id": payload["lineage_root_id"],
+                "checkpoint_id": exact_id,
+                "memory_id": exact_id,
+                "payload": json.loads(json.dumps(payload)),
+                "status": "verified",
+            }
+            self.fake_checkpoints[exact_id] = result
+            return result
+
         rg._memory_prepare = fake_memory
         rg._memory_verify = lambda ctx, receipt: None
+        rg._memory_ensure_lineage_root = fake_lineage_root
+        rg._memory_probe_lineage_root = fake_lineage_probe
+        rg._memory_create_checkpoint = fake_checkpoint
+        rg._memory_get_checkpoint = lambda ctx, checkpoint_id: json.loads(
+            json.dumps(self.fake_checkpoints[checkpoint_id])
+        )
         rg.verify_precode_semantics = lambda ctx: None
 
     def tearDown(self):
         rg._memory_prepare = self.original_prepare
         rg._memory_verify = self.original_verify
+        rg._memory_ensure_lineage_root = self.original_lineage_root
+        rg._memory_probe_lineage_root = self.original_lineage_probe
+        rg._memory_create_checkpoint = self.original_checkpoint_create
+        rg._memory_get_checkpoint = self.original_checkpoint_get
         rg.verify_precode_semantics = self.original_semantics
         if self.old_project is None:
             os.environ.pop("BUGATE_PROJECT_ROOT", None)
@@ -197,6 +269,11 @@ class RoleGovernanceTests(unittest.TestCase):
             os.environ["BUGATE_PROJECT_ROOT"] = self.old_project
         if self.old_profile is not None:
             os.environ["BUGATE_PROFILE"] = self.old_profile
+        for key, value in self.old_memory_homes.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         os.environ.pop("BUGATE_AGENT_ROLE", None)
         os.environ.pop("BUGATE_SESSION_ID", None)
         self.tmp_ctx.cleanup()
@@ -633,7 +710,12 @@ class RoleGovernanceTests(unittest.TestCase):
                     evidence_files=[log],
                     final_gate_status="passed",
                 )
-        self.assertEqual(0, rg.load_chain(rg.load_context(fx.artifact))["sequence"])
+        self.assertEqual(
+            0,
+            rg.load_chain(
+                rg.load_context(fx.artifact), allow_uninitialized=True
+            )["sequence"],
+        )
         self.assertFalse((fx.artifact / "00_role_evidence").exists())
 
     def test_accept_rejects_when_effective_base_mode_turns_off(self):
@@ -695,7 +777,9 @@ class RoleGovernanceTests(unittest.TestCase):
             encoding="utf-8",
         )
         with role_env("implementer", "implementer-session"):
-            with self.assertRaisesRegex(rg.RoleGovernanceError, "effective config"):
+            with self.assertRaisesRegex(
+                rg.RoleGovernanceError, "effective config|memory_mode"
+            ):
                 rg.accept(
                     fx.artifact,
                     phase="implementation",
@@ -711,6 +795,10 @@ class RoleGovernanceTests(unittest.TestCase):
         ctx = rg.load_context(fx.artifact)
         original_path = next((ctx.evidence_dir / "receipts").glob("*.json"))
         legacy = json.loads(json.dumps(receipt))
+        # v0.4.0-v0.4.2 receipts predate the v0.4.3 lineage precondition.
+        # Adoption must keep those exact legacy bytes readable rather than
+        # requiring or synthesizing the new field.
+        legacy.pop("lineage", None)
         legacy["profile"].pop("effective_config_sha256")
         idempotency_base = {
             key: legacy[key]
@@ -763,6 +851,24 @@ class RoleGovernanceTests(unittest.TestCase):
         self.assertEqual(1, len(rg.verify_chain(ctx)))
         with self.assertRaisesRegex(rg.RoleGovernanceError, "effective config"):
             rg._verify_snapshot(ctx, legacy)
+        legacy_bytes = legacy_path.read_bytes()
+        registry_path = rg.lineage_registry.registry_path()
+        for candidate in (
+            registry_path,
+            Path(str(registry_path) + "-wal"),
+            Path(str(registry_path) + "-shm"),
+        ):
+            candidate.unlink(missing_ok=True)
+        status = rg.status_data(fx.artifact)
+        self.assertEqual("migration_required", status["integrity_state"])
+        identity = rg.lineage_identity(fx.artifact)
+        adopted = rg.lineage_adopt(
+            fx.artifact,
+            lineage_id=identity["lineage_id"],
+            expected_head=legacy["receipt_sha256"],
+        )
+        self.assertEqual(0, adopted["receipts_rewritten"])
+        self.assertEqual(legacy_bytes, legacy_path.read_bytes())
         with role_env("designer", "designer-session"):
             replacement = rg.approve(fx.artifact, approved_by="qa-owner")
             handoff = rg.handoff(
@@ -1400,6 +1506,52 @@ class RoleGovernanceTests(unittest.TestCase):
         self.assertEqual(before, chain["sequence"])
         self.assertNotIn("designer_handoff", chain["latest_receipts"])
 
+    def test_deleted_complete_evidence_is_history_missing_not_a_new_empty_root(self):
+        """Regression: deleting append-only evidence can never reset one UC."""
+
+        fx = Fixture(self.tmp, memory_mode="required")
+        memory_transitions: list[dict] = []
+
+        def recording_memory(ctx, transition):
+            memory_transitions.append(json.loads(json.dumps(transition)))
+            return fake_memory(ctx, transition)
+
+        rg._memory_prepare = recording_memory
+        with role_env("designer", "designer-session-before-delete"):
+            rg.approve(fx.artifact, approved_by="qa-owner")
+            handoff = rg.handoff(
+                fx.artifact,
+                phase="pre_code",
+                to_role="implementer",
+            )
+        self.assertEqual(2, handoff["sequence"])
+        expected_head = handoff["receipt_sha256"]
+        calls_before_delete = len(memory_transitions)
+
+        shutil.rmtree(fx.artifact / "00_role_evidence")
+
+        status = rg.status_data(fx.artifact)
+        self.assertFalse(status["ok"], status)
+        self.assertEqual("history_missing", status["integrity_state"])
+        self.assertEqual(
+            "awaiting_implementer_acceptance",
+            status["lifecycle_state"],
+        )
+        self.assertEqual(expected_head, status["registry_head_sha256"])
+
+        with role_env("designer", "designer-session-after-delete"):
+            with self.assertRaisesRegex(rg.RoleGovernanceError, "history_missing"):
+                rg.approve(fx.artifact, approved_by="qa-owner")
+            with self.assertRaisesRegex(rg.RoleGovernanceError, "history_missing"):
+                rg.handoff(
+                    fx.artifact,
+                    phase="pre_code",
+                    to_role="implementer",
+                )
+
+        self.assertEqual(calls_before_delete, len(memory_transitions))
+        self.assertFalse((fx.artifact / "00_role_evidence").exists())
+
     def test_required_memory_finalize_and_acceptance_failures_publish_nothing(self):
         fx = Fixture(self.tmp, memory_mode="required")
         with role_env("designer", "designer-session"):
@@ -1422,10 +1574,23 @@ class RoleGovernanceTests(unittest.TestCase):
                 before_handoff,
                 rg.load_chain(rg.load_context(fx.artifact))["sequence"],
             )
+            pending_status = rg.status_data(fx.artifact)
+            self.assertEqual("recovery_pending", pending_status["integrity_state"])
 
             rg._memory_prepare = fake_memory
-            handoff = rg.handoff(
-                fx.artifact, phase="pre_code", to_role="implementer"
+            recovered = rg.recover(
+                fx.artifact,
+                lineage_id=pending_status["lineage_id"],
+                expected_head=pending_status["registry_head_sha256"],
+            )
+            self.assertEqual(
+                "awaiting_implementer_acceptance",
+                recovered["recovery_receipt"]["resulting_state"],
+            )
+            handoff = next(
+                receipt
+                for receipt in rg.verify_chain(rg.load_context(fx.artifact))
+                if receipt["event"] == "designer_handoff"
             )
 
         before_accept = rg.load_chain(rg.load_context(fx.artifact))["sequence"]

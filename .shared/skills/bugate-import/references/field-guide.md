@@ -125,8 +125,43 @@ v0.3.1 kit gaps found in the field are listed at the end.
   Wave 7 actors are `designer`, `implementer`, and `reviewer` across distinct
   sessions. Peer child environments must not inherit lifecycle identity.
 - A v0.3.x profile stays unchanged until `role_governance` is enabled. Existing
-  passed UCs are not grandfathered into required mode: record current human
-  acceptance, designer handoff, and implementer acceptance.
+  passed UCs are not grandfathered into required mode. Starting with v0.4.3,
+  establish/adopt each UC's lineage first; only at `aligned`
+  may it record current human acceptance, designer handoff, and implementer
+  acceptance.
+- After scaffolding a genuinely new UC, run
+  `bugate-role lineage-status <dir> --json`, confirm the non-zero
+  `uninitialized` result and exact ID, then run `lineage-init`. A verified
+  non-empty pre-v0.4.3 chain reporting `migration_required` uses
+  `lineage-adopt --expected-head <exact-head>` and rewrites zero receipts.
+  Never initialize over an existing strict root or known history. Initialization
+  journals an intent before Memory access and advances `pending` ->
+  `root_absence_verified` -> `root_verified` -> `registry_initialized` ->
+  `chain_written` -> `completed`; both Memory modes use this journal.
+- A `recovery_pending` JSON result with `active_initialization` resumes by
+  rerunning the same exact `lineage-init`, not by running `recover`. A registered
+  `history_missing`, `history_diverged`, or `recovery_pending` result with an
+  active publication/recovery transaction uses `bugate-role recover
+  --lineage-id <exact-id> --expected-head <head-or-EMPTY>`. Required Memory
+  reconstructs from immutable checkpoints by default. An explicitly supplied
+  trusted archive selects candidate bytes only; retained strict checkpoints
+  remain mandatory and authoritative, and every archive envelope must exactly
+  match them before any write. It is not an offline fallback for unavailable
+  or divergent strict Memory. Best-effort
+  requires a separately retained trusted recovery archive through `--archive`
+  when the committed local predecessor is missing, divergent, or cannot be
+  exact-verified. An active pre-CAS best-effort publication can resume without
+  an archive only while that exact predecessor remains locally verified; this
+  continues the journal and does not reconstruct lost history.
+  After validation/preflight, recovery claims the active source or creates and
+  claims a pending `recovery_restore` before target writes. It restores the
+  committed predecessor and resumes the original transaction through
+  checkpoint/CAS/local publication when applicable. One SQLite transaction then
+  terminalizes that restore/lifecycle source and installs the sole pending
+  `evidence_recovery` successor. There is no aligned/no-audit crash gap; an
+  already-active `evidence_recovery` resumes directly, and retry duplicates
+  neither successor nor lifecycle/recovery sequence. `EMPTY` means only the
+  sequence-zero expected head.
 - Use `bin/bugate-role run --role ... -- <command>` to create each role process.
   SessionStart can report identity, but a hook child cannot export variables to
   its parent. Desktop needs a fresh launch/session with the intended env.
@@ -140,18 +175,33 @@ v0.3.1 kit gaps found in the field are listed at the end.
   `scripts/bugate_update.py` for `status`/`verify` after that rollback or an
   interruption, never recreate the launcher. Offline mode
   requires both archive and checksum; conflicts stay `NO-GO` without a broad
-  force/adopt escape. Engine update preserves profiles, role evidence, Memory,
-  and SUT-owned hooks; profile migration is a separate explicit commit. See
+  force/adopt escape. Engine update preserves profiles, role evidence, the
+  machine lineage registry, Memory, and SUT-owned hooks; profile migration and
+  per-UC lineage classification are separate explicit actions. Updater
+  `apply`/`verify` success is not lineage-migration acceptance. Also distinguish
+  updater profile `migration_required` from role-lineage integrity
+  `migration_required`. See
   `updating-bugate.md`, including its 128-entry history limit and SHA-256
   threat model. Re-trust Codex only on an actual Codex hook byte change, and
   start a new agent session after any hook change before claiming enforcement.
-- Never edit `00_role_evidence/**` directly or delete it to reset. Profile or
-  pre-code drift restarts from designer acceptance/handoff; implementation
-  drift restarts from implementer handoff/reviewer acceptance. Append a
-  superseding generation.
+- Never edit `00_role_evidence/**` directly or delete it to reset. The registry
+  makes supported deletion detectable. Content drift still restarts from the
+  correct lifecycle boundary: profile/pre-code drift from designer
+  acceptance/handoff, implementation drift from implementer handoff/reviewer
+  acceptance. Append a superseding generation; use explicit `recover` for
+  lineage-integrity loss instead of treating it as content drift.
+- Ordinary `status`, hooks, and per-edit preflight perform zero Memory HTTP
+  requests. `lineage-status` is an explicit operator probe only when required
+  Memory plus local state appears `uninitialized`; required-mode
+  init/adopt/recover and lifecycle transitions can be explicit network
+  boundaries. Best-effort lifecycle transitions may attempt Memory but tolerate
+  its failure and never create a lineage root/checkpoint.
 - Role env, session IDs, hashes, and Memory anchors are audit controls, not
-  non-repudiable identity. Hooks do not cover arbitrary shell redirection or
-  external editors; managed runners/OS isolation own that stronger boundary.
+  non-repudiable identity. Hooks do not cover arbitrary shell redirection,
+  recursive deletion, or external editors; managed runners/OS isolation own
+  that stronger boundary. A same-OS-user actor who removes workspace evidence,
+  the machine registry, and the complete Memory home is outside the local
+  threat boundary; pre-anchor lost history cannot be inferred from emptiness.
 
 ## 6. CI carrier pattern (GitLab)
 

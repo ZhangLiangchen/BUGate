@@ -26,7 +26,7 @@ import bugate_update_source as source
 import bugate_update_transaction as transaction
 
 
-UPDATER_VERSION = "0.4.2"
+UPDATER_VERSION = "0.4.3"
 RELEASE_BASE_URL = "https://github.com/ZhangLiangchen/BUGate/releases/download"
 MAX_ARCHIVE_DOWNLOAD = 512 * 1024 * 1024
 MAX_CHECKSUM_DOWNLOAD = 2 * 1024 * 1024

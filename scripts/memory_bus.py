@@ -27,17 +27,20 @@ accept-handoff, verify-handoff, archive, lint.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import copy
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -54,6 +57,16 @@ VALID_STATUS = ("draft", "confirmed", "obsolete")
 
 ROLE_TRANSITION_SCHEMA = "bugate.role-transition/v1"
 MEMORY_TRANSITION_SCHEMA = "bugate.memory-role-transition/v1"
+ROLE_EVIDENCE_SCHEMA = "bugate.role-evidence/v1"
+ROLE_CHAIN_SCHEMA = "bugate.role-chain/v1"
+ROLE_LINEAGE_KEY_SCHEMA = "bugate.role-lineage-key/v1"
+ROLE_LINEAGE_ROOT_SCHEMA = "bugate.role-lineage-root/v1"
+ROLE_LINEAGE_CHECKPOINT_SCHEMA = "bugate.role-lineage-checkpoint/v1"
+MEMORY_LINEAGE_ROOT_SCHEMA = "bugate.memory-role-lineage-root/v1"
+MEMORY_LINEAGE_CHECKPOINT_SCHEMA = "bugate.memory-role-lineage-checkpoint/v1"
+_ABSOLUTE_IDENTITY_TEXT_RE = re.compile(
+    r"(?:^|[\s='\"])/(?:[^\s'\"]+)"
+)
 ACCEPTANCE_HANDOFFS = {
     "implementer_acceptance": ("designer_handoff", "pre_code", "implementation"),
     "reviewer_acceptance": ("implementer_handoff", "implementation", "post_run"),
@@ -69,6 +82,29 @@ _PREPARED_ROLE_TRANSITIONS: dict[tuple[str, str], dict[str, Any]] = {}
 
 class MemoryBusError(RuntimeError):
     pass
+
+
+class MemoryHTTPError(MemoryBusError):
+    """A syntactically valid HTTP response with a non-success status."""
+
+    def __init__(
+        self,
+        status_code: int,
+        method: str,
+        path: str,
+        detail: str = "",
+    ) -> None:
+        self.status_code = int(status_code)
+        self.status = self.status_code
+        self.method = method
+        self.path = path
+        self.detail = detail
+        suffix = f": {detail}" if detail else ""
+        super().__init__(f"Memory HTTP {self.status_code} for {method} {path}{suffix}")
+
+
+class MemoryNotFound(MemoryHTTPError):
+    """An exact Memory identifier is absent, rather than the service being down."""
 
 
 # --------------------------------------------------------------------------- #
@@ -221,6 +257,20 @@ def request_json(
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body.strip() else {}
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            raw = exc.read().decode("utf-8", errors="replace")
+            parsed = json.loads(raw) if raw.strip() else {}
+            if isinstance(parsed, dict):
+                candidate = parsed.get("detail") or parsed.get("message") or parsed.get("error")
+                if isinstance(candidate, (str, int, float, bool)):
+                    detail = str(candidate)[:240]
+        except (OSError, ValueError, json.JSONDecodeError):
+            detail = ""
+        is_exact_get = method == "GET" and path.startswith("/api/memories/")
+        error_type = MemoryNotFound if exc.code == 404 and is_exact_get else MemoryHTTPError
+        raise error_type(exc.code, method, path, detail) from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         raise MemoryBusError(str(exc)) from exc
 
@@ -509,6 +559,618 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _require_sha256(value: Any, label: str, *, allow_empty: bool = False) -> str:
+    candidate = str(value or "")
+    if allow_empty and not candidate:
+        return ""
+    if len(candidate) != 64 or any(ch not in "0123456789abcdef" for ch in candidate):
+        raise MemoryBusError(f"{label} must be a lowercase 64-character SHA-256")
+    return candidate
+
+
+def _workspace_relative_posix_path(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise MemoryBusError(f"{label} must be a non-empty workspace-relative path")
+    if "\\" in value:
+        raise MemoryBusError(f"{label} must use POSIX separators")
+    path = PurePosixPath(value)
+    windows = PureWindowsPath(value)
+    if (
+        path.is_absolute()
+        or windows.is_absolute()
+        or bool(windows.drive)
+        or re.match(r"^file:", value, flags=re.IGNORECASE) is not None
+        or value != path.as_posix()
+    ):
+        raise MemoryBusError(f"{label} must be a canonical workspace-relative POSIX path")
+    if any(part in ("", ".", "..") for part in path.parts):
+        raise MemoryBusError(f"{label} must not escape or alias the workspace")
+    return value
+
+
+def _lineage_identity_text(value: Any, label: str) -> str:
+    """Reject machine/path identity while preserving exact namespace text."""
+
+    if not isinstance(value, str) or not value or not value.strip():
+        raise MemoryBusError(f"{label} must be a non-empty exact string")
+    if "\x00" in value or "\r" in value or "\n" in value:
+        raise MemoryBusError(f"{label} must not contain control separators")
+    if (
+        value.startswith(("/", "\\"))
+        or _ABSOLUTE_IDENTITY_TEXT_RE.search(value)
+        or re.search(r"(?:^|:)\/(?:[^/]|$)", value)
+        or re.search(r"(?:^|:)[A-Za-z]:[\\/]", value)
+        or re.search(r"(?:^|:)[\\/]{2}[^\\/]", value)
+        or re.search(r"(?:^|:)file:", value, flags=re.IGNORECASE)
+        or PureWindowsPath(value).is_absolute()
+    ):
+        raise MemoryBusError(f"{label} must not contain an absolute path")
+    return value
+
+
+def _validate_role_lineage_key(
+    lineage_key: dict[str, Any],
+    *,
+    require_active_namespace: bool = True,
+) -> dict[str, Any]:
+    if not isinstance(lineage_key, dict):
+        raise MemoryBusError("role lineage key must be an object")
+    required = {"schema", "namespace", "uc", "artifact_dir"}
+    if set(lineage_key) != required:
+        missing = sorted(required - set(lineage_key))
+        extra = sorted(set(lineage_key) - required)
+        details = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if extra:
+            details.append("unexpected " + ", ".join(extra))
+        raise MemoryBusError("invalid role lineage key fields: " + "; ".join(details))
+    if lineage_key.get("schema") != ROLE_LINEAGE_KEY_SCHEMA:
+        raise MemoryBusError(f"role lineage key schema must be {ROLE_LINEAGE_KEY_SCHEMA}")
+    namespace = _lineage_identity_text(
+        lineage_key.get("namespace"), "role lineage key namespace"
+    )
+    _lineage_identity_text(lineage_key.get("uc"), "role lineage key uc")
+    _workspace_relative_posix_path(lineage_key.get("artifact_dir"), "lineage artifact_dir")
+    if require_active_namespace and namespace != project_tag():
+        raise MemoryBusError(
+            "role lineage namespace mismatch: "
+            f"expected {project_tag()!r}, got {namespace!r}"
+        )
+    # Return a detached value so callers cannot mutate a verified identity by
+    # retaining a reference to the input mapping.
+    return copy.deepcopy(lineage_key)
+
+
+def build_role_lineage_key(
+    namespace: str,
+    uc: str,
+    artifact_dir: str,
+) -> dict[str, Any]:
+    """Build the SUT-neutral, deterministic identity key for one governed UC."""
+
+    key = {
+        "schema": ROLE_LINEAGE_KEY_SCHEMA,
+        "namespace": namespace,
+        "uc": uc,
+        "artifact_dir": artifact_dir,
+    }
+    return _validate_role_lineage_key(key, require_active_namespace=False)
+
+
+def role_lineage_id(lineage_key: dict[str, Any]) -> str:
+    key = _validate_role_lineage_key(lineage_key, require_active_namespace=False)
+    return _sha256(_canonical_json(key))
+
+
+def _role_lineage_root_payload(
+    lineage_key: dict[str, Any],
+    lineage_id: str | None = None,
+) -> dict[str, Any]:
+    key = _validate_role_lineage_key(lineage_key)
+    computed = role_lineage_id(key)
+    supplied = str(lineage_id or computed)
+    if supplied != computed:
+        raise MemoryBusError(
+            f"role lineage ID mismatch: expected {computed}, got {supplied or '<missing>'}"
+        )
+    return {
+        "schema": ROLE_LINEAGE_ROOT_SCHEMA,
+        "lineage_key": key,
+        "lineage_id": computed,
+    }
+
+
+def _canonical_content(value: dict[str, Any]) -> str:
+    return _canonical_json(value).decode("utf-8")
+
+
+def _role_lineage_root_id(payload: dict[str, Any]) -> str:
+    return _sha256(_canonical_json(payload))
+
+
+def _require_post_content_hash(
+    response: dict[str, Any],
+    expected: str,
+    operation: str,
+) -> str:
+    returned: list[str] = []
+    for candidate in (response, response.get("memory")):
+        if isinstance(candidate, dict) and candidate.get("content_hash"):
+            value = str(candidate["content_hash"])
+            if value not in returned:
+                returned.append(value)
+    if not returned:
+        fallback = memory_id(response)
+        if fallback != "<unknown>" and fallback:
+            returned.append(fallback)
+    if not returned:
+        raise MemoryBusError(f"{operation} response is missing content hash")
+    mismatched = [value for value in returned if value != expected]
+    if mismatched:
+        raise MemoryBusError(
+            f"{operation} content hash mismatch: expected {expected}, "
+            f"got {', '.join(mismatched)}"
+        )
+    return expected
+
+
+def _role_lineage_tags(kind: str) -> list[str]:
+    if kind not in ("root", "checkpoint"):
+        raise MemoryBusError(f"unknown role lineage Memory kind: {kind}")
+    # Namespace and this fixed vocabulary are the only tags. UC identifiers,
+    # paths, receipt/checkpoint hashes, sequences, and revisions stay in
+    # immutable content or metadata and are never searched by tag.
+    return build_tags(
+        "agent",
+        "decision",
+        "confirmed",
+        scope=f"role-lineage-{kind}",
+        broadcast=True,
+    )
+
+
+def verify_role_lineage_root(
+    record: dict[str, Any],
+    lineage_key: dict[str, Any],
+    lineage_id: str | None = None,
+    *,
+    exact_id: str | None = None,
+) -> dict[str, Any]:
+    """Verify one deterministic lineage root returned by an exact GET."""
+
+    expected_payload = _role_lineage_root_payload(lineage_key, lineage_id)
+    expected_content = _canonical_content(expected_payload)
+    expected_id = _role_lineage_root_id(expected_payload)
+    if exact_id is not None and str(exact_id) != expected_id:
+        raise MemoryBusError(
+            f"role lineage root exact ID mismatch: expected {expected_id}, got {exact_id}"
+        )
+    actual_id = memory_id(record)
+    if actual_id != expected_id:
+        raise MemoryBusError(
+            f"role lineage root Memory ID mismatch: expected {expected_id}, got {actual_id}"
+        )
+    actual_content = memory_content(record)
+    if _sha256(actual_content.encode("utf-8")) != expected_id:
+        raise MemoryBusError("role lineage root content hash does not match its exact ID")
+    if actual_content != expected_content:
+        raise MemoryBusError("role lineage root content does not exactly match expected payload")
+    metadata = memory_metadata(record)
+    checks = {
+        "schema": MEMORY_LINEAGE_ROOT_SCHEMA,
+        "lineage_schema": ROLE_LINEAGE_ROOT_SCHEMA,
+        "namespace": expected_payload["lineage_key"]["namespace"],
+        "lineage_id": expected_payload["lineage_id"],
+    }
+    for key, wanted in checks.items():
+        if metadata.get(key) != wanted:
+            raise MemoryBusError(
+                f"role lineage root metadata mismatch for {key}: "
+                f"expected {wanted!r}, got {metadata.get(key)!r}"
+            )
+    expected_tags = set(_role_lineage_tags("root"))
+    if set(memory_tags(record)) != expected_tags:
+        raise MemoryBusError("role lineage root Memory tags do not exactly match contract")
+    return {
+        "namespace": expected_payload["lineage_key"]["namespace"],
+        "lineage_id": expected_payload["lineage_id"],
+        "lineage_root_id": expected_id,
+        "memory_id": expected_id,
+        "content_sha256": expected_id,
+        "payload": expected_payload,
+        "status": "verified",
+    }
+
+
+def probe_role_lineage_root(
+    lineage_key: dict[str, Any],
+    lineage_id: str | None = None,
+    *,
+    agent: str = "agent",
+    timeout: float = 3.0,
+) -> dict[str, Any] | None:
+    """Probe a deterministic root by exact ID; only a real 404 means absent."""
+
+    payload = _role_lineage_root_payload(lineage_key, lineage_id)
+    exact_id = _role_lineage_root_id(payload)
+    try:
+        record = get_memory_exact(exact_id, agent=agent, timeout=timeout)
+    except MemoryNotFound:
+        return None
+    return verify_role_lineage_root(
+        record,
+        payload["lineage_key"],
+        payload["lineage_id"],
+        exact_id=exact_id,
+    )
+
+
+def ensure_role_lineage_root(
+    lineage_key: dict[str, Any],
+    lineage_id: str | None = None,
+    *,
+    agent: str = "agent",
+    timeout: float = 3.0,
+) -> dict[str, Any]:
+    """Idempotently POST a deterministic root, then verify it by exact GET."""
+
+    payload = _role_lineage_root_payload(lineage_key, lineage_id)
+    content = _canonical_content(payload)
+    exact_id = _sha256(content.encode("utf-8"))
+    metadata = {
+        "schema": MEMORY_LINEAGE_ROOT_SCHEMA,
+        "lineage_schema": ROLE_LINEAGE_ROOT_SCHEMA,
+        "namespace": payload["lineage_key"]["namespace"],
+        "lineage_id": payload["lineage_id"],
+    }
+    response = _require_success(
+        request_json(
+            "POST",
+            "/api/memories",
+            {
+                "content": content,
+                "tags": _role_lineage_tags("root"),
+                "memory_type": "decision",
+                "conversation_id": f"bugate-role-lineage-root-{payload['lineage_id']}",
+                "metadata": metadata,
+            },
+            agent=agent,
+            timeout=timeout,
+        ),
+        "role lineage root POST",
+    )
+    _require_post_content_hash(response, exact_id, "role lineage root POST")
+    record = get_memory_exact(exact_id, agent=agent, timeout=timeout)
+    return verify_role_lineage_root(
+        record,
+        payload["lineage_key"],
+        payload["lineage_id"],
+        exact_id=exact_id,
+    )
+
+
+def _validate_evidence_envelope(
+    envelope: dict[str, Any],
+    label: str,
+) -> dict[str, Any]:
+    if not isinstance(envelope, dict):
+        raise MemoryBusError(f"{label} must be an object")
+    required = {"path", "mode", "bytes_sha256", "bytes_base64", "parsed"}
+    if set(envelope) != required:
+        missing = sorted(required - set(envelope))
+        extra = sorted(set(envelope) - required)
+        details = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if extra:
+            details.append("unexpected " + ", ".join(extra))
+        raise MemoryBusError(f"invalid {label} fields: " + "; ".join(details))
+    _workspace_relative_posix_path(envelope.get("path"), f"{label} path")
+    mode = envelope.get("mode")
+    if isinstance(mode, bool) or not isinstance(mode, int) or not 0 <= mode <= 0o7777:
+        raise MemoryBusError(f"{label} mode must be integer permission bits")
+    expected_hash = _require_sha256(envelope.get("bytes_sha256"), f"{label} bytes_sha256")
+    encoded = envelope.get("bytes_base64")
+    if not isinstance(encoded, str) or not encoded:
+        raise MemoryBusError(f"{label} bytes_base64 must be a non-empty string")
+    try:
+        raw = base64.b64decode(encoded.encode("ascii"), validate=True)
+    except (UnicodeEncodeError, binascii.Error, ValueError) as exc:
+        raise MemoryBusError(f"{label} bytes_base64 is invalid") from exc
+    if base64.b64encode(raw).decode("ascii") != encoded:
+        raise MemoryBusError(f"{label} bytes_base64 is not canonical")
+    if _sha256(raw) != expected_hash:
+        raise MemoryBusError(f"{label} bytes_sha256 does not match bytes_base64")
+    try:
+        decoded = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise MemoryBusError(f"{label} bytes are not a UTF-8 JSON document") from exc
+    parsed = envelope.get("parsed")
+    if not isinstance(parsed, dict) or not isinstance(decoded, dict):
+        raise MemoryBusError(f"{label} parsed value and bytes must be JSON objects")
+    if decoded != parsed:
+        raise MemoryBusError(f"{label} parsed value does not exactly match bytes")
+    return copy.deepcopy(parsed)
+
+
+def _validate_role_lineage_checkpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise MemoryBusError("role lineage checkpoint must be an object")
+    required = {
+        "schema",
+        "lineage_key",
+        "lineage_id",
+        "lineage_root_id",
+        "sequence",
+        "previous_checkpoint_id",
+        "previous_receipt_sha256",
+        "receipt_sha256",
+        "resulting_state",
+        "registry_revision",
+        "receipt_envelope",
+        "chain_envelope",
+    }
+    missing = sorted(required - set(payload))
+    extra = sorted(set(payload) - required)
+    if missing or extra:
+        details = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if extra:
+            details.append("unexpected " + ", ".join(extra))
+        raise MemoryBusError(
+            "invalid role lineage checkpoint fields: " + "; ".join(details)
+        )
+    if payload.get("schema") != ROLE_LINEAGE_CHECKPOINT_SCHEMA:
+        raise MemoryBusError(
+            f"role lineage checkpoint schema must be {ROLE_LINEAGE_CHECKPOINT_SCHEMA}"
+        )
+    key = _validate_role_lineage_key(payload.get("lineage_key"))
+    lineage_id = _require_sha256(payload.get("lineage_id"), "lineage_id")
+    computed_lineage_id = role_lineage_id(key)
+    if lineage_id != computed_lineage_id:
+        raise MemoryBusError(
+            f"checkpoint lineage ID mismatch: expected {computed_lineage_id}, got {lineage_id}"
+        )
+    root_payload = _role_lineage_root_payload(key, lineage_id)
+    expected_root_id = _role_lineage_root_id(root_payload)
+    root_id = _require_sha256(payload.get("lineage_root_id"), "lineage_root_id")
+    if root_id != expected_root_id:
+        raise MemoryBusError(
+            f"checkpoint lineage root ID mismatch: expected {expected_root_id}, got {root_id}"
+        )
+    sequence = payload.get("sequence")
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
+        raise MemoryBusError("checkpoint sequence must be a positive integer")
+    revision = payload.get("registry_revision")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+        raise MemoryBusError("checkpoint registry_revision must be a non-negative integer")
+    previous_checkpoint_id = _require_sha256(
+        payload.get("previous_checkpoint_id"),
+        "previous_checkpoint_id",
+        allow_empty=True,
+    )
+    previous_receipt = _require_sha256(
+        payload.get("previous_receipt_sha256"),
+        "previous_receipt_sha256",
+        allow_empty=True,
+    )
+    if sequence == 1 and (previous_checkpoint_id or previous_receipt):
+        raise MemoryBusError(
+            "first checkpoint must have empty predecessor IDs"
+        )
+    if sequence > 1 and (not previous_checkpoint_id or not previous_receipt):
+        raise MemoryBusError(
+            "non-root checkpoint must bind both predecessor IDs"
+        )
+    receipt_hash = _require_sha256(payload.get("receipt_sha256"), "receipt_sha256")
+    resulting_state = payload.get("resulting_state")
+    if not isinstance(resulting_state, str) or not resulting_state:
+        raise MemoryBusError("checkpoint resulting_state must be a non-empty string")
+    receipt = _validate_evidence_envelope(
+        payload.get("receipt_envelope"), "checkpoint receipt_envelope"
+    )
+    chain = _validate_evidence_envelope(
+        payload.get("chain_envelope"), "checkpoint chain_envelope"
+    )
+    receipt_path = PurePosixPath(payload["receipt_envelope"]["path"])
+    chain_path = PurePosixPath(payload["chain_envelope"]["path"])
+    artifact_path = PurePosixPath(key["artifact_dir"])
+
+    def below_artifact(path: PurePosixPath) -> bool:
+        return (
+            len(path.parts) > len(artifact_path.parts)
+            and path.parts[: len(artifact_path.parts)] == artifact_path.parts
+        )
+
+    if not below_artifact(receipt_path) or not below_artifact(chain_path):
+        raise MemoryBusError(
+            "checkpoint evidence path must stay below the lineage artifact directory"
+        )
+    if receipt.get("schema") != ROLE_EVIDENCE_SCHEMA:
+        raise MemoryBusError(
+            f"checkpoint receipt envelope schema must be {ROLE_EVIDENCE_SCHEMA}"
+        )
+    if chain.get("schema") != ROLE_CHAIN_SCHEMA:
+        raise MemoryBusError(
+            f"checkpoint chain envelope schema must be {ROLE_CHAIN_SCHEMA}"
+        )
+    event = receipt.get("event")
+    if not isinstance(event, str) or not event:
+        raise MemoryBusError("checkpoint receipt envelope event must be non-empty")
+    expected_receipt_name = (
+        f"{sequence:06d}-{event.replace('_', '-')}-{receipt_hash}.json"
+    )
+    if (
+        receipt_path.name != expected_receipt_name
+        or receipt_path.parent.name != "receipts"
+        or receipt_path.parent.parent != chain_path.parent
+        or chain_path.name != "chain.json"
+    ):
+        raise MemoryBusError(
+            "checkpoint receipt/chain evidence paths do not match the lineage layout"
+        )
+    receipt_checks = {
+        "sequence": sequence,
+        "uc": key["uc"],
+        "artifact_dir": key["artifact_dir"],
+        "previous_receipt_sha256": previous_receipt,
+        "receipt_sha256": receipt_hash,
+        "resulting_state": resulting_state,
+    }
+    for field, wanted in receipt_checks.items():
+        if receipt.get(field) != wanted:
+            raise MemoryBusError(
+                f"checkpoint receipt envelope mismatch for {field}: "
+                f"expected {wanted!r}, got {receipt.get(field)!r}"
+            )
+    chain_checks = {
+        "sequence": sequence,
+        "head_sha256": receipt_hash,
+        "state": resulting_state,
+    }
+    for field, wanted in chain_checks.items():
+        if chain.get(field) != wanted:
+            raise MemoryBusError(
+                f"checkpoint chain envelope mismatch for {field}: "
+                f"expected {wanted!r}, got {chain.get(field)!r}"
+            )
+    latest = chain.get("latest_receipts")
+    if not isinstance(latest, dict) or latest.get(event) != receipt_path.as_posix():
+        raise MemoryBusError(
+            "checkpoint chain latest_receipts does not bind the receipt evidence path"
+        )
+    if payload["receipt_envelope"]["path"] == payload["chain_envelope"]["path"]:
+        raise MemoryBusError("checkpoint receipt and chain envelopes must use distinct paths")
+    # Canonicalization here rejects non-JSON extension values before any POST.
+    _canonical_json(payload)
+    result = copy.deepcopy(payload)
+    result["lineage_key"] = key
+    result["lineage_id"] = lineage_id
+    result["lineage_root_id"] = root_id
+    result["previous_checkpoint_id"] = previous_checkpoint_id
+    result["previous_receipt_sha256"] = previous_receipt
+    result["receipt_sha256"] = receipt_hash
+    return result
+
+
+def verify_role_lineage_checkpoint(
+    record: dict[str, Any],
+    expected: dict[str, Any] | None = None,
+    *,
+    exact_id: str | None = None,
+) -> dict[str, Any]:
+    """Verify immutable checkpoint content and its exact content address."""
+
+    content = memory_content(record)
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise MemoryBusError("role lineage checkpoint content is not JSON") from exc
+    payload = _validate_role_lineage_checkpoint(parsed)
+    canonical_content = _canonical_content(payload)
+    if content != canonical_content:
+        raise MemoryBusError("role lineage checkpoint content is not canonical JSON")
+    content_id = _sha256(content.encode("utf-8"))
+    actual_id = memory_id(record)
+    if actual_id != content_id:
+        raise MemoryBusError(
+            f"role lineage checkpoint content hash mismatch: expected {content_id}, got {actual_id}"
+        )
+    if exact_id is not None and str(exact_id) != content_id:
+        raise MemoryBusError(
+            f"role lineage checkpoint exact ID mismatch: expected {exact_id}, got {content_id}"
+        )
+    if expected is not None:
+        expected_payload = _validate_role_lineage_checkpoint(expected)
+        if _canonical_json(expected_payload) != _canonical_json(payload):
+            raise MemoryBusError("role lineage checkpoint payload does not exactly match expected")
+    metadata = memory_metadata(record)
+    checks = {
+        "schema": MEMORY_LINEAGE_CHECKPOINT_SCHEMA,
+        "checkpoint_schema": ROLE_LINEAGE_CHECKPOINT_SCHEMA,
+        "namespace": payload["lineage_key"]["namespace"],
+        "lineage_id": payload["lineage_id"],
+        "lineage_root_id": payload["lineage_root_id"],
+        "sequence": payload["sequence"],
+        "registry_revision": payload["registry_revision"],
+    }
+    for key, wanted in checks.items():
+        if metadata.get(key) != wanted:
+            raise MemoryBusError(
+                f"role lineage checkpoint metadata mismatch for {key}: "
+                f"expected {wanted!r}, got {metadata.get(key)!r}"
+            )
+    if set(memory_tags(record)) != set(_role_lineage_tags("checkpoint")):
+        raise MemoryBusError("role lineage checkpoint Memory tags do not exactly match contract")
+    return {
+        "namespace": payload["lineage_key"]["namespace"],
+        "lineage_id": payload["lineage_id"],
+        "lineage_root_id": payload["lineage_root_id"],
+        "checkpoint_id": content_id,
+        "memory_id": content_id,
+        "content_sha256": content_id,
+        "sequence": payload["sequence"],
+        "registry_revision": payload["registry_revision"],
+        "resulting_state": payload["resulting_state"],
+        "payload": payload,
+        "status": "verified",
+    }
+
+
+def get_role_lineage_checkpoint(
+    exact_id: str,
+    *,
+    agent: str = "agent",
+    timeout: float = 3.0,
+) -> dict[str, Any]:
+    checkpoint_id = _require_sha256(exact_id, "checkpoint exact ID")
+    record = get_memory_exact(checkpoint_id, agent=agent, timeout=timeout)
+    return verify_role_lineage_checkpoint(record, exact_id=checkpoint_id)
+
+
+def create_role_lineage_checkpoint(
+    payload: dict[str, Any],
+    *,
+    agent: str = "agent",
+    timeout: float = 3.0,
+) -> dict[str, Any]:
+    """POST one immutable checkpoint and prove it with an exact GET; never PUT."""
+
+    checkpoint = _validate_role_lineage_checkpoint(payload)
+    content = _canonical_content(checkpoint)
+    exact_id = _sha256(content.encode("utf-8"))
+    metadata = {
+        "schema": MEMORY_LINEAGE_CHECKPOINT_SCHEMA,
+        "checkpoint_schema": ROLE_LINEAGE_CHECKPOINT_SCHEMA,
+        "namespace": checkpoint["lineage_key"]["namespace"],
+        "lineage_id": checkpoint["lineage_id"],
+        "lineage_root_id": checkpoint["lineage_root_id"],
+        "sequence": checkpoint["sequence"],
+        "registry_revision": checkpoint["registry_revision"],
+    }
+    response = _require_success(
+        request_json(
+            "POST",
+            "/api/memories",
+            {
+                "content": content,
+                "tags": _role_lineage_tags("checkpoint"),
+                "memory_type": "decision",
+                "conversation_id": f"bugate-role-lineage-checkpoint-{exact_id}",
+                "metadata": metadata,
+            },
+            agent=agent,
+            timeout=timeout,
+        ),
+        "role lineage checkpoint POST",
+    )
+    _require_post_content_hash(response, exact_id, "role lineage checkpoint POST")
+    record = get_memory_exact(exact_id, agent=agent, timeout=timeout)
+    return verify_role_lineage_checkpoint(record, checkpoint, exact_id=exact_id)
+
+
 def _require_success(data: Any, operation: str) -> dict[str, Any]:
     """Require the service's explicit mutation acknowledgement.
 
@@ -700,6 +1362,13 @@ def _validate_role_memory(
 ) -> dict[str, Any]:
     _validate_transition_payload(expected)
     namespace = project_tag()
+    expected_content = _role_memory_content(namespace, expected)
+    expected_content_id = _sha256(expected_content.encode("utf-8"))
+    if exact_id != expected_content_id:
+        raise MemoryBusError(
+            "role transition exact ID is not its content address: "
+            f"expected {expected_content_id}, got {exact_id}"
+        )
     actual_id = memory_id(record)
     if actual_id != exact_id:
         raise MemoryBusError(
@@ -733,7 +1402,6 @@ def _validate_role_memory(
         raise MemoryBusError(
             "role transition Memory tags mismatch; missing: " + ", ".join(missing_tags)
         )
-    expected_content = _role_memory_content(namespace, expected)
     if memory_content(record) != expected_content:
         raise MemoryBusError("role transition Memory content mismatch")
     verified_at = str(metadata.get("verified_at") or "")
@@ -813,6 +1481,7 @@ def prepare_role_transition(payload: dict[str, Any], strict: bool) -> dict[str, 
     verified_at = _utc_now()
     metadata = _role_memory_metadata(namespace, payload, verified_at=verified_at)
     content = _role_memory_content(namespace, payload)
+    content_id = _sha256(content.encode("utf-8"))
     tags = _role_memory_tags(namespace, payload)
     agent = _transition_agent(payload)
     response = _require_success(
@@ -832,6 +1501,7 @@ def prepare_role_transition(payload: dict[str, Any], strict: bool) -> dict[str, 
         ),
         "role transition POST",
     )
+    _require_post_content_hash(response, content_id, "role transition POST")
     exact_id = memory_id(response)
     if exact_id == "<unknown>" or not exact_id:
         raise MemoryBusError("role transition POST response is missing content hash")
