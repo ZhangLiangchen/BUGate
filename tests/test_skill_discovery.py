@@ -25,7 +25,7 @@ class SkillDiscoveryTests(unittest.TestCase):
         }
         self.assertEqual(
             contract.SKILL_NAMES,
-            ("bugate", "bugate-full-check", "bugate-import"),
+            ("bugate", "bugate-full-check", "bugate-import", "bugate-update"),
         )
 
         for surface, target_template in surfaces.items():

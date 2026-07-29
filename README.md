@@ -15,21 +15,24 @@ opening this repo is just developing BUGate itself), naming, and the
 evolution plan are chartered in
 [`CHARTER.md`](CHARTER.md) (CHARTER-BUGATE-001).
 
-**Repository release line: v0.4.3.** See the
-[release notes](docs/releases/v0.4.3.md). Version text alone is not publication
-evidence: v0.4.3 is authoritative for distribution only after its GitHub
+**Repository release line: v0.4.4.** See the
+[release notes](docs/releases/v0.4.4.md). Version text alone is not publication
+evidence: v0.4.4 is authoritative for distribution only after its GitHub
 Release visibly publishes these three assets:
-`bugate-0.4.3.tar.gz`, `bugate-0.4.3.zip`, and
-`bugate-0.4.3.SHA256SUMS`. Download the checksum file with either archive and
-verify SHA-256 before extracting it. Until that condition is satisfied, v0.4.2
+`bugate-0.4.4.tar.gz`, `bugate-0.4.4.zip`, and
+`bugate-0.4.4.SHA256SUMS`. Download the checksum file with either archive and
+verify SHA-256 before extracting it. Until that condition is satisfied, v0.4.3
 remains the current published fallback.
 
 ## First 5 minutes (start here)
 
-Already imported BUGate into a SUT repo and wondering how to USE it day to
-day? All post-import guidance is consolidated under one vendored skill:
-[.shared/skills/bugate-import/](.shared/skills/bugate-import/SKILL.md) —
-adaptation principle + layout wiring in SKILL.md, the operator manual at
+Already imported BUGate into a SUT repo and wondering how to use or upgrade it?
+The vendored
+[bugate-import skill](.shared/skills/bugate-import/SKILL.md) covers adaptation,
+layout wiring, and day-to-day governance. The dedicated
+[bugate-update skill](.shared/skills/bugate-update/SKILL.md) is selected for
+natural-language requests such as “upgrade the BUGate version” and defaults to
+read-only planning. The import operator manual remains at
 [references/using-bugate.md](.shared/skills/bugate-import/references/using-bugate.md)
 (中文: [using-bugate.zh-CN.md](.shared/skills/bugate-import/references/using-bugate.zh-CN.md)),
 operations lore at
@@ -53,6 +56,7 @@ your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 - **What is BUGate, and how is it meant to be used?** [`CHARTER.md`](CHARTER.md) — positioning, the single usage mode (imported), the self-development setup, naming, and the evolution plan.
 - **Bootstrapping with an AI agent?** [`INIT.md`](INIT.md) is a runnable init prompt (Python check → zero-install smoke → config load → optional capabilities).
 - **Importing BUGate into a SUT repo with an AI agent?** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) is a runnable import prompt (release download → installer → Claude/Codex wiring → Memory Bus → profile activation).
+- **Upgrading an existing imported BUGate with an AI agent?** [`UPDATE_PROMPT.md`](UPDATE_PROMPT.md) invokes the dedicated `bugate-update` skill (read-only `status` + `plan` by default; exact approval is required for `apply`).
 - **What can it do / every command?** [`CAPABILITIES.md`](CAPABILITIES.md).
 - **The required memory service** (auto-installed by the importer; prose
   shorthand `bugate init` currently means `python3 scripts/bugate_init.py`) and
@@ -254,13 +258,14 @@ orchestrators, and Core mutators are enforced. See the
 
 ### A) Imported mode — govern your SUT test repo (default)
 
-**Agent-assisted import prompt.** Open the SUT automation test repo as the
-project root, then paste [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) into Claude Code
-or Codex. The prompt first distinguishes a fresh install, an external
-legacy/pre-lock bootstrap, and a lock+launcher in-repo update, then guides the
-applicable release, verification, profile, runtime-reload, and Memory steps.
-Chinese mirror:
-[`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md).
+**Agent-assisted prompts.** For a fresh import, open the SUT automation test
+repo as the project root and paste [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) into
+Claude Code or Codex. For an existing import, say “upgrade the BUGate version”
+or paste [`UPDATE_PROMPT.md`](UPDATE_PROMPT.md); the dedicated
+`bugate-update` skill classifies the installation and stops after read-only
+`status` + `plan` unless the exact GO plan is separately approved. Chinese
+mirrors: [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) and
+[`UPDATE_PROMPT.zh-CN.md`](UPDATE_PROMPT.zh-CN.md).
 
 Choose exactly one lifecycle entry point:
 
@@ -276,7 +281,7 @@ the versioned GitHub Release asset, verify it, unpack it outside the SUT repo,
 then run the installer against a repo with no existing vendor path:
 
 ```bash
-BUGATE_VERSION=0.4.3
+BUGATE_VERSION=0.4.4
 BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -311,18 +316,21 @@ path already exists in any form, the installer performs no target or
 machine-state write and directs you to the updater.
 
 **Upgrade an existing import.** Work from the imported SUT test repo root and
-keep unrelated dirty files untouched. A supported v0.3.x or exact pre-lock
+keep unrelated dirty files untouched. Give the agent
+[`UPDATE_PROMPT.md`](UPDATE_PROMPT.md), invoke `$bugate-update`, or ask it to
+“upgrade the BUGate version.” The default authority is plan-only; applying the
+exact reviewed `Decision: GO` plan is a separate approval. A supported v0.3.x or exact pre-lock
 v0.4.0/v0.4.1 installation has no authoritative lock/updater pair, so use the
 updater from the unpacked v0.4.2-or-later release exactly once. Keep that
 verified unpacked release outside the SUT repo until the rollback window is
 closed:
 
 ```bash
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py status . --vendor-dir .bugate
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py plan . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py status . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py plan . --vendor-dir .bugate
 # Review the complete plan and require Decision: GO before mutation.
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py apply . --vendor-dir .bugate
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py apply . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py verify . --vendor-dir .bugate
 ```
 
 Only an installation with both `.bugate/bugate.lock.json` and executable
@@ -332,9 +340,9 @@ evidence:
 
 ```bash
 .bugate/bin/bugate-update status
-.bugate/bin/bugate-update plan --to 0.4.3
+.bugate/bin/bugate-update plan --to 0.4.4
 # Apply only the reviewed GO plan.
-.bugate/bin/bugate-update apply --to 0.4.3
+.bugate/bin/bugate-update apply --to 0.4.4
 .bugate/bin/bugate-update verify
 ```
 
@@ -345,11 +353,11 @@ rejected before target writes):
 
 ```bash
 .bugate/bin/bugate-update plan \
-  --archive /outside/bugate-0.4.3.tar.gz \
-  --checksums /outside/bugate-0.4.3.SHA256SUMS
+  --archive /outside/bugate-0.4.4.tar.gz \
+  --checksums /outside/bugate-0.4.4.SHA256SUMS
 .bugate/bin/bugate-update apply \
-  --archive /outside/bugate-0.4.3.tar.gz \
-  --checksums /outside/bugate-0.4.3.SHA256SUMS
+  --archive /outside/bugate-0.4.4.tar.gz \
+  --checksums /outside/bugate-0.4.4.SHA256SUMS
 .bugate/bin/bugate-update verify
 ```
 
@@ -361,7 +369,7 @@ retained, verified unpacked v0.4.2-or-later updater:
 
 ```bash
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-BOOTSTRAP=/outside/bugate-0.4.3/scripts/bugate_update.py
+BOOTSTRAP=/outside/bugate-0.4.4/scripts/bugate_update.py
 if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
   .bugate/bin/bugate-update verify
 else
@@ -457,8 +465,8 @@ open that SUT repo as the project root. The core checkout remains pure.
 To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.4.3
-(cd dist && shasum -a 256 -c bugate-0.4.3.SHA256SUMS)
+python3 scripts/build_release_archives.py --version 0.4.4
+(cd dist && shasum -a 256 -c bugate-0.4.4.SHA256SUMS)
 ```
 
 The builder emits all three files directly, rejects tracked or non-ignored
@@ -469,12 +477,12 @@ manifests, and normalizes archive timestamps/metadata for reproducibility.
 This writes:
 
 ```text
-dist/bugate-0.4.3.tar.gz
-dist/bugate-0.4.3.zip
-dist/bugate-0.4.3.SHA256SUMS
+dist/bugate-0.4.4.tar.gz
+dist/bugate-0.4.4.zip
+dist/bugate-0.4.4.SHA256SUMS
 ```
 
-Attach all three files to the GitHub Release for tag `v0.4.3`. These archives include
+Attach all three files to the GitHub Release for tag `v0.4.4`. These archives include
 the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
 bin wrappers as one versioned BUGate kit. Formal assets must come from a clean
 release commit; development-only dirty-tree flags are not valid for a release.

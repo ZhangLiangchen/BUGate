@@ -8,6 +8,12 @@ This document now lives inside the consolidated import-adapter skill:
 
 ## Existing installations: update, do not re-import
 
+Ask the agent to “upgrade the BUGate version”, invoke `$bugate-update`, or
+paste [`UPDATE_PROMPT.md`](../UPDATE_PROMPT.md). The dedicated
+[`bugate-update` skill](../.shared/skills/bugate-update/SKILL.md) defaults to
+read-only `status` + `plan`; applying the exact GO plan requires separate
+authority.
+
 The complete bilingual updater runbook is
 [`updating-bugate.md`](../.shared/skills/bugate-import/references/updating-bugate.md)
 ([中文](../.shared/skills/bugate-import/references/updating-bugate.zh-CN.md)).

@@ -9,6 +9,7 @@ This directory is the Codex adapter layer for BUGate.
 | `.codex/agents` | Codex gate-review agents (brief / testability / inventory). In **this** repo it is a symlink into the kit at `.shared/skills/bugate/adapters/codex/agents/`. In an **imported** SUT repo the installer copies the TOMLs here as committed files so each SUT repo reviews and versions the exact gate-agent cards it uses. |
 | `.agents/skills/bugate` | Official Codex repo-skill symlink to `.shared/skills/bugate`. |
 | `.agents/skills/bugate-full-check` | Official Codex repo-skill symlink to `.shared/skills/bugate-full-check`. |
+| `.agents/skills/bugate-update` | Official Codex repo-skill symlink for natural-language existing-install version upgrades; plan-only by default. |
 | `.codex/skills/*` | Legacy Codex compatibility symlinks. Keep them while older clients still read this path, but do not treat it as the canonical path. |
 | `.codex-plugin/plugin.json` | Codex plugin manifest; plugin-root `skills/` and `hooks/hooks.json` carry the shared skill and lifecycle hooks. |
 
@@ -33,6 +34,11 @@ flow (and exact-transaction `rollback` when needed) only when both the
 authoritative installed lock (`.bugate/bugate.lock.json`) and executable
 launcher exist. The updater refreshes only manifest-owned runtime surfaces;
 profile migration remains a separate reviewed change.
+
+When the user asks to update or upgrade the BUGate version, Codex should invoke
+the dedicated `bugate-update` skill (or follow `UPDATE_PROMPT.md`). The skill
+uses the same physical classifier and preserves separate authority for apply,
+profile/lineage actions, commit, and push.
 
 The shared skill tree also carries Codex **command-equivalent** adapters (the
 multi-view and adversarial dual-CLI procedures) under

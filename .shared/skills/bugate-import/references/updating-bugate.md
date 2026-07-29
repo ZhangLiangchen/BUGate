@@ -8,6 +8,13 @@ compatible releases. It is intentionally separate from first installation:
 `scripts/bugate_init.py` creates a new imported installation; it is not an
 upgrade, re-import, or vendor-refresh command.
 
+For agent execution, start with the dedicated sibling
+`../../bugate-update/SKILL.md` or paste the vendored root
+`UPDATE_PROMPT.md`. Natural-language requests such as “upgrade the BUGate
+version” route there. The default authority is read-only `status` + `plan`;
+`apply`, rollback, profile migration, lineage actions, commit, and push remain
+separate approvals.
+
 The normative ownership and transaction rules live in
 `docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.md` in the release source. This
 vendored guide is the self-contained operating path.

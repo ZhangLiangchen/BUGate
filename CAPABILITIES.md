@@ -7,11 +7,11 @@ testability → inventory/oracle map → readable cases → adversarial review �
 execution report → knowledge update) *before* any test implementation is
 generated.
 
-Current distribution release line: **v0.4.3**. It becomes authoritative only
+Current distribution release line: **v0.4.4**. It becomes authoritative only
 after the annotated tag and GitHub Release expose exactly
-`bugate-0.4.3.tar.gz`, `bugate-0.4.3.zip`, and
-`bugate-0.4.3.SHA256SUMS`, and the selected archive verifies. Until then, the
-current published fallback remains v0.4.2.
+`bugate-0.4.4.tar.gz`, `bugate-0.4.4.zip`, and
+`bugate-0.4.4.SHA256SUMS`, and the selected archive verifies. Until then, the
+current published fallback remains v0.4.3.
 
 **Runtime contract**
 
@@ -57,6 +57,7 @@ Normative rules: [`CHARTER.md`](CHARTER.md) §2 + Amendment A4. Per command clas
 
 | Command class | Runs in |
 |---|---|
+| Agent update entry (`bugate-update` skill / `UPDATE_PROMPT.md` / `UPDATE_PROMPT.zh-CN.md`) — natural-language upgrade requests route to read-only `status` + `plan` by default; exact `apply`, profile migration, lineage actions, commit/push, and rollback remain separately authorized | The **existing imported SUT test repo** as project root; never BUGate Core or a different SUT |
 | Pre-code gate engine, physical write guard, orchestrator, 3A/04/05 generators, Wave 0 / Wave 8 engines, Wave 1 / 3B peer bridges, role isolation/governance, plan lock, prompt reminder, `wave8-weekly` | The **imported SUT test repo**; in BUGate core only template checks and ephemeral fixture acceptances run |
 | Fresh importer (`bugate_init.py`) — vendors the kit, links Claude skills plus official Codex `.agents/skills` (with `.codex/skills` kept as a legacy bridge), copies Codex gate agents, merges the initial BUGate hook entries without replacing repo-owned hooks, scaffolds committed config + profile, writes the first installed lock, and appends the marked ignore block. Any existing vendor path is a zero-write failure; it never performs an upgrade. | The **engine checkout or unpacked release**, pointed at a fresh target SUT repo |
 | Imported updater (`scripts/bugate_update.py` / `bin/bugate-update`) — exact legacy detection or installed-lock verification, zero-write planning, transactional apply/recovery, verify, and exact-transaction rollback. It writes only manifest-owned engine/link/marked-block/exact-hook surfaces; profile, tests, artifacts, evidence, Memory, SUT-owned hooks, and unrelated dirt remain outside its transaction. | Bootstrap script from an unpacked v0.4.2-or-later release for v0.3.x/pre-lock v0.4.0/v0.4.1 (and verification after rollback to those images); vendored wrapper from the **imported SUT test repo root** only while its installed lock and launcher both exist |

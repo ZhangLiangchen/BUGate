@@ -9,6 +9,11 @@
 
 ## 已有安装：更新，禁止重新导入
 
+可直接对 agent 说“升级 BUGate 版本”、调用 `$bugate-update`，或粘贴
+[`UPDATE_PROMPT.zh-CN.md`](../UPDATE_PROMPT.zh-CN.md)。专用
+[`bugate-update` skill](../.shared/skills/bugate-update/SKILL.md) 默认只读执行
+`status` + `plan`；apply exact GO plan 需要独立授权。
+
 完整双语 updater 手册见
 [`updating-bugate.zh-CN.md`](../.shared/skills/bugate-import/references/updating-bugate.zh-CN.md)
 （[English](../.shared/skills/bugate-import/references/updating-bugate.md)）。当前选路契约：

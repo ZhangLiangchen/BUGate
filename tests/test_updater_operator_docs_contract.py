@@ -30,7 +30,10 @@ PRIMARY_ROUTE_DOCS = (
     "CAPABILITIES.md",
     "IMPORT_PROMPT.md",
     "IMPORT_PROMPT.zh-CN.md",
+    "UPDATE_PROMPT.md",
+    "UPDATE_PROMPT.zh-CN.md",
     ".shared/skills/bugate-import/SKILL.md",
+    ".shared/skills/bugate-update/SKILL.md",
     ".shared/skills/bugate-import/references/updating-bugate.md",
     ".shared/skills/bugate-import/references/updating-bugate.zh-CN.md",
     ".shared/skills/bugate-import/references/field-guide.md",
@@ -50,6 +53,9 @@ EXACT_FALLBACK_DOCS = (
     "INIT.zh-CN.md",
     "IMPORT_PROMPT.md",
     "IMPORT_PROMPT.zh-CN.md",
+    "UPDATE_PROMPT.md",
+    "UPDATE_PROMPT.zh-CN.md",
+    ".shared/skills/bugate-update/SKILL.md",
     ".shared/skills/bugate-import/references/updating-bugate.md",
     ".shared/skills/bugate-import/references/updating-bugate.zh-CN.md",
     "docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.md",
@@ -148,8 +154,13 @@ class UpdaterOperatorDocsContractTests(unittest.TestCase):
                 with self.subTest(document=relative, line=index + 1):
                     self.assertNotRegex(following, vendored_verify)
 
-    def test_import_prompt_classifier_requires_both_lock_and_launcher(self) -> None:
-        for relative in ("IMPORT_PROMPT.md", "IMPORT_PROMPT.zh-CN.md"):
+    def test_agent_prompts_require_both_lock_and_launcher(self) -> None:
+        for relative in (
+            "IMPORT_PROMPT.md",
+            "IMPORT_PROMPT.zh-CN.md",
+            "UPDATE_PROMPT.md",
+            "UPDATE_PROMPT.zh-CN.md",
+        ):
             with self.subTest(document=relative):
                 text = _normalized(relative)
                 self.assertRegex(

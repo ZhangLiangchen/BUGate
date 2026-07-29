@@ -31,6 +31,9 @@ class ReleaseManifestContractTests(unittest.TestCase):
         selected = [path for path in tracked if path]
         for path in (
             *contract.UPDATER_WORKER_FILES,
+            ".shared/skills/bugate-update/SKILL.md",
+            ".shared/skills/bugate-update/agents/openai.yaml",
+            *contract.VENDOR_SINGLE_FILES,
             "tests/test_release_manifests.py",
         ):
             if path not in selected:
@@ -75,7 +78,10 @@ class ReleaseManifestContractTests(unittest.TestCase):
         self.assertFalse(any(path.startswith("tests/") for path in paths))
 
         projection = first["installed_projection"]
-        self.assertEqual(sum(item["id"].startswith("skill:") for item in projection), 9)
+        self.assertEqual(
+            sum(item["id"].startswith("skill:") for item in projection),
+            len(contract.SKILL_NAMES) * len(contract.SKILL_RUNTIMES),
+        )
         self.assertEqual(sum(item["id"].startswith("agent:codex:") for item in projection), 3)
         self.assertEqual(
             sum(item["scope"] == "shared_json_fragment" for item in projection),
@@ -268,9 +274,10 @@ class ReleaseManifestContractTests(unittest.TestCase):
                 (root / rel).mkdir(parents=True)
                 marker = root / rel / "marker.txt"
                 marker.write_text(rel + "\n", encoding="utf-8")
-            setup = root / contract.VENDOR_SINGLE_FILES[0]
-            setup.parent.mkdir(parents=True, exist_ok=True)
-            setup.write_text("setup\n", encoding="utf-8")
+            for relative in contract.VENDOR_SINGLE_FILES:
+                single_file = root / relative
+                single_file.parent.mkdir(parents=True, exist_ok=True)
+                single_file.write_text(f"{relative}\n", encoding="utf-8")
             executable = root / "bin" / "tool"
             executable.write_text("#!/bin/sh\n", encoding="utf-8")
             os.chmod(executable, 0o755)

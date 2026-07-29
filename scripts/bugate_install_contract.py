@@ -80,8 +80,13 @@ VENDOR_TREE_ROOTS = (
     ".shared/skills/bugate",
     ".shared/skills/bugate-full-check",
     ".shared/skills/bugate-import",
+    ".shared/skills/bugate-update",
 )
-VENDOR_SINGLE_FILES = ("docs/SETUP-OPTIONAL.md",)
+VENDOR_SINGLE_FILES = (
+    "docs/SETUP-OPTIONAL.md",
+    "UPDATE_PROMPT.md",
+    "UPDATE_PROMPT.zh-CN.md",
+)
 UPDATER_WORKER_FILES = (
     "scripts/bugate_update.py",
     "scripts/bugate_update_transaction.py",
@@ -91,7 +96,7 @@ UPDATER_WORKER_FILES = (
     "scripts/bugate_legacy_manifest.py",
     "scripts/bugate_core.py",
 )
-SKILL_NAMES = ("bugate", "bugate-full-check", "bugate-import")
+SKILL_NAMES = ("bugate", "bugate-full-check", "bugate-import", "bugate-update")
 SKILL_RUNTIMES = (".claude", ".agents", ".codex")
 CODEX_GATE_AGENT_SOURCE_DIR = ".shared/skills/bugate/adapters/codex/agents"
 CODEX_GATE_AGENT_NAMES = (

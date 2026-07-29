@@ -6,6 +6,11 @@
 一等更新器及后续兼容版本。它与首次安装严格分开：`scripts/bugate_init.py` 只创建
 新的 imported 安装，不是升级、重新导入或 vendor 刷新命令。
 
+由 agent 执行时，先使用专用 sibling `../../bugate-update/SKILL.md`，或粘贴
+vendored root 的 `UPDATE_PROMPT.zh-CN.md`。“升级 BUGate 版本”等自然语言请求会
+路由到该 skill。默认授权只包含只读 `status` + `plan`；`apply`、rollback、profile
+migration、lineage action、commit 与 push 均需独立批准。
+
 规范性的 ownership 与 transaction 规则位于 release 源码中的
 `docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.zh-CN.md`；本 vendored 指南给出
 自包含的实际操作路径。

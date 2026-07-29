@@ -70,7 +70,7 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         version = versions.pop()
         self.assertRegex(version, VERSION_RE)
         self.assertEqual(
-            "0.4.3",
+            "0.4.4",
             version,
             "repository version surfaces must identify the source candidate",
         )
@@ -181,7 +181,7 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         expectations = {
             "INIT.md": (
                 f"release line is **v{version}**",
-                "current published fallback remains v0.4.2",
+                "current published fallback remains v0.4.3",
                 f"bugate-{version}.SHA256SUMS",
                 f"bugate-update plan --to {version}",
             ),
@@ -200,13 +200,13 @@ class RepositoryReleaseContractTests(unittest.TestCase):
             "IMPORT_PROMPT.md": (
                 f"otherwise `{version}`",
                 f"public v{version} tag/Release exists",
-                "published v0.4.2 fallback",
+                "published v0.4.3 fallback",
                 f'BUGATE_VERSION="${{BUGATE_VERSION:-{version}}}"',
             ),
             "IMPORT_PROMPT.zh-CN.md": (
                 f"否则使用 `{version}`",
                 f"公开 v{version} tag/Release 存在后",
-                "已发布的 v0.4.2 回退版本",
+                "已发布的 v0.4.3 回退版本",
                 f'BUGATE_VERSION="${{BUGATE_VERSION:-{version}}}"',
             ),
             "README.md": (

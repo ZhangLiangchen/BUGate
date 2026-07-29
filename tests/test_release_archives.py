@@ -22,7 +22,7 @@ SCRIPTS = ROOT / "scripts"
 BUILDER = SCRIPTS / "build_release_archives.py"
 CONTRACT = SCRIPTS / "bugate_install_contract.py"
 LEGACY = SCRIPTS / "bugate_legacy_manifest.py"
-VERSION = "0.4.3"
+VERSION = "0.4.4"
 LEGACY_TAGS = ("v0.3.0", "v0.3.1", "v0.3.2", "v0.3.4", "v0.3.5", "v0.4.0", "v0.4.1")
 
 if str(SCRIPTS) not in sys.path:
@@ -31,8 +31,19 @@ import build_release_archives as builder_module  # noqa: E402
 
 
 SYNTHETIC_INSTALLER = '''\
-KIT_DIRS = ["scripts", "bin", ".shared/skills/bugate", ".shared/skills/bugate-full-check", ".shared/skills/bugate-import"]
-KIT_FILES = ["docs/SETUP-OPTIONAL.md"]
+KIT_DIRS = [
+    "scripts",
+    "bin",
+    ".shared/skills/bugate",
+    ".shared/skills/bugate-full-check",
+    ".shared/skills/bugate-import",
+    ".shared/skills/bugate-update",
+]
+KIT_FILES = [
+    "docs/SETUP-OPTIONAL.md",
+    "UPDATE_PROMPT.md",
+    "UPDATE_PROMPT.zh-CN.md",
+]
 CODEX_AGENTS_KIT_REL = ".shared/skills/bugate/adapters/codex/agents"
 GITIGNORE_BEGIN = "# >>> BUGate imported-mode ignores (managed by bugate_init.py) >>>"
 GITIGNORE_END = "# <<< BUGate imported-mode ignores <<<"
@@ -54,7 +65,7 @@ def hook_blocks(vendor_dir: str, runtime: str) -> dict:
     }
 
 def link_skills(target, vendor_dir, dry, force):
-    skill_names = ("bugate", "bugate-full-check", "bugate-import")
+    skill_names = ("bugate", "bugate-full-check", "bugate-import", "bugate-update")
     runtimes = ((".claude", "claude"), (".agents", "agents"), (".codex", "codex"))
     return skill_names, runtimes
 '''
@@ -78,6 +89,7 @@ class ReleaseArchiveTests(unittest.TestCase):
             ".shared/skills/bugate/adapters/codex/agents",
             ".shared/skills/bugate-full-check",
             ".shared/skills/bugate-import",
+            ".shared/skills/bugate-update",
             "docs",
         ):
             (self.repo / directory).mkdir(parents=True, exist_ok=True)
@@ -89,7 +101,7 @@ class ReleaseArchiveTests(unittest.TestCase):
         )
         for name in ("check_bugate.py", "bugate_prompt_reminder.py"):
             (self.repo / "scripts" / name).write_text(f"# {name}\n", encoding="utf-8")
-        for skill in ("bugate", "bugate-full-check", "bugate-import"):
+        for skill in ("bugate", "bugate-full-check", "bugate-import", "bugate-update"):
             path = self.repo / ".shared" / "skills" / skill / "SKILL.md"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(f"# {skill}\n", encoding="utf-8")
@@ -98,6 +110,11 @@ class ReleaseArchiveTests(unittest.TestCase):
                 f'name = "{name}"\n', encoding="utf-8"
             )
         (self.repo / "docs/SETUP-OPTIONAL.md").write_text("# setup\n", encoding="utf-8")
+        (self.repo / "UPDATE_PROMPT.md").write_text("# update prompt\n", encoding="utf-8")
+        (self.repo / "UPDATE_PROMPT.zh-CN.md").write_text(
+            "# upgrade prompt zh-CN\n",
+            encoding="utf-8",
+        )
         (self.repo / "README.md").write_text("# release fixture\n", encoding="utf-8")
         (self.repo / "CLAUDE.md").symlink_to("README.md")
         executable = self.repo / "bin" / "fixture-tool"
@@ -321,7 +338,7 @@ class ReleaseArchiveTests(unittest.TestCase):
         self.assertIn(f"bugate-{VERSION}/untracked.txt", tar_names)
 
     def test_explicit_version_must_match_both_manifests(self) -> None:
-        result = self.run_builder("--version", "0.4.4")
+        result = self.run_builder("--version", "0.4.5")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("does not match both plugin manifests", result.stderr)
         self.assertFalse(self.dist.exists())
@@ -334,7 +351,7 @@ class ReleaseArchiveTests(unittest.TestCase):
 
     def test_plugin_manifest_mismatch_is_rejected(self) -> None:
         path = self.repo / ".claude-plugin/plugin.json"
-        path.write_text(json.dumps({"name": "bugate", "version": "0.4.4"}) + "\n")
+        path.write_text(json.dumps({"name": "bugate", "version": "0.4.5"}) + "\n")
         self.commit("make plugin versions inconsistent")
         result = self.run_builder()
         self.assertNotEqual(result.returncode, 0)
@@ -342,8 +359,13 @@ class ReleaseArchiveTests(unittest.TestCase):
         self.assertFalse(self.dist.exists())
 
     def test_updater_version_mismatch_is_rejected(self) -> None:
-        (self.repo / "scripts/bugate_update.py").write_text(
-            'UPDATER_VERSION = "0.4.4"\n', encoding="utf-8"
+        path = self.repo / "scripts/bugate_update.py"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                f'UPDATER_VERSION = "{VERSION}"',
+                'UPDATER_VERSION = "0.4.5"',
+            ),
+            encoding="utf-8",
         )
         self.commit("mismatch updater version")
         result = self.run_builder()
