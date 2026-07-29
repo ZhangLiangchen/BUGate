@@ -8,19 +8,20 @@
 
 BUGate 的定位、唯一规范使用方式（**导入模式**；打开本仓只是在开发 BUGate 本身）、命名与演进计划见 [`CHARTER.md`](CHARTER.md)（CHARTER-BUGATE-001）。
 
-**仓库 release line：v0.4.3。** 详见
-[release notes](docs/releases/v0.4.3.zh-CN.md)。版本文字本身不是发布证据；只有
-GitHub Release 已实际列出以下三个资产时，v0.4.3 才具有正式分发权威：
-`bugate-0.4.3.tar.gz`、`bugate-0.4.3.zip` 与
-`bugate-0.4.3.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
-并在解压前校验 SHA-256。在此条件满足前，当前已发布回退版本仍是 v0.4.2。
+**仓库 release line：v0.4.4。** 详见
+[release notes](docs/releases/v0.4.4.zh-CN.md)。版本文字本身不是发布证据；只有
+GitHub Release 已实际列出以下三个资产时，v0.4.4 才具有正式分发权威：
+`bugate-0.4.4.tar.gz`、`bugate-0.4.4.zip` 与
+`bugate-0.4.4.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
+并在解压前校验 SHA-256。在此条件满足前，当前已发布回退版本仍是 v0.4.3。
 
 ## 前 5 分钟（从这里开始）
 
-已经把 BUGate 导入 SUT 仓、想知道日常怎么**用**？导入后的全部指导整合在
-**一个 vendored 技能**之下：
-[.shared/skills/bugate-import/](.shared/skills/bugate-import/SKILL.md)——
-SKILL.md 是适配原则 + 布局接线,操作者手册在
+已经把 BUGate 导入 SUT 仓、想知道日常怎么用或升级？
+[bugate-import skill](.shared/skills/bugate-import/SKILL.md) 负责适配、布局接线与
+日常治理；专用
+[bugate-update skill](.shared/skills/bugate-update/SKILL.md) 会在“升级 BUGate
+版本”等自然语言请求下触发，并默认只做只读规划。Import 操作者手册在
 [references/using-bugate.zh-CN.md](.shared/skills/bugate-import/references/using-bugate.zh-CN.md)
 （English: 同目录 using-bugate.md）,运维经验在
 [references/field-guide.md](.shared/skills/bugate-import/references/field-guide.md)。
@@ -42,6 +43,7 @@ python3 scripts/bugate_init.py <sut-repo> --dry-run
 - **BUGate 是什么，应该如何使用？** [`CHARTER.md`](CHARTER.md) —— 定位、唯一使用模式（导入）、自开发设置、命名与演进计划。
 - **要用 AI agent 启动？** [`INIT.md`](INIT.md) / [`INIT.zh-CN.md`](INIT.zh-CN.md) 是可直接粘贴给 agent 的初始化 prompt。
 - **要让 AI agent 把 BUGate 导入 SUT 仓？** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) / [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 是可执行导入 prompt（release 下载 → installer → Claude/Codex 接线 → Memory Bus → profile 激活）。
+- **要让 AI agent 升级已有 imported BUGate？** [`UPDATE_PROMPT.md`](UPDATE_PROMPT.md) / [`UPDATE_PROMPT.zh-CN.md`](UPDATE_PROMPT.zh-CN.md) 会调用专用 `bugate-update` skill（默认只读执行 `status` + `plan`，`apply` 需要对 exact plan 的独立批准）。
 - **能做什么 / 全部命令？** [`CAPABILITIES.md`](CAPABILITIES.md)。
 - **必要的 Memory Service**（由 importer 自动安装；文档里的 `bugate init`
   shorthand 当前指 `python3 scripts/bugate_init.py`）与**可选**运行时（双 agent
@@ -203,12 +205,13 @@ tool、orchestrator 与 Core mutator。规范细节见
 
 ### A) 导入模式 —— 治理你的 SUT 测试仓（默认）
 
-**Agent 辅助导入 prompt。** 把 SUT 自动化测试仓作为项目根打开，然后把
-[`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 粘给 Claude Code 或
-Codex。该 prompt 会先区分首次安装、外部 legacy/pre-lock bootstrap 与
-lock+launcher 仓内更新，再引导
-适用的 release、验证、profile、runtime reload 与 Memory 步骤。英文版见
-[`IMPORT_PROMPT.md`](IMPORT_PROMPT.md)。
+**Agent 辅助 prompt。** Fresh import 时，把 SUT 自动化测试仓作为项目根打开，
+然后把 [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 粘给 Claude Code 或
+Codex。已有 import 时，直接说“升级 BUGate 版本”或粘贴
+[`UPDATE_PROMPT.zh-CN.md`](UPDATE_PROMPT.zh-CN.md)；专用 `bugate-update` skill
+会分类安装，默认在只读 `status` + `plan` 后停止，只有 exact GO plan 获得独立批准
+才会 apply。英文版见 [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) 与
+[`UPDATE_PROMPT.md`](UPDATE_PROMPT.md)。
 
 只能选择一个生命周期入口：
 
@@ -224,7 +227,7 @@ Release asset，校验后在 SUT 仓外解包，再把 installer 指向一个尚
 的 SUT 自动化测试仓：
 
 ```bash
-BUGATE_VERSION=0.4.3
+BUGATE_VERSION=0.4.4
 BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -248,16 +251,19 @@ python3 scripts/bugate_init.py <sut-repo>    # 加 --dry-run 可预览
 installer 会把 kit vendor 到 `<sut-repo>/.bugate/`，通过 `.claude/skills/`、官方 Codex `.agents/skills/` 和 legacy Codex `.codex/skills/` 链接 skill discovery，合并 hook block 到 SUT 仓的 `.claude/settings.json` + `.codex/hooks.json`（保留已有 hooks），生成并提交用的 `bugate.config.yaml` + `bugate.profile.yaml`，创建 `docs/usecases/`，写入第一份 installed lock，并打印验收清单（包括为新变化的 Codex hook hash re-trust）。若 vendor path 以任何形态存在，installer 在写 target 或 machine state 前退出，并指向 updater。
 
 **升级已有 import。** 在导入后的 SUT 测试仓根目录操作，保留无关 dirty files。
+把 [`UPDATE_PROMPT.zh-CN.md`](UPDATE_PROMPT.zh-CN.md) 交给 agent、显式调用
+`$bugate-update`，或直接说“升级 BUGate 版本”。默认授权仅为 plan-only；apply
+已复核且为 `Decision: GO` 的 exact plan 需要独立批准。
 受支持的 v0.3.x 或 exact pre-lock v0.4.0/v0.4.1 安装没有 authoritative
 lock/updater pair，因此只用一次已解包 v0.4.2 或更高 release 里的 bootstrap
 updater。把这份已验证、位于 SUT 仓外的解包 release 保留到 rollback 窗口结束：
 
 ```bash
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py status . --vendor-dir .bugate
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py plan . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py status . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py plan . --vendor-dir .bugate
 # 完整复核 plan，只有 Decision: GO 才能写入。
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py apply . --vendor-dir .bugate
-python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py apply . --vendor-dir .bugate
+python3 /outside/bugate-0.4.4/scripts/bugate_update.py verify . --vendor-dir .bugate
 ```
 
 只有 `.bugate/bugate.lock.json` 与 executable `.bugate/bin/bugate-update` 同时存在
@@ -266,9 +272,9 @@ python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bu
 
 ```bash
 .bugate/bin/bugate-update status
-.bugate/bin/bugate-update plan --to 0.4.3
+.bugate/bin/bugate-update plan --to 0.4.4
 # 只 apply 已复核且为 GO 的 plan。
-.bugate/bin/bugate-update apply --to 0.4.3
+.bugate/bin/bugate-update apply --to 0.4.4
 .bugate/bin/bugate-update verify
 ```
 
@@ -278,11 +284,11 @@ python3 /outside/bugate-0.4.3/scripts/bugate_update.py verify . --vendor-dir .bu
 
 ```bash
 .bugate/bin/bugate-update plan \
-  --archive /outside/bugate-0.4.3.tar.gz \
-  --checksums /outside/bugate-0.4.3.SHA256SUMS
+  --archive /outside/bugate-0.4.4.tar.gz \
+  --checksums /outside/bugate-0.4.4.SHA256SUMS
 .bugate/bin/bugate-update apply \
-  --archive /outside/bugate-0.4.3.tar.gz \
-  --checksums /outside/bugate-0.4.3.SHA256SUMS
+  --archive /outside/bugate-0.4.4.tar.gz \
+  --checksums /outside/bugate-0.4.4.SHA256SUMS
 .bugate/bin/bugate-update verify
 ```
 
@@ -293,7 +299,7 @@ lock 与 vendored launcher；因此要按 rollback 后仍存在的入口选择 v
 
 ```bash
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-BOOTSTRAP=/outside/bugate-0.4.3/scripts/bugate_update.py
+BOOTSTRAP=/outside/bugate-0.4.4/scripts/bugate_update.py
 if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
   .bugate/bin/bugate-update verify
 else
@@ -358,8 +364,8 @@ python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-ter
 从干净 BUGate checkout 构建 Phase 1 GitHub Release archive assets：
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.4.3
-(cd dist && shasum -a 256 -c bugate-0.4.3.SHA256SUMS)
+python3 scripts/build_release_archives.py --version 0.4.4
+(cd dist && shasum -a 256 -c bugate-0.4.4.SHA256SUMS)
 ```
 
 构建器会直接生成三个文件，默认拒绝 tracked 或未被 ignore 的 untracked dirt，
@@ -369,12 +375,12 @@ python3 scripts/build_release_archives.py --version 0.4.3
 输出：
 
 ```text
-dist/bugate-0.4.3.tar.gz
-dist/bugate-0.4.3.zip
-dist/bugate-0.4.3.SHA256SUMS
+dist/bugate-0.4.4.tar.gz
+dist/bugate-0.4.4.zip
+dist/bugate-0.4.4.SHA256SUMS
 ```
 
-把三个文件都附到 tag `v0.4.3` 的 GitHub Release。这些归档以一个版本化
+把三个文件都附到 tag `v0.4.4` 的 GitHub Release。这些归档以一个版本化
 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、
 hooks、scripts 与 bin wrappers。正式资产必须来自干净 release commit；开发态
 dirty-tree flag 不能用于正式发布。

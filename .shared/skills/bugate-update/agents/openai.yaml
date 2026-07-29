@@ -1,0 +1,6 @@
+interface:
+  display_name: "BUGate Update"
+  short_description: "Plan and execute safe BUGate engine updates"
+  default_prompt: "Use $bugate-update to plan a safe upgrade of this imported BUGate installation."
+policy:
+  allow_implicit_invocation: true

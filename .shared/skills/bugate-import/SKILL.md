@@ -14,7 +14,8 @@ the SUT profile — never a kit patch, never an invented product fact.
 
 | You need | Read |
 |---|---|
-| Install a new import vs update an existing one; external legacy/pre-lock bootstrap; lock+launcher plan/apply/verify/rollback; offline/conflict/profile/session rules | `references/updating-bugate.md` · 中文 `references/updating-bugate.zh-CN.md` |
+| Upgrade an existing import from a natural-language request; plan-only/apply authority; external legacy/pre-lock bootstrap; lock+launcher plan/apply/verify/rollback | sibling skill `../bugate-update/SKILL.md`, root `UPDATE_PROMPT.md` · 中文 `UPDATE_PROMPT.zh-CN.md`, then `references/updating-bugate.md` · 中文 `references/updating-bugate.zh-CN.md` |
+| Install a new import | root `IMPORT_PROMPT.md` · 中文 `IMPORT_PROMPT.zh-CN.md`, then the fresh installer |
 | Wire the write guard to THIS repo's layout (regex/binding/verification) | this file, below |
 | Day-to-day usage after import (three role sessions, human checkpoint, handoff/acceptance, post-run) | `references/using-bugate.md` · 中文 `references/using-bugate.zh-CN.md` |
 | Operations & diagnosis (peer dispatch, role drift/recovery, Memory boundaries, hooks/re-trust, copy hygiene, Wave 7/8, CI) | `references/field-guide.md` |
@@ -25,6 +26,10 @@ the SUT profile — never a kit patch, never an invented product fact.
 ## Install/update routing boundary
 
 - No existing imported installation: use `scripts/bugate_init.py` once.
+- Any natural-language request to update or upgrade an existing BUGate
+  installation routes to the dedicated sibling `bugate-update` skill. It
+  defaults to read-only `status` + `plan`; exact `apply` is a separate
+  authority.
 - Existing exact v0.3.x or pre-lock v0.4.0/v0.4.1 installation: bootstrap
   with `scripts/bugate_update.py` from an unpacked v0.4.2-or-later release;
   retain that verified external release through the rollback window.
