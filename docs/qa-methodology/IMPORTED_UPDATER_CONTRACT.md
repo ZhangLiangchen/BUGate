@@ -1,8 +1,10 @@
 ---
 title: "Imported-mode updater contract"
-version: 1.0
+version: 1.1
 target_release: BUGate v0.4.2
 status: normative
+amended_at: 2026-08-12
+amendments_through: BUGate v0.4.5
 language: en
 companion: IMPORTED_UPDATER_CONTRACT.zh-CN.md
 ---
@@ -99,6 +101,10 @@ hooks/skills/agents, non-marked `.gitignore` content, Memory data/namespace,
 the machine-level `role-lineage.sqlite3` registry, or product and environment
 material. Unrelated dirty files are reported as a warning only and are not an
 update conflict.
+
+> **Amendment pointer (2026-08-12):** This paragraph is retained as the frozen
+> v0.4.2 ownership list. The effective v0.4.5 extension is section 11; it adds
+> `00_self_healing/**` without rewriting the historical list.
 
 Unknown files under a managed directory remain unknown: the updater must not
 recursively remove them. A directory is removed only when it is manifest-owned,
@@ -549,3 +555,18 @@ copy, clone, worktree, or modify a real imported SUT. GO requires all release,
 archive, updater, compatibility, and pre-existing Wave 7 gates to pass; a
 desktop hook hash change remains a user re-trust prerequisite and must not be
 claimed active until re-trusted.
+
+## 11. Amendment — v0.4.5 self-healing ownership boundary (2026-08-12)
+
+The v0.4.5 self-healing capability adds UC-owned post-run evidence under
+`<artifact_dir>/00_self_healing/`. This directory is outside the installed
+engine projection and is added to section 3's absolute forbidden surface:
+the updater must never write, delete, stage, commit, normalize, migrate, or
+reconstruct `00_self_healing/**` during `status`, `plan`, `apply`, `verify`, or
+rollback.
+
+Installing a self-healing-capable engine changes only manifest-owned engine
+files. It does not opt a profile into `self_healing`, create an attempt, alter a
+sidecar receipt, or authorize any SUT/test-asset write. Release and updater
+acceptance must snapshot this directory when present and prove it byte-for-byte
+unchanged across every updater transaction and rollback path.

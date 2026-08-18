@@ -1,0 +1,29 @@
+{
+  "overall": "failed",
+  "exit_code": 1,
+  "primary_classification": "environment_or_resource",
+  "exclusions": {
+    "test_infrastructure": "clear",
+    "environment_or_resource": "detected"
+  },
+  "sut_defect_admissible": false,
+  "failures": [
+    {
+      "classification": "assertion_failure",
+      "evidence_pattern": "AssertionError|assert .*failed|E\\s+assert"
+    },
+    {
+      "classification": "environment_or_resource",
+      "evidence_pattern": "timeout|connection|network|resource|credential|permission denied"
+    },
+    {
+      "classification": "sut_behavior_failure",
+      "evidence_pattern": "expected .* got|status code|business|oracle|mismatch",
+      "status": "blocked_by_exclusion",
+      "blocked_by": [
+        "environment_or_resource"
+      ]
+    }
+  ],
+  "next_action": "exclude environment_or_resource first; do NOT record a SUT defect until infra/environment causes are ruled out, then re-run and re-classify"
+}

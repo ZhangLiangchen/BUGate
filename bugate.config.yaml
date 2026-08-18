@@ -17,6 +17,12 @@ guarded_path_regex: []
 role_governance:
   mode: off
 
+# Failure triage and test-asset self-healing. Absent ≡ `mode: off` ≡ zero
+# exposure: `--scope self-heal` returns `disabled` and creates nothing. Core
+# stays inert; an imported SUT profile opts in. Shape: references/profile-schema.md.
+self_healing:
+  mode: off
+
 # Wave 8 oracle falsification (default unmounted → oracle_falsification.py reports
 # profile_required). A SUT profile points at a declarative oracle/mutation spec and
 # an optional score threshold (0-1). Spec shape: references/profile-schema.md.

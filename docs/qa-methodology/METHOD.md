@@ -752,6 +752,7 @@ agent_roles:
 8. 需要双 agent 互审时跑 `sdtd_multiview_cli_bridge.py` / `sdtd_adversarial_cli_bridge.py`。Peer 子进程会清除父会话的角色/session/receipt 身份，不会被当成 Wave 7 actor。
 9. 03B 经真实人工接受后，designer 使用 `bugate-role approve` 记录决定，再 handoff；implementer 和 reviewer 各自在新 session 用 exact Memory ID accept。已记录 human-acceptance receipt 后不要重跑会重生成 03B 的 `--auto`。
 10. reviewer acceptance 后跑 `self_healing_mvp.py` + `generate_sdtd_reports.py` 或 orchestrator post-run 产出 04/05，最后用 `bugate-role complete` 记录命令、exit code 与 evidence hash。
+10a. （可选，profile 显式开启 `self_healing` 后）失败归因与测试资产自愈走 `sdtd_orchestrator.py <artifact_dir> --scope self-heal`。先归因再修复：环境、auth/precondition 前置失败、flaky 与证据不足一律不可自愈；SUT 真缺陷保留失败并出缺陷草稿；只有测试资产缺陷才允许候选补丁，且必须在 sandbox 副本验证、过结构防假绿检查、由**新会话**的独立 reviewer 评审、并通过 falsification。默认 `off` 时该入口返回 `disabled` 且零创建。契约见 ROLE_GOVERNANCE_PROTOCOL §10。
 11. 保持 runtime hook 表面一致：`check_bugate.py` 和 `check_role_evidence.py` 共同保护写入，`check_agent_role_paths.py` 单独保护路径读写。Codex hook hash 变化后必须 re-trust，未 re-trust 时不得声称 Wave 7 已激活。
 12. （可选）把 §1–§9 的 9-Wave 方法论工作产物放在 `.ai/` 下作为分析中间件，最终收敛到 01–05 gate 产物栈。
 

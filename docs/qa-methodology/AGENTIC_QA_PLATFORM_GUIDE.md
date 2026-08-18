@@ -426,6 +426,8 @@ Core 的环境角色声明、session 区分、hash 链接与 Memory 锚点提供
 | Adversarial | `scripts/sdtd_adversarial_cli_bridge.py` |
 | Reports | `scripts/generate_sdtd_reports.py` |
 | Failure classification | `scripts/self_healing_mvp.py` |
+| Failure attribution (owner / subtype, anchored rules) | `scripts/failure_triage.py` |
+| Governed test-asset self-healing (sidecar, anti-fake-green, sandbox verify) | `scripts/self_heal_gate.py` / `self_heal_sidecar.py` / `self_heal_review.py` / `self_heal_policy.py` |
 | Memory recall / durable notes | `scripts/memory_bus.py` / `bin/memory-*` |
 | Strict role-transition Memory anchor | `scripts/memory_bus.py get/handoff/accept-handoff/verify-handoff --strict` |
 | Role path isolation | `scripts/check_agent_role_paths.py` |
@@ -683,6 +685,20 @@ recommended_action: ...
 - SUT defect 与 test defect 能区分。
 - test defect 可进入 self-healing。
 - SUT defect 只生成缺陷草稿，不自动修 SUT。
+
+> **落地回填（2026-08-11，BUGate v0.4.5）**：本阶段的 *failure triage report* 与
+> *self-healing policy* 两项交付物已落地，四条验收全部由
+> `tests/test_failure_triage.py` 与 `tests/test_self_healing_governance.py` 强制。
+> 入口为 `sdtd_orchestrator.py --scope self-heal`，policy 为顶层 profile 键
+> `self_healing`（默认 `off`，未启用仓库零暴露面）。归因走
+> `bugate.failure-triage/v1`：`failure_owner` 分 environment / test_asset / sut /
+> unresolved，只有 test_asset 且证据充分才 `healing_eligible: true`；SUT 缺陷保留
+> 失败并出缺陷草稿，**不改测试迁就**。修复候选须同时过确定性结构检查与新会话的
+> 独立语义评审，且结构检查发现**直接拒绝**、评审的 approved 不得推翻；
+> falsification 为硬前置，缺 spec 即阻塞不降级。证据落
+> `<artifact_dir>/00_self_healing/` 这一锚定式 sidecar，不写主链（ADR-BUGATE-005 /
+> CHARTER §7 A6）。尚未落地：CI adapter、log adapter、defect 系统对接与 metrics
+> dashboard。
 
 ### Phase 4：企业化与数据库专项包（4-6 个月）
 

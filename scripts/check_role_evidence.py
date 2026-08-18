@@ -29,6 +29,7 @@ from role_governance import (  # noqa: E402
     resolve_uc,
     role_phase_owned_paths,
 )
+from self_heal_policy import SIDECAR_DIR as SELF_HEAL_DIR  # noqa: E402
 
 
 PATCH_PATH_RE = re.compile(
@@ -442,6 +443,10 @@ def _artifact_phase(
         compare("04_execution"),
         compare("05_knowledge"),
         compare("00_post_run"),
+        # The self-healing sidecar is post-run evidence with the same standing as
+        # 00_role_evidence: the engine publishes it through its own atomic
+        # writer, and a direct agent edit is always a forgery.
+        compare(SELF_HEAL_DIR),
     }:
         return "postrun"
     required_names = {compare(name) for name in required_precode_artifacts(config)}
@@ -873,6 +878,7 @@ def _structural_phase_identity_owners(
             "04_execution": "postrun",
             "05_knowledge": "postrun",
             "00_post_run": "postrun",
+            SELF_HEAL_DIR: "postrun",
         }.items():
             phase_root = artifact / name
             phase_target = phase_root.resolve(strict=False)
@@ -1045,22 +1051,34 @@ def classify_path(
     absolute_path = _path(root, target)
     resolved_relpath = _canonical_workspace_rel(root, target)
     evidence_parts = tuple(Path(policy["evidence_dir"]).parts)
+    sidecar_parts = tuple(Path(SELF_HEAL_DIR).parts)
     parts = tuple(Path(relpath).parts)
     case_insensitive = _filesystem_case_insensitive(root)
     if case_insensitive:
         evidence_parts = tuple(part.casefold() for part in evidence_parts)
+        sidecar_parts = tuple(part.casefold() for part in sidecar_parts)
         parts = tuple(part.casefold() for part in parts)
     if evidence_parts and any(
         parts[index : index + len(evidence_parts)] == evidence_parts
         for index in range(max(0, len(parts) - len(evidence_parts) + 1))
     ):
         return "evidence", None, relpath
+    if sidecar_parts and any(
+        parts[index : index + len(sidecar_parts)] == sidecar_parts
+        for index in range(max(0, len(parts) - len(sidecar_parts) + 1))
+    ):
+        return "self_heal_evidence", None, relpath
     for candidate in _artifact_candidates(root, config):
         evidence_dir = (candidate / Path(policy["evidence_dir"])).resolve()
         if _inside(absolute_path, evidence_dir) or _same_file_as_evidence_descendant(
             absolute_path, evidence_dir
         ):
             return "evidence", candidate, relpath
+        self_heal_dir = (candidate / SELF_HEAL_DIR).resolve()
+        if _inside(absolute_path, self_heal_dir) or _same_file_as_evidence_descendant(
+            absolute_path, self_heal_dir
+        ):
+            return "self_heal_evidence", candidate, relpath
 
     lexical_guarded = _guarded_match_one(root, config, relpath)
     resolved_guarded = (
@@ -1191,11 +1209,18 @@ def check_paths(
     for target in sorted(paths):
         try:
             kind, artifact, relpath = classify_path(root, config, policy, target)
-            if kind == "evidence":
+            if kind in {"evidence", "self_heal_evidence"}:
                 # Append-only receipts are never an agent-tool editing surface.
-                failures.append(
-                    f"{relpath}: direct edits to {policy['evidence_dir']}/ are forbidden; use bin/bugate-role"
-                )
+                if kind == "evidence":
+                    failures.append(
+                        f"{relpath}: direct edits to {policy['evidence_dir']}/ are "
+                        "forbidden; use bin/bugate-role"
+                    )
+                else:
+                    failures.append(
+                        f"{relpath}: direct edits to {SELF_HEAL_DIR}/ are forbidden; "
+                        "use the BUGate self-heal publisher"
+                    )
                 continue
             canonical_relpath = _canonical_workspace_rel(root, target)
             completion_owners = _completion_artifacts_for_path(

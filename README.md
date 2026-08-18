@@ -508,6 +508,17 @@ python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --
 - **Agent runtimes: Claude Code and Codex, by design.** The orchestrator, hook
   wiring, and dual-peer bridges target exactly these two; other agents/editors
   get no physical gate wiring today and are future evolution items.
+- **Governed test-asset self-healing is opt-in and deliberately narrow.**
+  `self_healing.mode` defaults to `off`; a SUT profile must opt in. When it is
+  on, automatic authorization covers exactly two closed proof languages — the
+  engine-derived literal repair and the canonical external JSON-evidence
+  assertion — and every other candidate shape stops at exit 2, blocked, with
+  nothing written. Exit 3 ("the repaired test survives a declared oracle
+  violation") is issued only when the assertion binding is carried by one of
+  those closed *static* proofs, never from evidence the candidate under test
+  produced; some genuinely fake-green candidates are therefore blocked without
+  being named. Full boundary, including measured authorization rates:
+  [`CAPABILITIES.md`](CAPABILITIES.md).
 - **Host runtime vs SUT language:** the kit itself needs `python3 >= 3.9` on
   the machine (stdlib-only). Your test framework does **not** have to be
   Python — the write guard, artifact gates, and orchestrator are

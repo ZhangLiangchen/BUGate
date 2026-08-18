@@ -399,6 +399,14 @@ python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --
   命令串、路径处理)目前由使用方自行负责;更广的 OS 支持属于后续演进,不视为缺陷。
 - **Agent 运行时:Claude Code 与 Codex,设计如此。** orchestrator、hook 接线与
   双端评审桥只面向这两家;其他 agent/编辑器目前没有物理门接线,属于未来演进项。
+- **受治理的测试资产自愈是可选开启的,且覆盖面刻意很窄。**
+  `self_healing.mode` 默认 `off`,必须由 SUT profile 显式开启。开启后,自动授权
+  只覆盖两条闭合证明语言——engine 自导的 literal 修复,以及 canonical 外部 JSON
+  证据断言;其余任何候选形态一律停在 exit 2:blocked、零写入。exit 3(「修好的
+  测试在声明的 oracle 违例下仍然通过」)只在断言绑定由上述闭合语言内的**静态**
+  证明承载时才会给出,绝不采信被测候选自己产出的证据;因此确实存在真的假绿候选
+  只被拦下(exit 2)而不被指名。完整边界与实测授权率见
+  [`CAPABILITIES.md`](CAPABILITIES.md)。
 - **宿主运行时 ≠ SUT 语言:** kit 本身需要机器上有 `python3 >= 3.9`(纯标准库),
   但你的测试框架**不必**是 Python——写守卫、工件门与 orchestrator 均与语言无关
   (已在 pytest、TypeScript/Playwright、Java/JUnit 驼峰命名、Cucumber `.feature`

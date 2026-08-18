@@ -1034,7 +1034,7 @@ def _empty_chain() -> dict[str, Any]:
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, ValueError, RecursionError) as exc:
         raise RoleGovernanceError(f"invalid JSON evidence {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise RoleGovernanceError(f"JSON evidence must be an object: {path}")
@@ -1439,7 +1439,9 @@ def _validate_receipt_contract(receipt: dict[str, Any], path: Path) -> None:
     ):
         raise RoleGovernanceError(f"invalid receipt hash in {path.name}")
     event = receipt.get("event")
-    if event not in EVENT_STATES and event != RECOVERY_EVENT:
+    if not isinstance(event, str) or (
+        event not in EVENT_STATES and event != RECOVERY_EVENT
+    ):
         raise RoleGovernanceError(f"unknown role receipt event in {path.name}: {event!r}")
     if receipt.get("phase") not in PHASES:
         raise RoleGovernanceError(f"invalid receipt phase in {path.name}")
@@ -2389,8 +2391,21 @@ def _memory_verify(ctx: GovernanceContext, receipt: dict[str, Any]) -> None:
         if verifier is None:
             raise RuntimeError("verify_role_transition adapter is unavailable")
         result = verifier(receipt=receipt, strict=True)
-        if result is False:
-            raise RuntimeError("Memory verification returned false")
+        anchor = receipt.get("memory")
+        expected_id = (
+            str(anchor.get("memory_id") or "")
+            if isinstance(anchor, dict)
+            else ""
+        )
+        if (
+            not isinstance(result, dict)
+            or result.get("status") != "verified"
+            or not expected_id
+            or result.get("memory_id") != expected_id
+        ):
+            raise RuntimeError(
+                "Memory verification did not return an exact verified result"
+            )
     except Exception as exc:
         raise RoleGovernanceError(f"strict Memory verification failed: {exc}") from exc
 

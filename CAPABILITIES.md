@@ -8,10 +8,10 @@ execution report → knowledge update) *before* any test implementation is
 generated.
 
 Current distribution release line: **v0.4.4**. It becomes authoritative only
-after the annotated tag and GitHub Release expose exactly
+through its annotated tag, GitHub Release, and exact verified assets:
 `bugate-0.4.4.tar.gz`, `bugate-0.4.4.zip`, and
-`bugate-0.4.4.SHA256SUMS`, and the selected archive verifies. Until then, the
-current published fallback remains v0.4.3.
+`bugate-0.4.4.SHA256SUMS`. The working tree described below is an unpublished
+**v0.4.5 source candidate**; it is not a v0.4.5 tag, Release, or distribution.
 
 **Runtime contract**
 
@@ -141,10 +141,47 @@ launcher is not recovery.
 
 | Capability | Stage | Script | Key flags | Graceful fallback | Example |
 |---|---|---|---|---|---|
-| Orchestrator: scaffold artifacts, run the pre-code chain, or the post-run chain | all | `sdtd_orchestrator.py` | `<artifact_dir>`, `--init`, `--auto`, `--scope {pre-code,post-run}`, `--full-sdtd`, `--run-cli-workers`, `--pytest-log`, `--command`, `--env`, `--exit-code` | No args → status listing; every mutating path runs role preflight. `--init` and `--auto` are separate entries. Lifecycle output is `BLOCKED`, `READY_FOR_HUMAN_ACCEPTANCE`, `READY_FOR_DESIGNER_HANDOFF`, `IMPLEMENTATION_UNLOCKED`, `READY_FOR_REVIEWER_HANDOFF`, `POST_RUN_ACTIVE`, or `CLOSED`; accepted 03B is never regenerated | `python3 scripts/sdtd_orchestrator.py docs/usecases/UC --init` |
+| Orchestrator: scaffold artifacts, run the pre-code chain, the post-run chain, or a self-heal step | all | `sdtd_orchestrator.py` | `<artifact_dir>`, `--init`, `--auto`, `--scope {pre-code,post-run,self-heal}`, `--full-sdtd`, `--run-cli-workers`, `--pytest-log`, `--command`, `--env`, `--exit-code`, `--self-heal-step`, `--candidate-dir`, `--review-file`, `--human-approval` | No args → status listing; every mutating path runs role preflight. `--init` and `--auto` are separate entries. Lifecycle output is `BLOCKED`, `READY_FOR_HUMAN_ACCEPTANCE`, `READY_FOR_DESIGNER_HANDOFF`, `IMPLEMENTATION_UNLOCKED`, `READY_FOR_REVIEWER_HANDOFF`, `POST_RUN_ACTIVE`, or `CLOSED`; accepted 03B is never regenerated. `--scope self-heal` has its own vocabulary (`BUGate self-heal status: ...`) and returns `disabled` unless a profile opts in | `python3 scripts/sdtd_orchestrator.py docs/usecases/UC --init` |
 | Readable test cases from `03_inventory.yaml` → `03a_test_cases.md` | 3A | `generate_sdtd_text_testcases.py` | `<artifact_dir>`, `--write` | No inventory → emits an empty-cases stub | `python3 scripts/generate_sdtd_text_testcases.py docs/usecases/UC --write` |
 | Post-run 04/05 report drafts (execution report + knowledge update) | 5 / 6 | `generate_sdtd_reports.py` | `<artifact_dir>`, `--pytest-log`, `--command`, `--env`, `--exit-code`, `--self-healing-json`, `--write` | Missing log → status `log_not_found`; without `--write` prints to stdout | `python3 scripts/generate_sdtd_reports.py docs/usecases/UC --pytest-log run.log --command "pytest" --exit-code 0 --write` |
-| Failure classifier + repair plan (exclude infra/env before any SUT-defect verdict) | 5 | `self_healing_mvp.py` | `--pytest-log`, `--json-output`, `--md-output`, `--repair-plan-output`, `--exit-code` | Empty log → `overall: no_log`; never edits tests automatically | `python3 scripts/self_healing_mvp.py --pytest-log run.log --json-output sh.json --md-output sh.md --repair-plan-output plan.md --exit-code 1` |
+| Failure classifier + repair plan (exclude infra/env before any SUT-defect verdict) | 5 | `self_healing_mvp.py` | `--pytest-log`, `--json-output`, `--md-output`, `--repair-plan-output`, `--exit-code`, `--command` | Empty log → `overall: no_log`; never edits tests automatically. With `self_healing.mode != off` it also appends the `bugate.failure-triage/v1` fields; with `off` the output is byte-identical to v0.4.4 | `python3 scripts/self_healing_mvp.py --pytest-log run.log --json-output sh.json --md-output sh.md --repair-plan-output plan.md --exit-code 1` |
+| Failure attribution (`failure_owner` / `failure_subtype` with anchored rules and counter-examples) | 5 | `failure_triage.py` | library module consumed by `self_healing_mvp.py` and `self_heal_gate.py` | Ambiguous evidence → `insufficient_evidence` with `healing_eligible: false`; never guesses an owner | consumed via `--scope self-heal` |
+| Governed test-asset self-healing (triage → handoff → accept → proposal verification/falsification → bound independent review → close) | 5 | `self_heal_gate.py` + `self_heal_sidecar.py` + `self_heal_review.py` + `self_heal_policy.py` | `--scope self-heal`, `--self-heal-step {triage,handoff,accept,propose,review,close,resume,status}`, `--candidate-dir`, `--review-file`, `--human-approval` | `self_healing.mode: off` (the default) → `disabled`, exit 0, creates nothing; `diagnose` and non-eligible triage write ordinary reports but open no sidecar attempt. Review requires the exact `review_context` binding plus real peer dispatch/runtime match. Receipt/index interruption exact-indexes only strict-Memory-proven events; other locally valid orphans are content-addressed evidence and the event retries. Exit codes: 0 ok, 2 blocked, 3 rejected, 4 lifecycle-drift invalidated. Evidence lands in `<artifact_dir>/00_self_healing/`, never in `00_role_evidence/` | `python3 scripts/sdtd_orchestrator.py docs/usecases/UC --scope self-heal --pytest-log run.log --command pytest --exit-code 1` |
+
+#### Self-healing coverage boundary (read this before enabling it)
+
+Governed test-asset self-healing is **off by default** (`self_healing.mode: off`)
+and does nothing until a SUT profile sets `verify` or `apply_with_approval`. When
+it is on, the boundary is deliberately narrow and fails closed:
+
+1. **Automatic authorization covers exactly two closed proof languages.** The
+   engine-derived literal repair (a misspelled expected-value name, proven by a
+   complete AST delta) and the canonical external-evidence assertion (exact
+   `import json` + `from pathlib import Path`, a literal evidence path, one
+   `json.loads(path.read_text())[key]` load, equality against an inherited
+   primitive observation, and a whole-module grammar check). **Every other
+   candidate shape stops at exit 2** — blocked, nothing written to the workspace
+   or the sidecar. On the review corpora used to size this, 4 of 20 and 3 of 8
+   candidates were authorized; the remainder were blocked, not applied.
+2. **Exit 3 — "the repaired test survives a declared oracle violation" — is
+   issued only when the assertion binding is carried by a closed *static* proof
+   inside those languages.** It is never issued from evidence produced by the
+   candidate under test. A dynamic execution witness cannot establish this:
+   the injected probe and the candidate share one interpreter, and the candidate
+   can read the injected line out of its own source before deciding what to
+   print, so any in-band signal is forgeable. The consequence is stated plainly:
+   some candidates that really are fake-green are blocked at exit 2 without being
+   named at exit 3. Blocking is unaffected; only the published diagnosis is
+   narrower than the truth.
+3. **"Honest" in the literal lane means sensitive to an engine-derived constant
+   perturbation, not sensitive to declared business evidence.** A repair that is
+   a tautology can satisfy that lane. The external-evidence lane is the one that
+   binds an assertion to a declared contract file.
+4. **Exit codes:** 0 accepted, 2 blocked (fail closed; nothing applied),
+   3 rejected, 4 lifecycle-drift invalidated. A blocked or rejected run leaves
+   the governed workspace and the complete `00_self_healing/` tree byte-for-byte
+   unchanged, and can never produce an `attempt_closed` receipt claiming an apply.
+
 
 ### Role isolation, de-SUT guard, plan lock, prompt reminder
 

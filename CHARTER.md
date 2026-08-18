@@ -4,7 +4,7 @@ id: CHARTER-BUGATE-001
 title: BUGate positioning, usage model, and evolution plan
 status: accepted
 created_at: 2026-07-03
-amended_at: 2026-07-22 (A5; A4 2026-07-06; A3/A2 2026-07-04; A1 2026-07-03)
+amended_at: 2026-08-11 (A6; A5 2026-07-22; A4 2026-07-06; A3/A2 2026-07-04; A1 2026-07-03)
 authority: ADR-BUGATE-001
 companions:
   - docs/qa-methodology/BUGATE_PLATFORM_DECOUPLING_ADR.md
@@ -12,7 +12,8 @@ companions:
   - docs/qa-methodology/BUGATE_DESUT_CALIBRATION_ADR.md
   - docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md
   - docs/qa-methodology/IMPORTED_UPDATER_CONTRACT.md
-updated_at: 2026-07-22 (A5 imported-updater boundary)
+  - docs/qa-methodology/BUGATE_SELF_HEALING_SIDECAR_ADR.md
+updated_at: 2026-08-11 (A6 self-healing sidecar write channel)
 provenance: >
   Produced by independent dual-agent analysis (Claude Code and Codex reached
   convergent conclusions from separate contexts, then were cross-checked),
@@ -354,6 +355,7 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
 | 2026-06-30 | 过渡落地：AGENTS 拆分、profile 证据源接线、Wave-8 回迁 |
 | 2026-07-03 | **本宪章**：宿主方向收敛回导入式；工作台模式限定为维护者例外 |
 | 2026-07-06 | **A4**：维护者例外继续收紧为纯 core 迭代；BUGate core 不再挂载 SUT |
+| 2026-08-11 | **A6**：失败归因与测试资产自愈以锚定式 sidecar 落地（ADR-BUGATE-005）；默认 `off`，主链零改动 |
 
 抽取期为自托管所需而形成的"SUT symlink 挂进 BUGate"用法已完成历史使命；自 A4 起不再作为
 当前维护者路径保留。真实 SUT 验收转移到 BUGate core 之外的导入式 SUT 仓或 scratch 仓。
@@ -520,6 +522,56 @@ depending on their plugins at runtime"——借鉴 Spec Kit 的 specification fl
 - **历史文本读法**：ADR-BUGATE-002 §6“升级重跑 installer”与 v0.4.0
   ROLE_GOVERNANCE_PROTOCOL §7 同类句子均保留为当时记录，但由本修正案及各文档的
   2026-07-22 amendment 明确取代，不再是当前 SOP。
+
+### A6 — 失败归因与测试资产自愈：锚定式 sidecar 写入通道（2026-08-11）
+
+- **批准**：human owner 直接指令（2026-08-11：四项决策——CF-01 走 sidecar、
+  `self_healing.mode` 默认 `off`、04 重写模板、falsification 必需；并追认
+  “严格是好事”）。决策记录：ADR-BUGATE-005
+  （`docs/qa-methodology/BUGATE_SELF_HEALING_SIDECAR_ADR.md`）。
+- **立法本意**：本能力新增了一条**受治理的写入通道**（自愈证据与——在
+  `apply_with_approval` 下——测试资产回写），属宪章级扩面，故以修正案追加，
+  不改 §2 既有条款正文。其目的不是“修好 SUT”，而是**把失败归因与测试资产修复
+  纳入证据纪律**：原始 FAIL 永不被覆盖、删除或伪装，凡不能被证据支持的结论
+  一律不下。
+- **不改动的既有加固**（本修正案不放松任何一条）：
+  1. `PHASES` 仍是三元组，六个 `EVENT_STATES` 键值不变，post_run 的
+     `allowed_roles` 仍冻结为 `["reviewer"]`；自愈事件**不进**
+     `00_role_evidence/`，因此 v0.4.0–v0.4.4 引擎读同一 UC 行为不变，A5 的
+     rollback-to-prior-image 保证不受影响。
+  2. R6/R9 的 de-SUT 判别式不变：新增引擎脚本、schema 与默认值均为 SUT-neutral，
+     可写路径、验证命令、falsification spec 一律由 SUT profile 声明。
+  3. 后置产物（`self_healing.json`、04/05）的写入仍走
+     `governed_write_preflight`，仍要求受理 reviewer 会话。
+- **生效条款（新增，不覆盖旧条）**：
+  1. **默认关闭即不存在**：`self_healing` 缺省或 `mode: off` 时
+     `--scope self-heal` 返回 `disabled` 且零创建，`--scope post-run` 产物与
+     v0.4.4 **逐字节一致**（由 v0.4.4 引擎实测生成的 golden fixture 钉死）。
+  2. **归因先于修复**：只有证据判定为测试资产缺陷才允许生成候选；环境、
+     auth/precondition 前置失败、flaky、证据不足一律 `healing_eligible: false`；
+     SUT 真缺陷保留失败并出缺陷草稿，**禁止**改测试迁就。
+  3. **防假绿双控，结构检查优先**：确定性结构检查与独立 Agent 语义评审都通过
+     才可 `healing_verified`；结构检查发现即**直接拒绝**，评审的 `approved`
+     不得推翻；降级派发的评审不算评审。
+  4. **falsification 必需**：缺 spec 即阻塞，**不降级**为结构检查。
+  5. **写回最小化**：`verify` 只在 sandbox 副本验证；`apply_with_approval`
+     须经全流程 + 人工批准记录，且只写 profile 显式授权的路径，全程带日志，
+     可精确回滚到原字节。
+  6. **回写即重锁**：修复写回会改变 implementer handoff 快照内的文件，该 UC
+     因此按既有 drift 规则重锁——这是**期望行为**：变更后的测试资产必须经正常
+     生命周期重新受理与评审，不得由“改它的那次修复”顺带放行。
+- **会话绑定的例外与其边界**：`_verify_acceptance_session` 把 post_run 写入
+  绑定到发布 `reviewer_acceptance` 的那个会话，与本能力要求的“独立评审必须是
+  新会话”不可兼得。故 sidecar 使用 `self_heal_preflight`——逐项对齐
+  `verify_evidence(phase=post_run)`，**仅**省略该一个 helper——并以更强的
+  **会话互异**约束替代（healer ≠ 宣告可修复的会话；独立评审 ≠ 前两者）。
+  该例外**只适用于 sidecar receipt**，不适用于任何后置产物写入。
+- **机制连带**：新增 `self_healing` 顶层 profile 键（默认 `off`，
+  `independent_review_required` 冻结为 `true`）；`00_self_healing/**` 进入
+  `check_role_evidence.py` 的两张分类表，直接编辑与 `00_role_evidence/**` 同级
+  拒绝；`GITIGNORE_BLOCK_TEMPLATE` **不改**（该块按设计只锚定仓库根产物，UC 目录
+  下的证据属应提交证据）；`ROLE_GOVERNANCE_PROTOCOL{,.zh-CN}.md` 追加
+  “v0.4.5 self-healing sidecar contract”章节，既有条款编号不变。
 
 ---
 

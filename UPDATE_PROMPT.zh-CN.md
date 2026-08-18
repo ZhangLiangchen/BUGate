@@ -123,8 +123,8 @@
    ```
 
    证明 profile/config、SUT tests、use-case artifacts、`00_role_evidence/**`、
-   Memory namespace/data、machine lineage registry、SUT-owned hooks/skills 和无关 dirty
-   文件均未被修改。
+   `00_self_healing/**`、Memory namespace/data、machine lineage registry、SUT-owned
+   hooks/skills 和无关 dirty 文件均未被修改。
 
 7. **保持后续权限独立**
 

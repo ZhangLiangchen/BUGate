@@ -53,6 +53,7 @@ EXPECTED_OBSOLETE_TARGETS = {
     "v0.4.0": (),
     "v0.4.1": (),
 }
+SELF_HEALING_EVIDENCE_ROOT = "docs/usecases/SYN-001/00_self_healing"
 _HOOK_ID_RE = re.compile(r"BUGATE_HOOK_ID='([^']+)'")
 _NOISE_NAMES = {"__pycache__", ".DS_Store"}
 
@@ -155,6 +156,67 @@ def _selected_snapshot(
         else:
             snapshot[relative] = _path_image(path)
     return snapshot
+
+
+def _populate_self_healing_evidence(project: Path) -> None:
+    """Seed opaque SUT-owned sidecar evidence for updater preservation checks."""
+
+    root = project / SELF_HEALING_EVIDENCE_ROOT
+    attempt = root / "attempts/attempt-synthetic-001"
+    opaque_receipt = (
+        b"{\n"
+        b'  "schema" : "bugate.self-heal-evidence/v1",\n'
+        b'  "event" : "self_heal_handoff",\n'
+        b'  "attempt_id" : "attempt-synthetic-001",\n'
+        b'  "prior_state" : "failure_triaged",\n'
+        b'  "resulting_state" : "healer_handoff",\n'
+        b'  "payload" : {"synthetic" : "opaque-update-evidence"},\n'
+        b'  "receipt_sha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"\n'
+        b"}\n"
+    )
+    opaque_sha256 = contract.sha256_bytes(opaque_receipt)
+
+    _write(
+        root / "chain.json",
+        b'{"schema":"bugate.self-heal-chain/v1","synthetic":"preserve exactly"}\n',
+        0o640,
+    )
+    _write(
+        root / "receipts/001-self_heal_triage.json",
+        b'{"event":"self_heal_triage","payload":{"healing_eligible":true}}\n',
+        0o444,
+    )
+    _write(
+        attempt / "baseline.json",
+        b'{"files":{"tests/test_synthetic_sut.py":{"before_sha256":"abc"}}}\n',
+        0o600,
+    )
+    _write(
+        attempt / "candidate.patch",
+        b"diff --git a/tests/test_synthetic_sut.py b/tests/test_synthetic_sut.py\n",
+        0o640,
+    )
+    _write(
+        attempt / "before/tests/test_synthetic_sut.py",
+        b"def test_synthetic_sut():\n    assert True\n",
+        0o400,
+    )
+    _write(
+        attempt / f"unindexed_self_heal_handoff_{opaque_sha256}.json",
+        opaque_receipt,
+        0o440,
+    )
+
+    # Non-default directory modes make tree normalization observable too.
+    for relative, mode in (
+        ("", 0o750),
+        ("receipts", 0o710),
+        ("attempts", 0o750),
+        ("attempts/attempt-synthetic-001", 0o710),
+        ("attempts/attempt-synthetic-001/before", 0o750),
+        ("attempts/attempt-synthetic-001/before/tests", 0o700),
+    ):
+        os.chmod(root / relative, mode)
 
 
 def _outside_marked_block(data: bytes, item: Mapping[str, Any]) -> bytes:
@@ -448,6 +510,7 @@ class ImportedUpdateIntegrationTests(unittest.TestCase):
             self.project / "docs/usecases/SYN-001/00_role_evidence/receipt.json",
             b'{"synthetic":"preserve"}\n',
         )
+        _populate_self_healing_evidence(self.project)
         _write(
             self.project / "00_role_evidence/root-receipt.json",
             b'{"synthetic":"preserve-root"}\n',
@@ -472,6 +535,7 @@ class ImportedUpdateIntegrationTests(unittest.TestCase):
             "bugate.config.yaml",
             "bugate.profile.yaml",
             "docs/usecases",
+            SELF_HEALING_EVIDENCE_ROOT,
             "00_role_evidence",
             "tests/test_synthetic_sut.py",
             "bin/bugate-auto",

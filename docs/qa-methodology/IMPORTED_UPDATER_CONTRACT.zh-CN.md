@@ -1,8 +1,10 @@
 ---
 title: "Imported-mode 更新器契约"
-version: 1.0
+version: 1.1
 target_release: BUGate v0.4.2
 status: normative
+amended_at: 2026-08-12
+amendments_through: BUGate v0.4.5
 language: zh-CN
 companion: IMPORTED_UPDATER_CONTRACT.md
 ---
@@ -70,6 +72,10 @@ tests/evidence/wrappers/operating rules、`AGENTS.md`、`CLAUDE.md`、SUT-owned
 hooks/skills/agents、`.gitignore` 的非标记内容、Memory data/namespace、machine-level
 `role-lineage.sqlite3` registry，以及产品与环境材料。无关 dirty file 只能报告
 warning，不能成为 update conflict。
+
+> **修订指针（2026-08-12）：** 本段保留为 v0.4.2 冻结的 ownership 清单。
+> v0.4.5 的有效扩展见第 11 节；它在不改写历史清单的前提下新增
+> `00_self_healing/**`。
 
 managed directory 内的未知文件仍是未知文件：更新器不得递归删除。目录只可在它属于 manifest、已知安全删除后为空、且类型仍为 directory 时删除。
 
@@ -285,3 +291,15 @@ session、使用不同 review prompt，且在 synthesis 前无法看到第一个
 同一会话或 self-review 永远不能满足该门禁。
 
 所有测试必须在运行时构造 SUT-neutral temporary repository。不得读取、复制、clone、worktree 或修改真实 imported SUT。GO 要求 release、archive、updater、compatibility 与既有 Wave 7 gate 全部通过；desktop hook hash change 仍需用户 re-trust，未 re-trust 前不得声称 hook 已激活。
+
+## 11. 修正案——v0.4.5 自愈 ownership 边界（2026-08-12）
+
+v0.4.5 自愈能力在 `<artifact_dir>/00_self_healing/` 下新增 UC-owned post-run
+evidence。该目录不属于 installed engine projection，并加入第 3 节的绝对禁止 surface：
+无论执行 `status`、`plan`、`apply`、`verify` 还是 rollback，更新器都不得写入、删除、
+stage、commit、格式化、迁移或重建 `00_self_healing/**`。
+
+安装具备自愈能力的 engine 只会改变 manifest-owned engine files。它不会替 profile
+启用 `self_healing`、创建 attempt、改动 sidecar receipt，也不授权任何 SUT/test-asset
+写入。Release 与 updater 验收必须在该目录存在时对其做 snapshot，并证明它在每条
+updater transaction 与 rollback 路径前后逐字节不变。

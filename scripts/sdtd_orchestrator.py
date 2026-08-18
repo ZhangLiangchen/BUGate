@@ -31,6 +31,7 @@ from role_governance import (
     status_data,
     verify_chain,
 )
+import self_heal_gate
 
 
 ROOT = find_root()  # workspace root: gate subprocesses run against it
@@ -103,6 +104,13 @@ _STATE_LABELS = {
 def _legacy_auto_state(artifact_dir: Path, scope: str) -> str:
     if scope == "post-run":
         return "POST_RUN_ACTIVE"
+    if scope == "self-heal":
+        # Self-healing needs the auditable lifecycle to anchor against; with
+        # role_governance off there is no chain, so the only honest lifecycle
+        # label is that the capability is not in play.  Without this branch the
+        # pre-code fall-through below would print a pre-code state for a
+        # post-run scope.
+        return "SELF_HEAL_DISABLED"
     try:
         config = load_config(ROOT, os.environ.get("BUGATE_PROFILE"))
         names = required_precode_artifacts(config)
@@ -320,6 +328,8 @@ def auto_postrun(artifact_dir: Path, args: argparse.Namespace) -> int:
         str(artifact_dir / "self_healing_repair_plan.md"),
         "--exit-code",
         str(args.exit_code),
+        "--command",
+        args.command,
     )
     rc = rc or run_script(
         "generate_sdtd_reports.py",
@@ -344,7 +354,9 @@ def main() -> int:
     parser.add_argument("artifact_dir", type=Path)
     parser.add_argument("--init", action="store_true")
     parser.add_argument("--auto", action="store_true")
-    parser.add_argument("--scope", choices=["pre-code", "post-run"], default="pre-code")
+    parser.add_argument(
+        "--scope", choices=["pre-code", "post-run", "self-heal"], default="pre-code"
+    )
     parser.add_argument(
         "--full-sdtd",
         action="store_true",
@@ -360,6 +372,7 @@ def main() -> int:
     parser.add_argument("--command", default="")
     parser.add_argument("--env", default="profile-owned")
     parser.add_argument("--exit-code", type=int, default=0)
+    self_heal_gate.add_arguments(parser)
     args = parser.parse_args()
     if args.init and args.auto:
         print("--init and --auto are separate operations; run them as separate commands")
@@ -367,6 +380,17 @@ def main() -> int:
         return 2
     if args.init:
         return init(args.artifact_dir, args.full_sdtd)
+    if args.scope == "self-heal":
+        # A separate entry with its own status vocabulary and exit codes; it
+        # never runs as part of --scope post-run, so a repository that has not
+        # opted in cannot reach it by accident.
+        rc = self_heal_gate.emit(self_heal_gate.run(args.artifact_dir, args))
+        # The lifecycle line reports the *lifecycle*, which a self-heal outcome
+        # never changes -- a blocked repair leaves the UC in post_run_active.
+        # Passing the self-heal rc here would print BLOCKED for a healthy
+        # lifecycle and pollute a string other gates assert on.
+        print_auto_state(args.artifact_dir, args.scope, 0)
+        return rc
     if args.auto:
         if args.scope == "pre-code":
             rc = auto_precode(

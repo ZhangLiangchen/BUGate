@@ -3,7 +3,7 @@ title: "新人 QA 执行手册（SOP）"
 subtitle: "基于业务理解约束层方法论的工程化操作指南"
 version: 1.0
 date: 2026-05-11
-last_updated: 2026-07-23
+last_updated: 2026-08-12
 companion: METHOD.md
 scope: Wave 0 - Wave 3（业务理解闭环）+ Wave 7（已发布可审计执行 SOP）
 ---
@@ -893,6 +893,169 @@ profile、任何 UC 的 `00_role_evidence/**`、pre-code、实现文件或 04/05
 共享 external log 会同时受所有引用它的 UC 约束；任一 owner 已关闭、stale 或 session
 不匹配，hook 都会阻止写入。路径按 canonical resolved identity 比对，不能借 `..` 或
 symlink alias 绕过。
+
+### E1. （可选）Reviewer + Healer：失败归因与测试资产自愈
+
+本节描述未发布的 **v0.4.5 source candidate**，不改变当前 v0.4.4 distribution
+release line，也不构成 tag、asset 或 publication 声明。
+
+仅当 profile 显式设置 `self_healing.mode`（默认 `off`）时可用；`off` 时该入口返回
+`disabled`、退出码 0 且**不创建任何文件**。全流程必须在 `post_run_active` 内完成。
+
+```bash
+# 0/1 reviewer（与 post-run 同一会话）：先归因；仅可修复归因才执行 handoff
+python3 scripts/sdtd_orchestrator.py <artifact-dir> --scope self-heal \
+  --pytest-log <run.log> --command "<exact command>" --exit-code <rc>
+python3 scripts/sdtd_orchestrator.py <artifact-dir> --scope self-heal --self-heal-step handoff
+
+# 2/3 healer：必须是 implementer 角色的**新会话**
+bin/bugate-role run --role implementer -- \
+  python3 scripts/sdtd_orchestrator.py <artifact-dir> --scope self-heal --self-heal-step accept
+bin/bugate-role run --role implementer -- \
+  python3 scripts/sdtd_orchestrator.py <artifact-dir> --scope self-heal \
+    --self-heal-step propose --candidate-dir <candidate-tree> --pytest-log <run.log>
+
+# 4/5 独立 reviewer：必须是**新会话**，且不同于 0/1 与 2/3
+bin/bugate-role run --role reviewer -- \
+  python3 scripts/sdtd_orchestrator.py <artifact-dir> --scope self-heal \
+    --self-heal-step review --review-file <verdict.json>
+bin/bugate-role run --role reviewer -- \
+  python3 scripts/sdtd_orchestrator.py <artifact-dir> --scope self-heal \
+    --self-heal-step close [--human-approval "<approver>"]
+```
+
+`propose` 会在发布 `healer_handoff` **之前**完成结构检查、sandbox 修复前/后验证和
+强制 falsification。只有三者都通过，才会生成
+`00_self_healing/attempts/<attempt-id>/review_context.json` 并进入独立评审。
+Reviewer 只读该 context 及其列出的证据；评审文档必须写在
+`00_self_healing/` **之外**，由 `review` gate 把输入的精确字节归档为
+`independent_review.json`。不要让 reviewer 或 healer 直接编辑 sidecar。
+
+评审文件至少采用以下形态；`binding` 必须逐字段复制
+`review_context.json` 的对象，不能重新计算、删字段或借用其他 attempt：
+
+```json
+{
+  "schema": "bugate.self-heal-review/v1",
+  "verdict": "approved",
+  "dispatch_mode": "real_peer_dispatch",
+  "runtime": "codex",
+  "binding": {
+    "uc": "<review_context.binding.uc>",
+    "attempt_id": "<review_context.binding.attempt_id>",
+    "candidate_manifest_sha256": "<64-hex>",
+    "candidate_patch_sha256": "<64-hex>",
+    "precode_evidence_sha256": "<64-hex>",
+    "original_failure_sha256": "<64-hex>",
+    "verification_sha256": "<64-hex>",
+    "before_log_sha256": "<64-hex>",
+    "after_log_sha256": "<64-hex>",
+    "falsification_sha256": "<64-hex>",
+    "oracle_refs": ["<exact oracle ref>"]
+  },
+  "findings": [
+    {"claim": "<review claim>", "evidence": "<exact path/hash/observation>"}
+  ],
+  "residual_risks": []
+}
+```
+
+`runtime` 必须与该 reviewer 会话实际的 `BUGATE_AGENT_RUNTIME` 一致，只接受
+`codex` 或 `claude`；降级 dispatch、占位 findings、空 evidence 或 stale binding
+都会阻塞。即使 verdict 为 `approved`，`findings` 也必须至少逐项说明一条已核验的
+claim/evidence；确无剩余风险时 `residual_risks` 可为空列表。
+
+Sidecar 发布按 receipt-first、chain-index-second 执行。若进程恰好在两次原子写之间
+中断，不要手工删除或编辑孤立 receipt：
+
+- 对 strict Memory 已锚定的事件，下一次 `status` 或原步骤读取会先完整 replay，再用
+  read-only exact Memory GET 回验 transition identity 与 receipt hash；只有完全一致的
+  唯一 next receipt 才会补入索引。
+- 对未锚定事件和所有 `best_effort` orphan，完整本地 replay 通过后，原字节会保存为
+  `attempts/<attempt-id>/unindexed_<event>_<content-sha256>.json`，chain 保持原状态；
+  用原 actor/session 重新执行同一 `--self-heal-step`，让新 receipt 经过普通控制发布。
+- 如果返回 `sidecar_integrity_failed`，先保留现场。Malformed、状态边非法、anchor
+  stale、伪造 Memory id 或 exact Memory 不匹配都不会自动入链或当成可信事件。
+
+并发时，主 role transition 与 sidecar 的完整 verified read、publication、invalidation
+和 `status_snapshot` 都在同一个既有 artifact directory inode 上取得排他的 advisory
+`flock`。每个完整 self-heal CLI step 从 sidecar state validation、attempt evidence 或
+workspace write 一直持锁到最终 receipt publication，并让 handler 复用同一个 re-entrant
+store；并发失败方因此不能在获胜步骤提交新状态后改写其证据。Publisher 会从 Memory 阶段一直持锁到 receipt 与 chain index 都持久化；因此
+另一个遵守 BUGate 协议的 reader 只会等待，不会把 live receipt/chain 间隙隔离成
+orphan。进程终止并由内核释放锁后，下一 reader 才执行上面的 crash-orphan 规则。
+`status` 从一次锁内快照取 state、attempt、review outcome 与 anchor comparison；drift
+写入以此前 sidecar head anchor 为 compare-and-swap token，若此时已经 retry/re-triage，
+旧 observation 会被拒绝，不会污染新 attempt。主 role chain 缺失时，empty anchor
+sentinel 只让每次 `status` 重复返回 `invalidated` 与 `lifecycle_drift`，不会被写入
+sidecar `chain.json`；malformed/unreadable anchor 同样不产生 drift record。只有
+schema-valid live anchor 才允许持久化 drift。该锁是协作式并发控制；同一 OS account
+的非合作进程可以忽略它，不能据此宣称获得了 OS 隔离。
+
+不要用 symlink 重定向项目根、artifact、`00_self_healing`、`attempts` 或某个 attempt
+目录，也不要在 sidecar root 放入未定义 leaf；sidecar 会在读写前逐级 `lstat`、独立
+校验主链 anchor leaf，并盘点所有 root entry 与递归 attempt evidence 后 fail-closed。
+Indexed receipt anchor 必须始终处于 `post_run_active`，且除明确 supersede 已索引 drift 的
+新 triage 外，相邻 anchor 必须相同；malformed live anchor 不会被写成 drift record。
+
+每个 sidecar receipt 的 `payload` 必须是可被 BUGate canonical JSON 编码并在当前
+interpreter 下重新解析的 JSON object；publication 与整链 replay 使用同一校验器，不接受
+非 string key、non-finite float、cycle 或 implementation-specific value。特别地：
+`triage_recorded.healing_eligible` 必须精确为 boolean `true`；
+`independent_review.outcome` 必须等于 receipt `resulting_state`；
+`attempt_closed.final_state` 必须等于 authenticated prior state，且只能是
+`healing_verified` / `healing_rejected`。对应 stable reason 分别为
+`triage_healing_eligible_not_true`、`review_outcome_state_mismatch` 与
+`close_final_state_mismatch`；其余 payload 结构错误使用
+`self_heal_event_payload_invalid`。
+
+Eligible triage 在写普通 report、attempt evidence 或 receipt 前，先完成 maximum-attempt
+与完整 publication preflight。若当前 state、payload、actor、session、attempt 或 anchor
+不允许该次 triage，本次请求必须零写入，不能用一次失败重试改写已经打开的 attempt 证据。
+
+`status` 先完整校验 sidecar，再读取主 role-chain anchor。Anchor reader 对
+`00_role_evidence/**` 与任何已存在的 `chain.json` 做 `lstat`/non-symlink 检查，校验
+精确五字段 v1
+envelope 后还必须运行完整 `verify_chain`，不能把 shape-only JSON 当可信 anchor。如果
+sidecar 与主链同时损坏，优先报告 sidecar corruption；malformed main envelope/replay
+映射为 exit 4 的 `lifecycle_drift`，其他 sidecar/path/payload violation 保留精确 reason 并
+映射为 exit 2。所有 CLI result object 精确包含 `status`、`exit_code`、
+`blocking_reasons`、`artifact_paths`、`next_action`，不得出现 raw traceback/exit 1。
+
+退出码：`0` 正常（`disabled` / `triaged` / `healing_active` / `healing_verified`）、
+`2` 阻塞、`3` 拒绝（防假绿或 falsification）、`4` 生命周期漂移导致 attempt 失效。
+状态行是独立的 `BUGate self-heal status: <STATUS>`，不复用生命周期状态行。
+
+纪律要点：
+
+1. **归因先于修复**。环境、auth/precondition 前置失败、flaky 与证据不足一律
+   `healing_eligible: false`；SUT 真缺陷保留失败并出缺陷草稿，不得改测试迁就。
+   这些不可修复结果以及 `diagnose` 模式只写普通 triage 报告，不发布
+   `triage_recorded`，也不开 sidecar attempt；因此可以用新证据重新 triage。
+2. **会话互异是防自批准的核心**。healer 不能是宣告可修复的那个会话；独立 reviewer
+   不能是前两者中的任何一个。违反即 `same_session_self_approval`。
+3. **Proposal 控制优先于评审**。删断言、把 expected 改成 actual、宽泛 except、悄悄
+   skip/xfail、用 mock 绕过目标层、无证据放大 timeout、缩小收集范围——任一命中即
+   `healing_rejected`，独立 reviewer 的 `approved` **不能推翻**。Falsification 缺失或
+   无结论时阻塞，低于阈值时拒绝；这些结果都不会发布 `healer_handoff`。
+4. **verify 模式绝不写真实工作区**；sandbox 复制前会拒绝复制 surface 内的 symbolic
+   link。`apply_with_approval` 才写回，且 `human_approval_required` 冻结为 `true`，
+   `close` 必须提供人工批准记录、profile 授权路径与带日志的 journal 写入。
+   已评审 candidate manifest 会绑定精确 `baseline.json` bytes、由 baseline 认证的原始
+   before image、candidate after image、重建 patch 与 apply 前不存在的 parent directory
+   canonical 集合；`close` 在 verify-only 与 apply 两条路径上都会重算该 manifest，并
+   重新校验全部 live review evidence、归档 review bytes 及其 receipt binding。
+   内部 `bugate.self-heal-apply-journal/v2` 必须精确绑定同一 manifest、file set、
+   before/after bytes、POSIX permission bits 与同一 missing-directory 集合。
+   `--self-heal-step resume` 可从 `applying` 或 `applied` 中断窗口还原旧字节与 POSIX
+   permission bits；任何额外 file/directory/symlink 都会在 restore write 前阻塞。它只
+   删除引擎创建的新文件，再删除经认证为 apply 前不存在且此时为空的 directory；
+   pre-existing parent 不会进入删除集合。它不承诺还原 owner、xattr 或 ACL；special
+   mode bits 会在 apply 前 fail-closed。
+5. **写回即重锁**：修复会改动 implementer handoff 快照内的文件，该 UC 因此重锁，
+   必须经正常生命周期重新受理与评审——这是期望行为，不是故障。
+
+完整契约见 `ROLE_GOVERNANCE_PROTOCOL.md` §10 与 CHARTER §7 A6。
 
 ### F. Lineage classification 与 registered-history recovery
 

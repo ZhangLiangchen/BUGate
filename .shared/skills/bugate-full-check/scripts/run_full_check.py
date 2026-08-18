@@ -1502,6 +1502,9 @@ if __name__ == "__main__":
                 (artifact_dir / "04_execution_report.md", False),
                 (artifact_dir / "05_knowledge_update.md", False),
                 (artifact_dir / "self_healing.json", False),
+                # self_healing defaults to off, so the sidecar must not exist at
+                # any point in the default flow -- zero exposure when unopted-in.
+                (artifact_dir / "00_self_healing", False),
             ),
             extra_ok=role_chain(evidence_dir).get("sequence") == 5,
             extra_detail="chain_sequence=5",
@@ -1556,6 +1559,7 @@ if __name__ == "__main__":
                 (artifact_dir / "04_execution_report.md", True),
                 (artifact_dir / "05_knowledge_update.md", True),
                 (artifact_dir / "self_healing.json", True),
+                (artifact_dir / "00_self_healing", False),
             ),
             extra_ok=role_chain(evidence_dir).get("sequence") == 6,
             extra_detail="chain_sequence=6",

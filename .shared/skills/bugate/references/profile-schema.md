@@ -36,6 +36,7 @@ These keys are read from the core config and may be overridden by a profile.
 | `memory.namespace` | str | `project:bugate` (`DEFAULT_PROJECT_TAG`, after `MEMORY_BUS_PROJECT_TAG` env) | Project namespace/tag used for all Memory Service reads/writes. In imported mode this is the ONLY memory scaffolding a governed repo declares: all repos share the machine-level bus (one DB under `~/.bugate/memory-bus`), isolated by this tag — do not scaffold a per-repo service dir (ADR-BUGATE-003). |
 | `namespace` | str | `project:bugate` | Legacy alias for `memory.namespace`. Each base/profile document is canonicalized before merge, and the merged result exposes both access forms. If both forms conflict in one document, the nested form wins. |
 | `role_governance` | mapping | `{mode: off}` | Wave 7 auditable lifecycle policy. Core stays inert by default; an imported profile may select `advisory` or `required`. Full contract below. |
+| `self_healing` | mapping | `{mode: off}` | Failure-triage and test-asset self-healing policy. Absent ≡ `mode: off` ≡ the v0.4.4 behavior with zero exposure. Full contract below. |
 
 `load_config()` deep-merges deterministically: mappings merge recursively,
 profile scalars replace base scalars, and profile lists replace base lists
@@ -296,6 +297,208 @@ The normative state, receipt, Memory ordering, compatibility, and threat-model
 contract is
 [`docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md`](../../../../docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md).
 
+### Test-asset self-healing: `self_healing`
+
+`self_healing` governs **failure attribution and governed test-asset repair**.
+The key is top level, a sibling of `role_governance`, and every relative path in
+it resolves against **the directory that owns `bugate.config.yaml`** (the
+imported SUT test repository's project root) — never against the caller's
+working directory.
+
+```yaml
+self_healing:
+  mode: off                        # off | diagnose | verify | apply_with_approval
+  allowed_write_regex: []          # empty = no path may be written
+  denied_write_regex: []           # evaluated before allowed_write_regex
+  verification_commands: []        # empty blocks verify/apply_with_approval
+  falsification_spec: ""           # required during propose, before healer_handoff
+  max_attempts: 3
+  independent_review_required: true   # frozen true; false is a config error
+  human_approval_required: true       # frozen true; false is a config error
+```
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `mode` | str | `off` | `off` = the capability does not exist: `--scope self-heal` returns `disabled` (exit 0) and creates nothing. `diagnose` = ordinary governed attribution/report output only, with no sidecar receipt or attempt. `verify` = a candidate is generated and verified **in a sandbox copy**; the real workspace is never written. `apply_with_approval` = a verified candidate may be written back after the full review flow and a human approval record. |
+| `allowed_write_regex` | str \| list | `[]` | Python regexes matched against workspace-relative POSIX paths. Empty allows nothing — self-healing is opt-in per path, not per repository. |
+| `denied_write_regex` | str \| list | `[]` | Evaluated before `allowed_write_regex`; a match always wins. |
+| `verification_commands` | str \| list | `[]` | How a repair is proven. Each runs in the sandbox before *and* after the candidate: the "before" run must reproduce the failure, the "after" run must pass. Empty blocks `verify` and `apply_with_approval`. |
+| `falsification_spec` | path | `""` | Oracle/mutation spec for `oracle_falsification.py`. **Required**: a missing or unresolvable spec blocks with `falsification_spec_missing` and never degrades to a structural-only check. Its evidence must resolve to workspace-local, non-symlink regular JSON files for repaired-test reverse verification; no runner-visible clean counterexample means fail closed. |
+| `max_attempts` | int | `3` | Repair attempts per UC before the flow insists on a defect record instead. |
+| `independent_review_required` | bool | `true` | **Frozen `true`.** `false` is rejected as a `RoleConfigError`: the independent semantic review is the only control separating a real repair from a fake-green one. |
+| `human_approval_required` | bool | `true` | **Frozen `true`.** `false` is rejected as a `RoleConfigError`; in `apply_with_approval`, `--human-approval` must name the approver before anything is written back. |
+
+Whatever the profile allows, these are never writable: `00_role_evidence/`,
+`00_self_healing/`, accepted 01/02/03/03A/03B and 04/05 artifacts,
+`bugate.config.yaml`, any `bugate.profile*.yaml`, `.git/`, `.env*`, and any path
+whose name contains `secret`, `credential`, or `token`.
+
+For `verify` and `apply_with_approval`, an eligible failure's evidence lives in
+`<artifact_dir>/00_self_healing/` — an append-only sidecar
+chain (`bugate.self-heal-chain/v1`) of receipts (`bugate.self-heal-evidence/v1`)
+plus one `attempts/<attempt_id>/` directory per attempt holding the baseline
+hashes, the candidate patch, before/after logs, the verification record, and the
+falsification result. A non-eligible attribution and `diagnose` mode still write
+the ordinary governed triage reports, but publish no `triage_recorded` receipt
+and open no sidecar attempt. The sidecar **never writes into
+`00_role_evidence/`**; it binds to the role chain through a read-only
+`role_chain_anchor`
+(`chain_sha256`, `sequence`, `lifecycle_state`). If the role chain advances
+while an attempt is open, the attempt is invalidated rather than continued
+against stale evidence. This is what keeps a v0.4.0–v0.4.4 engine's behavior
+unchanged on a UC that has self-healing evidence: it never sees an event it does
+not know.
+
+`check_role_evidence.py` recognizes `00_self_healing/**` as its own protected
+evidence class and rejects every direct agent edit unconditionally, exactly as
+it does for `00_role_evidence/**`. The structural ownership table also records
+the directory's post-run standing; that phase label is not the write-guard
+decision and cannot authorize a reviewer edit.
+
+Proposal controls complete before the healer hands anything to a reviewer.
+`propose` performs structural analysis, sandbox before/after verification, the
+required falsification run, and repaired-test reverse verification before
+publishing `healer_handoff`. Each exact clean `(evidence path, mutation,
+triaged oracle)` counterexample is applied to a fresh candidate sandbox. The
+repaired command must change from PASS to an `AssertionError` at the mapped
+changed assertion and return to PASS from a fresh restored sandbox. A survivor
+is rejected; a crash, unsafe/missing input, unrelated oracle, or ambiguous
+assertion is blocked. A clean dynamic failure is not sufficient for arbitrary
+Python: authorization is limited to the closed one-file literal or canonical
+JSON-evidence languages described below. These rejected proposals create no attempt artifacts. On success
+it writes `review_context.json`, and the handoff receipt binds both that file's
+SHA-256 and its complete evidence identity: UC and attempt, candidate manifest
+and patch, the canonical accepted-business-brief/inventory evidence manifest,
+captured original failure, before/after logs, verification, falsification, and
+oracle references. The review document must reproduce that binding exactly,
+must use `dispatch_mode: real_peer_dispatch`, and must declare the same
+`codex`/`claude` runtime as the active fresh reviewer session. It also carries a
+non-empty list of itemized `{claim, evidence}` findings and a list of non-empty
+residual-risk strings (which may itself be empty). The gate archives the exact
+input bytes as `independent_review.json` and binds their hash in the review
+receipt.
+
+The falsification result embeds a workspace-relative spec/evidence SHA-256
+manifest. Review and close both recompute it, so a stale score cannot authorize
+changed inputs. Finite candidate-visible mutants cannot prove arbitrary Python
+honest. Automatic authorization therefore accepts only one changed test file in
+one of two closed languages. The literal NameError language allows the complete
+AST to differ only by one local immutable-scalar assignment and replacement of
+the recorded unresolved name. The canonical JSON-evidence language allows only
+exact `json`/`Path` imports, unique bindings, one direct built-in scalar load
+from the exact declared path/key, an inherited immutable-scalar observation, a
+direct equality, zero-argument `test_*` functions/direct calls, and unchanged
+auxiliary primitive equality assertions without message expressions; functions
+are unannotated. Removing the exact repair delta must reconstruct the original
+AST. Source must be coherent UTF-8 whose encoding-detected byte AST equals its
+decoded AST. Workspace/configured import shadows block, and
+pristine/mutant/restored runs repeat under `python -I -S`. Both languages also
+perturb the observation scalar. Helpers, custom comparators, descriptors,
+decorators, dynamic imports, rebinding, annotations, assertion messages,
+alternate source encodings, dispatch, control flow, or additional candidate
+files are outside the proof language and block. This
+proves falsifiability and the stated scalar binding, not complete business
+provenance or all undeclared states. More complex honest repairs remain blocked
+until a separately governed observation contract exists; nondeterminism, host
+compromise, and OS-level sandbox escape remain explicit residual risks.
+
+Before a sandbox copy, the engine rejects symbolic links on the copied surface;
+candidate, evidence, journal, and write targets are checked without following
+symbolic links. Apply journals authenticate before/after bytes and POSIX
+permission bits. While the attempt remains independently verified, `resume`
+can restore either an `applying` or `applied` journal window, including exact
+prior bytes and permission bits; it removes journal-created files and only
+empty journal-created parent directories. New regular files use mode `0600`.
+Ownership, xattrs, and ACLs are not part of that restore guarantee.
+
+Receipt publication precedes the chain-index replace. After an interruption in
+that cut, only the sole possible next receipt that passes a complete
+prospective replay is considered. A strict-`required` receipt for one of the
+three Memory-anchored events is indexed only after read-only exact Memory
+verification binds its transition identity and receipt hash; that check creates
+no Memory record and changes neither the main role-evidence tree nor any
+receipt. Every unanchored event and every `best_effort` orphan lacks that
+authenticity proof. Its exact bytes are instead preserved as
+`attempts/<attempt_id>/unindexed_<event>_<content-sha256>.json`, the root-level
+orphan is removed, the chain remains at its prior indexed state, and the same
+event may retry through the ordinary publication controls. The preserved file
+is evidence, never a chain entry. Structurally invalid, stale-anchor, forged-id,
+or exact-Memory-mismatched receipts fail integrity rather than being accepted.
+All existing project/artifact/sidecar/attempt directory components are checked
+with `lstat`, must remain within the real project and artifact roots, and may
+not be symbolic links. The main role-chain anchor leaf is checked even when the
+CLI step skips main preflight, and verified sidecar loads inventory every direct
+root entry plus every recursive attempt-evidence component; unknown, special,
+or symlinked leaves fail integrity. Indexed receipt anchors must remain
+`post_run_active` and continuous except when a retriage explicitly supersedes
+indexed drift. Malformed live sequence/state values are not persisted as drift.
+
+Every receipt payload is a replayable canonical JSON object, checked both
+before publication and during full-chain replay. Object keys must be strings;
+values are limited to JSON types with finite floats and no cycles. In addition,
+`triage_recorded.healing_eligible` is exactly boolean `true`,
+`independent_review.outcome` equals its `resulting_state`, and
+`attempt_closed.final_state` equals the authenticated prior
+`healing_verified`/`healing_rejected` state. These are authenticated state-edge
+claims, not advisory metadata. An eligible triage's maximum-attempt and full
+publication preflight run before ordinary triage reports, attempt evidence, or
+receipt writes, so a rejected retry cannot rewrite the current attempt.
+
+The main-chain anchor reader applies the role-evidence `lstat` boundary to any
+present chain, validates the exact minimal five-key v1 chain envelope, and then
+runs the full
+`verify_chain` receipt-inventory/hash/state/history check before using those
+bytes as an anchor. CLI `status` verifies the sidecar first, so simultaneous
+damage reports sidecar corruption before main-chain drift. Every CLI result
+retains exactly `status`, `exit_code`, `blocking_reasons`, `artifact_paths`, and
+`next_action`: malformed main-envelope/replay evidence maps to
+`invalidated`/`lifecycle_drift`/exit 4, while sidecar/path/payload violations
+retain their exact reason under `blocked`/exit 2; no integrity path emits an
+uncaught traceback/exit 1.
+
+Main role transitions and complete sidecar verified reads, publications,
+invalidations, and status snapshots serialize on one exclusive advisory
+`flock` over the same existing UC artifact-directory inode. The publication
+lock also spans each complete self-heal CLI step from sidecar-state validation
+through attempt-evidence or workspace writes and final receipt publication;
+nested calls reuse one re-entrant store, so a losing cooperating step cannot
+rewrite evidence after its peer commits. The publication
+lock spans Memory work, receipt durability, and chain-index replacement, while
+the read lock spans orphan reconciliation or quarantine; a cooperating reader
+therefore cannot quarantine the live receipt/chain gap of another BUGate
+publisher. CLI status returns state, attempt identity, review outcome, and
+anchor comparison from one locked snapshot. Drift persistence uses the prior
+sidecar-head anchor as a compare-and-swap token. A missing main chain is exposed
+by every status call as `invalidated` with `lifecycle_drift` through the empty
+read sentinel, but that sentinel is not a valid anchor and is never written to
+sidecar `chain.json`; only a schema-valid live anchor with a 64-hex chain hash
+can be persisted as the observed drift. The lock is advisory: a
+same-OS-account process that does not cooperate with BUGate can ignore it, so
+this is not an OS isolation or identity guarantee.
+
+The reviewed candidate manifest binds the exact `baseline.json` bytes,
+baseline-authenticated original before images, candidate after images, the
+reconstructed patch, and the canonical set of parent directories absent before
+apply. `close` recomputes it and re-authenticates the full live review context,
+archived review bytes and receipt binding before closing in either `verify` or
+`apply_with_approval`. The internal
+`bugate.self-heal-apply-journal/v2` must bind that same manifest, exact file
+set, before/after bytes, ordinary POSIX permission bits, and an exact copy of
+the reviewed missing-directory set. Resume blocks before writing on any
+unexpected tree entry, removes only engine-created new files, and then removes
+only authenticated originally-missing directories that are empty; pre-existing
+parents are never eligible. The restore guarantee does not include ownership,
+xattrs, or ACLs, and special permission bits fail closed before apply.
+
+Enabling this key changes `profile.effective_config_sha256`, so adding it to a
+UC that already carries published role receipts re-locks that chain. Set it
+before the lifecycle runs, or start a new generation.
+
+The normative sidecar state machine, actor rules, and compatibility contract are
+in
+[`docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md`](../../../../docs/qa-methodology/ROLE_GOVERNANCE_PROTOCOL.md)
+§ "v0.4.5 self-healing sidecar contract".
+
 ### Evidence- and skill-source keys
 
 These keys point the flow at where the governed SUT test workspace keeps its
@@ -511,6 +714,22 @@ role_governance:
 falsification_spec: sut/example/falsification_spec.yaml
 falsification_threshold: 0.7
 
+# Failure triage and test-asset self-healing. Omit the whole block (or keep
+# mode: off) for exactly the v0.4.4 behavior. `verify` never writes the real
+# workspace; only apply_with_approval does, and only after the full review flow.
+self_healing:
+  mode: verify
+  allowed_write_regex:
+    - "^sut/example/tests/.*[.]py$"
+  denied_write_regex:
+    - "^sut/example/tests/conftest[.]py$"
+  verification_commands:
+    - "python3 -m pytest sut/example/tests -q"
+  falsification_spec: sut/example/falsification_spec.yaml
+  max_attempts: 3
+  independent_review_required: true
+  human_approval_required: true
+
 # Memory Service project namespace/tag for all reads/writes.
 memory:
   namespace: project:example-sut
@@ -570,3 +789,8 @@ in `scripts/oracle_falsification.py`'s module docstring.
   the falsifier (SUT-specific, so not hardcoded). Also settable via the
   `WAVE8_EVIDENCE_GLOB` env var; `WAVE8_REPORTS_DIR` / `WAVE8_ARTIFACT_ROOT`
   override the weekly run's output dir and the inventory-scan root.
+- `self_healing` — enables failure triage (`--scope self-heal`) and, above
+  `diagnose`, governed test-asset repair. Off by default; the full contract is in
+  "Test-asset self-healing" above. It requires `role_governance` to be active:
+  the sidecar anchors to the role chain and refuses to act unless the UC is in
+  `post_run_active`.

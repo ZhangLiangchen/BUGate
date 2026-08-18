@@ -1,7 +1,7 @@
 ---
 title: "BUGate Workflow Evolution Timeline"
-version: 2.0
-date: 2026-06-17
+version: 2.1
+date: 2026-08-11
 status: active
 purpose: "SUT-neutral summary of how BUGate evolved from methodology into a reusable pre-code governance framework."
 ---
@@ -73,6 +73,24 @@ The framework is extracted into a SUT-neutral core:
   live evidence.
 
 This split is now the baseline for future BUGate work.
+
+## Phase 6: Failure Attribution and Governed Test-Asset Self-Healing
+
+The post-run layer gains an owner for every failure, and a governed route from
+"this is a broken test asset" to a reviewed repair:
+
+- Attribution comes before repair. `failure_owner` separates environment,
+  test_asset, sut, and unresolved with anchored rules and counter-example tests,
+  replacing substring matching that could never clear its own exclusions.
+- Only a test-asset defect may be repaired. A SUT defect keeps the failing
+  assertion and produces a defect draft; the test is never bent to fit.
+- A repair must survive two independent controls: a deterministic structural
+  analysis and an independent semantic review in a fresh session. The structural
+  half is authoritative — an approving reviewer cannot overrule it.
+- Evidence lives in an append-only sidecar anchored to the role chain, so no
+  earlier engine's read of the same use case changes.
+- The whole capability is off by default. A repository that does not opt in
+  behaves byte for byte as it did before.
 
 ## Current Shape
 

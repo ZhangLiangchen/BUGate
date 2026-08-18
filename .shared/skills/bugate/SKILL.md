@@ -119,6 +119,7 @@ guarded writes until then, jumping to code is rejected rather than helpful.
 - Multi-view core bridge: `python3 scripts/sdtd_multiview_cli_bridge.py run-all <artifact_dir>`
 - Adversarial core bridge: `python3 scripts/sdtd_adversarial_cli_bridge.py run-all <artifact_dir>`
 - Post-run reports: `python3 scripts/self_healing_mvp.py ...` then `python3 scripts/generate_sdtd_reports.py <artifact_dir> ... --write`
+- Failure triage / test-asset self-healing (opt-in; `disabled` unless the profile sets `self_healing.mode`): `python3 scripts/sdtd_orchestrator.py <artifact_dir> --scope self-heal --self-heal-step {triage|handoff|accept|propose|review|close|resume|status} ...` — attributes the failure first, only proposes a candidate when the evidence says a test asset is at fault, verifies it in a sandbox copy, and requires an independent reviewer in a fresh session. It never edits the system under test and never overwrites the original failure.
 - Role status/local verification: `bin/bugate-role status <artifact_dir>` and `bin/bugate-role verify <artifact_dir> --phase <pre_code|implementation|post_run>`
 - Explicit lineage identity/status: `bin/bugate-role lineage-status <artifact_dir> --json` (read-only; under required Memory it probes the deterministic root only when local state appears uninitialized)
 - Confirmed first use: `bin/bugate-role lineage-init <artifact_dir> --lineage-id <exact-id>`; verified legacy history: `lineage-adopt ... --lineage-id <exact-id> --expected-head <exact-head>`

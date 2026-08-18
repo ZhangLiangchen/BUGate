@@ -20,6 +20,7 @@ profile or the imported SUT test repo. On any conflict,
 | [TRANSITION_PROTOCOL.md](TRANSITION_PROTOCOL.md) | PROTO-BUGATE-TRANS-001: the *journey* from an old embedded BUGate to the decoupled core — asymmetric strangler-fig, the 3-bucket capability-gap classifier, the transition-gap ledger, and retirement exit criteria. |
 | [BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md](BUGATE_MEMORY_BUS_SYSTEM_LEVEL_ADR.md) | ADR-BUGATE-003: the machine-level memory bus — one service instance per machine (`~/.bugate/memory-bus`), namespace-tag isolation instead of per-repo databases, client resolution order, and the 2026-07-03 migration/rollback record. |
 | [BUGATE_DESUT_CALIBRATION_ADR.md](BUGATE_DESUT_CALIBRATION_ADR.md) | ADR-BUGATE-004: de-SUT calibration — "block seepage, not mention"; the three-layer discriminator, profile-supplied identity terms, narrative exemption channels, and the upstream legacy-fixture regression. The narrative dividend lives in [`../case-studies/`](../case-studies/). |
+| [BUGATE_SELF_HEALING_SIDECAR_ADR.md](BUGATE_SELF_HEALING_SIDECAR_ADR.md) | ADR-BUGATE-005: failure triage and governed test-asset self-healing use an anchored sidecar, preserving the frozen three-phase role lifecycle and prior-engine compatibility. |
 | [BUGATE_EVOLUTION_TIMELINE.md](BUGATE_EVOLUTION_TIMELINE.md) | SUT-neutral summary of how BUGate evolved from a method into a profile-driven pre-code governance framework. |
 
 ## Recommended reading order

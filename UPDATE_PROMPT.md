@@ -133,8 +133,9 @@ authority from a request to inspect, assess, or plan an upgrade.
    ```
 
    Prove profile/config, SUT tests, use-case artifacts,
-   `00_role_evidence/**`, Memory namespace/data, machine lineage registry,
-   SUT-owned hooks/skills, and unrelated dirty files were not modified.
+   `00_role_evidence/**`, `00_self_healing/**`, Memory namespace/data, machine
+   lineage registry, SUT-owned hooks/skills, and unrelated dirty files were not
+   modified.
 
 7. **Keep later authorities separate**
 
