@@ -4,7 +4,7 @@ id: ADR-BUGATE-005
 title: Failure triage and test-asset self-healing — an anchored sidecar, not a fourth phase
 status: accepted
 created_at: 2026-08-11
-amended_at: 2026-08-12
+amended_at: 2026-08-18
 authority: ADR-BUGATE-001
 companions:
   - CHARTER.md
@@ -135,6 +135,12 @@ into* the role chain.
 > accepted wording. The effective ordering, exact review binding, permission-bit
 > restore boundary, and receipt/index crash-cut rules are specified by the dated
 > amendment below.
+>
+> **Amendment pointer (2026-08-18):** Item 6 is likewise retained as the original
+> accepted wording. The condition under which a survivor may be published as
+> `repaired_test_survives_mutation` is narrowed by the dated amendment below: the
+> assertion binding must be carried by a closed static proof, never by evidence
+> the candidate under test produced.
 
 ## Consequences
 
@@ -272,6 +278,11 @@ contract exists. It proves falsifiability and the stated scalar binding, not
 full business provenance or correctness over every undeclared state.
 Nondeterminism, host compromise, and operating-system-level sandbox escape
 remain residual risks requiring independent review.
+
+> **Amendment pointer (2026-08-18):** The observation-source perturbation
+> described above is retained as accepted. What it is allowed to *conclude* is
+> narrowed by the dated amendment below, which also records why an in-band
+> execution witness cannot establish the binding it was introduced to prove.
 
 The review document must reproduce that binding exactly. Only
 `dispatch_mode: real_peer_dispatch` is trusted, and its declared `runtime` must
@@ -440,3 +451,101 @@ evidence I/O/decoding failures also map to a five-field blocked result rather
 than exit 1. `status` verifies the sidecar before reading the main anchor, so if
 both are damaged the immutable sidecar corruption is reported instead of being
 masked by lifecycle drift.
+
+## Amendment — assertion-binding proof and the published fake-green verdict (2026-08-18)
+
+This amendment records a correction to *what BUGate is entitled to publish* about
+a surviving negative control. It preserves the accepted sidecar/event vocabulary,
+the six-event table, the two closed proof languages, and every exit-code mapping
+above; only the condition under which `repaired_test_survives_mutation` may be
+returned is narrowed, and it is narrowed in the blocking direction.
+
+**Two defects were found against a fully green suite.** Neither moved any test at
+the time it existed, which is the reason this amendment exists at all.
+
+*The observation control did not check what it claimed to perturb.* Decision
+item 6 requires the repaired command to fail at the changed governed assertion
+after the counterexample is applied, and the closed languages additionally
+perturb the observation source. That perturbation targets a module-level
+assignment, but Python resolves an assertion operand by scope, not by module
+order. A candidate that rebinds the same name inside the assertion's scope — a
+function-local assignment, a `global` write, a parameter, an import alias, an
+`except .. as`, a same-named `def`/`class` — makes the perturbation invisible to
+its own assertion while the assertion still executes. Such a candidate survived
+and was published as a *proven* fake-green repair, even when it was in fact bound
+to the declared external contract and would die if that contract were falsified.
+The control now counts every binding site of the observation name in the
+candidate module and refuses to derive a control unless there is exactly one:
+the module assignment it perturbs. This is a positive requirement, not a
+blacklist of rebinding tricks, and it fails closed to
+`repaired_test_reverse_verification_unavailable`.
+
+*The binding that carried the verdict rested on the candidate's own testimony.*
+The engine established "the mapped assertion executed" by injecting a sentinel
+`raise AssertionError(...)` immediately above that assertion, re-running the
+candidate's own verification commands, and confirming when the sentinel string
+appeared in the resulting output with an `AssertionError` attributed to that
+file and line. Every input to that judgement is written by the process under
+judgement. The sentinel and the candidate share one interpreter, and the
+candidate can read the injected line out of its own `__file__` before deciding
+what to print, so it can produce the whole confirmation without executing
+anything. A nonce does not help — the nonce is in the source the candidate
+reads. A decoy injection into a line that provably will not execute does not
+help either: it removes candidates that forge whenever the sentinel appears
+anywhere in their source, and it was measured to leave untouched a candidate
+that forges only when the sentinel sits immediately above an `assert`, which is
+a source-local test the candidate can run on itself. No in-band dynamic witness
+is sound against a candidate that can read its own source.
+
+A separate observation makes the point structural rather than merely practical:
+even a *sound* execution witness would establish that the assertion line was
+reached, which is not the proposition the basis name asserted — that the
+perturbed observation source is the binding of that assertion's operand. Line
+reachability and operand binding are different claims.
+
+**The in-band witness is therefore retired.** An assertion binding may now be
+confirmed only by a closed *static* proof: the engine-derived literal source, the
+canonical external observation source, or the canonical declared-JSON source.
+Every other shape records an unproven binding and the caller blocks at exit 2.
+The negative control still runs and a survivor is still recorded in the
+governance artifact; what is withdrawn is the promotion of that record to a
+published verdict.
+
+**This is a contraction, not a relaxation, and the code path makes that
+checkable.** `repaired_test_survives_mutation` requires a confirmed binding
+together with a surviving control; a binding that is not confirmed falls through
+to `repaired_test_reverse_verification_unavailable`. Downgrading a binding can
+therefore only move a result toward exit 2 and can never move one toward exit 0.
+Measured over the complete review corpus, five attack candidates and one
+adversarial probe case moved from exit 3 to exit 2; every honest control kept
+exit 0; nothing moved to exit 0; and the affected candidates remained blocked
+with the governed workspace and the complete `00_self_healing/` tree unchanged.
+
+**The cost is stated rather than hidden.** Those candidates really are fake-green.
+BUGate no longer claims to have proven it. They are blocked, never applied, and
+not named. The gate's safety is unchanged; the precision of its public diagnosis
+is narrower than the truth, and the operator-facing boundary in `CAPABILITIES.md`
+says so.
+
+**The governing principle, generalized.** A published attribution of
+responsibility may not rest on evidence produced by the subject of that
+attribution. `blocked` and `rejected` are different public governance outcomes
+with different facts, different attribution, and different next actions; the
+stricter of the two must be reachable only from evidence the subject cannot
+author. Where BUGate cannot obtain such evidence, it says "cannot verify" rather
+than saying something stronger from something weaker.
+
+**Residual surfaces, explicitly not closed.** The binding-site count reads the
+candidate module's own AST, so a rebinding performed from another file or through
+a dynamic namespace write is outside it. After this amendment that no longer
+produces a wrong `rejected` verdict, because the lane can no longer confirm a
+binding at all — but it does mean a recorded `result: survived` is not by itself
+proof of fake-greenness and must not be read as one. Separately,
+`repaired_test_survives_mutation` was not observed in any corpus after this
+change; it has not been proven unreachable and is not treated as dead.
+
+**Verification discipline.** The reproductions for both defects, the honest
+controls that guard against over-tightening, and an exact-one-anchor engine
+mutation harness now live in the engine's own test tree rather than in an
+external review workspace, so a future change that reverts either fix fails a
+test in the same repository that carries the change.
