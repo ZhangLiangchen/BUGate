@@ -896,8 +896,9 @@ symlink alias 绕过。
 
 ### E1. （可选）Reviewer + Healer：失败归因与测试资产自愈
 
-本节描述未发布的 **v0.4.5 source candidate**，不改变当前 v0.4.4 distribution
-release line，也不构成 tag、asset 或 publication 声明。
+本节描述 **v0.4.5** 引入的能力。v0.4.5 只有在其 annotated tag、GitHub Release
+与三项已校验 asset 全部就位后才成为权威 distribution；在此之前当前已发布回退版本
+仍是 v0.4.4。
 
 仅当 profile 显式设置 `self_healing.mode`（默认 `off`）时可用；`off` 时该入口返回
 `disabled`、退出码 0 且**不创建任何文件**。全流程必须在 `post_run_active` 内完成。

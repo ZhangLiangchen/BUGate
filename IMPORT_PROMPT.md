@@ -38,9 +38,9 @@ core files.
   hooks load from the session's workspace, so a session rooted at a parent
   (monorepo) directory silently loads no guard. The importer warns when the
   target is not the git toplevel; relay that warning to the user.
-- BUGate target release line: use `BUGATE_VERSION` if set, otherwise `0.4.4`.
+- BUGate target release line: use `BUGATE_VERSION` if set, otherwise `0.4.5`.
   The default is usable only after that public tag/Release and its assets pass
-  checksum verification; until then, explicitly select the published v0.4.3
+  checksum verification; until then, explicitly select the published v0.4.4
   fallback rather than treating source-branch wording as release authority.
 - Vendor dir: use `BUGATE_VENDOR_DIR` if set, otherwise `.bugate`.
 - Installation route: detect it read-only. Do not accept a user's remembered
@@ -50,10 +50,10 @@ core files.
   Legacy bootstrap requires a formal unpacked v0.4.2-or-later release carrying its
   canonical and legacy manifests. If `BUGATE_ENGINE_DIR` does not point to the
   applicable source, download the GitHub Release outside the SUT repo.
-- When the public v0.4.4 tag/Release exists, it becomes authoritative only if
-  it has exactly three assets: `bugate-0.4.4.tar.gz`, `bugate-0.4.4.zip`, and
-  `bugate-0.4.4.SHA256SUMS`. The checksum asset is mandatory; verify the
-  selected archive before extraction. Until then, use the published v0.4.3
+- When the public v0.4.5 tag/Release exists, it becomes authoritative only if
+  it has exactly three assets: `bugate-0.4.5.tar.gz`, `bugate-0.4.5.zip`, and
+  `bugate-0.4.5.SHA256SUMS`. The checksum asset is mandatory; verify the
+  selected archive before extraction. Until then, use the published v0.4.4
   fallback explicitly.
 
 ### Required Flow
@@ -96,7 +96,7 @@ core files.
    - Otherwise run the equivalent of:
 
      ```bash
-     BUGATE_VERSION="${BUGATE_VERSION:-0.4.4}"
+     BUGATE_VERSION="${BUGATE_VERSION:-0.4.5}"
      BUGATE_TMP="$(mktemp -d)"
      BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
      BUGATE_SUMS="bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -192,7 +192,7 @@ core files.
    **Lock+launcher in-repo update** (`BUGATE_ROUTE=locked-in-repo-update`):
 
    ```bash
-   BUGATE_VERSION="${BUGATE_VERSION:-0.4.4}"
+   BUGATE_VERSION="${BUGATE_VERSION:-0.4.5}"
    BUGATE_VENDOR_DIR="${BUGATE_VENDOR_DIR:-.bugate}"
    UPDATER="$BUGATE_VENDOR_DIR/bin/bugate-update"
    "$UPDATER" status
@@ -212,11 +212,11 @@ core files.
 
    ```bash
    "$UPDATER" plan \
-     --archive /outside/bugate-0.4.4.tar.gz \
-     --checksums /outside/bugate-0.4.4.SHA256SUMS
+     --archive /outside/bugate-0.4.5.tar.gz \
+     --checksums /outside/bugate-0.4.5.SHA256SUMS
    "$UPDATER" apply \
-     --archive /outside/bugate-0.4.4.tar.gz \
-     --checksums /outside/bugate-0.4.4.SHA256SUMS
+     --archive /outside/bugate-0.4.5.tar.gz \
+     --checksums /outside/bugate-0.4.5.SHA256SUMS
    "$UPDATER" verify
    ```
 
@@ -225,11 +225,11 @@ core files.
 
    ```bash
    python3 "$BOOTSTRAP" plan "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
-     --archive /outside/bugate-0.4.4.tar.gz \
-     --checksums /outside/bugate-0.4.4.SHA256SUMS
+     --archive /outside/bugate-0.4.5.tar.gz \
+     --checksums /outside/bugate-0.4.5.SHA256SUMS
    python3 "$BOOTSTRAP" apply "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR" \
-     --archive /outside/bugate-0.4.4.tar.gz \
-     --checksums /outside/bugate-0.4.4.SHA256SUMS
+     --archive /outside/bugate-0.4.5.tar.gz \
+     --checksums /outside/bugate-0.4.5.SHA256SUMS
    python3 "$BOOTSTRAP" verify "$SUT_REPO" --vendor-dir "$BUGATE_VENDOR_DIR"
    ```
 
@@ -243,7 +243,7 @@ core files.
    vendored launcher:
 
    ```bash
-   BOOTSTRAP=/outside/bugate-0.4.4/scripts/bugate_update.py
+   BOOTSTRAP=/outside/bugate-0.4.5/scripts/bugate_update.py
    "$BUGATE_VENDOR_DIR/bin/bugate-update" rollback \
      --transaction <32-hex-transaction-id>
    if test -f "$BUGATE_VENDOR_DIR/bugate.lock.json" \

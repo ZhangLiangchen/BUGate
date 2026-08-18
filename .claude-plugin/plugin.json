@@ -1,7 +1,7 @@
 {
   "name": "bugate",
   "displayName": "BUGate",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "Agentic QA governance kit / SDTD gate engine: pre-code gates, auditable lifecycle-role handoffs, a dedicated bugate-update skill for BUGate version upgrades, hash-linked evidence, strict Memory transitions, dual-runtime peer bridges, and physical write guards. Fresh installs use bugate_init.py; existing installations use bugate-update. Inert until the project carries a committed bugate.config.yaml.",
   "author": {
     "name": "BUGate maintainers"

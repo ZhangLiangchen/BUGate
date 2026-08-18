@@ -22,7 +22,14 @@ SCRIPTS = ROOT / "scripts"
 BUILDER = SCRIPTS / "build_release_archives.py"
 CONTRACT = SCRIPTS / "bugate_install_contract.py"
 LEGACY = SCRIPTS / "bugate_legacy_manifest.py"
-VERSION = "0.4.4"
+VERSION = "0.4.5"
+# A version that is deliberately *not* VERSION, for the three negative controls
+# that prove the builder refuses a mismatch.  These used to hard-code the next
+# release number as "the wrong one", so each of them silently started passing
+# for the wrong reason the moment the repository actually reached that version:
+# the builder was accepting the build, not rejecting it.  Keep this far away
+# from any real release line.
+MISMATCH_VERSION = "9.9.9"
 LEGACY_TAGS = ("v0.3.0", "v0.3.1", "v0.3.2", "v0.3.4", "v0.3.5", "v0.4.0", "v0.4.1")
 
 if str(SCRIPTS) not in sys.path:
@@ -338,7 +345,7 @@ class ReleaseArchiveTests(unittest.TestCase):
         self.assertIn(f"bugate-{VERSION}/untracked.txt", tar_names)
 
     def test_explicit_version_must_match_both_manifests(self) -> None:
-        result = self.run_builder("--version", "0.4.5")
+        result = self.run_builder("--version", MISMATCH_VERSION)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("does not match both plugin manifests", result.stderr)
         self.assertFalse(self.dist.exists())
@@ -351,7 +358,9 @@ class ReleaseArchiveTests(unittest.TestCase):
 
     def test_plugin_manifest_mismatch_is_rejected(self) -> None:
         path = self.repo / ".claude-plugin/plugin.json"
-        path.write_text(json.dumps({"name": "bugate", "version": "0.4.5"}) + "\n")
+        path.write_text(
+            json.dumps({"name": "bugate", "version": MISMATCH_VERSION}) + "\n"
+        )
         self.commit("make plugin versions inconsistent")
         result = self.run_builder()
         self.assertNotEqual(result.returncode, 0)
@@ -363,7 +372,7 @@ class ReleaseArchiveTests(unittest.TestCase):
         path.write_text(
             path.read_text(encoding="utf-8").replace(
                 f'UPDATER_VERSION = "{VERSION}"',
-                'UPDATER_VERSION = "0.4.5"',
+                f'UPDATER_VERSION = "{MISMATCH_VERSION}"',
             ),
             encoding="utf-8",
         )

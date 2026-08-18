@@ -9,10 +9,10 @@
 > Until BUGate ships a packaged console-script, prose shorthand `bugate init`
 > means `python3 scripts/bugate_init.py`.
 >
-> This checkout's release line is **v0.4.4**. Treat it as the current published
+> This checkout's release line is **v0.4.5**. Treat it as the current published
 > release only after the annotated tag and GitHub Release expose exactly the
-> tar, zip, and `bugate-0.4.4.SHA256SUMS` assets and the selected archive
-> verifies. Until then, the current published fallback remains v0.4.3 (see
+> tar, zip, and `bugate-0.4.5.SHA256SUMS` assets and the selected archive
+> verifies. Until then, the current published fallback remains v0.4.4 (see
 > `IMPORT_PROMPT.md`).
 
 ---
@@ -54,11 +54,11 @@ entry point:
   the rollback window closes:
 
   ```bash
-  python3 /outside/bugate-0.4.4/scripts/bugate_update.py status . --vendor-dir .bugate
-  python3 /outside/bugate-0.4.4/scripts/bugate_update.py plan . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.5/scripts/bugate_update.py status . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.5/scripts/bugate_update.py plan . --vendor-dir .bugate
   # Require a reviewed Decision: GO.
-  python3 /outside/bugate-0.4.4/scripts/bugate_update.py apply . --vendor-dir .bugate
-  python3 /outside/bugate-0.4.4/scripts/bugate_update.py verify . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.5/scripts/bugate_update.py apply . --vendor-dir .bugate
+  python3 /outside/bugate-0.4.5/scripts/bugate_update.py verify . --vendor-dir .bugate
   ```
 
 - **Lock-based import:** use the installed interface only when both
@@ -68,13 +68,13 @@ entry point:
 
   ```bash
   .bugate/bin/bugate-update status
-  .bugate/bin/bugate-update plan --to 0.4.4
+  .bugate/bin/bugate-update plan --to 0.4.5
   # Require a reviewed Decision: GO.
-  .bugate/bin/bugate-update apply --to 0.4.4
+  .bugate/bin/bugate-update apply --to 0.4.5
   .bugate/bin/bugate-update verify
   # Only for an intentional reversal of a committed transaction:
   .bugate/bin/bugate-update rollback --transaction <transaction-id>
-  BOOTSTRAP=/outside/bugate-0.4.4/scripts/bugate_update.py
+  BOOTSTRAP=/outside/bugate-0.4.5/scripts/bugate_update.py
   if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
     .bugate/bin/bugate-update verify
   else
@@ -89,8 +89,8 @@ entry point:
   `verify`; never copy the launcher back manually.
 
 For an offline update, pass the matching archive and checksum asset together to
-both `plan` and `apply`: `--archive /outside/bugate-0.4.4.tar.gz --checksums
-/outside/bugate-0.4.4.SHA256SUMS`. `status`, `plan`, and `verify` are read-only;
+both `plan` and `apply`: `--archive /outside/bugate-0.4.5.tar.gz --checksums
+/outside/bugate-0.4.5.SHA256SUMS`. `status`, `plan`, and `verify` are read-only;
 `plan` and `apply --dry-run` make zero persistent target writes. A managed
 local change, unknown hook shape, type/mode drift, or mixed legacy layout makes
 the plan `NO-GO`; there is no broad `--force` and no installer fallback.

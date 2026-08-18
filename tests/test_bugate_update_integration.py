@@ -32,7 +32,7 @@ import bugate_update_engine as engine  # noqa: E402
 import bugate_update_source as source  # noqa: E402
 
 
-VERSION = "0.4.4"
+VERSION = "0.4.5"
 VENDOR_DIR = ".bugate"
 LEGACY_TAG = "v0.3.2"
 LEGACY_MATRIX_TAGS = (

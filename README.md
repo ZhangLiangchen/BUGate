@@ -15,13 +15,13 @@ opening this repo is just developing BUGate itself), naming, and the
 evolution plan are chartered in
 [`CHARTER.md`](CHARTER.md) (CHARTER-BUGATE-001).
 
-**Repository release line: v0.4.4.** See the
-[release notes](docs/releases/v0.4.4.md). Version text alone is not publication
-evidence: v0.4.4 is authoritative for distribution only after its GitHub
+**Repository release line: v0.4.5.** See the
+[release notes](docs/releases/v0.4.5.md). Version text alone is not publication
+evidence: v0.4.5 is authoritative for distribution only after its GitHub
 Release visibly publishes these three assets:
-`bugate-0.4.4.tar.gz`, `bugate-0.4.4.zip`, and
-`bugate-0.4.4.SHA256SUMS`. Download the checksum file with either archive and
-verify SHA-256 before extracting it. Until that condition is satisfied, v0.4.3
+`bugate-0.4.5.tar.gz`, `bugate-0.4.5.zip`, and
+`bugate-0.4.5.SHA256SUMS`. Download the checksum file with either archive and
+verify SHA-256 before extracting it. Until that condition is satisfied, v0.4.4
 remains the current published fallback.
 
 ## First 5 minutes (start here)
@@ -281,7 +281,7 @@ the versioned GitHub Release asset, verify it, unpack it outside the SUT repo,
 then run the installer against a repo with no existing vendor path:
 
 ```bash
-BUGATE_VERSION=0.4.4
+BUGATE_VERSION=0.4.5
 BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -326,11 +326,11 @@ verified unpacked release outside the SUT repo until the rollback window is
 closed:
 
 ```bash
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py status . --vendor-dir .bugate
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py plan . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py status . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py plan . --vendor-dir .bugate
 # Review the complete plan and require Decision: GO before mutation.
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py apply . --vendor-dir .bugate
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py verify . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py apply . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py verify . --vendor-dir .bugate
 ```
 
 Only an installation with both `.bugate/bugate.lock.json` and executable
@@ -340,9 +340,9 @@ evidence:
 
 ```bash
 .bugate/bin/bugate-update status
-.bugate/bin/bugate-update plan --to 0.4.4
+.bugate/bin/bugate-update plan --to 0.4.5
 # Apply only the reviewed GO plan.
-.bugate/bin/bugate-update apply --to 0.4.4
+.bugate/bin/bugate-update apply --to 0.4.5
 .bugate/bin/bugate-update verify
 ```
 
@@ -353,11 +353,11 @@ rejected before target writes):
 
 ```bash
 .bugate/bin/bugate-update plan \
-  --archive /outside/bugate-0.4.4.tar.gz \
-  --checksums /outside/bugate-0.4.4.SHA256SUMS
+  --archive /outside/bugate-0.4.5.tar.gz \
+  --checksums /outside/bugate-0.4.5.SHA256SUMS
 .bugate/bin/bugate-update apply \
-  --archive /outside/bugate-0.4.4.tar.gz \
-  --checksums /outside/bugate-0.4.4.SHA256SUMS
+  --archive /outside/bugate-0.4.5.tar.gz \
+  --checksums /outside/bugate-0.4.5.SHA256SUMS
 .bugate/bin/bugate-update verify
 ```
 
@@ -369,7 +369,7 @@ retained, verified unpacked v0.4.2-or-later updater:
 
 ```bash
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-BOOTSTRAP=/outside/bugate-0.4.4/scripts/bugate_update.py
+BOOTSTRAP=/outside/bugate-0.4.5/scripts/bugate_update.py
 if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
   .bugate/bin/bugate-update verify
 else
@@ -465,8 +465,8 @@ open that SUT repo as the project root. The core checkout remains pure.
 To build Phase 1 GitHub Release archive assets from a clean BUGate checkout:
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.4.4
-(cd dist && shasum -a 256 -c bugate-0.4.4.SHA256SUMS)
+python3 scripts/build_release_archives.py --version 0.4.5
+(cd dist && shasum -a 256 -c bugate-0.4.5.SHA256SUMS)
 ```
 
 The builder emits all three files directly, rejects tracked or non-ignored
@@ -477,12 +477,12 @@ manifests, and normalizes archive timestamps/metadata for reproducibility.
 This writes:
 
 ```text
-dist/bugate-0.4.4.tar.gz
-dist/bugate-0.4.4.zip
-dist/bugate-0.4.4.SHA256SUMS
+dist/bugate-0.4.5.tar.gz
+dist/bugate-0.4.5.zip
+dist/bugate-0.4.5.SHA256SUMS
 ```
 
-Attach all three files to the GitHub Release for tag `v0.4.4`. These archives include
+Attach all three files to the GitHub Release for tag `v0.4.5`. These archives include
 the Codex and Claude Code plugin surfaces, shared skills, hooks, scripts, and
 bin wrappers as one versioned BUGate kit. Formal assets must come from a clean
 release commit; development-only dirty-tree flags are not valid for a release.

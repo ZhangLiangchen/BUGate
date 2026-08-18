@@ -8,12 +8,12 @@
 
 BUGate 的定位、唯一规范使用方式（**导入模式**；打开本仓只是在开发 BUGate 本身）、命名与演进计划见 [`CHARTER.md`](CHARTER.md)（CHARTER-BUGATE-001）。
 
-**仓库 release line：v0.4.4。** 详见
-[release notes](docs/releases/v0.4.4.zh-CN.md)。版本文字本身不是发布证据；只有
-GitHub Release 已实际列出以下三个资产时，v0.4.4 才具有正式分发权威：
-`bugate-0.4.4.tar.gz`、`bugate-0.4.4.zip` 与
-`bugate-0.4.4.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
-并在解压前校验 SHA-256。在此条件满足前，当前已发布回退版本仍是 v0.4.3。
+**仓库 release line：v0.4.5。** 详见
+[release notes](docs/releases/v0.4.5.zh-CN.md)。版本文字本身不是发布证据；只有
+GitHub Release 已实际列出以下三个资产时，v0.4.5 才具有正式分发权威：
+`bugate-0.4.5.tar.gz`、`bugate-0.4.5.zip` 与
+`bugate-0.4.5.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
+并在解压前校验 SHA-256。在此条件满足前，当前已发布回退版本仍是 v0.4.4。
 
 ## 前 5 分钟（从这里开始）
 
@@ -227,7 +227,7 @@ Release asset，校验后在 SUT 仓外解包，再把 installer 指向一个尚
 的 SUT 自动化测试仓：
 
 ```bash
-BUGATE_VERSION=0.4.4
+BUGATE_VERSION=0.4.5
 BUGATE_RELEASE="https://github.com/ZhangLiangchen/BUGate/releases/download/v${BUGATE_VERSION}"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.tar.gz"
 curl -fLO "${BUGATE_RELEASE}/bugate-${BUGATE_VERSION}.SHA256SUMS"
@@ -259,11 +259,11 @@ lock/updater pair，因此只用一次已解包 v0.4.2 或更高 release 里的 
 updater。把这份已验证、位于 SUT 仓外的解包 release 保留到 rollback 窗口结束：
 
 ```bash
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py status . --vendor-dir .bugate
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py plan . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py status . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py plan . --vendor-dir .bugate
 # 完整复核 plan，只有 Decision: GO 才能写入。
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py apply . --vendor-dir .bugate
-python3 /outside/bugate-0.4.4/scripts/bugate_update.py verify . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py apply . --vendor-dir .bugate
+python3 /outside/bugate-0.4.5/scripts/bugate_update.py verify . --vendor-dir .bugate
 ```
 
 只有 `.bugate/bugate.lock.json` 与 executable `.bugate/bin/bugate-update` 同时存在
@@ -272,9 +272,9 @@ python3 /outside/bugate-0.4.4/scripts/bugate_update.py verify . --vendor-dir .bu
 
 ```bash
 .bugate/bin/bugate-update status
-.bugate/bin/bugate-update plan --to 0.4.4
+.bugate/bin/bugate-update plan --to 0.4.5
 # 只 apply 已复核且为 GO 的 plan。
-.bugate/bin/bugate-update apply --to 0.4.4
+.bugate/bin/bugate-update apply --to 0.4.5
 .bugate/bin/bugate-update verify
 ```
 
@@ -284,11 +284,11 @@ python3 /outside/bugate-0.4.4/scripts/bugate_update.py verify . --vendor-dir .bu
 
 ```bash
 .bugate/bin/bugate-update plan \
-  --archive /outside/bugate-0.4.4.tar.gz \
-  --checksums /outside/bugate-0.4.4.SHA256SUMS
+  --archive /outside/bugate-0.4.5.tar.gz \
+  --checksums /outside/bugate-0.4.5.SHA256SUMS
 .bugate/bin/bugate-update apply \
-  --archive /outside/bugate-0.4.4.tar.gz \
-  --checksums /outside/bugate-0.4.4.SHA256SUMS
+  --archive /outside/bugate-0.4.5.tar.gz \
+  --checksums /outside/bugate-0.4.5.SHA256SUMS
 .bugate/bin/bugate-update verify
 ```
 
@@ -299,7 +299,7 @@ lock 与 vendored launcher；因此要按 rollback 后仍存在的入口选择 v
 
 ```bash
 .bugate/bin/bugate-update rollback --transaction <transaction-id>
-BOOTSTRAP=/outside/bugate-0.4.4/scripts/bugate_update.py
+BOOTSTRAP=/outside/bugate-0.4.5/scripts/bugate_update.py
 if test -f .bugate/bugate.lock.json && test -x .bugate/bin/bugate-update; then
   .bugate/bin/bugate-update verify
 else
@@ -364,8 +364,8 @@ python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-ter
 从干净 BUGate checkout 构建 Phase 1 GitHub Release archive assets：
 
 ```bash
-python3 scripts/build_release_archives.py --version 0.4.4
-(cd dist && shasum -a 256 -c bugate-0.4.4.SHA256SUMS)
+python3 scripts/build_release_archives.py --version 0.4.5
+(cd dist && shasum -a 256 -c bugate-0.4.5.SHA256SUMS)
 ```
 
 构建器会直接生成三个文件，默认拒绝 tracked 或未被 ignore 的 untracked dirt，
@@ -375,12 +375,12 @@ python3 scripts/build_release_archives.py --version 0.4.4
 输出：
 
 ```text
-dist/bugate-0.4.4.tar.gz
-dist/bugate-0.4.4.zip
-dist/bugate-0.4.4.SHA256SUMS
+dist/bugate-0.4.5.tar.gz
+dist/bugate-0.4.5.zip
+dist/bugate-0.4.5.SHA256SUMS
 ```
 
-把三个文件都附到 tag `v0.4.4` 的 GitHub Release。这些归档以一个版本化
+把三个文件都附到 tag `v0.4.5` 的 GitHub Release。这些归档以一个版本化
 BUGate kit 的形式包含 Codex 与 Claude Code plugin surfaces、shared skills、
 hooks、scripts 与 bin wrappers。正式资产必须来自干净 release commit；开发态
 dirty-tree flag 不能用于正式发布。

@@ -119,8 +119,8 @@ class BugateUpdateCliTests(unittest.TestCase):
             "decision": "GO",
         }
 
-    def test_updater_version_is_a_literal_0_4_4(self) -> None:
-        self.assertEqual(cli.UPDATER_VERSION, "0.4.4")
+    def test_updater_version_is_a_literal_0_4_5(self) -> None:
+        self.assertEqual(cli.UPDATER_VERSION, "0.4.5")
         tree = ast.parse((SCRIPTS / "bugate_update.py").read_text(encoding="utf-8"))
         assignments = [
             node
@@ -133,7 +133,7 @@ class BugateUpdateCliTests(unittest.TestCase):
         ]
         self.assertEqual(len(assignments), 1)
         self.assertIsInstance(assignments[0].value, ast.Constant)
-        self.assertEqual(assignments[0].value.value, "0.4.4")
+        self.assertEqual(assignments[0].value.value, "0.4.5")
 
     def test_wrapper_is_canonical_regular_and_executable(self) -> None:
         wrapper = ROOT / "bin/bugate-update"

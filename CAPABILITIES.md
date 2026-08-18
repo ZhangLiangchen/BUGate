@@ -7,11 +7,12 @@ testability → inventory/oracle map → readable cases → adversarial review �
 execution report → knowledge update) *before* any test implementation is
 generated.
 
-Current distribution release line: **v0.4.4**. It becomes authoritative only
+Current distribution release line: **v0.4.5**. It becomes authoritative only
 through its annotated tag, GitHub Release, and exact verified assets:
-`bugate-0.4.4.tar.gz`, `bugate-0.4.4.zip`, and
-`bugate-0.4.4.SHA256SUMS`. The working tree described below is an unpublished
-**v0.4.5 source candidate**; it is not a v0.4.5 tag, Release, or distribution.
+`bugate-0.4.5.tar.gz`, `bugate-0.4.5.zip`, and
+`bugate-0.4.5.SHA256SUMS`. A tag alone is not publication evidence: until that
+Release lists all three assets and the selected archive verifies its SHA-256,
+the current published fallback remains v0.4.4.
 
 **Runtime contract**
 

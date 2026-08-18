@@ -44,7 +44,7 @@ from test_bugate_update_engine import materialize_install  # noqa: E402
 
 
 VERSION_OLD = "0.4.2"
-VERSION_NEW = "0.4.4"
+VERSION_NEW = "0.4.5"
 VENDOR_DIR = ".bugate"
 IGNORED_NAMES = {"__pycache__", ".DS_Store"}
 
@@ -122,7 +122,7 @@ def build_functional_release(
 
     updater_path = release_root / "scripts/bugate_update.py"
     updater = updater_path.read_text(encoding="utf-8")
-    old_literal = 'UPDATER_VERSION = "0.4.4"'
+    old_literal = 'UPDATER_VERSION = "0.4.5"'
     if updater.count(old_literal) != 1:
         raise AssertionError("temporary release expected one updater version literal")
     updater_path.write_text(
@@ -149,7 +149,7 @@ if len(__import__("sys").argv) >= 2 and __import__("sys").argv[1] == "__transact
     _receipt = __import__("os").environ.get("BUGATE_TARGET_WORKER_RECEIPT")
     if _receipt:
         with open(_receipt, "a", encoding="utf-8") as _stream:
-            _stream.write("target-worker-0.4.4\n")
+            _stream.write("target-worker-0.4.5\n")
 '''
     worker_path.write_text(
         worker.replace(future, future + worker_probe + "\n"),
@@ -658,7 +658,7 @@ class RealUpdaterAcceptanceTests(unittest.TestCase):
         self.assertTrue(self.target_worker_receipt.is_file())
         self.assertEqual(
             self.target_worker_receipt.read_text(encoding="utf-8").splitlines(),
-            ["target-worker-0.4.4"],
+            ["target-worker-0.4.5"],
         )
         transaction_id = applied["transaction_id"]
         self.assertRegex(transaction_id, r"^[0-9a-f]{32}$")
