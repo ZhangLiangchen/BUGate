@@ -4,6 +4,8 @@
 - **目标版本：** BUGate 2.0
 - **日期：** 2026-09-18
 - **上位设计：** [BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md](BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md)
+- **Host Integration ADR：** [ADR-BUGATE-009](BUGATE_HOST_INTEGRATION_POWERCONTEXT_ADR.zh-CN.md)
+- **工程模式：** PowerContext-style first-class host catalog / capability manifest / setup / doctor / self-contained adapter / shared conformance
 - **首批宿主：** Claude Code、Codex
 - **预留宿主：** Pi Agent、DeepSeek Harness
 - **核心目标：** 让 Agent 在长会话、上下文压缩、Subagent、Resume 与模型切换中持续获得同一份 BUGate Protocol，而不是依赖模型“记住”某段 Skill / Prompt。
@@ -290,7 +292,7 @@ CLAUDE.md
   hooks/
 ```
 
-### 6.1 CLAUDE.md
+### 7.1 CLAUDE.md
 
 Root `CLAUDE.md` 只承载最短的 Protocol Bootstrap，例如：
 
@@ -307,7 +309,7 @@ For test-development work:
 
 不得把整个 BUGate Protocol 放入 `CLAUDE.md`。
 
-### 6.2 Skill
+### 8.2 Skill
 
 Claude Skill 的职责从“规范本体”调整为：
 
@@ -326,7 +328,7 @@ Skill 应指导 Agent：
 5. 产出 Artifact + Evidence + Claim；
 6. 请求 Assessment。
 
-### 6.3 Lifecycle Hydration
+### 8.3 Lifecycle Hydration
 
 Claude Code Adapter 应尽可能利用宿主提供的 session / hook 生命周期，在以下时机重新 Hydrate：
 
@@ -363,7 +365,7 @@ AGENTS.md
   hooks.json
 ```
 
-### 7.1 AGENTS.md
+### 8.1 AGENTS.md
 
 Root `AGENTS.md` 承担与 Claude `CLAUDE.md` 相同的 always-on bootstrap 角色。
 
@@ -690,6 +692,44 @@ BUGate 不假定其最终 API、session model 或 lifecycle hook 设计。目录
 | Claim -> Assessment | required | required | reserved | reserved |
 
 Protocol Core 对所有 Host 必须保持同一行为。
+
+---
+
+## 16. PowerContext-style Host Integration Contract
+
+BUGate 2.0 的 Adapter 实现不再由各 Host 自行约定。仓库中的以下对象共同构成正式契约：
+
+```text
+adapters/catalog.yaml
+adapters/schema/host-manifest.schema.json
+adapters/<host>/manifest.yaml
+adapters/CONFORMANCE.md
+views/
+```
+
+采用以下规则：
+
+- catalog 是 first-class Host 列表；
+- manifest 声明 capability，不要求所有 Host 使用同名 hook；
+- projection 是可重建的安装产物，不是规范事实源；
+- Claude/Codex/Pi/DSH Adapter 各自 self-contained；
+- 行为一致性由共享 Conformance Suite 保证；
+- multi-host setup 必须隔离 sibling failure；
+- missing Host 对 `doctor integrations` 非致命；
+- present but broken integration 必须报告失败；
+- stale projection / binding mismatch 必须可诊断。
+
+统一 CLI 目标：
+
+```text
+bugate setup <host>
+bugate setup select --host ...
+bugate doctor <host>
+bugate doctor integrations
+bugate protocol prepare --task ... --json
+```
+
+完整裁决见 [ADR-BUGATE-009](BUGATE_HOST_INTEGRATION_POWERCONTEXT_ADR.zh-CN.md)。
 
 ---
 
