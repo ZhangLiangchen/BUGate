@@ -888,6 +888,55 @@ ProtocolBinding
 
 > **不要让 Agent 记住 BUGate；让 Host 每次都把正确版本的 BUGate 带给 Agent。**
 
+### 16.2 Stateless Core / TestTaskWorkspace
+
+BUGate 2.0 Core 不拥有 current task、current stage、active method、session 或 host-state。
+
+一次测试任务的长期事实保存在独立的 **TestTaskWorkspace** 中，包括：
+
+- Task Manifest / ProtocolBinding；
+- Artifact；
+- Evidence；
+- Claim；
+- AssessmentResult。
+
+BUGate 可以从这些事实动态派生 QualityPosture，但不保存状态机。
+
+状态必须严格分离：
+
+```text
+Execution State
+  -> Agent Harness / Runtime
+
+Artifact Lifecycle State
+  -> TestTaskWorkspace
+
+Quality State
+  -> BUGate-derived AssessmentResult
+  -> persisted in TestTaskWorkspace
+```
+
+因此 Context Compiler 的优先输入模型是：
+
+```text
+ProtocolBinding
++ TestTaskWorkspace
++ Profile
+        |
+        v
+derive QualityPosture
+        |
+        v
+resolve relevant MethodSpec
+        |
+        v
+Protocol Context Capsule
+```
+
+完整裁决见：
+
+[BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md](BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md)
+
 ---
 
 ## 17. Profile 的重新定义
