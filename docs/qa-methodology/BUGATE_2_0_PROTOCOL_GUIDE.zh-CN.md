@@ -835,6 +835,10 @@ BUGate/
     deepseek-harness/
     ci/
 
+  context/
+    providers/
+      powercontext/
+
   compatibility/
     v1/
 ```
@@ -1267,33 +1271,52 @@ Lineage 如果保留，应成为 Assessment / Evidence Provenance，而不是 Wo
 
 ---
 
-## 24. Memory Bus 的处理
+## 24. Memory Bus → Context Runtime
 
-BUGate 2.0 Core 不拥有 Agent Memory Implementation。
+BUGate 2.0 Core 不拥有 Agent Memory Implementation，也不依赖任何 Context Runtime 才能完成 Protocol validation / Assessment。
 
-因此 `memory_bus.py` 不应作为核心 runtime dependency。
+现有 `mcp-memory-service + memory_bus.py` 在 v0.x / 1.x 中承担的 long-term memory、cross-session recall、handoff、progress sync 与 promotion 能力，不继续作为 BUGate 2.0 required core component 扩展。
 
-BUGate 可以继续定义：
-
-- Knowledge Artifact；
-- Finding；
-- Lesson；
-- Reusable Pattern；
-- Known Risk；
-- Test Heuristic；
-- Experience Promotion Methodology。
-
-至于保存到：
+2.0 的长期方向升级为独立的 **Context Runtime**：
 
 ```text
-SQLite
-Vector DB
-MCP Memory
-HyperTest Memory
-External Knowledge Store
+Memory Bus
+    ↓
+Context Runtime
+    ├── Memory
+    ├── Scope
+    ├── Context Pack
+    ├── Handoff
+    ├── Source / Artifact / Revision
+    ├── Experience
+    ├── Skill Candidate
+    └── Cross-session / Cross-agent continuity
 ```
 
-由宿主决定。
+BUGate 保留：
+
+- Knowledge Artifact；
+- Finding / Lesson / Reusable Pattern；
+- Known Risk / Test Heuristic；
+- Experience Promotion Methodology；
+- 何种 Evidence 足以支持知识晋升；
+- SUT-local 与 SUT-neutral promotion criteria。
+
+Context Runtime 负责：
+
+- storage / retrieval；
+- context budget / composition；
+- cross-session continuity；
+- Handoff；
+- revision / provenance；
+- Experience / Skill candidate lifecycle。
+
+PowerContext 被接受为 BUGate 2.0 Context Runtime 的**参考架构与首选初始 Provider**，但不得成为 `protocol/` 或 Assessment Engine 的硬依赖。
+
+详细裁决见：
+
+- [ADR-BUGATE-008 — Memory Bus → Context Runtime](BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md)
+- [BUGate 2.0 Context Runtime Integration Guide](BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md)
 
 ---
 
