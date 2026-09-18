@@ -79,7 +79,44 @@ BUGate Adapter 不把这些 Runtime 决策重新收回 BUGate Core。
 
 ---
 
-## 3. ProtocolBinding
+## 3. Stateless TestTaskWorkspace
+
+Host Adapter 不应通过 BUGate-owned `host-state.json` 保存“当前执行到哪”。
+
+长期事实应保存在一次测试任务自己的 **TestTaskWorkspace**：
+
+```text
+test-task/<task-id>/
+  task.yaml
+  sources/
+  evidence/
+  01-business-understanding/
+  02-testability/
+  03-test-design/
+  04-implementation/
+  05-execution/
+  06-diagnosis/
+  07-knowledge/
+```
+
+Workspace 持久化：
+
+- Artifact；
+- Evidence；
+- Claim；
+- AssessmentResult。
+
+Host 自己可以拥有瞬时 Execution State，但 BUGate 不依赖它完成 Assessment。
+
+QualityPosture 由 Workspace 事实动态派生，而不是由可编辑的 current-stage 文件维护。
+
+规范裁决见：
+
+[BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md](BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md)
+
+---
+
+## 5. ProtocolBinding
 
 所有 Host Adapter 共享同一个 repo-level Binding 概念。
 
@@ -126,7 +163,7 @@ ProtocolBinding 的语义类似 lockfile：
 
 ---
 
-## 4. Protocol Context Capsule
+## 5. Protocol Context Capsule
 
 Agent 不应该在每一轮加载整个 BUGate Protocol。
 
@@ -188,7 +225,7 @@ Capsule 应保持短小、确定性、可重新生成。
 
 ---
 
-## 5. Always-on Bootstrap
+## 6. Always-on Bootstrap
 
 Skill 是按需加载机制，不能单独承担 Protocol Persistence。
 
@@ -206,7 +243,7 @@ Bootstrap 只负责“让 Agent 永远知道 BUGate 存在”。
 
 ---
 
-## 6. Claude Code Adapter
+## 7. Claude Code Adapter
 
 建议目录：
 
@@ -278,7 +315,7 @@ Claude Code Adapter 应尽可能利用宿主提供的 session / hook 生命周�
 
 ---
 
-## 7. Codex Adapter
+## 8. Codex Adapter
 
 建议目录：
 
@@ -344,7 +381,7 @@ Host Adapter 应独立为每个 Subagent resolve 同一个 ProtocolBinding。
 
 ---
 
-## 8. 多轮工作与 Context Compaction
+## 9. 多轮工作与 Context Compaction
 
 Protocol Persistence 的硬要求：
 
@@ -387,7 +424,7 @@ continue
 
 ---
 
-## 9. Subagent Inheritance
+## 10. Subagent Inheritance
 
 ProtocolBinding 是任务属性，不是聊天属性。
 
@@ -422,7 +459,7 @@ Main Agent knows BUGate
 
 ---
 
-## 10. Protocol Conformance
+## 11. Protocol Conformance
 
 BUGate 2.0 不承诺“控制模型内部思考”。
 
@@ -465,7 +502,7 @@ BUGate 负责 **Conformance**，不重新承担 **Enforcement / Orchestration**�
 
 ---
 
-## 11. Inner Loop / Outer Loop
+## 12. Inner Loop / Outer Loop
 
 推荐 Agent Host 使用两层质量闭环。
 
@@ -501,7 +538,7 @@ Host Runtime
 
 ---
 
-## 12. Host Adapter Contract
+## 13. Host Adapter Contract
 
 未来建议 BUGate 定义一个宿主无关的逻辑接口：
 
@@ -535,7 +572,7 @@ resume integration
 
 ---
 
-## 13. adapters/ 目录约束
+## 14. adapters/ 目录约束
 
 目标目录：
 
@@ -578,7 +615,7 @@ BUGate 不假定其最终 API、session model 或 lifecycle hook 设计。目录
 
 ---
 
-## 14. Host-neutral Test Matrix
+## 15. Host-neutral Test Matrix
 
 未来 Adapter Conformance 至少需要验证：
 
@@ -597,7 +634,7 @@ Protocol Core 对所有 Host 必须保持同一行为。
 
 ---
 
-## 15. 第一阶段实施顺序
+## 16. 第一阶段实施顺序
 
 ### HA-0 — Adapter Skeleton
 
@@ -662,7 +699,7 @@ Artifact + Evidence + Claim
 
 ---
 
-## 16. 完成标准
+## 17. 完成标准
 
 Claude Code / Codex Adapter 只有同时满足以下条件才算完成：
 
@@ -681,7 +718,7 @@ Claude Code / Codex Adapter 只有同时满足以下条件才算完成：
 
 ---
 
-## 17. 最终原则
+## 18. 最终原则
 
 BUGate 2.0 的 Protocol Persistence 设计应长期遵守：
 
