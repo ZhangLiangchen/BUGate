@@ -16,6 +16,8 @@ next-stage direction.
 | [BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md](BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md) | **BUGate 2.0 accepted direction:** refactors BUGate into a SUT/model/harness/runtime-neutral executable testing methodology protocol; defines MethodSpec, Artifact, Evidence, Claim and Assessment, and moves orchestration/enforcement to the host Agent Runtime. |
 | [BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md](BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md) | **BUGate 2.0 host-integration direction:** ProtocolBinding, always-on bootstrap, Context Capsule hydration, compaction/resume/subagent persistence, Claude Code/Codex first implementation, with Pi and DeepSeek Harness adapters reserved for HyperTest. |
 | [BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md](BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md) | **ADR-BUGATE-007:** BUGate Core is stateless; persistent task facts live in TestTaskWorkspace, while Execution State stays with the Harness and Quality State is derived by BUGate Assessment and persisted as workspace artifacts. |
+| [BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md](BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md) | **ADR-BUGATE-008:** evolves the v1 Memory Bus into an independent Context Runtime; BUGate stays stateless, while PowerContext is the preferred initial provider/reference architecture for Scope, Context Pack, Handoff, revisioned context and Experience/Skill promotion. |
+| [BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md](BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md) | Host-facing integration guide for Protocol Capsule + Context Pack dual hydration, PowerContext mapping, Workspace→Memory/Experience promotion and legacy Memory Bus migration. |
 | [IMPORTED_UPDATER_CONTRACT.md](IMPORTED_UPDATER_CONTRACT.md) | Normative imported-install update contract: fresh-install separation, exact legacy adoption, manifest ownership, plan/apply/verify/rollback transactions, archive integrity, profile isolation, and runtime activation boundaries. ([简体中文](IMPORTED_UPDATER_CONTRACT.zh-CN.md)) |
 | [ROLE_GOVERNANCE_PROTOCOL.md](ROLE_GOVERNANCE_PROTOCOL.md) | The normative Wave 7 lifecycle contract: distinct designer / implementer / reviewer sessions, human acceptance, strict Memory-anchored handoffs, hash-linked receipts, drift recovery, and enforcement limits. |
 | [BUGATE_GOVERNANCE_REFACTOR_GUIDE.md](BUGATE_GOVERNANCE_REFACTOR_GUIDE.md) | Implementation guide for ADR-BUGATE-006: source-level changes, BG-0–BG-5 work packages, action-grant/effect recovery, compatibility and cross-repository acceptance. ([简体中文](BUGATE_GOVERNANCE_REFACTOR_GUIDE.zh-CN.md)) |
@@ -37,15 +39,17 @@ For BUGate 2.0 work, read [BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md](BUGATE_2_0_PROTOC
 1. `BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md` — target architecture and migration direction for BUGate 2.0.
 2. `BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md` — how Claude Code/Codex and future Agent Harnesses durably consume the Protocol.
 3. `BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md` — stateless Core, TestTaskWorkspace, and derived QualityPosture.
-4. `METHOD.md` — understand the method and its reasoning first.
-5. `SOP.md` — then learn how to execute the current 1.x method day to day.
-6. `IMPORTED_UPDATER_CONTRACT.md` — before changing an existing imported engine; the vendored operator route is `.shared/skills/bugate-import/references/updating-bugate.md`.
-7. `ROLE_GOVERNANCE_PROTOCOL.md` — the auditable Wave 7 lifecycle and receipt contract.
-8. `BUGATE_RUNTIME_BOUNDARY_ADR.md` — the execution/authorization split, brokered receipt enforcement, and orchestrator migration.
-9. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
-10. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
-11. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
-12. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
+4. `BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md` — Memory Bus → Context Runtime and PowerContext provider boundary.
+5. `BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md` — dual hydration, Context Pack, Handoff and knowledge promotion integration.
+6. `METHOD.md` — understand the method and its reasoning first.
+7. `SOP.md` — then learn how to execute the current 1.x method day to day.
+8. `IMPORTED_UPDATER_CONTRACT.md` — before changing an existing imported engine; the vendored operator route is `.shared/skills/bugate-import/references/updating-bugate.md`.
+9. `ROLE_GOVERNANCE_PROTOCOL.md` — the auditable Wave 7 lifecycle and receipt contract.
+10. `BUGATE_RUNTIME_BOUNDARY_ADR.md` — the execution/authorization split, brokered receipt enforcement, and orchestrator migration.
+11. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
+12. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
+13. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
+14. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
 
 ## Method summary (English)
 
