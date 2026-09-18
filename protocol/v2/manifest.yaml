@@ -1,0 +1,16 @@
+apiVersion: bugate.io/v2
+kind: ProtocolManifest
+
+metadata:
+  id: bugate
+  version: 2.0.0-dev
+
+status: design
+
+schemas:
+  prepared_protocol_context: schemas/prepared_protocol_context.schema.json
+
+notes:
+  - BUGate 2.0 Protocol is stateless.
+  - PreparedProtocolContext is the canonical host-neutral injection contract.
+  - Host adapters validate and inject it; they do not reinterpret methodology semantics.
