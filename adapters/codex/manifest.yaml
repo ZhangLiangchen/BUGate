@@ -1,0 +1,52 @@
+apiVersion: bugate.io/host/v1
+kind: HostAdapterManifest
+
+host:
+  id: codex
+  label: Codex
+
+availability: planned
+
+install:
+  kind: plugin
+
+projections:
+  - role: bootstrap
+    path: AGENTS.md
+  - role: skill
+    path: .agents/skills/bugate/SKILL.md
+  - role: plugin
+    path: adapters/codex/plugin
+
+capabilities:
+  protocol_discovery:
+    status: required
+  workspace_discovery:
+    status: required
+  protocol_binding:
+    status: required
+  prepared_protocol_context:
+    status: required
+  automatic_hydration:
+    status: required
+    surface: host-native session/prompt hooks
+  session_rehydration:
+    status: required
+    surface: session lifecycle
+  compaction_rehydration:
+    status: required
+    surface: compact/resume lifecycle
+  subagent_inheritance:
+    status: supported
+    surface: child-agent lifecycle
+  skill_projection:
+    status: required
+  explicit_assessment:
+    status: required
+  diagnostics:
+    status: required
+  rollback:
+    status: required
+  context_runtime_hydration:
+    status: supported
+    surface: ContextProvider integration
