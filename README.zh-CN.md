@@ -34,6 +34,9 @@ BUGate 走向 1.0 的过程也带来了另一个重要结论：**一个 Toolkit 
 BUGate 2.0 的完整目标架构与迁移方案见
 [`docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md)。
 
+Protocol 在 Claude Code / Codex 中的持续加载、Context Hydration、Subagent 继承与 Assessment 接入方案见
+[`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md)。首批实现面向 Claude Code 与 Codex；`adapters/pi/` 与 `adapters/deepseek-harness/` 已为 HyperTest 后续接入预留。
+
 ## 前 5 分钟（从这里开始）
 
 已经把 BUGate 导入 SUT 仓、想知道日常怎么用或升级？
