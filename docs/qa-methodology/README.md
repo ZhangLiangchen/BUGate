@@ -13,6 +13,7 @@ profile or the imported SUT test repo. On any conflict,
 | [SOP.md](SOP.md) | The "what to do next": step-by-step execution handbook for the Wave 0–3 minimum viable loop. |
 | [IMPORTED_UPDATER_CONTRACT.md](IMPORTED_UPDATER_CONTRACT.md) | Normative imported-install update contract: fresh-install separation, exact legacy adoption, manifest ownership, plan/apply/verify/rollback transactions, archive integrity, profile isolation, and runtime activation boundaries. ([简体中文](IMPORTED_UPDATER_CONTRACT.zh-CN.md)) |
 | [ROLE_GOVERNANCE_PROTOCOL.md](ROLE_GOVERNANCE_PROTOCOL.md) | The normative Wave 7 lifecycle contract: distinct designer / implementer / reviewer sessions, human acceptance, strict Memory-anchored handoffs, hash-linked receipts, drift recovery, and enforcement limits. |
+| [BUGATE_GOVERNANCE_REFACTOR_GUIDE.md](BUGATE_GOVERNANCE_REFACTOR_GUIDE.md) | Implementation guide for ADR-BUGATE-006: source-level changes, BG-0–BG-5 work packages, action-grant/effect recovery, compatibility and cross-repository acceptance. ([简体中文](BUGATE_GOVERNANCE_REFACTOR_GUIDE.zh-CN.md)) |
 | [BUGATE_RUNTIME_BOUNDARY_ADR.md](BUGATE_RUNTIME_BOUNDARY_ADR.md) | ADR-BUGATE-006: BUGate remains a runtime-agnostic governance kernel; defines brokered receipt enforcement, the workflow-runtime boundary, and the `sdtd_orchestrator.py` migration. ([简体中文](BUGATE_RUNTIME_BOUNDARY_ADR.zh-CN.md)) |
 | [AGENTIC_QA_PLATFORM_GUIDE.md](AGENTIC_QA_PLATFORM_GUIDE.md) | Working guide for evolving BUGate from an Agentic QA Governance Kernel into an enterprise Agentic QA Platform with a self-hosted agent control center and multi-role SOP orchestration. |
 | [EXPERIENCE_PROMOTION_PROTOCOL.md](EXPERIENCE_PROMOTION_PROTOCOL.md) | How a SUT-local lesson is decided to either stay local or be promoted into SUT-neutral BUGate Core. |
@@ -25,6 +26,10 @@ profile or the imported SUT test repo. On any conflict,
 | [BUGATE_EVOLUTION_TIMELINE.md](BUGATE_EVOLUTION_TIMELINE.md) | SUT-neutral summary of how BUGate evolved from a method into a profile-driven pre-code governance framework. |
 
 ## Recommended reading order
+
+For upcoming governance/runtime changes, read the boundary ADR and then the
+[refactoring guide](BUGATE_GOVERNANCE_REFACTOR_GUIDE.md) before implementation.
+后续治理/运行时改造先读边界 ADR，再读[中文改造指导](BUGATE_GOVERNANCE_REFACTOR_GUIDE.zh-CN.md)。
 
 1. `METHOD.md` — understand the method and its reasoning first.
 2. `SOP.md` — then learn how to execute it day to day.

@@ -5,6 +5,9 @@
 - **配套决策：** [HyperTest ADR-0005](https://github.com/ZhangLiangchen/hypertest/blob/main/docs/adr/0005-durable-workflow-runtime-and-bugate-boundary.md)
 - **语言：** [English](BUGATE_RUNTIME_BOUNDARY_ADR.md) | 简体中文
 
+实施顺序与验收详见 [BUGate 改造指导](BUGATE_GOVERNANCE_REFACTOR_GUIDE.zh-CN.md)。
+指南明确区分已有角色链实现与待实施的动作授权能力。
+
 ## 1. 背景
 
 BUGate 的核心价值是与 SUT 无关的质量治理契约：Evidence、Policy、Gate、Authorization、Receipt、Audit 与 Promotion。它可以作为 toolkit 导入 Claude Code、Codex、CI 或其他宿主，原则上不拥有 Agent loop，也不应绑定某一种工作流运行时。

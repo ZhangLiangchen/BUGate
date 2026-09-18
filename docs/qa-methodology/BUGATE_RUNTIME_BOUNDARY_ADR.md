@@ -5,6 +5,9 @@
 - **Companion:** [HyperTest ADR-0005](https://github.com/ZhangLiangchen/hypertest/blob/main/docs/adr/0005-durable-workflow-runtime-and-bugate-boundary.md)
 - **Language:** English | [简体中文](BUGATE_RUNTIME_BOUNDARY_ADR.zh-CN.md)
 
+Implementation sequencing and acceptance: [BUGate refactoring guide](BUGATE_GOVERNANCE_REFACTOR_GUIDE.md).
+The guide distinguishes the existing role-chain implementation from planned action-grant capabilities.
+
 ## 1. Context
 
 BUGate began as a SUT-neutral method and toolkit that can be imported into

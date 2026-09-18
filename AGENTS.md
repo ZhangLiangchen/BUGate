@@ -56,6 +56,11 @@ For non-trivial BUGate work:
 4. Inspect the active SUT profile only inside an imported SUT test repo, or when
    reviewing a generated imported-repo fixture.
 
+For governance/runtime refactoring, also read the
+[implementation guide](docs/qa-methodology/BUGATE_GOVERNANCE_REFACTOR_GUIDE.md).
+治理/运行时改造前还须阅读[中文改造指导](docs/qa-methodology/BUGATE_GOVERNANCE_REFACTOR_GUIDE.zh-CN.md)；
+其中工作包是待实施计划，不代表已经落地，也不替代冻结协议。
+
 ## Hook Policy
 
 Codex and Claude hooks call only SUT-neutral scripts from `scripts/`. Hook
