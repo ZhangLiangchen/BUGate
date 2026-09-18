@@ -9,6 +9,15 @@ authority: ADR-BUGATE-001
 
 # ADR-BUGATE-003: System-Level Memory Bus
 
+> **BUGate 2.0 supersession note — 2026-09-18:** ADR-BUGATE-008 supersedes
+> the conclusion that Memory Bus is a required BUGate Core component for the
+> 2.0 architecture. This ADR remains authoritative for v0.x / 1.x compatibility
+> and for the historical machine-level mcp-memory-service deployment. BUGate
+> 2.0 evolves this capability into an independent Context Runtime, with
+> PowerContext as the preferred initial provider/reference architecture. See
+> [ADR-BUGATE-008](BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md).
+
+
 > **Update — 2026-07-06 (owner decision):** the memory bus is re-scoped from
 > **optional** to a **REQUIRED core BUGate component**. It carries long-term
 > memory, dual-agent progress sync + relay, and memory promotion — a BUGate
