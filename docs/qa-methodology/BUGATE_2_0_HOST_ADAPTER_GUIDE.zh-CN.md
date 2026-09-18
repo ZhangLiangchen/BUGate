@@ -116,7 +116,7 @@ QualityPosture 由 Workspace 事实动态派生，而不是由可编辑的 curre
 
 ---
 
-## 5. ProtocolBinding
+## 4. ProtocolBinding
 
 所有 Host Adapter 共享同一个 repo-level Binding 概念。
 
