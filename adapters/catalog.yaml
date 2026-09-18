@@ -1,0 +1,51 @@
+schema_version: 1
+
+availability:
+  released: available in a tagged BUGate release
+  planned: accepted for BUGate 2.0 implementation
+  reserved: integration boundary reserved; implementation deferred
+  unsupported: not supported; rationale required
+
+hosts:
+  - id: claude-code
+    label: Claude Code
+    first_class: true
+    availability: planned
+    install_kind: plugin
+    manifest: adapters/claude-code/manifest.yaml
+
+  - id: codex
+    label: Codex
+    first_class: true
+    availability: planned
+    install_kind: plugin
+    manifest: adapters/codex/manifest.yaml
+
+  - id: pi
+    label: Pi Agent
+    first_class: true
+    availability: reserved
+    install_kind: package
+    manifest: adapters/pi/manifest.yaml
+
+  - id: deepseek-harness
+    label: DeepSeek Harness
+    first_class: true
+    availability: reserved
+    install_kind: plugin
+    manifest: adapters/deepseek-harness/manifest.yaml
+
+capabilities:
+  - protocol_discovery
+  - workspace_discovery
+  - protocol_binding
+  - prepared_protocol_context
+  - automatic_hydration
+  - session_rehydration
+  - compaction_rehydration
+  - subagent_inheritance
+  - skill_projection
+  - explicit_assessment
+  - diagnostics
+  - rollback
+  - context_runtime_hydration
