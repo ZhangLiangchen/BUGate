@@ -14,6 +14,7 @@ next-stage direction.
 | [METHOD.md](METHOD.md) | The "why": full AI-assisted black-box test methodology, the nine-Wave flow, theory mapping, and rationale. |
 | [SOP.md](SOP.md) | The "what to do next": step-by-step execution handbook for the Wave 0–3 minimum viable loop. |
 | [BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md](BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md) | **BUGate 2.0 accepted direction:** refactors BUGate into a SUT/model/harness/runtime-neutral executable testing methodology protocol; defines MethodSpec, Artifact, Evidence, Claim and Assessment, and moves orchestration/enforcement to the host Agent Runtime. |
+| [BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md](BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md) | **BUGate 2.0 host-integration direction:** ProtocolBinding, always-on bootstrap, Context Capsule hydration, compaction/resume/subagent persistence, Claude Code/Codex first implementation, with Pi and DeepSeek Harness adapters reserved for HyperTest. |
 | [IMPORTED_UPDATER_CONTRACT.md](IMPORTED_UPDATER_CONTRACT.md) | Normative imported-install update contract: fresh-install separation, exact legacy adoption, manifest ownership, plan/apply/verify/rollback transactions, archive integrity, profile isolation, and runtime activation boundaries. ([简体中文](IMPORTED_UPDATER_CONTRACT.zh-CN.md)) |
 | [ROLE_GOVERNANCE_PROTOCOL.md](ROLE_GOVERNANCE_PROTOCOL.md) | The normative Wave 7 lifecycle contract: distinct designer / implementer / reviewer sessions, human acceptance, strict Memory-anchored handoffs, hash-linked receipts, drift recovery, and enforcement limits. |
 | [BUGATE_GOVERNANCE_REFACTOR_GUIDE.md](BUGATE_GOVERNANCE_REFACTOR_GUIDE.md) | Implementation guide for ADR-BUGATE-006: source-level changes, BG-0–BG-5 work packages, action-grant/effect recovery, compatibility and cross-repository acceptance. ([简体中文](BUGATE_GOVERNANCE_REFACTOR_GUIDE.zh-CN.md)) |
@@ -33,15 +34,16 @@ next-stage direction.
 For BUGate 2.0 work, read [BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md](BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md) first; it is the accepted next-stage architecture direction. Existing boundary/refactor ADRs remain authoritative for 1.x compatibility and migration details until their responsibilities are retired.
 
 1. `BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md` — target architecture and migration direction for BUGate 2.0.
-2. `METHOD.md` — understand the method and its reasoning first.
-3. `SOP.md` — then learn how to execute the current 1.x method day to day.
-4. `IMPORTED_UPDATER_CONTRACT.md` — before changing an existing imported engine; the vendored operator route is `.shared/skills/bugate-import/references/updating-bugate.md`.
-5. `ROLE_GOVERNANCE_PROTOCOL.md` — the auditable Wave 7 lifecycle and receipt contract.
-6. `BUGATE_RUNTIME_BOUNDARY_ADR.md` — the execution/authorization split, brokered receipt enforcement, and orchestrator migration.
-7. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
-8. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
-9. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
-10. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
+2. `BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md` — how Claude Code/Codex and future Agent Harnesses durably consume the Protocol.
+3. `METHOD.md` — understand the method and its reasoning first.
+4. `SOP.md` — then learn how to execute the current 1.x method day to day.
+5. `IMPORTED_UPDATER_CONTRACT.md` — before changing an existing imported engine; the vendored operator route is `.shared/skills/bugate-import/references/updating-bugate.md`.
+6. `ROLE_GOVERNANCE_PROTOCOL.md` — the auditable Wave 7 lifecycle and receipt contract.
+7. `BUGATE_RUNTIME_BOUNDARY_ADR.md` — the execution/authorization split, brokered receipt enforcement, and orchestrator migration.
+8. `BUGATE_PLATFORM_DECOUPLING_ADR.md` — the architecture that keeps Core reusable.
+9. `EXPERIENCE_PROMOTION_PROTOCOL.md` — how learning compounds back into Core.
+10. `TRANSITION_PROTOCOL.md` — how to migrate an old embedded BUGate to the decoupled core without losing capability.
+11. `BUGATE_EVOLUTION_TIMELINE.md` — optional background on how it all came to be.
 
 ## Method summary (English)
 
