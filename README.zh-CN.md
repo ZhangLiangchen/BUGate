@@ -37,6 +37,8 @@ BUGate 2.0 的完整目标架构与迁移方案见
 Protocol 在 Claude Code / Codex 中的持续加载、Context Hydration、Subagent 继承与 Assessment 接入方案见
 [`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md)。首批实现面向 Claude Code 与 Codex；`adapters/pi/` 与 `adapters/deepseek-harness/` 已为 HyperTest 后续接入预留。
 
+BUGate 2.0 的状态模型进一步明确为 **Stateless Core + TestTaskWorkspace**：BUGate 不保存 current stage / host state；Artifact、Evidence、Claim 与 AssessmentResult 持久化在任务工作目录中，QualityPosture 由这些事实动态派生。详见 [`ADR-BUGATE-007`](docs/qa-methodology/BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md)。
+
 ## 前 5 分钟（从这里开始）
 
 已经把 BUGate 导入 SUT 仓、想知道日常怎么用或升级？
