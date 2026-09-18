@@ -65,6 +65,18 @@ Protocol Binding
 - 在 Compaction / Resume 后重新 Hydrate；
 - 把 Agent 产出的 Claim 交给 BUGate Assessment。
 
+### Context Runtime 负责
+
+- long-term Memory；
+- bounded Context Pack / Prepared Context；
+- Scope；
+- cross-session continuity；
+- Handoff；
+- context provenance / revision；
+- Experience / Skill candidate lifecycle。
+
+Context Runtime 是独立 companion infrastructure，不是 BUGate Core。首选初始 Provider 为 PowerContext，但 Host Adapter 必须通过 provider-neutral boundary 接入。
+
 ### Host Runtime 负责
 
 - 是否继续；
@@ -166,6 +178,20 @@ ProtocolBinding 的语义类似 lockfile：
 ## 5. Protocol Context Capsule
 
 Agent 不应该在每一轮加载整个 BUGate Protocol。
+
+同时，Host 不应把历史 Memory 与 BUGate Protocol 混成一个事实层。BUGate 2.0 采用“双上下文”模型：
+
+```text
+Protocol Capsule
+  = What does GOOD mean?
+
+Context Pack
+  = What happened before?
+```
+
+Context Pack 由独立 Context Runtime 生成；PowerContext 是首选初始 Provider。当前任务事实仍以 TestTaskWorkspace / live evidence 为准。
+
+
 
 BUGate 应提供一个纯函数式 Context Compiler：
 
@@ -378,6 +404,39 @@ Codex Adapter 优先在以下 lifecycle 上重新注入 Protocol Capsule：
 Subagent 不应依赖主 Agent 用自然语言转述 BUGate 规则。
 
 Host Adapter 应独立为每个 Subagent resolve 同一个 ProtocolBinding。
+
+---
+
+### 5.1 Protocol Capsule + Context Pack 双路 Hydration
+
+每次 Agent invocation 推荐由 Host 组合：
+
+```text
+Current task / user instruction
+        +
+BUGate Protocol Capsule
+        +
+Context Runtime Context Pack
+        +
+Current Workspace / repository / environment facts
+        ↓
+      Agent
+```
+
+权威级别必须保持：
+
+```text
+current instructions
+  > ProtocolBinding / Protocol Capsule
+  > TestTaskWorkspace / live evidence
+  > historical Context Pack
+```
+
+Context Runtime recall 故障默认 fail-open；显式 durable memory / handoff / promotion 写失败必须 fail-visible。
+
+详细设计见：
+
+[BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md](BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md)
 
 ---
 
