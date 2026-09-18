@@ -21,6 +21,14 @@ GitHub Release 已实际列出以下三个资产时，v0.4.5 才具有正式分�
 
 这并不是我们对 BUGate 的长期预期。BUGate 的核心价值始终应该是 **SUT 无关的测试方法论**：它应当像一名优秀的测试开发工程师一样，告诉 Agent 应该理解什么、关注什么、产出什么，以及怎样判断自己的工作是否已经达到足够的质量，而不是替 Agent 决定下一步如何执行。
 
+### 从 BUGate 1.0 到 HyperTest
+
+BUGate 走向 1.0 的过程也带来了另一个重要结论：**一个 Toolkit 或一组 Skills，已经不足以承载完整的自主测试开发系统。** 当需求分析、测试设计、用例实现、执行、失败诊断、自愈、经验沉淀以及多 Agent 协作逐渐汇聚到同一套体系中时，如果继续把这些能力堆叠进 BUGate，它就会不可避免地同时承担方法论、Agent 行为、运行时和编排职责。
+
+因此，BUGate 1.0 阶段真正导出的系统级结论是 **HyperTest**。我们需要一个面向测试开发场景特化的自主 Agent 来承接这些执行能力，而不是继续扩大 BUGate 本身。HyperTest 选择 **Pi Agent** 作为极简 Agent Harness 底座进行二次开发，在其之上承载模型路由、任务拆分、Subagent、工具执行以及 Runtime / LangGraph 等执行能力；BUGate 则作为其中独立、可复用的测试方法论与质量 Protocol。
+
+换句话说：**HyperTest 并不是 BUGate 的替代品，而是 BUGate 在明确自身边界之后自然分化出的执行系统。** BUGate 负责定义一个优秀的测试开发 Agent 应该“知道什么、考虑什么、做到什么”；HyperTest 负责让 Agent 真正自主地把这些事情做完。
+
 因此从 BUGate 2.0 开始，我们选择主动收缩边界：保留方法论、Protocol、Artifact / Evidence 规范与质量 Assessment，把具体的工作流、任务拆分、Subagent 调度、Retry、Checkpoint、Tool Enforcement 和长期执行交给 Agent Harness、LangGraph 或其他宿主 Runtime。这样可以让 BUGate 保持方法论本身的纯粹性，并成为任何 Agent、任何模型、任何执行框架都可以复用的 **Executable Agent Testing Protocol**。
 
 BUGate 2.0 的完整目标架构与迁移方案见
