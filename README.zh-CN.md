@@ -39,6 +39,8 @@ Protocol 在 Claude Code / Codex 中的持续加载、Context Hydration、Subage
 
 BUGate 2.0 的状态模型进一步明确为 **Stateless Core + TestTaskWorkspace**：BUGate 不保存 current stage / host state；Artifact、Evidence、Claim 与 AssessmentResult 持久化在任务工作目录中，QualityPosture 由这些事实动态派生。详见 [`ADR-BUGATE-007`](docs/qa-methodology/BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md)。
 
+原有 Memory Bus 在 2.0 中进一步升级为独立 **Context Runtime**：BUGate Core 不再依赖 Memory Service；长期 Memory、Scope、Context Pack、Handoff、Experience / Skill candidate 等能力由 Context Runtime 承担。BUGate 吸收 OceanBase PowerContext 的架构思想，并将 PowerContext 作为首选初始 Provider / 参考实现，但不把它变成 Protocol Core 的硬依赖。详见 [`ADR-BUGATE-008`](docs/qa-methodology/BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md) 与 [Context Runtime Guide](docs/qa-methodology/BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md)。
+
 ## 前 5 分钟（从这里开始）
 
 已经把 BUGate 导入 SUT 仓、想知道日常怎么用或升级？
