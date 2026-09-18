@@ -1,0 +1,52 @@
+apiVersion: bugate.io/host/v1
+kind: HostAdapterManifest
+
+host:
+  id: claude-code
+  label: Claude Code
+
+availability: planned
+
+install:
+  kind: plugin
+
+projections:
+  - role: bootstrap
+    path: CLAUDE.md
+  - role: skill
+    path: .claude/skills/bugate/SKILL.md
+  - role: plugin
+    path: adapters/claude-code/plugin
+
+capabilities:
+  protocol_discovery:
+    status: required
+  workspace_discovery:
+    status: required
+  protocol_binding:
+    status: required
+  prepared_protocol_context:
+    status: required
+  automatic_hydration:
+    status: required
+    surface: host-native prompt/session lifecycle
+  session_rehydration:
+    status: supported
+    surface: bootstrap plus host-native lifecycle
+  compaction_rehydration:
+    status: supported
+    surface: bootstrap plus host-native lifecycle
+  subagent_inheritance:
+    status: supported
+    surface: host-native delegated-agent context
+  skill_projection:
+    status: required
+  explicit_assessment:
+    status: required
+  diagnostics:
+    status: required
+  rollback:
+    status: required
+  context_runtime_hydration:
+    status: supported
+    surface: ContextProvider integration
