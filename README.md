@@ -43,6 +43,8 @@ Starting with BUGate 2.0, we therefore deliberately narrow the boundary. BUGate 
 See the BUGate 2.0 target architecture and migration guide:
 [`docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md).
 
+The host-integration plan for durable Protocol loading, context hydration, subagent inheritance, and Assessment is documented in [`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md). Claude Code and Codex are the first implementation targets; `adapters/pi/` and `adapters/deepseek-harness/` are reserved for future HyperTest integration.
+
 ## First 5 minutes (start here)
 
 Already imported BUGate into a SUT repo and wondering how to use or upgrade it?
