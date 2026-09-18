@@ -30,6 +30,14 @@ Across the v0.x line, BUGate gradually accumulated gates, hooks, role governance
 
 That is not the long-term role we want BUGate to play. Its core value should remain a **SUT-neutral testing methodology**: it should guide an Agent the way an excellent test-development engineer would—what to understand, what to pay attention to, what to produce, and how to judge whether the work is good enough—rather than deciding how the Agent must execute the next step.
 
+### From BUGate 1.0 to HyperTest
+
+The path toward BUGate 1.0 produced another important conclusion: **a toolkit or a collection of skills is no longer sufficient to carry a complete autonomous test-development system.** Once requirements analysis, test design, implementation, execution, failure diagnosis, self-healing, experience accumulation, and multi-agent collaboration converge into one system, continuing to place those capabilities inside BUGate would inevitably make it responsible for methodology, agent behavior, runtime concerns, and orchestration at the same time.
+
+The system-level conclusion of the BUGate 1.0 era is therefore **HyperTest**. Rather than continuing to expand BUGate, we need a test-development-specialized autonomous Agent to own execution. HyperTest uses **Pi Agent** as its minimal Agent Harness foundation and builds model routing, task decomposition, Subagents, tool execution, and Runtime / LangGraph capabilities around it, while BUGate remains an independent and reusable testing methodology and quality Protocol.
+
+In other words, **HyperTest is not a replacement for BUGate; it is the execution system that naturally separated from BUGate once BUGate's boundary became clear.** BUGate defines what an excellent test-development Agent should know, consider, and accomplish; HyperTest is responsible for enabling the Agent to autonomously get that work done.
+
 Starting with BUGate 2.0, we therefore deliberately narrow the boundary. BUGate keeps the methodology, Protocol, Artifact / Evidence specifications, and quality Assessment, while concrete workflow execution, task decomposition, Subagent scheduling, retry, checkpointing, tool enforcement, and long-running execution belong to the Agent Harness, LangGraph, or another host Runtime. This keeps BUGate methodologically pure and makes it reusable as an **Executable Agent Testing Protocol** across Agents, models, and execution frameworks.
 
 See the BUGate 2.0 target architecture and migration guide:
