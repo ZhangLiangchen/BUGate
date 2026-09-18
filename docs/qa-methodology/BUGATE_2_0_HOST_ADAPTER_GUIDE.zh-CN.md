@@ -177,80 +177,78 @@ ProtocolBinding 的语义类似 lockfile：
 
 ---
 
-## 5. Protocol Context Capsule
+## 5. PreparedProtocolContext
 
-Agent 不应该在每一轮加载整个 BUGate Protocol。
+Agent 不应该在每一轮加载整个 BUGate Protocol，也不应该由每个 Host Adapter 自己拼接方法论 Prompt。
 
-同时，Host 不应把历史 Memory 与 BUGate Protocol 混成一个事实层。BUGate 2.0 采用“双上下文”模型：
+BUGate 2.0 采用 PowerContext-style 的 **Core-owned final rendering**：
 
 ```text
-Protocol Capsule
+ProtocolBinding
++ TestTaskWorkspace
++ Profile
+        |
+        v
+derive QualityPosture
+        |
+        v
+resolve relevant MethodSpec / findings
+        |
+        v
+PreparedProtocolContext
+```
+
+`PreparedProtocolContext` 是 Host-neutral、injection-ready 的最终对象。规范 schema 位于：
+
+```text
+protocol/v2/schemas/prepared_protocol_context.schema.json
+```
+
+正式目标 CLI：
+
+```bash
+bugate protocol prepare \
+  --task test-task/REQ-001 \
+  --max-bytes 8000 \
+  --json
+```
+
+Host Adapter 对成功结果只允许：
+
+```text
+validate schema
+  -> verify ProtocolBinding / digest
+  -> verify workspace identity
+  -> inject render.content unchanged
+```
+
+Adapter **不得**：
+
+- 重新搜索 Protocol；
+- 自行判断 current layer；
+- 替换 MethodSpec；
+- 删除或降级 finding；
+- 重算 QualityPosture；
+- 改写 Assessment 结论；
+- 重新排序 Methodology priority；
+- 把历史 Memory 内容混入 Protocol authority。
+
+同时，Host 不应把历史 Memory 与 BUGate Protocol 混成一个事实层。完整 Agent Context 仍是双路 Hydration：
+
+```text
+PreparedProtocolContext
   = What does GOOD mean?
 
-Context Pack
+Context Runtime Context Pack
   = What happened before?
+
+TestTaskWorkspace / live evidence
+  = What is true NOW?
 ```
 
 Context Pack 由独立 Context Runtime 生成；PowerContext 是首选初始 Provider。当前任务事实仍以 TestTaskWorkspace / live evidence 为准。
 
-
-
-BUGate 应提供一个纯函数式 Context Compiler：
-
-```text
-Protocol Bundle
-+ active MethodSpec
-+ Profile extensions
-+ current subject
-+ unresolved Assessment findings
-        |
-        v
-Protocol Context Capsule
-```
-
-未来建议提供：
-
-```bash
-bugate protocol render \
-  --binding .bugate/protocol.lock.json \
-  --method testability \
-  --format agent
-```
-
-典型输出：
-
-```text
-BUGate Protocol v2.0.0
-Binding: PB-20260918-001
-Active Method: testability
-
-Objective:
-For each proposition, determine a sufficient verification strategy.
-
-Must account for:
-- proposition coverage
-- oracle binding
-- evidence strategy
-- test-layer choice
-- environment/resource constraints
-- side effects
-
-Required Artifact:
-bugate.testability/v2
-
-Profile extensions:
-- consensus_safety
-- consensus_liveness
-- epoch_transition
-
-Unresolved findings:
-- P-018 lacks runtime evidence
-```
-
-Capsule 应保持短小、确定性、可重新生成。
-
-目标通常是数百到低千 token，而不是把整套 Methodology 文档塞入 Context。
-
+`PreparedProtocolContext.render.content` 应保持短小、确定性、可重新生成，并受明确 byte/token budget 约束。
 ---
 
 ## 6. Always-on Bootstrap
