@@ -43,6 +43,8 @@ BUGate 2.0 的状态模型进一步明确为 **Stateless Core + TestTaskWorkspac
 
 BUGate 2.0 的多 Agent 接入进一步**直接采用 PowerContext 的工程模式**：first-class Host Catalog、Capability Manifest、Core-owned `PreparedProtocolContext`、Host-local Projection、统一 `setup select` / `doctor integrations`、Adapter 自包含 + 共享 Conformance Suite。详见 [`ADR-BUGATE-009`](docs/qa-methodology/BUGATE_HOST_INTEGRATION_POWERCONTEXT_ADR.zh-CN.md)。
 
+后续实现统一从 [`BUGATE_2_0_IMPLEMENTATION_ROADMAP.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_IMPLEMENTATION_ROADMAP.zh-CN.md) 续接。该文档记录当前已定架构、已有目录骨架、Phase A–L 实施顺序、验收标准和禁止回退的架构红线；如果没有新的架构决策，下一步直接进入 **Phase A：Core Schemas**。
+
 ## 前 5 分钟（从这里开始）
 
 已经把 BUGate 导入 SUT 仓、想知道日常怎么用或升级？
