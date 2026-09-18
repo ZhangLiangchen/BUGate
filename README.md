@@ -45,6 +45,8 @@ See the BUGate 2.0 target architecture and migration guide:
 
 The host-integration plan for durable Protocol loading, context hydration, subagent inheritance, and Assessment is documented in [`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md). Claude Code and Codex are the first implementation targets; `adapters/pi/` and `adapters/deepseek-harness/` are reserved for future HyperTest integration.
 
+For BUGate 2.0, the legacy Memory Bus evolves into an independent **Context Runtime** rather than remaining a required Core component. Long-term Memory, Scope, bounded Context Packs, Handoff, revisioned context, and Experience/Skill candidate lifecycle live behind a provider-neutral boundary. OceanBase PowerContext is the preferred initial provider/reference architecture, not a Protocol Core dependency. See [ADR-BUGATE-008](docs/qa-methodology/BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md).
+
 ## First 5 minutes (start here)
 
 Already imported BUGate into a SUT repo and wondering how to use or upgrade it?
