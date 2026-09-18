@@ -24,6 +24,17 @@ Release visibly publishes these three assets:
 verify SHA-256 before extracting it. Until that condition is satisfied, v0.4.4
 remains the current published fallback.
 
+## Version direction: from v0.x to BUGate 2.0
+
+Across the v0.x line, BUGate gradually accumulated gates, hooks, role governance, receipt / lineage handling, and orchestration. If that trajectory continued unchecked, BUGate would increasingly become a mixture of **testing specification, workflow orchestration, and execution control**; architecturally, it would end up looking more like an orchestration and scheduling layer.
+
+That is not the long-term role we want BUGate to play. Its core value should remain a **SUT-neutral testing methodology**: it should guide an Agent the way an excellent test-development engineer would—what to understand, what to pay attention to, what to produce, and how to judge whether the work is good enough—rather than deciding how the Agent must execute the next step.
+
+Starting with BUGate 2.0, we therefore deliberately narrow the boundary. BUGate keeps the methodology, Protocol, Artifact / Evidence specifications, and quality Assessment, while concrete workflow execution, task decomposition, Subagent scheduling, retry, checkpointing, tool enforcement, and long-running execution belong to the Agent Harness, LangGraph, or another host Runtime. This keeps BUGate methodologically pure and makes it reusable as an **Executable Agent Testing Protocol** across Agents, models, and execution frameworks.
+
+See the BUGate 2.0 target architecture and migration guide:
+[`docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md).
+
 ## First 5 minutes (start here)
 
 Already imported BUGate into a SUT repo and wondering how to use or upgrade it?
