@@ -15,6 +15,17 @@ GitHub Release 已实际列出以下三个资产时，v0.4.5 才具有正式分�
 `bugate-0.4.5.SHA256SUMS`。必须随任一 archive 一起下载 checksum 文件，
 并在解压前校验 SHA-256。在此条件满足前，当前已发布回退版本仍是 v0.4.4。
 
+## 版本迭代方向：从 v0.x 到 BUGate 2.0
+
+回顾 v0.x 的演进路线，BUGate 逐步吸收了 gate、hook、角色治理、receipt / lineage、orchestrator 等能力。若继续沿这条路径扩张，BUGate 会逐渐成为一个把**测试规范、流程编排与执行控制糅合在一起**的系统；从工程形态上看，它最终会更像一个编排与调度层。
+
+这并不是我们对 BUGate 的长期预期。BUGate 的核心价值始终应该是 **SUT 无关的测试方法论**：它应当像一名优秀的测试开发工程师一样，告诉 Agent 应该理解什么、关注什么、产出什么，以及怎样判断自己的工作是否已经达到足够的质量，而不是替 Agent 决定下一步如何执行。
+
+因此从 BUGate 2.0 开始，我们选择主动收缩边界：保留方法论、Protocol、Artifact / Evidence 规范与质量 Assessment，把具体的工作流、任务拆分、Subagent 调度、Retry、Checkpoint、Tool Enforcement 和长期执行交给 Agent Harness、LangGraph 或其他宿主 Runtime。这样可以让 BUGate 保持方法论本身的纯粹性，并成为任何 Agent、任何模型、任何执行框架都可以复用的 **Executable Agent Testing Protocol**。
+
+BUGate 2.0 的完整目标架构与迁移方案见
+[`docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md)。
+
 ## 前 5 分钟（从这里开始）
 
 已经把 BUGate 导入 SUT 仓、想知道日常怎么用或升级？
