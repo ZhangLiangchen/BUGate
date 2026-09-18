@@ -41,6 +41,8 @@ BUGate 2.0 的状态模型进一步明确为 **Stateless Core + TestTaskWorkspac
 
 原有 Memory Bus 在 2.0 中进一步升级为独立 **Context Runtime**：BUGate Core 不再依赖 Memory Service；长期 Memory、Scope、Context Pack、Handoff、Experience / Skill candidate 等能力由 Context Runtime 承担。BUGate 吸收 OceanBase PowerContext 的架构思想，并将 PowerContext 作为首选初始 Provider / 参考实现，但不把它变成 Protocol Core 的硬依赖。详见 [`ADR-BUGATE-008`](docs/qa-methodology/BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md) 与 [Context Runtime Guide](docs/qa-methodology/BUGATE_2_0_CONTEXT_RUNTIME_GUIDE.zh-CN.md)。
 
+BUGate 2.0 的多 Agent 接入进一步**直接采用 PowerContext 的工程模式**：first-class Host Catalog、Capability Manifest、Core-owned `PreparedProtocolContext`、Host-local Projection、统一 `setup select` / `doctor integrations`、Adapter 自包含 + 共享 Conformance Suite。详见 [`ADR-BUGATE-009`](docs/qa-methodology/BUGATE_HOST_INTEGRATION_POWERCONTEXT_ADR.zh-CN.md)。
+
 ## 前 5 分钟（从这里开始）
 
 已经把 BUGate 导入 SUT 仓、想知道日常怎么用或升级？
