@@ -829,9 +829,10 @@ BUGate/
     docs/
 
   adapters/
-    claude/
+    claude-code/
     codex/
     pi/
+    deepseek-harness/
     ci/
 
   compatibility/
@@ -849,6 +850,43 @@ Views / Adapters
 ```
 
 反向依赖禁止。
+
+### 16.1 Host Adapter / Protocol Persistence
+
+BUGate Protocol 不能依赖 Agent 在长会话中“记住”一次性加载的 Skill 或 Prompt。
+
+BUGate 2.0 的宿主接入统一采用：
+
+```text
+ProtocolBinding
+  -> Host lifecycle hydration
+  -> Protocol Context Capsule
+  -> Agent autonomous work
+  -> Artifact + Evidence + Claim
+  -> BUGate Assessment
+```
+
+其中：
+
+- `.bugate/protocol.lock.json` 固定 exact Protocol / Profile version 与 digest；
+- always-on bootstrap 只负责让 Agent 始终知道 BUGate Binding 存在；
+- Skill 是 Protocol Loader / Agent View，不再是规范事实源；
+- Protocol Context Capsule 按 active MethodSpec 动态生成；
+- context compaction、resume、Subagent 创建后必须重新 Hydrate；
+- Conversation History 不是 Protocol 的 Source of Truth；
+- BUGate 只负责 Protocol / Context Compiler / Assessment；
+- Claude Code、Codex、Pi、DeepSeek Harness 的 lifecycle 接入全部留在 `adapters/`；
+- Host 根据 AssessmentResult 自行决定 continue / rework / escalate / stop。
+
+首批实施目标是 Claude Code 与 Codex。Pi 与 DeepSeek Harness 目录只作为 HyperTest 后续接入边界预留，不得提前把其 API 或 Runtime 语义写入 BUGate Core。
+
+详细实施规范见：
+
+[BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md](BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md)
+
+核心原则：
+
+> **不要让 Agent 记住 BUGate；让 Host 每次都把正确版本的 BUGate 带给 Agent。**
 
 ---
 
