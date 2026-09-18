@@ -1,0 +1,46 @@
+apiVersion: bugate.io/host/v1
+kind: HostAdapterManifest
+
+host:
+  id: pi
+  label: Pi Agent
+
+availability: reserved
+
+install:
+  kind: package
+
+projections:
+  - role: package
+    path: adapters/pi/package
+  - role: skill
+    path: generated-by-projection-compiler
+
+capabilities:
+  protocol_discovery:
+    status: reserved
+  workspace_discovery:
+    status: reserved
+  protocol_binding:
+    status: reserved
+  prepared_protocol_context:
+    status: reserved
+  automatic_hydration:
+    status: reserved
+    rationale: HyperTest/Pi contract is not stable yet.
+  session_rehydration:
+    status: reserved
+  compaction_rehydration:
+    status: reserved
+  subagent_inheritance:
+    status: reserved
+  skill_projection:
+    status: reserved
+  explicit_assessment:
+    status: reserved
+  diagnostics:
+    status: reserved
+  rollback:
+    status: reserved
+  context_runtime_hydration:
+    status: reserved
