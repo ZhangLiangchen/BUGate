@@ -47,6 +47,8 @@ The host-integration plan for durable Protocol loading, context hydration, subag
 
 For BUGate 2.0, the legacy Memory Bus evolves into an independent **Context Runtime** rather than remaining a required Core component. Long-term Memory, Scope, bounded Context Packs, Handoff, revisioned context, and Experience/Skill candidate lifecycle live behind a provider-neutral boundary. OceanBase PowerContext is the preferred initial provider/reference architecture, not a Protocol Core dependency. See [ADR-BUGATE-008](docs/qa-methodology/BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md).
 
+BUGate 2.0 also directly adopts PowerContext's multi-host integration pattern: a first-class Host Catalog, Capability Manifests, Core-owned `PreparedProtocolContext`, Host-local Projections, unified `setup select` / `doctor integrations`, self-contained adapters, and one shared conformance contract. See [ADR-BUGATE-009](docs/qa-methodology/BUGATE_HOST_INTEGRATION_POWERCONTEXT_ADR.zh-CN.md).
+
 ## First 5 minutes (start here)
 
 Already imported BUGate into a SUT repo and wondering how to use or upgrade it?
