@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugate.io/schemas/host-manifest.schema.json",
+  "title": "BUGate Host Adapter Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "host", "availability", "install", "capabilities"],
+  "properties": {
+    "apiVersion": { "const": "bugate.io/host/v1" },
+    "kind": { "const": "HostAdapterManifest" },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "availability": {
+      "enum": ["released", "planned", "reserved", "unsupported"]
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["plugin", "package", "files", "none"] }
+      }
+    },
+    "projections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path"],
+        "properties": {
+          "role": { "enum": ["bootstrap", "skill", "plugin", "hooks", "package", "settings"] },
+          "path": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": {
+          "status": { "enum": ["required", "supported", "unsupported", "reserved"] },
+          "surface": { "type": ["string", "null"] },
+          "rationale": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}
