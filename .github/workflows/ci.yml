@@ -81,9 +81,16 @@ jobs:
               if not note.is_file():
                   raise SystemExit(f"missing bilingual release note: {note}")
 
+          native = json.loads(Path("adapters/deepseek-harness/plugin/package.json").read_text())["version"]
+          native_note = Path(f"docs/releases/dsh-v{native}.md")
+          if not native_note.is_file() or not native_note.with_suffix(".zh-CN.md").is_file():
+              raise SystemExit("missing bilingual DSH release notes")
+
           if os.environ.get("GITHUB_REF_TYPE") == "tag":
               tag = os.environ.get("GITHUB_REF_NAME", "")
-              expected = f"v{version}"
+              # DSH prereleases have an independent version line. Both lines
+              # retain exact version, annotated-tag and peeled-commit checks.
+              expected = f"dsh-v{native}" if tag.startswith("dsh-") else f"v{version}"
               if tag != expected:
                   raise SystemExit(
                       f"tag/repository version mismatch: "
