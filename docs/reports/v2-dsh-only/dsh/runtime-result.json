@@ -1,0 +1,275 @@
+{
+  "status": "PASS",
+  "verification": "real DSH runtime; deterministic model fixture; real local command execution",
+  "tests": [
+    {
+      "name": "AC-15 actual provider rejects missing Python, malformed JSON and oversized output",
+      "status": "PASS",
+      "duration_ms": 2947.433709,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-15 envelope operation and exit semantics cannot be forged",
+      "status": "PASS",
+      "duration_ms": 1195.687584,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-16 timeout and cancellation terminate real managed processes",
+      "status": "PASS",
+      "duration_ms": 3392.711042,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-30 provider has opaque targets and rejects unmapped installation",
+      "status": "PASS",
+      "duration_ms": 459.112209,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction",
+      "status": "PASS",
+      "duration_ms": 34094.345666,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-12/25 multi-workspace same task id has isolated contexts and evidence",
+      "status": "PASS",
+      "duration_ms": 3764.985167,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads",
+      "status": "PASS",
+      "duration_ms": 1706.169083,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly",
+      "status": "PASS",
+      "duration_ms": 3127.789416,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-29 completion submission rework is bounded and unchanged gaps stop",
+      "status": "PASS",
+      "duration_ms": 4016.176583,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-32 non-BUGate workspace does not activate context or guard",
+      "status": "PASS",
+      "duration_ms": 557.142667,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+      "status": "PASS",
+      "duration_ms": 4.307458,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication",
+      "status": "PASS",
+      "duration_ms": 3488.934666,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard",
+      "status": "PASS",
+      "duration_ms": 8136.91525,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context",
+      "status": "PASS",
+      "duration_ms": 2121.206209,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps",
+      "status": "PASS",
+      "duration_ms": 3681.926541,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-21/27 source-backed authoring starts empty and records digests through the shared core",
+      "status": "PASS",
+      "duration_ms": 31573.255375,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it",
+      "status": "PASS",
+      "duration_ms": 2730.224958,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-28 configured source probe runs before design without turning zero cases into verification",
+      "status": "PASS",
+      "duration_ms": 1811.663666,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts",
+      "status": "PASS",
+      "duration_ms": 1595.723916,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world",
+      "status": "PASS",
+      "duration_ms": 1479.98275,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly",
+      "status": "PASS",
+      "duration_ms": 1863.658875,
+      "log": "dsh/runtime-final.log"
+    },
+    {
+      "name": "HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model",
+      "status": "PASS",
+      "duration_ms": 3593.814709,
+      "log": "dsh/runtime-final.log"
+    }
+  ],
+  "mapping": {
+    "AC-15": [
+      "AC-15 actual provider rejects missing Python, malformed JSON and oversized output",
+      "AC-15 envelope operation and exit semantics cannot be forged"
+    ],
+    "AC-16": [
+      "AC-16 timeout and cancellation terminate real managed processes",
+      "AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts"
+    ],
+    "AC-30": [
+      "AC-30 provider has opaque targets and rejects unmapped installation",
+      "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+      "HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world",
+      "HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model"
+    ],
+    "HC-02": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "HC-04": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "HC-05": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction",
+      "HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly"
+    ],
+    "HC-06": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "HC-07": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "HC-08": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "HC-12": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "HC-13": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "HC-15": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "AC-22": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction",
+      "AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps",
+      "HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it"
+    ],
+    "AC-23": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "AC-34": [
+      "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+    ],
+    "AC-12": [
+      "AC-12/25 multi-workspace same task id has isolated contexts and evidence"
+    ],
+    "AC-25": [
+      "AC-12/25 multi-workspace same task id has isolated contexts and evidence",
+      "HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard",
+      "HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it"
+    ],
+    "AC-27": [
+      "AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads",
+      "AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps",
+      "AC-21/27 source-backed authoring starts empty and records digests through the shared core"
+    ],
+    "AC-28": [
+      "AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads",
+      "AC-28 configured source probe runs before design without turning zero cases into verification"
+    ],
+    "AC-24": [
+      "AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly",
+      "HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard"
+    ],
+    "AC-31": [
+      "AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly",
+      "AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts"
+    ],
+    "AC-29": [
+      "AC-29 completion submission rework is bounded and unchanged gaps stop"
+    ],
+    "AC-32": [
+      "AC-32 non-BUGate workspace does not activate context or guard"
+    ],
+    "HC-10": [
+      "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+      "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context",
+      "HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world"
+    ],
+    "HC-11": [
+      "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+      "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context"
+    ],
+    "AC-09": [
+      "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+      "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context"
+    ],
+    "AC-01": [
+      "AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication"
+    ],
+    "AC-17": [
+      "AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication"
+    ],
+    "AC-26": [
+      "AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication"
+    ],
+    "HC-09": [
+      "HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard",
+      "HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it"
+    ],
+    "AC-08": [
+      "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context"
+    ],
+    "AC-11": [
+      "AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps"
+    ],
+    "AC-21": [
+      "AC-21/27 source-backed authoring starts empty and records digests through the shared core"
+    ],
+    "HC-03": [
+      "HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world",
+      "HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model"
+    ],
+    "AC-14": [
+      "HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly"
+    ]
+  },
+  "commands": [
+    "node adapters/deepseek-harness/plugin/build.mjs",
+    "BUGATE_TEST_PYTHON=\"$PWD/.venv/bin/python\" node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs"
+  ],
+  "protocol_digest": "sha256:053717ac25e49aa4a03e2a11176c3e9263d1a5d89b0388f0eaaa3a7b568fd77e",
+  "notes": [
+    "output.schema describes the host tool presentation envelope; checked() enforces canonical full schemas before interpreting results",
+    "runtime-initial.log records projection mismatch during concurrent canonical edits; final build used frozen canonical protocol and all 22 tests passed"
+  ]
+}

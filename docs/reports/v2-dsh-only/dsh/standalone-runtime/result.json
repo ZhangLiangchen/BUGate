@@ -1,0 +1,308 @@
+{
+  "verification": "real-dsh-runtime-deterministic-model-installed-package",
+  "source_isolation": "OS sandbox denied checkout reads, verified before runtime loading",
+  "module_identity": {
+    "host": "/private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-llm/lib/index.js",
+    "plugin": "/private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-llm/lib/index.js"
+  },
+  "python_identity": {
+    "module": "/private/tmp/bugate-v2-only-source-denied/bootstrap/lib/python3.13/site-packages/bugate/__init__.py",
+    "prefix": "/private/tmp/bugate-v2-only-source-denied/bootstrap",
+    "base_prefix": "/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13",
+    "version": "2.0.0a2"
+  },
+  "profile_directory": "/tmp/bugate-v2-only-source-denied/dsh-home/profiles/source-denied",
+  "compatibility": {
+    "adapter_version": "2.0.0-dev.2",
+    "core_version": "2.0.0a2",
+    "protocol_version": "2.0.0",
+    "dsh_version": "0.2.2-alpha.2",
+    "dsh_commit": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3"
+  },
+  "installed": "/tmp/bugate-v2-only-source-denied/dsh-home/profiles/source-denied/node_modules/@bugate/deepseek-harness",
+  "python": "/tmp/bugate-v2-only-source-denied/bootstrap/bin/python",
+  "task": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-F1WOeQ/generated-project/test-task/same-task",
+  "requests": 27,
+  "requirement_assessment": {
+    "apiVersion": "bugate.io/v2",
+    "kind": "AssessmentResult",
+    "id": "assessment-verified-requirement",
+    "task_id": "same-task",
+    "workspace_id": "sha256:472e709950bcfca52499522055f52d4e11117d7ed109beaf270777c09180892b",
+    "claim_id": "verified-requirement",
+    "claim_type": "requirement_verified",
+    "claim_digest": "sha256:5985d95b61ad1fc9fb26f4c7347a88172440d44504a244842ca82ee977c1bcac",
+    "evaluator_version": "2.0.0a2",
+    "request_digest": "sha256:b6a4ac3ff07124ef3ca75dd38d9b0d1e933d19638c3733a3065b5f3c1ea918a5",
+    "workspace_snapshot": "sha256:0556ed1f0f3838be65a2a3dc33bc57624222df9f88e3e577b73a343ac787b9cd",
+    "verdict": "satisfied",
+    "dimensions": {
+      "deterministic": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Schema and content hashes establish consistency, not the truth of supplied facts."
+        ]
+      },
+      "semantic_review": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Source-backed reviewer opinion is not a mathematical proof."
+        ]
+      },
+      "runtime_validation": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Managed local-process observation; same-permission filesystem owners can alter local evidence."
+        ]
+      }
+    },
+    "findings": [],
+    "evidence_ids": [
+      "run-dsh-d12f284dfa33ff2bede73dcd8f5d9b9c"
+    ],
+    "unknowns": [],
+    "scope": [
+      "R1"
+    ],
+    "quality_posture": "satisfactory"
+  },
+  "observations": [
+    {
+      "tool": "read_requirement"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "bugate_status",
+      "invocation": "completed"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_assess",
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "bugate_status",
+      "invocation": "completed"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_assess",
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    },
+    {
+      "tool": "bugate_run_test",
+      "invocation": "completed",
+      "kind": "Evidence"
+    },
+    {
+      "tool": "bugate_status",
+      "invocation": "completed"
+    },
+    {
+      "tool": "write"
+    },
+    {
+      "tool": "bugate_assess",
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    }
+  ],
+  "evidence": {
+    "apiVersion": "bugate.io/v2",
+    "kind": "Evidence",
+    "id": "run-dsh-d12f284dfa33ff2bede73dcd8f5d9b9c",
+    "task_id": "same-task",
+    "workspace_id": "sha256:472e709950bcfca52499522055f52d4e11117d7ed109beaf270777c09180892b",
+    "source_type": "host_observed",
+    "evidence_type": "test_execution",
+    "description": "Managed execution capture",
+    "references": [
+      {
+        "path": "logs/dsh-d12f284dfa33ff2bede73dcd8f5d9b9c.stdout.log",
+        "digest": "sha256:7ad54db3b20bd85332078110322f37ae718690d50df72f55540febb6f3406537"
+      },
+      {
+        "path": "logs/dsh-d12f284dfa33ff2bede73dcd8f5d9b9c.stderr.log",
+        "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "logs/installed.xml",
+        "digest": "sha256:abd6af64a62b04a8e5da0d0c400637ec177009fb633f40296f4eecbccfaa0d5a"
+      }
+    ],
+    "applicability": {
+      "run_id": "dsh-d12f284dfa33ff2bede73dcd8f5d9b9c",
+      "current_task": true,
+      "limitations": [
+        "Local managed process observation; not tamper-proof against a same-permission filesystem owner.",
+        "A framework result does not prove the correctness of its business oracle."
+      ]
+    },
+    "execution": {
+      "run_id": "dsh-d12f284dfa33ff2bede73dcd8f5d9b9c",
+      "agent_id": "installed-runtime",
+      "session_id": "installed-runtime",
+      "call_id": "installed-runtime:workflow-21",
+      "parent_call_id": null,
+      "root_call_id": "workflow-21",
+      "argv": [
+        "/tmp/bugate-v2-only-source-denied/bootstrap/bin/python",
+        "tests/runner.py",
+        "logs/installed.xml"
+      ],
+      "cwd": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-F1WOeQ/generated-project/test-task/same-task",
+      "started_at": "2026-10-29T06:19:05.011415+00:00",
+      "finished_at": "2026-10-29T06:19:05.031741+00:00",
+      "status": "passed",
+      "exit_code": 0,
+      "stdout": {
+        "path": "logs/dsh-d12f284dfa33ff2bede73dcd8f5d9b9c.stdout.log",
+        "digest": "sha256:7ad54db3b20bd85332078110322f37ae718690d50df72f55540febb6f3406537"
+      },
+      "stderr": {
+        "path": "logs/dsh-d12f284dfa33ff2bede73dcd8f5d9b9c.stderr.log",
+        "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "report": {
+        "path": "logs/installed.xml",
+        "digest": "sha256:abd6af64a62b04a8e5da0d0c400637ec177009fb633f40296f4eecbccfaa0d5a"
+      },
+      "statistics": {
+        "tests": 2,
+        "passed": 2,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfail": 0
+      },
+      "requested_case_ids": [
+        "C1",
+        "C2"
+      ],
+      "cases": [
+        {
+          "id": "C1",
+          "selector": "fixture.test_positive",
+          "outcome": "passed"
+        },
+        {
+          "id": "C2",
+          "selector": "fixture.test_negative",
+          "outcome": "passed"
+        }
+      ],
+      "input_snapshot": "sha256:a2ee1b13fca2da69293595d1597d19b1e5e0a3c30aa6da088fa9496da5546b5a",
+      "input_manifest": {
+        "@protocol": "sha256:053717ac25e49aa4a03e2a11176c3e9263d1a5d89b0388f0eaaa3a7b568fd77e",
+        "@profile": "sha256:03c89e6c060bd9ab2d483b10c44d5c4ba0d410c4a6a84fed651ad1d306ba7731",
+        "@evaluator": "sha256:5429950f272a9fec4fc99d5ec2e8f7edb13aa80f164019e36d993813ceeada0c",
+        "@source/SRC1": "sha256:273d8bb934d83d46c6f2df4233f6dda130de7e522bffa88764f451397154b68e",
+        "artifacts/brief.json": "sha256:b578584d2955ca7fb265ab209c90972fdb3aa1eba170db7774a2d5ebf97c90c5",
+        "artifacts/inventory.json": "sha256:a3b582bd35c187d7e5e916141be4048ff08fefd1c0e2e5046b7979a4c095f5d9",
+        "artifacts/review.json": "sha256:f0e86788f21dc26d56dc113e9ef32220fc713b3b0222b9e9839eca2cd3eb6bd1",
+        "artifacts/testability.json": "sha256:235d840c1cb7946334b9749b7cff051d5cc61ed54792eda4dd64fdd096ab2ded",
+        "profile.json": "sha256:9befb36df52ee7b530a785874bf1b5198ac41b9b66cfe8389affc2b08d19794f",
+        "task.json": "sha256:4f7c68bd184eca930c09566857042d928d4e0ab2b3d02608a93a7f102fd48b33",
+        "tests/runner.py": "sha256:e751c1b715ac6186f15069d7da8e984efc6565ed8c658a814ec5aaa2abeeecab"
+      },
+      "implementation_digests": {
+        "tests/runner.py": "sha256:e751c1b715ac6186f15069d7da8e984efc6565ed8c658a814ec5aaa2abeeecab"
+      },
+      "collector": "bugate.execution/v1"
+    },
+    "digest": "sha256:6b32b12a7773b3772c19a91571f9f4194316c1c2376bcb8eb09cc18fc43bdec7"
+  },
+  "candidate_sha256": "1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0",
+  "status": "PASS",
+  "mapping": {
+    "AC-01": [
+      "authorAndExecute"
+    ],
+    "AC-17": [
+      "durable execution Evidence before tools/result"
+    ],
+    "AC-19": [
+      "actual installed plugin apply"
+    ],
+    "AC-20": [
+      "OS source denial; installed venv+bundle only"
+    ],
+    "AC-21": [
+      "compiled plugin against real DSH runtime"
+    ],
+    "AC-34": [
+      "canonical assess result satisfied"
+    ]
+  }
+}

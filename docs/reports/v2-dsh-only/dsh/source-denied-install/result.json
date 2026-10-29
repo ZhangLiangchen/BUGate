@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "candidate_sha256": "1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0",
+  "source_root": "/Users/zhangliangchen/PycharmProjects/BUGate",
+  "sandbox_policy": "(version 1) (allow default) (deny file-read* (subpath \"/Users/zhangliangchen/PycharmProjects/BUGate\"))",
+  "command": "cd /tmp/bugate-v2-only-source-denied && /usr/bin/sandbox-exec -f sandbox.sb /opt/homebrew/bin/python3 distribution/install_dsh.py --package distribution/bugate-deepseek-harness-2.0.0-dev.2.tgz --project project --dsh-profile source-denied --dsh /Users/zhangliangchen/.local/bin/dsh --dsh-home dsh-home --venv bootstrap",
+  "exit_code": 0,
+  "verification": "real DSH clean bootstrap while OS sandbox denies checkout reads"
+}

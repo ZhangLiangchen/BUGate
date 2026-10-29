@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "verification": "published-v2-archive-upgrade-and-rollback; no task migration",
+  "previous_sha256": "0a4f7ddbcb0a035f603823f82da14e399ffa6bd236afeed3879625e8f626baab",
+  "candidate_sha256": "1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0",
+  "tests": 9,
+  "mapping": {
+    "HC-01": [
+      "03-actual-dev2-upgrade"
+    ],
+    "HC-04": [
+      "04-old-binding-rejected-no-migration"
+    ],
+    "HC-10": [
+      "04-old-binding-rejected-no-migration"
+    ],
+    "HC-14": [
+      "07-actual-archive-rollback",
+      "09-remove-preserves-both-tasks"
+    ],
+    "AC-09": [
+      "04-old-binding-rejected-no-migration"
+    ],
+    "AC-31": [
+      "03-actual-dev2-upgrade",
+      "07-actual-archive-rollback"
+    ]
+  }
+}

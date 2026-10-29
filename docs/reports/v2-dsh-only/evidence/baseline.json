@@ -1,0 +1,88 @@
+{
+  "recorded_at": "2026-10-29T06:07:39.497074+00:00",
+  "baseline": {
+    "argv": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "stdout": "61e1327a7bf01505cc82760782ffa1272ccaa03f\n",
+    "stderr": ""
+  },
+  "refs": {
+    "argv": [
+      "git",
+      "show-ref",
+      "--tags"
+    ],
+    "exit_code": 0,
+    "stdout": "303d5844bc728bf849cb64b3768edd726596da6f refs/tags/dsh-v2.0.0-dev.1\nfedf1c13a149bfd115adb2f4ca9b5f5a213488ce refs/tags/v0.3.0\n299f3ce1e10f825aa8444263cf0efc0246b655b9 refs/tags/v0.3.1\n96844f339ec1f39fcfd16c39c270737309e33b94 refs/tags/v0.3.2\n4ee291c7dca5ca710a1bc5f2412b28d38c5457c8 refs/tags/v0.3.4\n521c6e39efa0f3bb346b31d739dfb7149bc086a4 refs/tags/v0.3.5\n6d464a27c8ec9752875bcf98ce1632ec6da3478f refs/tags/v0.4.0\n0cf7fac327b1fa408f524074b636308e4908d9a4 refs/tags/v0.4.1\n41107bdcc8afe803ba31c1c6522b60a431c95f0d refs/tags/v0.4.2\n7d1a617750b6acea56285837c1b94dbca8c5fa06 refs/tags/v0.4.3\n253135b9994736aeacfc48e7fe8b879b38258032 refs/tags/v0.4.4\neb6c2c7127fe9fd49a82ab7b1dbc8e11d366e354 refs/tags/v0.4.5\n",
+    "stderr": ""
+  },
+  "worktrees": {
+    "argv": [
+      "git",
+      "worktree",
+      "list",
+      "--porcelain"
+    ],
+    "exit_code": 0,
+    "stdout": "worktree /Users/zhangliangchen/PycharmProjects/BUGate\nHEAD 61e1327a7bf01505cc82760782ffa1272ccaa03f\nbranch refs/heads/codex/v2-dsh-only\n\nworktree /Users/zhangliangchen/PycharmProjects/BUGate/.claude/worktrees/bugate-stage-11-s10-d02-6c5b49\nHEAD f76f22ab9468977677bc6637226a4aa3049ad8ca\ndetached\n\n",
+    "stderr": ""
+  },
+  "dsh": {
+    "argv": [
+      "dsh",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "0.2.2-alpha.2\n",
+    "stderr": ""
+  },
+  "node": {
+    "argv": [
+      "node",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "v26.8.1\n",
+    "stderr": ""
+  },
+  "python": {
+    "argv": [
+      ".venv/bin/python",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "Python 3.13.3\n",
+    "stderr": ""
+  },
+  "dsh_source": {
+    "argv": [
+      "git",
+      "-C",
+      "/tmp/bugate-dsh-source",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "stdout": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3\n",
+    "stderr": ""
+  },
+  "release": {
+    "argv": [
+      "gh",
+      "release",
+      "view",
+      "dsh-v2.0.0-dev.1",
+      "--repo",
+      "ZhangLiangchen/BUGate",
+      "--json",
+      "tagName,targetCommitish,isPrerelease,assets,url"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"assets\":[{\"apiUrl\":\"https://api.github.com/repos/ZhangLiangchen/BUGate/releases/assets/687487741\",\"contentType\":\"application/x-gtar\",\"createdAt\":\"2026-10-29T05:37:00Z\",\"digest\":\"sha256:0a4f7ddbcb0a035f603823f82da14e399ffa6bd236afeed3879625e8f626baab\",\"downloadCount\":2,\"id\":\"RA_kwDOS9SV3M4o-jr9\",\"label\":\"macOS arm64 CPython 3.13 native bundle\",\"name\":\"bugate-deepseek-harness-2.0.0-dev.1.tgz\",\"size\":1086333,\"state\":\"uploaded\",\"updatedAt\":\"2026-10-29T05:37:01Z\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1/bugate-deepseek-harness-2.0.0-dev.1.tgz\"},{\"apiUrl\":\"https://api.github.com/repos/ZhangLiangchen/BUGate/releases/assets/687487758\",\"contentType\":\"application/octet-stream\",\"createdAt\":\"2026-10-29T05:37:01Z\",\"digest\":\"sha256:ceffa043485f3383b8ecc03b71a273e5f646a7c7c2ad898bf965f18d10ec4e02\",\"downloadCount\":2,\"id\":\"RA_kwDOS9SV3M4o-jsO\",\"label\":\"Shared Python core wheel\",\"name\":\"bugate_core-2.0.0a1-py3-none-any.whl\",\"size\":535017,\"state\":\"uploaded\",\"updatedAt\":\"2026-10-29T05:37:01Z\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1/bugate_core-2.0.0a1-py3-none-any.whl\"},{\"apiUrl\":\"https://api.github.com/repos/ZhangLiangchen/BUGate/releases/assets/687487728\",\"contentType\":\"application/json\",\"createdAt\":\"2026-10-29T05:37:00Z\",\"digest\":\"sha256:e4f2190af1f866438e84476e9a74b69b636cd2ee9ebdae790cfdae87a7831f45\",\"downloadCount\":2,\"id\":\"RA_kwDOS9SV3M4o-jrw\",\"label\":\"\",\"name\":\"build-manifest.json\",\"size\":503,\"state\":\"uploaded\",\"updatedAt\":\"2026-10-29T05:37:00Z\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1/build-manifest.json\"},{\"apiUrl\":\"https://api.github.com/repos/ZhangLiangchen/BUGate/releases/assets/687487720\",\"contentType\":\"application/octet-stream\",\"createdAt\":\"2026-10-29T05:36:59Z\",\"digest\":\"sha256:5680d650f4e72e705e19f3e3618076999341e58f84eefe94a6aceff5b7f3bdd2\",\"downloadCount\":1,\"id\":\"RA_kwDOS9SV3M4o-jro\",\"label\":\"\",\"name\":\"install_dsh.py\",\"size\":7531,\"state\":\"uploaded\",\"updatedAt\":\"2026-10-29T05:36:59Z\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1/install_dsh.py\"},{\"apiUrl\":\"https://api.github.com/repos/ZhangLiangchen/BUGate/releases/assets/687487722\",\"contentType\":\"application/octet-stream\",\"createdAt\":\"2026-10-29T05:36:59Z\",\"digest\":\"sha256:fa9fd0eb9f5d6480fef839192034b14301eebd17305708773669f7e88e6ea8ff\",\"downloadCount\":2,\"id\":\"RA_kwDOS9SV3M4o-jrq\",\"label\":\"\",\"name\":\"INSTALL_DSH_PROMPT.md\",\"size\":2741,\"state\":\"uploaded\",\"updatedAt\":\"2026-10-29T05:36:59Z\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1/INSTALL_DSH_PROMPT.md\"},{\"apiUrl\":\"https://api.github.com/repos/ZhangLiangchen/BUGate/releases/assets/687487723\",\"contentType\":\"application/octet-stream\",\"createdAt\":\"2026-10-29T05:36:59Z\",\"digest\":\"sha256:e17da418e277f54395753c6b2475268b04d5fe27e08f2b158bb98b471a7f2aa1\",\"downloadCount\":1,\"id\":\"RA_kwDOS9SV3M4o-jrr\",\"label\":\"\",\"name\":\"INSTALL_DSH_PROMPT.zh-CN.md\",\"size\":2846,\"state\":\"uploaded\",\"updatedAt\":\"2026-10-29T05:36:59Z\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1/INSTALL_DSH_PROMPT.zh-CN.md\"},{\"apiUrl\":\"https://api.github.com/repos/ZhangLiangchen/BUGate/releases/assets/687487721\",\"contentType\":\"application/octet-stream\",\"createdAt\":\"2026-10-29T05:36:59Z\",\"digest\":\"sha256:d0ab99f4135f5149bf882f4cbea40e50001275643df7f72096e000212dd63bfe\",\"downloadCount\":2,\"id\":\"RA_kwDOS9SV3M4o-jrp\",\"label\":\"\",\"name\":\"SHA256SUMS\",\"size\":376,\"state\":\"uploaded\",\"updatedAt\":\"2026-10-29T05:36:59Z\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1/SHA256SUMS\"}],\"isPrerelease\":true,\"tagName\":\"dsh-v2.0.0-dev.1\",\"targetCommitish\":\"main\",\"url\":\"https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.1\"}\n",
+    "stderr": ""
+  }
+}

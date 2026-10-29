@@ -1,0 +1,9 @@
+test_credentials_paths_and_fixtures_are_rejected (test_distribution.DistributionTests.test_credentials_paths_and_fixtures_are_rejected) ... ok
+test_current_source_has_only_v2_entries_and_explicit_resources (test_distribution.DistributionTests.test_current_source_has_only_v2_entries_and_explicit_resources) ... ok
+test_retired_import_and_process_path_are_rejected (test_distribution.DistributionTests.test_retired_import_and_process_path_are_rejected) ... ok
+test_wheel_checks_actual_members_not_filename (test_distribution.DistributionTests.test_wheel_checks_actual_members_not_filename) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.033s
+
+OK

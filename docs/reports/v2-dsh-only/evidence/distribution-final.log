@@ -1,0 +1,17 @@
+{
+  "source": {
+    "modules": 12,
+    "protocol_files": 24,
+    "status": "PASS"
+  },
+  "bundle": {
+    "members": 46,
+    "core_wheels": [
+      {
+        "members": 41,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS"
+  }
+}

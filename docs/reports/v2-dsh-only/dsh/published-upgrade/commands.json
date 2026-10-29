@@ -1,0 +1,168 @@
+[
+  {
+    "name": "01-published-dev1-install",
+    "argv": [
+      "/Users/zhangliangchen/PycharmProjects/BUGate/.venv/bin/python",
+      "/private/tmp/bugate-dsh-release/public-download/install_dsh.py",
+      "--package",
+      "/private/tmp/bugate-dsh-release/public-download/bugate-deepseek-harness-2.0.0-dev.1.tgz",
+      "--project",
+      "/private/tmp/bugate-v2-only-published-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/tmp/bugate-v2-only-published-upgrade/dsh-home",
+      "--venv",
+      "/private/tmp/bugate-v2-only-published-upgrade/previous-bootstrap"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 6.47
+  },
+  {
+    "name": "02-old-task-init",
+    "argv": [
+      "/private/tmp/bugate-v2-only-published-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/0a4f7ddbcb0a035f603823f82da14e399ffa6bd236afeed3879625e8f626baab/venv/bin/python",
+      "-m",
+      "bugate",
+      "init",
+      "--project",
+      "/private/tmp/bugate-v2-only-published-upgrade/project",
+      "--task",
+      "old-task",
+      "--sut-profile",
+      "/private/tmp/bugate-v2-only-published-upgrade/project/profile.json",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.32
+  },
+  {
+    "name": "03-actual-dev2-upgrade",
+    "argv": [
+      "/Users/zhangliangchen/PycharmProjects/BUGate/.venv/bin/python",
+      "/Users/zhangliangchen/PycharmProjects/BUGate/dist/v2-dsh-only/install_dsh.py",
+      "--package",
+      "/Users/zhangliangchen/PycharmProjects/BUGate/dist/v2-dsh-only/bugate-deepseek-harness-2.0.0-dev.2.tgz",
+      "--project",
+      "/private/tmp/bugate-v2-only-published-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/tmp/bugate-v2-only-published-upgrade/dsh-home",
+      "--venv",
+      "/private/tmp/bugate-v2-only-published-upgrade/candidate-bootstrap"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.92
+  },
+  {
+    "name": "04-old-binding-rejected-no-migration",
+    "argv": [
+      "/private/tmp/bugate-v2-only-published-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0/venv/bin/python",
+      "-m",
+      "bugate",
+      "protocol",
+      "prepare",
+      "--task",
+      "/private/tmp/bugate-v2-only-published-upgrade/project/test-task/old-task",
+      "--json"
+    ],
+    "exit_code": 2,
+    "elapsed_seconds": 0.36
+  },
+  {
+    "name": "05-new-v2-task-init",
+    "argv": [
+      "/private/tmp/bugate-v2-only-published-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0/venv/bin/python",
+      "-m",
+      "bugate",
+      "init",
+      "--project",
+      "/private/tmp/bugate-v2-only-published-upgrade/project",
+      "--task",
+      "new-task",
+      "--sut-profile",
+      "/private/tmp/bugate-v2-only-published-upgrade/project/profile.json",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.09
+  },
+  {
+    "name": "06-new-v2-task-prepare",
+    "argv": [
+      "/private/tmp/bugate-v2-only-published-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0/venv/bin/python",
+      "-m",
+      "bugate",
+      "protocol",
+      "prepare",
+      "--task",
+      "/private/tmp/bugate-v2-only-published-upgrade/project/test-task/new-task",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.1
+  },
+  {
+    "name": "07-actual-archive-rollback",
+    "argv": [
+      "/private/tmp/bugate-v2-only-published-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0/venv/bin/python",
+      "-m",
+      "bugate",
+      "remove",
+      "deepseek-harness",
+      "--project",
+      "/private/tmp/bugate-v2-only-published-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/tmp/bugate-v2-only-published-upgrade/dsh-home",
+      "--json",
+      "--rollback"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.73
+  },
+  {
+    "name": "08-restored-old-binding-prepare",
+    "argv": [
+      "/private/tmp/bugate-v2-only-published-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/0a4f7ddbcb0a035f603823f82da14e399ffa6bd236afeed3879625e8f626baab/venv/bin/python",
+      "-m",
+      "bugate",
+      "protocol",
+      "prepare",
+      "--task",
+      "/private/tmp/bugate-v2-only-published-upgrade/project/test-task/old-task",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.11
+  },
+  {
+    "name": "09-remove-preserves-both-tasks",
+    "argv": [
+      "/private/tmp/bugate-v2-only-published-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0/venv/bin/python",
+      "-m",
+      "bugate",
+      "remove",
+      "deepseek-harness",
+      "--project",
+      "/private/tmp/bugate-v2-only-published-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/tmp/bugate-v2-only-published-upgrade/dsh-home",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.49
+  }
+]

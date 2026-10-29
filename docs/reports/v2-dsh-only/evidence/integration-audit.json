@@ -1,0 +1,19 @@
+{
+  "source_manifest_files": 52,
+  "changed_build_inputs": [],
+  "published_tag_refs_unchanged": true,
+  "protected_worktree_status_exit": 0,
+  "protected_worktree_status": "",
+  "checksums": "bugate-deepseek-harness-2.0.0-dev.2.tgz: OK\nbugate_core-2.0.0a2-py3-none-any.whl: OK\nbuild-manifest.json: OK\ninstall_dsh.py: OK\nsource-manifest.json: OK\n",
+  "implementation_commit": "e40ce1f739899acf1b88084c537ae62b871282b6",
+  "independent_final_review": {
+    "requirements": 49,
+    "requirement_drift": [],
+    "expected_drift": [],
+    "applicable_pass": 48,
+    "retired": [
+      "AC-33"
+    ],
+    "blocking_findings": []
+  }
+}

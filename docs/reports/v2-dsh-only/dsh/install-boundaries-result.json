@@ -1,0 +1,82 @@
+{
+  "status": "PASS",
+  "verification": "installer unit/boundary tests; not host runtime",
+  "command": ".venv/bin/python -m unittest discover -s tests/integration_install -p test_*.py -v",
+  "tests": [
+    {
+      "name": "test_ac11_second_process_lock_conflicts",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac11_second_process_lock_conflicts",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac12_profile_cannot_rebind_other_project",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac12_profile_cannot_rebind_other_project",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac13_archive_link_and_parent_escape",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac13_archive_link_and_parent_escape",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac13_profile_path_escape",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac13_profile_path_escape",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac13_symlink_scope_escape",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac13_symlink_scope_escape",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac15_missing_python",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac15_missing_python",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac15_output_bound",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac15_output_bound",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac16_timeout_reaps_process",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac16_timeout_reaps_process",
+      "status": "PASS"
+    },
+    {
+      "name": "test_ac17_atomic_write_does_not_follow_symlink",
+      "location": "test_install_boundaries.InstallBoundaries.test_ac17_atomic_write_does_not_follow_symlink",
+      "status": "PASS"
+    },
+    {
+      "name": "test_hc01_same_block_replacement_is_byte_idempotent",
+      "location": "test_install_boundaries.InstallBoundaries.test_hc01_same_block_replacement_is_byte_idempotent",
+      "status": "PASS"
+    },
+    {
+      "name": "test_hc14_edited_block_is_not_overwritten",
+      "location": "test_install_boundaries.InstallBoundaries.test_hc14_edited_block_is_not_overwritten",
+      "status": "PASS"
+    },
+    {
+      "name": "test_hc14_owned_block_remove_preserves_user_bytes",
+      "location": "test_install_boundaries.InstallBoundaries.test_hc14_owned_block_remove_preserves_user_bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "test_missing_unselected_host_is_nonfatal",
+      "location": "test_install_boundaries.InstallBoundaries.test_missing_unselected_host_is_nonfatal",
+      "status": "PASS"
+    },
+    {
+      "name": "test_v2_bundle_core_pin_and_legacy_version_rejection",
+      "location": "test_install_boundaries.InstallBoundaries.test_v2_bundle_core_pin_and_legacy_version_rejection",
+      "status": "PASS"
+    },
+    {
+      "name": "test_wheel_abi_mismatch_is_explicit_before_install",
+      "location": "test_install_boundaries.InstallBoundaries.test_wheel_abi_mismatch_is_explicit_before_install",
+      "status": "PASS"
+    }
+  ]
+}

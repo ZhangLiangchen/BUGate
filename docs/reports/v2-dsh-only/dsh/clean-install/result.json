@@ -1,0 +1,38 @@
+{
+  "status": "PASS",
+  "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted",
+  "package_sha256": "1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0",
+  "dsh_version": "0.2.2-alpha.2",
+  "tests": 19,
+  "mapping": {
+    "HC-01": [
+      "02-repeat"
+    ],
+    "HC-02": [
+      "03-doctor"
+    ],
+    "HC-11": [
+      "05-stale-projection"
+    ],
+    "HC-14": [
+      "07-rollback",
+      "09-remove",
+      "13-explicit-pending-rollback",
+      "18-post-record-recovery"
+    ],
+    "AC-19": [
+      "01-clean-bootstrap"
+    ],
+    "AC-20": [
+      "01-clean-bootstrap",
+      "03-doctor"
+    ],
+    "AC-31": [
+      "02-repeat",
+      "06-upgrade",
+      "07-rollback",
+      "09-remove",
+      "14-reinstall-after-recovery"
+    ]
+  }
+}

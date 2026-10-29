@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/usr/bin/sandbox-exec",
+    "-p",
+    "(version 1) (allow default) (deny file-read* (subpath \"/Users/zhangliangchen/PycharmProjects/BUGate\"))",
+    "/bin/cat",
+    "/Users/zhangliangchen/PycharmProjects/BUGate/pyproject.toml"
+  ],
+  "exit_code": 1,
+  "stdout": "",
+  "stderr": "cat: /Users/zhangliangchen/PycharmProjects/BUGate/pyproject.toml: Operation not permitted\n",
+  "result": "PASS"
+}

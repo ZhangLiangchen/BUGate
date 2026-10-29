@@ -1,0 +1,1088 @@
+{
+  "authority": "User 2026-10-29 v2 + DSH only destructive upgrade",
+  "source_sha256": "96375e7c7357e01aaea9197539bc2096a94833d1130e25c3a655faa261ec00e2",
+  "baseline": "61e1327a7bf01505cc82760782ffa1272ccaa03f",
+  "items": [
+    {
+      "id": "HC-01",
+      "requirement": "setup 幂等",
+      "expected": "setup 幂等",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/clean-install/result.json",
+          "tests": [
+            "02-repeat"
+          ],
+          "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted"
+        },
+        {
+          "log": "dsh/published-upgrade/result.json",
+          "tests": [
+            "03-actual-dev2-upgrade"
+          ],
+          "level": "published-v2-archive-upgrade-and-rollback; no task migration"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-02",
+      "requirement": "canonical Protocol 可发现",
+      "expected": "canonical Protocol 可发现",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_HC02_04_05_canonical_schema_binding_context"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/clean-install/result.json",
+          "tests": [
+            "03-doctor"
+          ],
+          "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-03",
+      "requirement": "工作区/任务身份一致解析",
+      "expected": "工作区/任务身份一致解析",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_HC03_task_ambiguity_is_explicit"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world",
+            "HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-04",
+      "requirement": "精确绑定版本与摘要保持一致",
+      "expected": "精确绑定版本与摘要保持一致",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_HC02_04_05_canonical_schema_binding_context"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/published-upgrade/result.json",
+          "tests": [
+            "04-old-binding-rejected-no-migration"
+          ],
+          "level": "published-v2-archive-upgrade-and-rollback; no task migration"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-05",
+      "requirement": "PreparedContext 注入前通过 Schema 校验",
+      "expected": "PreparedContext 注入前通过 Schema 校验",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_HC02_04_05_canonical_schema_binding_context"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction",
+            "HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-06",
+      "requirement": "相关 Agent 推理前已有适用协议上下文",
+      "expected": "相关 Agent 推理前已有适用协议上下文",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-07",
+      "requirement": "长任务不依赖一次性 Skill 记忆",
+      "expected": "长任务不依赖一次性 Skill 记忆",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-08",
+      "requirement": "提供恢复生命周期时，压缩/重启后重新 hydrate",
+      "expected": "提供恢复生命周期时，压缩/重启后重新 hydrate",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-09",
+      "requirement": "受支持子 Agent 独立取得同一 Binding",
+      "expected": "受支持子 Agent 独立取得同一 Binding",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard",
+            "HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-10",
+      "requirement": "版本/摘要失配可见失败",
+      "expected": "版本/摘要失配可见失败",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+            "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context",
+            "HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/published-upgrade/result.json",
+          "tests": [
+            "04-old-binding-rejected-no-migration"
+          ],
+          "level": "published-v2-archive-upgrade-and-rollback; no task migration"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-11",
+      "requirement": "过期投影可检测",
+      "expected": "过期投影可检测",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+            "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/clean-install/result.json",
+          "tests": [
+            "05-stale-projection"
+          ],
+          "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-12",
+      "requirement": "显式 assessment 可调用",
+      "expected": "显式 assessment 可调用",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-13",
+      "requirement": "Adapter 不改变核心方法与评估语义",
+      "expected": "Adapter 不改变核心方法与评估语义",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-14",
+      "requirement": "rollback 只删除本插件拥有的集成状态",
+      "expected": "rollback 只删除本插件拥有的集成状态",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/clean-install/result.json",
+          "tests": [
+            "07-rollback",
+            "09-remove",
+            "13-explicit-pending-rollback",
+            "18-post-record-recovery"
+          ],
+          "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted"
+        },
+        {
+          "log": "dsh/published-upgrade/result.json",
+          "tests": [
+            "07-actual-archive-rollback",
+            "09-remove-preserves-both-tasks"
+          ],
+          "level": "published-v2-archive-upgrade-and-rollback; no task migration"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "HC-15",
+      "requirement": "历史 Context Runtime 不覆盖协议与当前工作区事实",
+      "expected": "历史 Context Runtime 不覆盖协议与当前工作区事实",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_HC15_historical_memory_cannot_override_current_facts"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-01",
+      "requirement": "通用临时 SUT 完整闭环",
+      "expected": "工件、Oracle、用例、真实执行与声明逐项可追溯",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC01_complete_traceable_real_execution"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/standalone-runtime/result.json",
+          "tests": [
+            "authorAndExecute"
+          ],
+          "level": "real-dsh-runtime-deterministic-model-installed-package"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-02",
+      "requirement": "缺少 Oracle 或业务语义未定",
+      "expected": "对应需求验证声明不能 satisfied，给明确缺口",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC02_missing_oracle_rejected",
+            "test_AC02_semantics_require_current_review",
+            "test_AC02_stale_review_rejected"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-03",
+      "requirement": "只有代码，无运行",
+      "expected": "执行保持 not_run，不能宣称已验证",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC03_code_without_execution"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-04",
+      "requirement": "退出码零但零用例/全部跳过",
+      "expected": "不给出需求通过结论",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC04_all_skipped_exit_zero",
+            "test_AC04_all_xfail_not_verified",
+            "test_AC04_zero_tests_exit_zero"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-05",
+      "requirement": "真实产品失败",
+      "expected": "保留失败证据；符合交付范围时可完成测试任务",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC05_real_product_failure_completes_delivery_not_verification"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-06",
+      "requirement": "伪造 passed/verified/exit_code 字段",
+      "expected": "不升级为宿主观测，不绕过评估",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC06_forged_host_record_without_receipt",
+            "test_AC06_import_cannot_upgrade_source"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-07",
+      "requirement": "导入历史或他人日志",
+      "expected": "保留来源与适用性，不能冒称本次执行",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC07_external_history_retains_provenance"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-08",
+      "requirement": "同路径内容修改/证据截断/删除",
+      "expected": "检测摘要或引用异常，旧评估失效",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC08_evidence_deleted",
+            "test_AC08_evidence_truncated",
+            "test_AC08_new_runtime_input_invalidates_prior_execution",
+            "test_AC08_same_path_implementation_changed"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-09",
+      "requirement": "协议/Profile/规则/脚本变化",
+      "expected": "旧评估不再授权当前声明",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC09_changed_oracle_cannot_reuse_prior_execution",
+            "test_AC09_profile_mismatch",
+            "test_AC09_protocol_mismatch",
+            "test_AC09_source_revision_mismatch"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+            "HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/published-upgrade/result.json",
+          "tests": [
+            "04-old-binding-rejected-no-migration"
+          ],
+          "level": "published-v2-archive-upgrade-and-rollback; no task migration"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-10",
+      "requirement": "评估写入后的重复 prepare",
+      "expected": "派生输出不导致输入摘要无限自变",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC10_assessment_outputs_do_not_self_invalidate",
+            "test_AC10_current_claim_mutation_cannot_reuse_old_satisfaction",
+            "test_AC10_forged_result_not_authority"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-11",
+      "requirement": "并发修改发生在评估与提交之间",
+      "expected": "重评或明确冲突，无静默旧结果",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC11_binding_change_detected_in_existing_workspace",
+            "test_AC11_change_between_evaluation_and_commit_is_conflict",
+            "test_AC11_concurrent_lock_rejects_second_writer",
+            "test_AC11_expected_snapshot_conflict"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-12",
+      "requirement": "同 task id、不同工作区",
+      "expected": "不串上下文、证据、缓存或结论",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC12_same_task_id_different_workspace"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-12/25 multi-workspace same task id has isolated contexts and evidence"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-13",
+      "requirement": "路径逃逸、符号链接、越权写",
+      "expected": "限定到授权任务/安装范围",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC13_report_symlink_created_during_execution_is_rejected",
+            "test_AC13_traversal_and_symlink"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-14",
+      "requirement": "工件含指令、模板变量或长文本",
+      "expected": "作为数据处理，不执行或插值；预算正确",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC14_content_is_data_and_utf8_budget"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-15",
+      "requirement": "Python 缺失、异常、无效 JSON、输出过大",
+      "expected": "有界、明确失败，无假通过",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC15_invalid_json_cli",
+            "test_AC15_missing_process",
+            "test_AC15_missing_python_package_has_structured_error",
+            "test_AC15_output_limit"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-15 actual provider rejects missing Python, malformed JSON and oversized output",
+            "AC-15 envelope operation and exit semantics cannot be forged"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-16",
+      "requirement": "超时或用户取消",
+      "expected": "正确分类并结束受管进程，无残留",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC16_cancel_cli_terminates_process",
+            "test_AC16_cancel_terminates_process_group_child",
+            "test_AC16_timeout_terminates_process"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-16 timeout and cancellation terminate real managed processes",
+            "AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-17",
+      "requirement": "evidence 写盘失败、半写、重复事件",
+      "expected": "不接受不完整证据，去重且可恢复",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC17_atomic_failure_keeps_previous",
+            "test_AC17_evidence_publication_failure_does_not_authorize",
+            "test_AC17_run_idempotency",
+            "test_AC17_unknown_execution_is_not_replayed"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/standalone-runtime/result.json",
+          "tests": [
+            "durable execution Evidence before tools/result"
+          ],
+          "level": "real-dsh-runtime-deterministic-model-installed-package"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-18",
+      "requirement": "无记忆服务",
+      "expected": "普通 prepare/validate/assess 仍可运行",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC18_no_memory_service_dependency"
+          ],
+          "level": "core and real local process"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-19",
+      "requirement": "实际 bundle 安装到新 profile",
+      "expected": "dump-config 层正确，插件真实加载",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/clean-install/result.json",
+          "tests": [
+            "01-clean-bootstrap"
+          ],
+          "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted"
+        },
+        {
+          "log": "dsh/standalone-runtime/result.json",
+          "tests": [
+            "actual installed plugin apply"
+          ],
+          "level": "real-dsh-runtime-deterministic-model-installed-package"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-20",
+      "requirement": "脱离 BUGate checkout",
+      "expected": "Python、Schema、Skill、方法资源全部可定位",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/clean-install/result.json",
+          "tests": [
+            "01-clean-bootstrap",
+            "03-doctor"
+          ],
+          "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted"
+        },
+        {
+          "log": "dsh/standalone-runtime/result.json",
+          "tests": [
+            "OS source denial; installed venv+bundle only"
+          ],
+          "level": "real-dsh-runtime-deterministic-model-installed-package"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-21",
+      "requirement": "用锁定 DSH 类型编译",
+      "expected": "无虚构接口、宽泛 any 或 stub 掩盖契约错误",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-21/27 source-backed authoring starts empty and records digests through the shared core"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/standalone-runtime/result.json",
+          "tests": [
+            "compiled plugin against real DSH runtime"
+          ],
+          "level": "real-dsh-runtime-deterministic-model-installed-package"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-22",
+      "requirement": "真正模型请求前的上下文",
+      "expected": "首轮和刷新后都是正确任务、绑定与最新缺口",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction",
+            "AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps",
+            "HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-23",
+      "requirement": "至少 50 次确定性 turn/等价刷新驱动及压缩",
+      "expected": "上下文恢复且无无界累积或旧满意结论",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-24",
+      "requirement": "restart/resume 与 preset 变化",
+      "expected": "独立验证 BUGate exact digest，不静默升级",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly",
+            "HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-25",
+      "requirement": "spawn/fork/独立 preset 子 Agent",
+      "expected": "同绑定、正确权限和隔离；不靠父局部 guard 继承假设",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-12/25 multi-workspace same task id has isolated contexts and evidence",
+            "HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard",
+            "HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-26",
+      "requirement": "nested/PTC tool call",
+      "expected": "正确归因、去重与执行证据关联",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-27",
+      "requirement": "async pre-execute + sync guard",
+      "expected": "时序正确，拒绝不会被后续允许反转",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads",
+            "AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps",
+            "AC-21/27 source-backed authoring starts empty and records digests through the shared core"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-28",
+      "requirement": "缺业务理解时补足材料",
+      "expected": "必要读取、分析与合法探索不被全部锁死",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads",
+            "AC-28 configured source probe runs before design without turning zero cases into verification"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-29",
+      "requirement": "turn-stopping 缺口返工",
+      "expected": "有界继续；取消/受阻可终止，不伪造完成",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-29 completion submission rework is bounded and unchanged gaps stop"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-30",
+      "requirement": "fs/subprocess execution world 不匹配",
+      "expected": "明确 capability error，无偷偷跨环境读取",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "evidence/core-tests.log",
+          "tests": [
+            "test_AC30_filesystem_witness_covers_bytes_path_set_and_declared_sources",
+            "test_AC30_filesystem_witness_excludes_only_runtime_pins_and_lock",
+            "test_AC30_filesystem_witness_is_bounded"
+          ],
+          "level": "core and real local process"
+        },
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-30 provider has opaque targets and rejects unmapped installation",
+            "HC-10/11 AC-09/30 invalid projection/world mapping fails before registration",
+            "HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world",
+            "HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-31",
+      "requirement": "插件重载/卸载/升级/重复安装",
+      "expected": "无重复注册；保留用户配置和任务事实",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly",
+            "AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/clean-install/result.json",
+          "tests": [
+            "02-repeat",
+            "06-upgrade",
+            "07-rollback",
+            "09-remove",
+            "14-reinstall-after-recovery"
+          ],
+          "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted"
+        },
+        {
+          "log": "dsh/published-upgrade/result.json",
+          "tests": [
+            "03-actual-dev2-upgrade",
+            "07-actual-archive-rollback"
+          ],
+          "level": "published-v2-archive-upgrade-and-rollback; no task migration"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-32",
+      "requirement": "非 BUGate 工作区",
+      "expected": "不误启用治理、不误拦截",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "AC-32 non-BUGate workspace does not activate context or guard"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "id": "AC-33",
+      "requirement": "legacy Claude/Codex 与脚本回归",
+      "expected": "原契约保持，安装/更新/归档相关测试通过",
+      "status": "RETIRED",
+      "evidence": [],
+      "reason": "因本次范围变更退役：用户明确撤销旧 Claude/Codex、脚本、installer/updater 兼容与回归要求。"
+    },
+    {
+      "id": "AC-34",
+      "requirement": "CLI 与插件同一输入",
+      "expected": "findings、verdict 和 QualityPosture 语义一致",
+      "status": "PASS",
+      "evidence": [
+        {
+          "log": "dsh/runtime-final.log",
+          "tests": [
+            "HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction"
+          ],
+          "level": "real DSH runtime; deterministic model fixture; real local command execution"
+        },
+        {
+          "log": "dsh/standalone-runtime/result.json",
+          "tests": [
+            "canonical assess result satisfied"
+          ],
+          "level": "real-dsh-runtime-deterministic-model-installed-package"
+        }
+      ],
+      "reason": ""
+    }
+  ],
+  "additional": [
+    {
+      "id": "NL-01",
+      "requirement": "No legacy source runtime or old host entry",
+      "status": "PASS",
+      "evidence": [
+        "evidence/distribution-final.json",
+        "evidence/distribution-tests-final.log"
+      ]
+    },
+    {
+      "id": "NL-02",
+      "requirement": "No legacy in new wheel and bundle",
+      "status": "PASS",
+      "evidence": [
+        "evidence/distribution-final.json",
+        "evidence/distribution-tests-final.log"
+      ]
+    },
+    {
+      "id": "NL-03",
+      "requirement": "Native v2 runtime independent of deleted scripts; old inputs rejected",
+      "status": "PASS",
+      "evidence": [
+        "evidence/distribution-final.json",
+        "evidence/distribution-tests-final.log",
+        "evidence/core-tests.log",
+        "dsh/source-denied-install/result.json",
+        "dsh/standalone-runtime/result.json"
+      ]
+    }
+  ],
+  "status": "COMPLETE",
+  "applicable_pass": 48,
+  "retired": 1,
+  "additional_pass": 3,
+  "live_model": "NOT_RUN; optional; deterministic model fixture used with real DSH runtime"
+}

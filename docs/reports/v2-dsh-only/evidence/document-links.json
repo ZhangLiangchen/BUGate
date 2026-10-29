@@ -1,0 +1,22 @@
+{
+  "markdown_files": 49,
+  "missing_local_links": [
+    {
+      "file": "docs/releases/dsh-v2.0.0-dev.2.md",
+      "target": "../reports/v2-dsh-only/DELIVERY.md"
+    },
+    {
+      "file": "docs/releases/dsh-v2.0.0-dev.2.zh-CN.md",
+      "target": "../reports/v2-dsh-only/DELIVERY.zh-CN.md"
+    },
+    {
+      "file": "README.md",
+      "target": "docs/reports/v2-dsh-only/DELIVERY.md"
+    },
+    {
+      "file": "README.zh-CN.md",
+      "target": "docs/reports/v2-dsh-only/DELIVERY.zh-CN.md"
+    }
+  ],
+  "note": "DELIVERY.md / DELIVERY.zh-CN.md are the parent-owned final report outputs, expected to be written next."
+}

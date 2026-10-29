@@ -1,0 +1,41 @@
+{
+  "dsh_version": "0.2.2-alpha.2",
+  "node": "v26.8.1",
+  "python": "3.13.3",
+  "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "dsh_source_commit": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3",
+  "interface_probes": {
+    "synchronous_context": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-system-prompt/lib/types/index.d.ts",
+      "line": 60,
+      "sha256": "32d1ce35d3438f080f71534f5f0bd2f87f804b27a119b43d7bb8e84f64b35268",
+      "matched": "readonly text: string | ((context: AssembleContext) => string);"
+    },
+    "synchronous_guard": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/index.js",
+      "line": 659,
+      "sha256": "1889cbf718d64518dd83245d4dba1e1f080b2c5326259c3ed5b1be7a7666a2bd",
+      "matched": "const reason = guard(exec);"
+    },
+    "awaited_pre_execute": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/pipeline.js",
+      "line": 386,
+      "sha256": "f6c850cefce30831c4c5f160e831856b105935331bacd1ae0823129001614bc6",
+      "matched": "await this.ctx.waterfall(carrier, \"tools/pre-execute\""
+    },
+    "awaited_created": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js",
+      "line": 710,
+      "sha256": "8673b5cfadfbb6e6ce0bcb341d0ea2877adc2986eab1c2b6c8baf32726534c92",
+      "matched": "await this.ctx.serial(entry.carrier, \"agent/created\""
+    },
+    "awaited_turn_stopping": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js",
+      "line": 791,
+      "sha256": "a6fa8e0c7c90191caf5f4a3bb5c624a86e9845cf3c79d020b71420d0e20ae4c1",
+      "matched": "\"agent/turn-stopping\""
+    }
+  },
+  "model": "deterministic fixture; live-model not run"
+}
