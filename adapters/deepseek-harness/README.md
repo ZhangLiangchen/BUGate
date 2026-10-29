@@ -5,8 +5,9 @@
 The native `@bugate/deepseek-harness` bundle targets DSH **0.2.2-alpha.2**, verified
 against official source commit `f3803c96974ad4a94195fb97e5c637e9c2a3afe3`.
 It uses the shared Python core **2.1.0a1** and canonical protocol **2.1.0-dev.1**.
-This is the sole current product adapter. The 2.1.0-dev.1 build is a local delivery;
-this refactor does not publish or replace a public release.
+This is the sole current product adapter. Release assets and verification
+records are indexed in the [documentation guide](../../docs/README.md); local
+builds do not publish or replace releases.
 
 See [installation and usage](../../docs/DEEPSEEK_HARNESS.md),
 [plugin configuration](plugin/README.md), and [runtime tests](tests/README.md).

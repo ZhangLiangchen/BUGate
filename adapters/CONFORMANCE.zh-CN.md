@@ -2,7 +2,7 @@
 
 [English](CONFORMANCE.md) | 简体中文
 
-HC-01～HC-15 编号与原始语义不变，逐项定义见英文对应表；当前验证对象仅为 DeepSeek Harness。
+DeepSeek Harness 适配器遵循以下行为契约。HC 编号用于证据追踪，不表示支持其他宿主；唯一机器规则仍位于 `protocol/v2/`。
 
 | ID | 契约 |
 |---|---|
@@ -22,4 +22,4 @@ HC-01～HC-15 编号与原始语义不变，逐项定义见英文对应表；当
 | HC-14 | Rollback 仅移除插件拥有的集成状态。 |
 | HC-15 | 历史上下文不能覆盖协议和当前工作区事实。 |
 
-HC-15 保留为权威边界，但不要求 Context Runtime 服务。多宿主 setup 和旧兼容回归已退役，AC-33 明确标为退役而非 PASS。Manifest 声明支持能力及限制。Setup/doctor/remove 针对一个明确 DSH profile。Doctor 区分宿主存在、插件/资源、投影、绑定与 hydration 观察；安装成功不证明真实受管会话已运行。
+HC-15 保留为权威边界，但不要求 Context Runtime 服务。多宿主 setup 和旧兼容回归已退役；[历史证据索引](../docs/README.zh-CN.md#验证记录)保留这些历史决策，与当前适配器行为分开。Manifest 声明支持能力及限制。Setup/doctor/remove 针对一个明确 DSH profile。Doctor 区分宿主存在、插件/资源、投影、绑定与 hydration 观察；安装成功不证明真实受管会话已运行。

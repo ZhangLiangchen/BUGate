@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-29",
+  "request": "Commit all current changes, integrate main, publish updated release, remove misleading obsolete documentation, rewrite positioning/architecture in README.",
+  "head_before": "bb6153efc7a334172c36f069c2c160504df8f375",
+  "main_before": "fe3e29b82059504cd47893b72005051489c0810f",
+  "remote_main_after_fetch": "fe3e29b82059504cd47893b72005051489c0810f",
+  "worktrees": "worktree /Users/zhangliangchen/PycharmProjects/BUGate\nHEAD bb6153efc7a334172c36f069c2c160504df8f375\nbranch refs/heads/codex/scope-convergence\n\nworktree /Users/zhangliangchen/PycharmProjects/BUGate/.claude/worktrees/bugate-stage-11-s10-d02-6c5b49\nHEAD f76f22ab9468977677bc6637226a4aa3049ad8ca\ndetached\n\n",
+  "repository": {
+    "defaultBranchRef": {
+      "name": "main"
+    },
+    "description": "An AI black-box testing analysis and test case generation automation framework.",
+    "nameWithOwner": "ZhangLiangchen/BUGate",
+    "url": "https://github.com/ZhangLiangchen/BUGate"
+  },
+  "existing_releases": [
+    {
+      "isDraft": false,
+      "isPrerelease": true,
+      "name": "BUGate DSH v2.0.0-dev.2 — v2-only native release",
+      "publishedAt": "2026-10-29T06:45:00Z",
+      "tagName": "dsh-v2.0.0-dev.2"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": true,
+      "name": "BUGate DSH 2.0.0-dev.1 — macOS arm64 prerelease",
+      "publishedAt": "2026-10-29T05:37:02Z",
+      "tagName": "dsh-v2.0.0-dev.1"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate v0.4.5",
+      "publishedAt": "2026-08-18T06:56:06Z",
+      "tagName": "v0.4.5"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate v0.4.4",
+      "publishedAt": "2026-07-29T12:56:54Z",
+      "tagName": "v0.4.4"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate v0.4.3",
+      "publishedAt": "2026-07-23T13:21:36Z",
+      "tagName": "v0.4.3"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate v0.4.2",
+      "publishedAt": "2026-07-22T13:06:30Z",
+      "tagName": "v0.4.2"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate v0.4.1",
+      "publishedAt": "2026-07-20T14:46:51Z",
+      "tagName": "v0.4.1"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate v0.4.0",
+      "publishedAt": "2026-07-20T13:01:16Z",
+      "tagName": "v0.4.0"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate 0.3.5 — imported full-check layout fix",
+      "publishedAt": "2026-07-20T08:14:16Z",
+      "tagName": "v0.3.5"
+    },
+    {
+      "isDraft": false,
+      "isPrerelease": false,
+      "name": "BUGate 0.3.4 — consolidated import guidance, collision guards, session-alignment safety",
+      "publishedAt": "2026-07-15T09:55:04Z",
+      "tagName": "v0.3.4"
+    }
+  ],
+  "release_plan": {
+    "tag": "dsh-v2.1.0-dev.1",
+    "prerelease": true,
+    "existing_tags_releases": "preserve",
+    "artifact_directory": "dist/release-2.1-dev.1",
+    "reason_for_rebuild": "Correct stale version/schema-count/scope documentation in packaged protocol README resources; retain prior local bundle and observations."
+  }
+}

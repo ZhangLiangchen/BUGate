@@ -14,7 +14,7 @@
 
 `ProtocolBinding` 锁定精确协议与 Profile；`TestTask` 标识规范化项目/任务范围；`Artifact`、`Evidence`、`Claim` 保存内容、来源与适用性。`AssessmentRequest` 绑定固定声明和输入快照；`AssessmentResult` 保存确定性/语义/执行维度与 findings；`PreparedProtocolContext` 为宿主渲染当前约束和缺口。字段与类型以 canonical Schema 为准。
 
-工作区快照排除派生评估和事务记账；请求摘要额外覆盖声明、绑定、评估器与参数。对象摘要排除自身摘要字段。内容变化或并发提交冲突使旧授权失效。核心不拥有 Agent loop、current-stage、调度器或必需长期记忆服务。
+授权快照排除派生评估、草稿、建议、未引用用户收据与事务记账；请求摘要额外覆盖声明、绑定、评估器与参数。请求中的 `advisory_digest` 使建议变化后可保存独立评估记录，但不使既有声明或执行失效。对象摘要排除自身摘要字段。内容变化或并发提交冲突使旧授权失效。核心不拥有 Agent loop、current-stage、调度器或必需长期记忆服务。
 
 版本化范围契约引用用户请求证据、有限目标及已有要求/Oracle 事实，inventory 用例绑定其当前版本和摘要。建议与必需覆盖、完成阻塞隔离，辅助活动具有明确边界，见[范围语义](../ACCEPTANCE_SCOPE.zh-CN.md)。
 
@@ -24,4 +24,4 @@
 
 DSH `context.text` 与 `tools.guard` 保持同步；准备和证据持久化使用可等待生命周期/工具接缝。适配器校验并原样注入核心 `render.content`；子 Agent 和恢复会话独立验证精确绑定。文件与执行使用配置的 provider/execution-world 映射，opaque key 不当路径。实现前提缺失时仍允许读取、分析和合法探索。
 
-文档和投影不复制机器权威。原生构建向 Skill 入口追加 canonical MethodSpec 并记录协议/内容摘要；打包校验 Python 与原生资源一致。参见[安装](../DEEPSEEK_HARNESS.zh-CN.md)、[方法](METHOD.zh-CN.md)及[验收](../reports/scope-convergence/ACCEPTANCE_MATRIX.zh-CN.md)。
+文档和投影不复制机器权威。原生构建向 Skill 入口追加 canonical MethodSpec 并记录协议/内容摘要；打包校验 Python 与原生资源一致。参见[安装](../DEEPSEEK_HARNESS.zh-CN.md)、[方法](METHOD.zh-CN.md)及[当前文档与历史记录](../README.zh-CN.md)。

@@ -1,0 +1,180 @@
+{
+  "status": "PASS",
+  "base_commit": "bb6153efc7a334172c36f069c2c160504df8f375",
+  "current_commit": "062b03f2895a7ddabe7ee848d5b8f047a1826da5",
+  "scope": "documentation-only; no product test rerun implied",
+  "commands": [
+    "git ls-files *.md",
+    "Python local Markdown-link existence and bilingual-pair check on owned current documents",
+    "Python stale-version/current-contract scan",
+    "git diff --name-only bb6153efc7a334172c36f069c2c160504df8f375 --"
+  ],
+  "owned_documents": [
+    "AGENTS.md",
+    "AGENTS.zh-CN.md",
+    "CAPABILITIES.md",
+    "CAPABILITIES.zh-CN.md",
+    "CHARTER.md",
+    "CHARTER.zh-CN.md",
+    "CONTRIBUTING.md",
+    "CONTRIBUTING.zh-CN.md",
+    "INIT.md",
+    "INIT.zh-CN.md",
+    "adapters/CONFORMANCE.md",
+    "adapters/CONFORMANCE.zh-CN.md",
+    "adapters/README.md",
+    "adapters/README.zh-CN.md",
+    "adapters/deepseek-harness/README.md",
+    "adapters/deepseek-harness/README.zh-CN.md",
+    "adapters/deepseek-harness/plugin/README.md",
+    "adapters/deepseek-harness/plugin/README.zh-CN.md",
+    "adapters/deepseek-harness/tests/README.md",
+    "adapters/deepseek-harness/tests/README.zh-CN.md",
+    "docs/ACCEPTANCE_SCOPE.md",
+    "docs/ACCEPTANCE_SCOPE.zh-CN.md",
+    "docs/DEEPSEEK_HARNESS.md",
+    "docs/DEEPSEEK_HARNESS.zh-CN.md",
+    "docs/USING-BUGATE.md",
+    "docs/USING-BUGATE.zh-CN.md",
+    "docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md",
+    "docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md",
+    "docs/qa-methodology/METHOD.md",
+    "docs/qa-methodology/METHOD.zh-CN.md",
+    "docs/qa-methodology/README.md",
+    "docs/qa-methodology/README.zh-CN.md",
+    "docs/qa-methodology/SOP.md",
+    "docs/qa-methodology/SOP.zh-CN.md",
+    "protocol/v2/README.md",
+    "protocol/v2/README.zh-CN.md",
+    "views/README.md",
+    "views/README.zh-CN.md",
+    "views/skills/bugate/README.md",
+    "views/skills/bugate/README.zh-CN.md",
+    "views/skills/bugate/SKILL.md",
+    "docs/README.md",
+    "docs/README.zh-CN.md",
+    "docs/reports/release-2.1-dev.1/DOCUMENTATION_AUDIT.md",
+    "docs/reports/release-2.1-dev.1/DOCUMENTATION_AUDIT.zh-CN.md"
+  ],
+  "local_links_checked": 172,
+  "missing_links": [],
+  "bilingual_pairs": [
+    {
+      "chinese": "AGENTS.zh-CN.md",
+      "english": "AGENTS.md",
+      "exists": true
+    },
+    {
+      "chinese": "CAPABILITIES.zh-CN.md",
+      "english": "CAPABILITIES.md",
+      "exists": true
+    },
+    {
+      "chinese": "CHARTER.zh-CN.md",
+      "english": "CHARTER.md",
+      "exists": true
+    },
+    {
+      "chinese": "CONTRIBUTING.zh-CN.md",
+      "english": "CONTRIBUTING.md",
+      "exists": true
+    },
+    {
+      "chinese": "INIT.zh-CN.md",
+      "english": "INIT.md",
+      "exists": true
+    },
+    {
+      "chinese": "adapters/CONFORMANCE.zh-CN.md",
+      "english": "adapters/CONFORMANCE.md",
+      "exists": true
+    },
+    {
+      "chinese": "adapters/README.zh-CN.md",
+      "english": "adapters/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "adapters/deepseek-harness/README.zh-CN.md",
+      "english": "adapters/deepseek-harness/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "adapters/deepseek-harness/plugin/README.zh-CN.md",
+      "english": "adapters/deepseek-harness/plugin/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "adapters/deepseek-harness/tests/README.zh-CN.md",
+      "english": "adapters/deepseek-harness/tests/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/ACCEPTANCE_SCOPE.zh-CN.md",
+      "english": "docs/ACCEPTANCE_SCOPE.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/DEEPSEEK_HARNESS.zh-CN.md",
+      "english": "docs/DEEPSEEK_HARNESS.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/USING-BUGATE.zh-CN.md",
+      "english": "docs/USING-BUGATE.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md",
+      "english": "docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/qa-methodology/METHOD.zh-CN.md",
+      "english": "docs/qa-methodology/METHOD.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/qa-methodology/README.zh-CN.md",
+      "english": "docs/qa-methodology/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/qa-methodology/SOP.zh-CN.md",
+      "english": "docs/qa-methodology/SOP.md",
+      "exists": true
+    },
+    {
+      "chinese": "protocol/v2/README.zh-CN.md",
+      "english": "protocol/v2/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "views/README.zh-CN.md",
+      "english": "views/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "views/skills/bugate/README.zh-CN.md",
+      "english": "views/skills/bugate/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/README.zh-CN.md",
+      "english": "docs/README.md",
+      "exists": true
+    },
+    {
+      "chinese": "docs/reports/release-2.1-dev.1/DOCUMENTATION_AUDIT.zh-CN.md",
+      "english": "docs/reports/release-2.1-dev.1/DOCUMENTATION_AUDIT.md",
+      "exists": true
+    }
+  ],
+  "stale_current_statements": [],
+  "sealed_scope_evidence_changes": [],
+  "product_code_changes": [],
+  "packaged_protocol_changes": [
+    "protocol/v2/README.md",
+    "protocol/v2/README.zh-CN.md"
+  ]
+}

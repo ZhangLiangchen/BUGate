@@ -172,7 +172,7 @@ DSH session pin 及其原子临时文件位于该目录，受管模型写入不�
 ## 开发与验证证据
 
 在独立 Python 环境安装本项目；进入 `adapters/deepseek-harness/plugin` 运行
-`npm run build`，随后运行 `python packaging/build_dsh.py --out-dir dist/scope-convergence`。
+`npm run build`，随后运行 `python packaging/build_dsh.py --out-dir dist/local-build`。
 
 验收区分 Python 契约、真实 DSH 加确定性模型 fixture，以及可选 live-model 测试。
 确定性 fixture 驱动真实 DSH Agent loop 不等于 DeepSeek 模型效果评测。精确命令、
@@ -182,7 +182,7 @@ DSH session pin 及其原子临时文件位于该目录，受管模型写入不�
 ## 本次范围与升级边界
 
 当前仅交付 v2 + DSH；旧宿主自动入口、安装器与格式已退役，不支持 v0.x 自动迁移。
-当前验收以[实现合同](reports/scope-convergence/CONTRACT.zh-CN.md)与[采纳验证映射](reports/scope-convergence/ACCEPTANCE_MATRIX.zh-CN.md)为准。此前 v2-only 报告作为历史记录保留；CI 配置不证明未执行平台通过，也不证明 live-model 效果。
+[文档索引](README.zh-CN.md)区分当前说明、发布验证与冻结实现记录。历史验收矩阵仅适用于其记录的变更与产物摘要，不是未来任务的默认场景清单；CI 配置不证明未执行平台通过，也不证明 live-model 效果。
 支持 v2 bundle 安装升级和按留存安装归档 rollback；core 或协议摘要变化不会静默迁移现有任务，应按当前 v2 输入建立新任务。
 
 范围变更后，本版本要求针对新契约重新执行；旧证据和失败继续作为历史保留。不实现选择性复用，即使部分要求字段未变也不恢复旧授权。

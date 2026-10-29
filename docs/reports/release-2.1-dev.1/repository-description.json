@@ -1,0 +1,19 @@
+{
+  "before": {
+    "description": "An AI black-box testing analysis and test case generation automation framework.",
+    "url": "https://github.com/ZhangLiangchen/BUGate"
+  },
+  "command": [
+    "gh",
+    "repo",
+    "edit",
+    "ZhangLiangchen/BUGate",
+    "--description",
+    "Evidence-based acceptance scope and testing quality protocol, Python evaluator, and native DeepSeek Harness plugin."
+  ],
+  "after": {
+    "description": "Evidence-based acceptance scope and testing quality protocol, Python evaluator, and native DeepSeek Harness plugin.",
+    "url": "https://github.com/ZhangLiangchen/BUGate"
+  },
+  "status": "VERIFIED"
+}

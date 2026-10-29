@@ -26,7 +26,9 @@ test delivery while requirement verification remains unsatisfied.
 
 No legacy format migration, alternative host adapter, role process manager,
 self-healing loop, automatic memory lifecycle or global user configuration cleanup
-is included. Current acceptance requirements are in the [scope matrix](docs/reports/scope-convergence/ACCEPTANCE_MATRIX.md); recorded results must be read separately from that frozen contract.
+is included. Current behavior is defined by the protocol and
+[scope semantics](docs/ACCEPTANCE_SCOPE.md). The [documentation index](docs/README.md)
+separates those rules from version-specific verification snapshots.
 
 The guard uses declared case/activity IDs and current protocol, scope, plan and
 snapshot bindings. It cannot determine every business meaning in arbitrary shell

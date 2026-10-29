@@ -20,8 +20,11 @@ snapshot; `AssessmentResult` records deterministic/semantic/execution dimensions
 and findings. `PreparedProtocolContext` renders current constraints and gaps for
 the host. Consult the canonical Schemas for fields and allowed variants.
 
-Workspace snapshots exclude derived assessments and transaction bookkeeping;
-request digests also cover the claim, binding, evaluator and parameters. Object
+Authorization snapshots exclude derived assessments, drafts, suggestions,
+unreferenced user receipts and transaction bookkeeping. Request digests also
+cover the claim, binding, evaluator and parameters. The request `advisory_digest`
+allows distinct assessment records after suggestions change without invalidating
+the existing claim or execution. Object
 digests exclude their own digest fields. Content changes or concurrent commit
 conflicts invalidate authorization. The core does not own an Agent loop, current
 stage, scheduler or required long-term memory service.
@@ -52,4 +55,4 @@ Machine authority is not duplicated in documentation or projections. The native
 build appends canonical MethodSpec resources to the Skill entry and records
 protocol/content digests; packaging verifies Python/native resource equality.
 See [installation](../DEEPSEEK_HARNESS.md), [method](METHOD.md) and
-[acceptance](../reports/scope-convergence/ACCEPTANCE_MATRIX.md).
+[current and historical documentation](../README.md).

@@ -228,7 +228,7 @@ missing unselected host is nonfatal; a broken selected integration fails.
 
 Install the Python project in a dedicated environment; build the adapter with
 `npm run build` in `adapters/deepseek-harness/plugin`, then run
-`python packaging/build_dsh.py --out-dir dist/scope-convergence`. Development
+`python packaging/build_dsh.py --out-dir dist/local-build`. Development
 dependencies are not shipped. CI executes only current v2 core, distribution and native DSH acceptance.
 
 Acceptance distinguishes Python contracts, real DSH plus a deterministic model
@@ -238,10 +238,11 @@ commands, artifact hashes, adopted requirement/Oracle checks and applicable
 regression results belong in the
 delivery report, not in capability claims inferred from tool registration.
 
-The [current implementation contract](reports/scope-convergence/CONTRACT.md) and
-[adopted verification mapping](reports/scope-convergence/ACCEPTANCE_MATRIX.md) define
-this delivery. Historical v2-only reports remain historical records. No live-model
-effectiveness or unexecuted platform result is implied by the CI configuration.
+The [documentation index](README.md) separates current instructions, release
+verification and frozen implementation records. A historical acceptance matrix
+applies to its recorded change and artifact digest; it does not create a default
+scenario list for future tasks. No live-model effectiveness or unexecuted platform
+result is implied by the CI configuration.
 
 Supported v2 bundle upgrade/rollback preserves prior installation archives.
 A changed core or protocol digest never silently migrates an existing task.

@@ -2,8 +2,9 @@
 
 English | [简体中文](CONFORMANCE.zh-CN.md)
 
-Every first-class BUGate Host Adapter is evaluated against one shared behavioral
-contract. Host-native APIs may differ; observable BUGate semantics must not.
+The DeepSeek Harness adapter follows the behavioral contract below. The HC IDs
+are retained for evidence traceability; they do not imply support for other hosts.
+Canonical machine rules remain under `protocol/v2/`.
 
 ## Required contract
 
@@ -30,7 +31,8 @@ contract. Host-native APIs may differ; observable BUGate semantics must not.
 The only product host is DeepSeek Harness. HC-15 remains applicable as an authority
 invariant: historical text never overrides current task facts, although there is
 no Context Runtime service. Shared multi-host setup and prior compatibility tests
-are retired. AC-33 is marked retired, not passed, in the acceptance matrix.
+are retired. The [historical evidence index](../docs/README.md#verification-records)
+retains those past decisions separately from current adapter behavior.
 
 The manifest records supported capabilities and explicit limits. Setup/doctor/
 remove target one explicit DSH profile. Doctor distinguishes host availability,
