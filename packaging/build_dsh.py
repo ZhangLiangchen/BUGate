@@ -115,7 +115,7 @@ def build(out, python):
             check_name(relative)
             if path.suffix in {'.json', '.js', '.yml', '.yaml'}:
                 content = path.read_text(encoding='utf-8')
-                if str(ROOT) in content or '/Users/zhangliangchen/' in content or 'workspace:*' in content:
+                if str(ROOT) in content or str(Path.home()) + os.sep in content or 'workspace:*' in content:
                     raise SystemExit(f'developer path/reference leaked into {relative}')
             inventory[relative] = digest(path)
         (stage / 'inventory.json').write_text(json.dumps({'apiVersion': 'bugate.bundle/v1', 'files': inventory}, indent=2) + '\n')
