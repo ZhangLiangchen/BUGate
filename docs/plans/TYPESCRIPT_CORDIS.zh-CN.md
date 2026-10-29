@@ -30,6 +30,25 @@ JSON、YAML 和文档保留各自格式。外部 SUT 测试可以使用所需语
 
 当前包锁定 DSH `0.2.2-alpha.2` 和 Cordis `4.0.6-alpha.1`。已有 `apply(ctx, config)`/注入、同步 `context.text`/`tools.guard`、可等待的 `agent/created`、`agent/pre-step`、`agent/request`、`tools/pre-execute`，以及模型准入检查、provider 调用和 teardown，是实施起点。开发前重新核验实际选用的 DSH 源码、类型与包，不虚构 hook、取消接口或子 Agent guard 继承。异步准备完成后才能供同步 guard 使用，证据持久化完成后才能返回工具结果。
 
+## DSH 官方 Agent Team 多视角交叉互审（用户追加决策）
+
+**来源与状态：** 用户先要求原生 subagent 评审及真实来源、独立性、工件绑定，随后明确改为优先复用 DSH 官方 Agent Team 插件。采用最新决定：由 Team 成员执行多视角交叉互审，BUGate 校验真实评审来源、独立性和工件绑定，不能仅靠 reviewer 名称不同就认定独立，不恢复 Claude/Codex 依赖。本项已接受，实施及验收仍为 **NOT_RUN**；效率提升是用户期望，尚未实测。现有 [`assessment.py`](../../src/bugate/assessment.py) 的独立性检查主要比较 producer/reviewer 名称；现有 [DSH 子 Agent 测试](../../adapters/deepseek-harness/tests/runtime.test.mjs)证明绑定和授权来源的部分行为，不证明完整互审链路。本项是有用户来源、需版本化的能力增强，不回写成旧协议已经保证的能力。
+
+DSH 单宿主允许多个 Agent。优先使用官方 Agent Team 承载有限的必要视角评审；宿主拥有成员名册、任务板、消息、委派、执行、取消和生命周期。BUGate 只保存评审工件、必要宿主引用和评估，不复制 Team 状态机，不另建 Agent loop 或调度器，不依赖 Claude Code/Codex。subagent 可以作为官方 Team 的底层实现，或在明确有依据的降级设计中使用；不能自行用直接 subagent 调用替代 Team 来宣称本项验收完成。
+
+**现场接口核验（不是运行验收）：** 本地 `adapters/deepseek-harness/plugin/node_modules/@deepseek-ai/dsh-experimental-agent-team` 的 `package.json`、README 和类型声明对应官方 [`packages/experimental/agent-team`](https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/experimental/agent-team)，版本为 `0.2.2-alpha.2`，另有 `dsh-experimental-tool-agent-team` 和 `dsh-experimental-agent-team-profile`。`ctx.agentTeams` 提供以精确 live Agent 为调用身份的 membership、成员查询、spawnTeammate、sendMessage、任务查询/创建/expectedRevision CAS 更新、waitForChange 和 interrupt。TeamId 关联 Lead SessionId，成员支持 fresh/fork；官方 Team profile 挂载 Team 并禁用直接 subagent/control/fork 工具，底层仍依赖 dsh-subagent。实施前复核实际选用版本和配置，不把 experimental 能力描述成稳定接口。
+
+Team 持久化名册及任务板；消息发送成功只证明目标 inbox 接受，不证明模型处理或单独同步 flush。当前为进程内共享 cwd，不提供 worktree 隔离；writeScopes 是提示，不能替代写入保护。任务 owner 不自动释放，消息无自动重试/重发去重保证。复用这些真实语义设计恢复、取消、并发及评审发布屏障；Team task complete 不等于评审有效，更不等于业务通过。本轮未运行 Team 真实联调。
+
+- **适用范围：** 独立评审是否必需及所需视角由有效 Profile 和本轮采纳要求决定。视角说明它验证什么命题及必要性，不默认固定角色数、模型数、轮数或全员两两互审。评审发现范围外机会仍只记建议，不扩展 SUT 目标；评审本身也有可观察的完成条件和有界返工。
+- **真实来源：** 从实际 DSH 执行接缝捕获被评审工件作者和评审者的 Agent/session 身份、Team/成员身份、委派/父子关系及实际执行结果，绑定此次评审输入与持久化输出。模型填写的名称、session ID、模型名或“已经独立审查”不能提升为宿主观察。主 Agent 代写评审文本可以保留为模型材料，不能冒充 Team 成员的实际输出；作者来源缺失时也不能判定独立性已证明。
+- **独立性边界：** 依据宿主可核验的作者/评审执行关系和输入上下文策略校验独立性，拒绝同一 Agent 换名自审。区分可观察的运行独立性与业务评审质量；新 session、不同 Agent 或不同模型均不单独证明认知独立或结论正确。记录 Team 成员 fresh/fork 创建方式和上下文继承，fork 不得冒称盲审。模型多样性不是默认要求，也不是独立性的替代证据。必要信息不可观察或无法满足既定独立性策略时报告明确缺口，不伪造通过。
+- **精确绑定与失效：** 评审关联任务、协议/评估器/Profile、当前范围/计划、被评审工件 ID/摘要、被审输入快照及评审执行身份。实现时在唯一机器规范中定义适用字段和无循环的输入快照边界。工件或相关输入变化使旧评审失效；跨任务、过时或重放的记录不能授权当前声明。恢复后的有效性依据持久化事实重算，不能依赖父 Agent 局部状态。
+- **交叉核对与结论：** 保存各视角的原始意见、来源、发现、反证及限制，关联后续 Team 讨论/反驳的真实来源、修订及对相同命题分歧的有依据采纳、拒绝、未解决处置。交叉互审不止并行提交几份同意；Lead 不能抹平异议。不得用多数票、名称不同或一致的 pass 替代业务 Oracle，不隐藏范围内未解决问题。结论修订保留历史；修订被评审工件后重新评审当前版本，不无限循环追求全员同意。评审失败、取消、超时或缺失输出不能算评审完成；必要评审缺口只影响相关声明，不能阻止合法辅助工作。
+- **持久化与信任边界：** 宿主观察和模型语义意见分开存储/标识，复用现有工件、证据及评估体系并合理规范化；先完成评审输出与来源记录的持久化，再允许据此授权。CLI、共享核心和插件消费同一规范，不能靠 CLI 导入模型 JSON 伪造宿主评审收据。保证属于本地受管宿主可观察的真实性，不宣称能对抗拥有同等文件系统权限的篡改者，也不承诺评审必然发现所有缺陷。
+
+阶段 0 将上述用户要求映射到规范/Oracle；阶段 1 落实版本化 Schema、MethodSpec、reason codes 和评估；阶段 3 实现官方 Team 原生链路；阶段 4 验证已安装包。最小充分验证至少区分：真实 Team 成员对精确工件的多视角评审及分歧处置；换名自审、伪填身份/主 Agent 代写与来源缺失；工件变更/跨任务/重放失效；恢复、取消及返回前持久化。按这些需求及实际接口选取、合并检查，不固定用例数量。确定性 fixture 必须驱动真实 DSH Agent Team、成员与实际工具；mock、预写 review JSON 或历史子 Agent 测试不能单独证明本项通过。精确安装包在源码禁读、Python 不可用环境中也要运行互审路径；live-model 质量验证另行报告。
+
 ## 必须保持的不变量与差分策略
 
 来源为用户本次决策、[AGENTS](../../AGENTS.zh-CN.md)、[METHOD](../qa-methodology/METHOD.zh-CN.md)、[SOP](../qa-methodology/SOP.zh-CN.md)和当前 v2 机器契约。迁移所需检查覆盖：
@@ -51,11 +70,11 @@ JSON、YAML 和文档保留各自格式。外部 SUT 测试可以使用所需语
 
 | 阶段 | 需求 / 交付 | 可观察 Oracle 与最小充分验证 | 退出条件 |
 |---|---|---|---|
-| 0. 需求、Oracle、基线 | 冻结契约/源码及已知缺陷，映射变更边界、Python 依赖和真实 DSH 接口；决定版本/绑定及历史查看策略。 | 有来源的需求/Oracle 映射、规范字节向量、针对性基线反例、真实 provider/接口核验。 | 每项变更有必要性来源和可区分的 Oracle；实质缺口解决或明确阻塞，不用占位分析放行实现。 |
-| 1. 核心与 Node CLI | 移植校验、语义/范围/声明、创作/上下文与统一 CLI，明确 IO 边界。 | [核心测试](../../tests/v2/)中的适用类别：真实 verdict/reason 断言、无效 JSON、规范向量、旧引用和建议隔离；明确身份差异的开发期差分。 | 运行时检查及输出语义满足 Oracle，差异有证据处置。 |
+| 0. 需求、Oracle、基线 | 冻结契约/源码及已知缺陷，映射变更边界、Python 依赖和真实 DSH 接口；决定版本/绑定及历史查看策略，核验作者/评审来源和 Team 身份及成员独立性可观察边界。 | 有来源的需求/Oracle 映射、规范字节向量、针对性基线反例、真实 provider/接口核验。 | 每项变更有必要性来源和可区分的 Oracle；实质缺口解决或明确阻塞，不用占位分析放行实现；互审来源/上下文策略有可验证设计。 |
+| 1. 核心与 Node CLI | 移植校验、语义/范围/声明、创作/上下文与统一 CLI，明确 IO 边界；版本化原生互审来源、独立性及绑定规则。 | [核心测试](../../tests/v2/)中的适用类别：真实 verdict/reason 断言、无效 JSON、规范向量、旧引用和建议隔离；明确身份差异的开发期差分。 | 运行时检查及输出语义满足 Oracle，差异有证据处置；名称或自报身份不能满足宿主独立评审要求。 |
 | 2. 执行、存储、采集 | 移植工作区身份、原子发布/CAS/锁及进程/报告采集；设计 execution world、CPU/IO 和清理边界。 | 临时真实命令覆盖成功/失败/skip/xfail、缺报告、超时/取消；必要的并发写入、路径/world 不一致、返回前持久化检查。 | 中断不制造完成，使用正确配置 world，清理有界，不支持的映射明确拒绝。 |
-| 3. Cordis 原生接入 | 在核验过的原生接缝以共享 TS 服务替代 PythonBridge，保持上下文/准入、来源和有界返工。 | [真实 DSH 测试类别](../../adapters/deepseek-harness/tests/README.zh-CN.md)：确定性 fixture 驱动实际工具/临时 SUT 命令，检查范围、建议、失败、辅助/诊断、恢复/子 Agent/隔离和取消。 | 真实宿主调用证明约束和证据屏障；mock context 不单独完成本阶段；若运行 live model，单独报告。 |
-| 4. Node 打包与 CI | 移植第一方 build/install/doctor/distribution/test 入口，产出有限 npm 资产、规范投影及一致使用说明/CI。 | 源码禁读且 Python 不可用的干净安装；摘要/资源；适用的重复安装、doctor、升级/rollback/卸载/所有权检查；已安装包真实 DSH 流程。运行所声明的 CI 检查并报告实测平台。 | 精确产物独立运行，校验和与文档一致；不因 TS 推断 Windows 等平台支持。 |
+| 3. Cordis 原生接入 | 在核验过的原生接缝以共享 TS 服务替代 PythonBridge，保持上下文/准入、来源和有界返工；复用 DSH 官方 Agent Team 实现多视角互审和持久化来源。 | [真实 DSH 测试类别](../../adapters/deepseek-harness/tests/README.zh-CN.md)：确定性 fixture 驱动实际工具/临时 SUT 命令，检查范围、建议、失败、辅助/诊断、恢复/子 Agent/隔离和取消，以及上节互审正反例。 | 真实宿主调用证明约束、互审来源/独立性/绑定及证据屏障；mock context 不单独完成本阶段；若运行 live model，单独报告。 |
+| 4. Node 打包与 CI | 移植第一方 build/install/doctor/distribution/test 入口，产出有限 npm 资产、规范投影及一致使用说明/CI。 | 源码禁读且 Python 不可用的干净安装；摘要/资源；适用的重复安装、doctor、升级/rollback/卸载/所有权检查；已安装包真实 DSH 流程及多视角互审链路。运行所声明的 CI 检查并报告实测平台。 | 精确产物独立运行，校验和与文档一致；不因 TS 推断 Windows 等平台支持。 |
 | 5. Python 退役与切换 | 替代实现验证后退役产品桥接/bootstrap/wheelhouse、第一方 Python 工具链和生产回退。 | 有限包/依赖清单检查；无 Python 的产品安装/运行/验收；旧绑定明确拒绝、历史保留及自有卸载/rollback 验证。 | 只保留一个受支持的 TS 产品路径，无隐含 Python 前提；历史发布不变，后续发布独立授权交付。 |
 
 ## 版本、旧证据与安装切换

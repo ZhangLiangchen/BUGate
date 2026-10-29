@@ -71,6 +71,114 @@ Reinspect actual selected DSH source/types/packages before implementation; do no
 invent hooks, cancellation APIs or child-guard inheritance. Await preparation
 before synchronous guards consume it and durable evidence before tool return.
 
+## DSH official Agent Team multi-perspective cross-review (user-added decision)
+
+**Source and status:** The user first requested native subagent review with
+actual provenance, independence and artifact binding, then explicitly selected
+reuse of DSH's official Agent Team plugin. The latest decision takes precedence:
+Team members perform cross-review; BUGate validates actual provenance,
+independence and artifact binding rather than different reviewer names, without
+restoring Claude/Codex dependencies. Accepted; implementation and verification
+remain **NOT_RUN**. Improved efficiency is the user's expectation, not a measured
+result. The
+current independence check in [`assessment.py`](../../src/bugate/assessment.py)
+primarily compares producer/reviewer names. Existing [DSH subagent tests](../../adapters/deepseek-harness/tests/runtime.test.mjs)
+prove some binding and authorization-provenance behavior, not a complete
+cross-review workflow. This is a user-sourced, versioned enhancement, not a claim
+that the previous protocol already guaranteed it.
+
+One DSH host can run multiple Agents. Prefer the official Agent Team for a finite
+set of necessary review perspectives. DSH owns roster, task board, messages,
+delegation, execution, cancellation and lifecycle. BUGate keeps review artifacts,
+necessary host references and assessments; it does not duplicate Team's state
+machine or add an Agent loop, scheduler or Claude Code/Codex dependency. Subagents
+may be the official Team implementation detail or part of an explicitly justified
+fallback design. Direct subagent calls cannot silently replace Team and count as
+completion of this requirement.
+
+**Inspected interfaces, not runtime acceptance:** Local `package.json`, README
+and type declarations under
+`adapters/deepseek-harness/plugin/node_modules/@deepseek-ai/dsh-experimental-agent-team`
+identify official [`packages/experimental/agent-team`](https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/experimental/agent-team)
+version `0.2.2-alpha.2`, with companion `dsh-experimental-tool-agent-team` and
+`dsh-experimental-agent-team-profile` packages. `ctx.agentTeams` exposes membership
+using the exact live calling Agent, member lookup, spawnTeammate, sendMessage,
+task lookup/creation/expectedRevision CAS updates, waitForChange and interrupt.
+TeamId relates to the Lead SessionId; members may start fresh or fork. The official
+Team profile mounts Team and disables direct subagent/control/fork tools while
+Team itself still depends on dsh-subagent. Recheck the selected version and
+configuration before implementation; experimental does not mean a stable API.
+
+Team persists roster and task state. A successful send proves inbox acceptance,
+not model processing or a separate synchronous flush. The current implementation
+shares a cwd within one process, offers no worktree isolation, and treats
+writeScopes as hints rather than write protection. Task ownership is not
+automatically released, and sends have no automatic retry/resend deduplication
+guarantee. Design recovery, cancellation, concurrency and review publication
+barriers around these actual semantics. Team task completion proves neither review
+validity nor business acceptance. No actual Team integration run occurred in this
+documentation update.
+
+- **Applicability:** The effective Profile and adopted requirements determine
+  whether independent review is required and which perspectives are needed.
+  Each perspective explains its proposition and necessity. Do not impose fixed
+  role/model/round counts or all-pairs review. Out-of-scope opportunities remain
+  suggestions, not new SUT goals. Review has observable completion conditions and
+  bounded rework of its own.
+- **Actual provenance:** Capture both the artifact author's and reviewer's
+  Agent/session and Team/member identities, delegation/parent-child relations and actual outcomes
+  at real DSH execution seams, binding review inputs and persisted outputs.
+  Model-supplied names, session IDs, model names or independence claims are not
+  host observations. Parent-authored review text may remain model material but
+  cannot masquerade as a Team member's actual output. Missing author provenance also
+  prevents independence from being established.
+- **Independence boundary:** Check host-verifiable author/reviewer execution
+  relations and input-context policy, rejecting renamed self-review. Separate
+  observable execution independence from business review quality: a new session,
+  another Agent or another model alone proves neither cognitive independence nor
+  correctness. Record fresh/fork Team member creation and inherited context; a fork is not a blind
+  review. Model diversity is neither a default requirement nor substitute evidence.
+  Unobservable required facts or an unmet independence policy produce explicit
+  gaps, never invented success.
+- **Exact binding and invalidation:** Bind reviews to task, protocol/evaluator/
+  Profile, current scope/plan, artifact IDs/digests, reviewed input snapshot and
+  review execution identity. Define applicable fields and non-circular input
+  snapshot boundaries in the sole machine specification during implementation.
+  Changed artifacts or relevant inputs stale the review. Cross-task, stale or
+  replayed records cannot authorize a current claim. Resume recomputes validity
+  from persisted facts, not inherited parent-local state.
+- **Cross-checking and conclusions:** Preserve each perspective's original
+  opinion, sources, findings, counterevidence and limits. Link subsequent Team
+  discussion/rebuttal provenance and revisions to evidence-backed adoption,
+  rejection or unresolved disposition of disagreements about the same proposition.
+  Parallel agreement alone is not cross-review; the Lead cannot erase dissent.
+  Majority votes, different names and matching pass flags do not replace business
+  Oracles or hide unresolved in-scope issues. Preserve conclusion history; changed
+  artifacts require review of the current version, without unbounded attempts to
+  obtain unanimity. Failed, cancelled, timed-out or missing-output reviews are
+  not complete. Required review gaps affect relevant claims without blocking
+  lawful auxiliary work.
+- **Persistence and trust:** Distinguish host observations from model semantic
+  opinions, normalizing within the existing artifact/evidence/assessment system.
+  Durably publish outputs and provenance before they can authorize a claim.
+  CLI, shared core and plugin consume one specification; importing model JSON
+  through the CLI cannot manufacture host review receipts. Assurance covers
+  observations in the managed local host, not tamper resistance against an actor
+  with equal filesystem privileges or a promise to find every defect.
+
+Phase 0 maps these user requirements to specifications/Oracles; phase 1 adds
+versioned Schemas, MethodSpec, reason codes and evaluation; phase 3 implements the
+official Team workflow; phase 4 verifies the installed package. Minimum sufficient checks
+distinguish actual multi-perspective Team member review and disagreement handling on
+exact artifacts; renamed self-review, fabricated identities/parent-authored results
+and absent provenance; changed artifacts/cross-task/replayed records; and resume,
+cancellation and durable return. Select and combine checks by these requirements
+and actual interfaces, without a fixed count. Deterministic fixtures must drive
+real DSH Agent Team, members and actual tools. Mocks, prewritten review JSON and historical
+subagent tests alone do not prove this enhancement. The exact installed package
+must also run the review path with source access denied and Python unavailable;
+live-model quality checks are reported separately.
+
 ## Preserved invariants and comparison policy
 
 Sources are the user's decision, [AGENTS](../../AGENTS.md),
@@ -117,11 +225,11 @@ require the not-yet-built TS evaluator to authorize its own migration.
 
 | Phase | Requirement / deliverable | Observable Oracle and minimum sufficient checks | Exit condition |
 |---|---|---|---|
-| 0. Requirements, Oracles, baseline | Freeze selected contracts/source and known defects; map changed boundaries, Python dependencies and actual DSH interfaces. Decide version/binding and historical inspection policy. | Source-backed requirement/Oracle map; canonical vectors; targeted baseline counterexamples; actual provider/interface probes. | Every planned change has a necessity source and discriminating Oracle; material gaps resolved or explicitly blocked, no placeholder implementation approval. |
-| 1. Core and Node CLI | Port validation, semantics/scope/claims, authoring/context and unified CLI with explicit IO boundaries. | Relevant categories from [core tests](../../tests/v2/): real verdict/reason expectations, malformed JSON, canonical vectors, stale refs and advisory isolation; development differential comparison with documented identity differences. | Runtime checks and output semantics meet their Oracles; disagreements have evidence-backed dispositions. |
+| 0. Requirements, Oracles, baseline | Freeze selected contracts/source and known defects; map changed boundaries, Python dependencies and actual DSH interfaces. Decide version/binding and historical inspection policy; verify observable author/reviewer provenance and Team identity and member independence boundaries. | Source-backed requirement/Oracle map; canonical vectors; targeted baseline counterexamples; actual provider/interface probes. | Every planned change has a necessity source and discriminating Oracle; material gaps resolved or explicitly blocked, no placeholder implementation approval; review provenance/context policy has a verifiable design. |
+| 1. Core and Node CLI | Port validation, semantics/scope/claims, authoring/context and unified CLI with explicit IO boundaries; version native review provenance, independence and binding rules. | Relevant categories from [core tests](../../tests/v2/): real verdict/reason expectations, malformed JSON, canonical vectors, stale refs and advisory isolation; development differential comparison with documented identity differences. | Runtime checks and output semantics meet their Oracles; disagreements have evidence-backed dispositions; names or self-reported identities cannot satisfy host independent-review requirements. |
 | 2. Execution, storage, collector | Port workspace identity, atomic publication/CAS/locks and process/report capture; design execution-world, CPU/IO and cleanup boundaries. | Neutral real commands for success/failure/skip/xfail, missing report, timeout/cancel; necessary concurrent-writer/path/world mismatch and durable-return checks. | No false completion on interruption; correct configured world and bounded cleanup, unsupported mappings explicitly rejected. |
-| 3. Cordis native integration | Replace PythonBridge with shared TS services at verified native seams; preserve context/admission, provenance and bounded rework. | [Real DSH test categories](../../adapters/deepseek-harness/tests/README.md): deterministic fixtures drive actual tools/temporary SUT commands for scope, suggestions, failures, aux/diagnosis, recovery/children/isolation and cancellation. | Actual host calls demonstrate enforcement and evidence barriers. Mock contexts alone do not close the phase; live-model checks, if run, are separate. |
-| 4. Node packaging and CI | Port first-party build/install/doctor/distribution/test entry points; produce finite npm assets, canonical projections and matching usage/CI. | Clean installation with source reads denied and Python unavailable; digest/resources; applicable repeat/doctor/upgrade/rollback/remove/ownership checks; installed real DSH workflows. Run declared CI checks and report actual platforms. | Exact assets work independently; checksums/docs agree. No platform claim from TS alone, including Windows. |
+| 3. Cordis native integration | Replace PythonBridge with shared TS services at verified native seams; preserve context/admission, provenance and bounded rework; reuse DSH official Agent Team for multi-perspective review with persisted provenance. | [Real DSH test categories](../../adapters/deepseek-harness/tests/README.md): deterministic fixtures drive actual tools/temporary SUT commands for scope, suggestions, failures, aux/diagnosis, recovery/children/isolation and cancellation, plus the review success/counterexamples above. | Actual host calls demonstrate enforcement, review provenance/independence/binding and evidence barriers. Mock contexts alone do not close the phase; live-model checks, if run, are separate. |
+| 4. Node packaging and CI | Port first-party build/install/doctor/distribution/test entry points; produce finite npm assets, canonical projections and matching usage/CI. | Clean installation with source reads denied and Python unavailable; digest/resources; applicable repeat/doctor/upgrade/rollback/remove/ownership checks; installed real DSH workflows including multi-perspective cross-review. Run declared CI checks and report actual platforms. | Exact assets work independently; checksums/docs agree. No platform claim from TS alone, including Windows. |
 | 5. Python retirement and cutover | Retire product bridge/bootstrap/wheelhouse, first-party Python tooling and production fallback after replacements are verified. | Finite package/dependency inspection; product install/runtime/verification without Python; explicit old-binding rejection, retained history and owned uninstall/rollback checks. | One supported TS product path, no implicit Python requirement. Historical releases remain intact; later publication has its own authorized delivery. |
 
 ## Version, evidence and installation cutover
