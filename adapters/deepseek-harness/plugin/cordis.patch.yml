@@ -1,0 +1,6 @@
+- insert:
+    - id: bugate
+      name: '@bugate/deepseek-harness'
+      config:
+        pythonExecutable: python3
+        mode: managed

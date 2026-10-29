@@ -35,7 +35,7 @@ BUGate 2.0 的完整目标架构与迁移方案见
 [`docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md)。
 
 Protocol 在 Claude Code / Codex 中的持续加载、Context Hydration、Subagent 继承与 Assessment 接入方案见
-[`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md)。首批实现面向 Claude Code 与 Codex；`adapters/pi/` 与 `adapters/deepseek-harness/` 已为 HyperTest 后续接入预留。
+[`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md)。DeepSeek Harness 原生适配器与 Python v2 共享包已有独立的[安装使用指南](docs/DEEPSEEK_HARNESS.zh-CN.md)，其开发包版本不改变 legacy 0.4.5 release line。Pi 保持预留，已有 Claude/Codex 入口继续兼容。
 
 BUGate 2.0 的状态模型进一步明确为 **Stateless Core + TestTaskWorkspace**：BUGate 不保存 current stage / host state；Artifact、Evidence、Claim 与 AssessmentResult 持久化在任务工作目录中，QualityPosture 由这些事实动态派生。详见 [`ADR-BUGATE-007`](docs/qa-methodology/BUGATE_STATELESS_WORKSPACE_ADR.zh-CN.md)。
 
@@ -43,7 +43,7 @@ BUGate 2.0 的状态模型进一步明确为 **Stateless Core + TestTaskWorkspac
 
 BUGate 2.0 的多 Agent 接入进一步**直接采用 PowerContext 的工程模式**：first-class Host Catalog、Capability Manifest、Core-owned `PreparedProtocolContext`、Host-local Projection、统一 `setup select` / `doctor integrations`、Adapter 自包含 + 共享 Conformance Suite。详见 [`ADR-BUGATE-009`](docs/qa-methodology/BUGATE_HOST_INTEGRATION_POWERCONTEXT_ADR.zh-CN.md)。
 
-后续实现统一从 [`BUGATE_2_0_IMPLEMENTATION_ROADMAP.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_IMPLEMENTATION_ROADMAP.zh-CN.md) 续接。该文档记录当前已定架构、已有目录骨架、Phase A–L 实施顺序、验收标准和禁止回退的架构红线；如果没有新的架构决策，下一步直接进入 **Phase A：Core Schemas**。
+完整架构路线见 [`BUGATE_2_0_IMPLEMENTATION_ROADMAP.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_IMPLEMENTATION_ROADMAP.zh-CN.md)。该文档保留原设计阶段记录；本次共享核心与 DSH 的实际能力、命令和验证边界以[原生接入指南](docs/DEEPSEEK_HARNESS.zh-CN.md)及交付证据为准，不代表所有宿主已完成 2.0 迁移。
 
 ## 前 5 分钟（从这里开始）
 
@@ -57,7 +57,7 @@ BUGate 2.0 的多 Agent 接入进一步**直接采用 PowerContext 的工程模�
 [references/field-guide.md](.shared/skills/bugate-import/references/field-guide.md)。
 它随 kit 进入每个受治理仓,并通过 skill 链接被 agent 自动发现。
 
-零安装（Python 3.9+，只用标准库；推荐 3.10+）。在仓库根目录执行：
+Legacy 零安装（Python 3.9+，只用标准库；推荐 3.10+）。在仓库根目录执行：
 
 ```bash
 python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
@@ -75,9 +75,10 @@ python3 scripts/bugate_init.py <sut-repo> --dry-run
 - **要让 AI agent 把 BUGate 导入 SUT 仓？** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) / [`IMPORT_PROMPT.zh-CN.md`](IMPORT_PROMPT.zh-CN.md) 是可执行导入 prompt（release 下载 → installer → Claude/Codex 接线 → Memory Bus → profile 激活）。
 - **要让 AI agent 升级已有 imported BUGate？** [`UPDATE_PROMPT.md`](UPDATE_PROMPT.md) / [`UPDATE_PROMPT.zh-CN.md`](UPDATE_PROMPT.zh-CN.md) 会调用专用 `bugate-update` skill（默认只读执行 `status` + `plan`，`apply` 需要对 exact plan 的独立批准）。
 - **能做什么 / 全部命令？** [`CAPABILITIES.md`](CAPABILITIES.md)。
-- **必要的 Memory Service**（由 importer 自动安装；文档里的 `bugate init`
-  shorthand 当前指 `python3 scripts/bugate_init.py`）与**可选**运行时（双 agent
+- **Legacy Memory Service**（由旧 importer 安装；旧文档中的 `bugate init`
+  shorthand 指 `python3 scripts/bugate_init.py`）与**可选**运行时（双 agent
   AI CLI、角色隔离）：[`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md)。
+- **DSH 原生适配器与 v2 CLI**：[接入指南](docs/DEEPSEEK_HARNESS.zh-CN.md)。安装后的 `bugate` 命令使用 v2 任务协议；普通 prepare/validate/assess 不依赖 Memory 服务。
 - **方法论**（为什么这样做）：[`docs/qa-methodology/`](docs/qa-methodology/) —— 先读其中的 [README](docs/qa-methodology/README.md)（英文摘要 + 术语表），再读 `METHOD.md` / `SOP.md`。
 
 ## 使用方式 —— 只有一种：导入模式。（打开本仓 = 开发 BUGate 本身。）

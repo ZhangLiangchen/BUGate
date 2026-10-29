@@ -43,7 +43,7 @@ Starting with BUGate 2.0, we therefore deliberately narrow the boundary. BUGate 
 See the BUGate 2.0 target architecture and migration guide:
 [`docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md).
 
-The host-integration plan for durable Protocol loading, context hydration, subagent inheritance, and Assessment is documented in [`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md). Claude Code and Codex are the first implementation targets; `adapters/pi/` and `adapters/deepseek-harness/` are reserved for future HyperTest integration.
+The host-integration design for durable Protocol loading, context hydration, subagent inheritance, and Assessment is documented in [`docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md`](docs/qa-methodology/BUGATE_2_0_HOST_ADAPTER_GUIDE.zh-CN.md). The native DeepSeek Harness adapter and shared Python v2 package now have a separate [installation and usage guide](docs/DEEPSEEK_HARNESS.md). Their development package versions do not change the legacy 0.4.5 release line. Pi remains reserved; existing Claude/Codex interfaces remain supported.
 
 For BUGate 2.0, the legacy Memory Bus evolves into an independent **Context Runtime** rather than remaining a required Core component. Long-term Memory, Scope, bounded Context Packs, Handoff, revisioned context, and Experience/Skill candidate lifecycle live behind a provider-neutral boundary. OceanBase PowerContext is the preferred initial provider/reference architecture, not a Protocol Core dependency. See [ADR-BUGATE-008](docs/qa-methodology/BUGATE_CONTEXT_RUNTIME_ADR.zh-CN.md).
 
@@ -64,7 +64,7 @@ operations lore at
 [references/field-guide.md](.shared/skills/bugate-import/references/field-guide.md).
 It ships inside every governed repo and is agent-discoverable via skill links.
 
-Zero install (Python 3.9+, standard library only; 3.10+ recommended). From the repo root:
+Legacy zero install (Python 3.9+, standard library only; 3.10+ recommended). From the repo root:
 
 ```bash
 python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
@@ -83,10 +83,11 @@ your SUT repo: `python3 scripts/bugate_init.py <sut-repo> --dry-run`.
 - **Importing BUGate into a SUT repo with an AI agent?** [`IMPORT_PROMPT.md`](IMPORT_PROMPT.md) is a runnable import prompt (release download → installer → Claude/Codex wiring → Memory Bus → profile activation).
 - **Upgrading an existing imported BUGate with an AI agent?** [`UPDATE_PROMPT.md`](UPDATE_PROMPT.md) invokes the dedicated `bugate-update` skill (read-only `status` + `plan` by default; exact approval is required for `apply`).
 - **What can it do / every command?** [`CAPABILITIES.md`](CAPABILITIES.md).
-- **The required memory service** (auto-installed by the importer; prose
-  shorthand `bugate init` currently means `python3 scripts/bugate_init.py`) and
+- **The legacy memory service** (installed by the legacy importer; in older
+  guides, shorthand `bugate init` means `python3 scripts/bugate_init.py`) and
   the **optional** runtimes (dual-agent AI CLIs, role isolation):
   [`docs/SETUP-OPTIONAL.md`](docs/SETUP-OPTIONAL.md).
+- **Native DeepSeek Harness and v2 CLI:** [guide](docs/DEEPSEEK_HARNESS.md). The installed `bugate` command uses the v2 task protocol; ordinary v2 prepare/validate/assess does not require a Memory service.
 - **The methodology** (why): [`docs/qa-methodology/`](docs/qa-methodology/) — start with its [README](docs/qa-methodology/README.md) (English summary + glossary) then `METHOD.md` / `SOP.md`.
 
 ## Usage — one mode: imported. (Opening this repo = developing BUGate itself.)

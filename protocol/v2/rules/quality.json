@@ -1,0 +1,40 @@
+{
+  "apiVersion": "bugate.io/v2",
+  "kind": "QualityRules",
+  "version": "2.0.0",
+  "claim_dimensions": {
+    "business_understanding_complete": [
+      "business_understanding"
+    ],
+    "test_design_complete": [
+      "business_understanding",
+      "testability",
+      "test_design"
+    ],
+    "test_implementation_complete": [
+      "business_understanding",
+      "testability",
+      "test_design",
+      "implementation"
+    ],
+    "execution_complete": [
+      "execution"
+    ],
+    "requirement_verified": [
+      "business_understanding",
+      "testability",
+      "test_design",
+      "implementation",
+      "execution",
+      "verification"
+    ],
+    "task_delivery_complete": [
+      "profile.delivery_criteria dependency closure"
+    ]
+  },
+  "negative_coverage": "at least one negative/boundary case per proposition",
+  "scope_denominator": "locked Profile requirements and risks",
+  "runtime_statistics": "parse JUnit testcases; zero and entirely skipped/xfail runs do not establish execution completion",
+  "semantic_review": "source-backed reviewer artifact bound to the exact current relevant artifact digests",
+  "freshness": "reassess claim and facts; do not trust stored AssessmentResult flags"
+}

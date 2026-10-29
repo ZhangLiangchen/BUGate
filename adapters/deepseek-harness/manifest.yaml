@@ -1,46 +1,54 @@
 apiVersion: bugate.io/host/v1
 kind: HostAdapterManifest
-
 host:
   id: deepseek-harness
   label: DeepSeek Harness
-
-availability: reserved
-
+availability: planned
 install:
   kind: plugin
-
 projections:
   - role: plugin
     path: adapters/deepseek-harness/plugin
   - role: skill
-    path: generated-by-projection-compiler
-
+    path: adapters/deepseek-harness/plugin/resources/SKILL.md
 capabilities:
   protocol_discovery:
-    status: reserved
+    status: supported
+    surface: Bundled canonical protocol resources and Python version handshake.
   workspace_discovery:
-    status: reserved
+    status: supported
+    surface: Configured filesystem provider and session workingDirectory; ambiguity fails closed.
   protocol_binding:
-    status: reserved
+    status: supported
+    surface: Task protocol.lock.json and atomically persisted session identity pin.
   prepared_protocol_context:
-    status: reserved
+    status: supported
+    surface: Canonical schema validation and unchanged core render.content.
   automatic_hydration:
-    status: reserved
-    rationale: HyperTest/DeepSeek Harness contract is not stable yet.
+    status: supported
+    surface: Awaited agent/created, agent/pre-step and agent/request; synchronous required context.text and final llm/stream admission check.
   session_rehydration:
-    status: reserved
+    status: supported
+    surface: Real JSONL session resume with exact binding validation.
   compaction_rehydration:
-    status: reserved
+    status: supported
+    surface: Required dynamic context reappears after real DSH compactNow.
   subagent_inheritance:
-    status: reserved
+    status: supported
+    surface: Global adapter registration covers spawn, fork and independent preset agents.
+    rationale: Parent-local policy inheritance is not assumed; child binding is independently checked.
   skill_projection:
-    status: reserved
+    status: supported
+    surface: Generated MethodSpec projection with protocol and content digests.
   explicit_assessment:
-    status: reserved
+    status: supported
+    surface: bugate_assess delegates to the shared core; turn-stopping rework is bounded.
   diagnostics:
-    status: reserved
+    status: supported
+    surface: bugate doctor and structured runtime errors.
   rollback:
-    status: reserved
+    status: supported
+    surface: Recorded setup rollback and remove preserve unrelated profile entries.
   context_runtime_hydration:
-    status: reserved
+    status: unsupported
+    rationale: Optional external long-term memory services are not required for protocol hydration.

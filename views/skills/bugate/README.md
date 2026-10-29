@@ -1,11 +1,10 @@
-# BUGate Skill Projection
+[简体中文](README.zh-CN.md)
 
-The BUGate Agent Skill is a projection of canonical BUGate Protocol and view
-templates. It is not the normative source of methodology.
+# Shared Skill projection source
 
-The projection compiler will produce Host-local Skill assets for Claude Code,
-Codex, Pi, DeepSeek Harness, and future hosts from the same upstream
-definitions.
-
-A generated Skill must carry Protocol/View version metadata so diagnostics can
-detect drift.
+`SKILL.md` is a concise bilingual entry, not a competing methodology source.
+The DSH build appends the canonical MethodSpec JSON resources and records both
+protocol and generated Skill digests in `resources/projection.json`. Runtime
+loading verifies these digests against the bundled protocol and installed core.
+Regenerate with `node adapters/deepseek-harness/plugin/build.mjs` whenever the
+canonical protocol or this entry changes. Do not edit generated resources.

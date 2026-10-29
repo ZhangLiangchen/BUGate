@@ -1,0 +1,459 @@
+{
+  "apiVersion": "bugate.io/v2",
+  "kind": "ReasonCodeCatalog",
+  "version": "2.0.0",
+  "codes": {
+    "ALL_TESTS_SKIPPED": {
+      "meaning": "all tests skipped",
+      "stable": true
+    },
+    "ASSESSMENT_STALE": {
+      "meaning": "assessment stale",
+      "stable": true
+    },
+    "BINDING_DIGEST_MISMATCH": {
+      "meaning": "Live or persisted host binding differs from the exact task binding.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "BINDING_MISMATCH": {
+      "meaning": "binding mismatch",
+      "stable": true
+    },
+    "BINDING_MISSING": {
+      "meaning": "binding missing",
+      "stable": true
+    },
+    "BINDING_UNAVAILABLE": {
+      "meaning": "binding unavailable",
+      "stable": true
+    },
+    "BUSINESS_SEMANTICS_UNRESOLVED": {
+      "meaning": "business semantics unresolved",
+      "stable": true
+    },
+    "BUSINESS_UNDERSTANDING_MISSING": {
+      "meaning": "business understanding missing",
+      "stable": true
+    },
+    "CALL_LINEAGE_MISSING": {
+      "meaning": "A nested tool call has no stable mapped parent identity.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "CANCELLED": {
+      "meaning": "cancelled",
+      "stable": true
+    },
+    "CASE_MISSING": {
+      "meaning": "case missing",
+      "stable": true
+    },
+    "CASE_NOT_EXECUTED": {
+      "meaning": "case not executed",
+      "stable": true
+    },
+    "CLAIM_HAS_GAPS": {
+      "meaning": "claim has gaps",
+      "stable": true
+    },
+    "CLAIM_INPUT_MISSING": {
+      "meaning": "claim input missing",
+      "stable": true
+    },
+    "CLAIM_SCOPE_EMPTY": {
+      "meaning": "claim scope empty",
+      "stable": true
+    },
+    "COMMAND_NOT_CONFIGURED": {
+      "meaning": "Requested execution command is not in host-owned configured commands.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "CONCURRENT_CONFLICT": {
+      "meaning": "concurrent conflict",
+      "stable": true
+    },
+    "CONCURRENT_MODIFICATION": {
+      "meaning": "concurrent modification",
+      "stable": true
+    },
+    "CONFIG_INVALID": {
+      "meaning": "Adapter configuration violates its declared capability or budget contract.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "CONTEXT_BUDGET": {
+      "meaning": "Prepared context byte count or configured budget is inconsistent.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "CONTEXT_BUDGET_TOO_SMALL": {
+      "meaning": "context budget too small",
+      "stable": true
+    },
+    "CONTEXT_INVALIDATED": {
+      "meaning": "A managed task operation invalidated prepared context; model admission requires fresh context.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "CONTEXT_NOT_ENABLED": {
+      "meaning": "context not enabled",
+      "stable": true
+    },
+    "CONTEXT_UNAVAILABLE": {
+      "meaning": "context unavailable",
+      "stable": true
+    },
+    "DEPENDENCY_MISSING": {
+      "meaning": "dependency missing",
+      "stable": true
+    },
+    "DESIGN_NOT_ACCEPTED": {
+      "meaning": "No current satisfied design claim exists for the managed implementation operation.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "DSH_HOME": {
+      "meaning": "dsh home",
+      "stable": true
+    },
+    "DUPLICATE_ID": {
+      "meaning": "duplicate id",
+      "stable": true
+    },
+    "EVIDENCE_SOURCE_FORBIDDEN": {
+      "meaning": "evidence source forbidden",
+      "stable": true
+    },
+    "EVIDENCE_UNTRUSTED": {
+      "meaning": "evidence untrusted",
+      "stable": true
+    },
+    "EXECUTION_CANCELLED": {
+      "meaning": "execution cancelled",
+      "stable": true
+    },
+    "EXECUTION_CASE_MISSING": {
+      "meaning": "execution case missing",
+      "stable": true
+    },
+    "EXECUTION_FAILED_NO_EFFECT": {
+      "meaning": "execution failed no effect",
+      "stable": true
+    },
+    "EXECUTION_INCOMPLETE": {
+      "meaning": "execution incomplete",
+      "stable": true
+    },
+    "EXECUTION_INPUTS_CHANGED": {
+      "meaning": "execution inputs changed",
+      "stable": true
+    },
+    "EXECUTION_NOT_RUN": {
+      "meaning": "execution not run",
+      "stable": true
+    },
+    "EXECUTION_OUTCOME_UNKNOWN": {
+      "meaning": "execution outcome unknown",
+      "stable": true
+    },
+    "EXECUTION_REPORT_MISSING": {
+      "meaning": "execution report missing",
+      "stable": true
+    },
+    "EXECUTION_TIMEOUT": {
+      "meaning": "execution timeout",
+      "stable": true
+    },
+    "EXECUTION_WORLD_MISMATCH": {
+      "meaning": "execution world mismatch",
+      "stable": true
+    },
+    "FAILURE_HIDDEN": {
+      "meaning": "failure hidden",
+      "stable": true
+    },
+    "HOST_COMMAND_FAILED": {
+      "meaning": "host command failed",
+      "stable": true
+    },
+    "HOST_MISSING": {
+      "meaning": "host missing",
+      "stable": true
+    },
+    "HOST_VERSION_UNSUPPORTED": {
+      "meaning": "host version unsupported",
+      "stable": true
+    },
+    "IMPLEMENTATION_MISSING": {
+      "meaning": "implementation missing",
+      "stable": true
+    },
+    "INTEGRATION_CONFLICT": {
+      "meaning": "integration conflict",
+      "stable": true
+    },
+    "INTEGRATION_INVALID": {
+      "meaning": "integration invalid",
+      "stable": true
+    },
+    "INTEGRATION_MISSING": {
+      "meaning": "integration missing",
+      "stable": true
+    },
+    "INVALID_ARGUMENT": {
+      "meaning": "invalid argument",
+      "stable": true
+    },
+    "INVALID_INPUT": {
+      "meaning": "invalid input",
+      "stable": true
+    },
+    "KNOWLEDGE_MISSING": {
+      "meaning": "knowledge missing",
+      "stable": true
+    },
+    "LEGACY_CHECKER_FAILURE": {
+      "meaning": "legacy checker failure",
+      "stable": true
+    },
+    "LEGACY_PRECODE_INVALID": {
+      "meaning": "legacy precode invalid",
+      "stable": true
+    },
+    "LEGACY_PRECODE_WARNING": {
+      "meaning": "legacy precode warning",
+      "stable": true
+    },
+    "NEGATIVE_COVERAGE_MISSING": {
+      "meaning": "negative coverage missing",
+      "stable": true
+    },
+    "OBJECT_DIGEST_MISMATCH": {
+      "meaning": "object digest mismatch",
+      "stable": true
+    },
+    "ORACLE_BINDING_INVALID": {
+      "meaning": "oracle binding invalid",
+      "stable": true
+    },
+    "ORACLE_MISSING": {
+      "meaning": "oracle missing",
+      "stable": true
+    },
+    "ORACLE_UNCOVERED": {
+      "meaning": "oracle uncovered",
+      "stable": true
+    },
+    "OUTPUT_LIMIT": {
+      "meaning": "output limit",
+      "stable": true
+    },
+    "PACKAGE_INVALID": {
+      "meaning": "package invalid",
+      "stable": true
+    },
+    "PACKAGE_REQUIRED": {
+      "meaning": "package required",
+      "stable": true
+    },
+    "PATH_ESCAPE": {
+      "meaning": "path escape",
+      "stable": true
+    },
+    "PATH_NOT_MANAGED": {
+      "meaning": "Write target is outside explicitly supported task operation paths.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "PATH_OUTSIDE_SCOPE": {
+      "meaning": "path outside scope",
+      "stable": true
+    },
+    "PATH_SYMLINK": {
+      "meaning": "path symlink",
+      "stable": true
+    },
+    "PENDING_RECOVERY_REQUIRED": {
+      "meaning": "pending recovery required",
+      "stable": true
+    },
+    "PROFILE_MISMATCH": {
+      "meaning": "profile mismatch",
+      "stable": true
+    },
+    "PROJECTION_STALE": {
+      "meaning": "projection stale",
+      "stable": true
+    },
+    "PROPOSITION_UNCOVERED": {
+      "meaning": "proposition uncovered",
+      "stable": true
+    },
+    "PROTOCOL_MISMATCH": {
+      "meaning": "protocol mismatch",
+      "stable": true
+    },
+    "PYTHON_ABI_UNSUPPORTED": {
+      "meaning": "python abi unsupported",
+      "stable": true
+    },
+    "PYTHON_CANCELLED": {
+      "meaning": "python cancelled",
+      "stable": true
+    },
+    "PYTHON_EXIT_ERROR": {
+      "meaning": "Core process exited outside the declared exit-code contract.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "PYTHON_INVALID_RESPONSE": {
+      "meaning": "python invalid response",
+      "stable": true
+    },
+    "PYTHON_MISSING": {
+      "meaning": "python missing",
+      "stable": true
+    },
+    "PYTHON_OUTPUT_LIMIT": {
+      "meaning": "Core stdout or stderr exceeded the managed bridge output bound.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "PYTHON_TIMEOUT": {
+      "meaning": "python timeout",
+      "stable": true
+    },
+    "REFERENCE_DIGEST_MISMATCH": {
+      "meaning": "reference digest mismatch",
+      "stable": true
+    },
+    "REFERENCE_MISSING": {
+      "meaning": "reference missing",
+      "stable": true
+    },
+    "REPORT_COVERAGE_INCOMPLETE": {
+      "meaning": "report coverage incomplete",
+      "stable": true
+    },
+    "REQUIREMENT_NOT_VERIFIED": {
+      "meaning": "requirement not verified",
+      "stable": true
+    },
+    "REQUIREMENT_UNCOVERED": {
+      "meaning": "requirement uncovered",
+      "stable": true
+    },
+    "RESOURCES_MISSING": {
+      "meaning": "resources missing",
+      "stable": true
+    },
+    "RESOURCE_DIGEST_MISMATCH": {
+      "meaning": "resource digest mismatch",
+      "stable": true
+    },
+    "RESOURCE_INVALID": {
+      "meaning": "A canonical package resource is not a regular file or valid resource.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "RESOURCE_MISSING": {
+      "meaning": "resource missing",
+      "stable": true
+    },
+    "RISK_UNCOVERED": {
+      "meaning": "risk uncovered",
+      "stable": true
+    },
+    "RUNTIME_ERROR": {
+      "meaning": "Unexpected adapter runtime failure; no quality success is implied.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "RUNTIME_FAILURE": {
+      "meaning": "runtime failure",
+      "stable": true
+    },
+    "RUNTIME_UNSUPPORTED": {
+      "meaning": "runtime unsupported",
+      "stable": true
+    },
+    "SCHEMA_INVALID": {
+      "meaning": "Adapter-facing JSON value violates the declared tool or value schema.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "SCHEMA_UNKNOWN": {
+      "meaning": "schema unknown",
+      "stable": true
+    },
+    "SCOPE_DENOMINATOR_CHANGED": {
+      "meaning": "scope denominator changed",
+      "stable": true
+    },
+    "SEMANTIC_REVIEW_MISSING": {
+      "meaning": "semantic review missing",
+      "stable": true
+    },
+    "SEMANTIC_REVIEW_STALE": {
+      "meaning": "semantic review stale",
+      "stable": true
+    },
+    "STRUCTURE_INVALID": {
+      "meaning": "structure invalid",
+      "stable": true
+    },
+    "TASK_AMBIGUOUS": {
+      "meaning": "task ambiguous",
+      "stable": true
+    },
+    "TASK_IDENTITY_REQUIRED": {
+      "meaning": "Tool invocation lacks the host-owned Agent identity needed for task binding.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "TASK_NOT_FOUND": {
+      "meaning": "task not found",
+      "stable": true
+    },
+    "TASK_SCOPE_MISMATCH": {
+      "meaning": "task scope mismatch",
+      "stable": true
+    },
+    "TESTABILITY_GAP": {
+      "meaning": "testability gap",
+      "stable": true
+    },
+    "TEST_REPORT_EXISTS": {
+      "meaning": "test report exists",
+      "stable": true
+    },
+    "TEST_REPORT_INVALID": {
+      "meaning": "test report invalid",
+      "stable": true
+    },
+    "TEST_REPORT_MISSING": {
+      "meaning": "test report missing",
+      "stable": true
+    },
+    "UNCLASSIFIED_MANAGED_WRITE": {
+      "meaning": "Unclassified shell or write operation cannot be admitted by managed policy.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "VERSION_MISMATCH": {
+      "meaning": "Installed core or protocol version is outside the exact adapter target.",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "WORKSPACE_MISMATCH": {
+      "meaning": "workspace mismatch",
+      "stable": true
+    },
+    "ZERO_TESTS": {
+      "meaning": "zero tests",
+      "stable": true
+    }
+  }
+}

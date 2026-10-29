@@ -31,7 +31,7 @@ hosts:
   - id: deepseek-harness
     label: DeepSeek Harness
     first_class: true
-    availability: reserved
+    availability: planned
     install_kind: plugin
     manifest: adapters/deepseek-harness/manifest.yaml
 

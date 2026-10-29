@@ -629,7 +629,7 @@ def _archive_roles(path: str) -> list[str]:
 def _default_release_paths(root: Path) -> set[str]:
     """Development-only inventory fallback; the release builder passes Git paths."""
 
-    excluded = {".git", ".venv", "dist", ".memory_bus", "__pycache__"}
+    excluded = {".git", ".venv", "dist", ".memory_bus", "__pycache__", "node_modules"}
     paths: set[str] = set()
     for current, dirnames, filenames in os.walk(root, followlinks=False):
         current_path = Path(current)

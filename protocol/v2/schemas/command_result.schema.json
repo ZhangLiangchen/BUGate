@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugate.io/v2/schemas/command_result.schema.json",
+  "title": "BUGate CommandResult",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "bugate.io/v2"
+    },
+    "kind": {
+      "const": "CommandResult"
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "invocation": {
+      "enum": [
+        "completed",
+        "invalid_input",
+        "runtime_error",
+        "cancelled",
+        "timeout"
+      ]
+    },
+    "data": {},
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "details": {}
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ]
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "operation",
+    "request_id",
+    "invocation",
+    "data",
+    "errors"
+  ],
+  "$defs": {
+    "filesystem_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "task_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 33554432
+              }
+            },
+            "required": [
+              "path",
+              "digest",
+              "bytes"
+            ]
+          },
+          "maxItems": 2048
+        },
+        "task_directories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 2048,
+          "uniqueItems": true
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 33554432
+              }
+            },
+            "required": [
+              "id",
+              "path",
+              "digest",
+              "bytes"
+            ]
+          },
+          "maxItems": 2048
+        },
+        "excluded_runtime_files": {
+          "const": {
+            "exact": [
+              ".bugate/write.lock"
+            ],
+            "patterns": []
+          }
+        },
+        "limits": {
+          "const": {
+            "max_files": 2048,
+            "max_directories": 2048,
+            "max_total_bytes": 33554432
+          }
+        },
+        "excluded_runtime_directories": {
+          "const": [
+            ".bugate/runtime"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "task_root",
+        "task_files",
+        "task_directories",
+        "sources",
+        "excluded_runtime_files",
+        "limits",
+        "excluded_runtime_directories"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "status"
+          },
+          "invocation": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "operation",
+          "invocation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [
+              "filesystem_manifest"
+            ],
+            "properties": {
+              "filesystem_manifest": {
+                "$ref": "#/$defs/filesystem_manifest"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

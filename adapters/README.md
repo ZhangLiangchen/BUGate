@@ -1,5 +1,7 @@
 # BUGate Host Adapters
 
+English | [简体中文](README.zh-CN.md)
+
 This directory contains **host-specific integration only**.
 
 BUGate Core remains SUT-, model-, harness-, and runtime-neutral. An adapter may
@@ -21,12 +23,15 @@ catalog + capabilities + self-contained host adapters
 BUGate-specific implementation is independent; adapters consume BUGate's own
 `PreparedProtocolContext` rather than PowerContext memory APIs.
 
-## Planned hosts
+## Host status
 
-- `claude-code/` — first implementation target.
-- `codex/` — first implementation target.
+- `claude-code/` — v2 migration target; existing legacy interfaces remain supported.
+- `codex/` — v2 migration target; existing legacy interfaces remain supported.
 - `pi/` — reserved for future HyperTest integration.
-- `deepseek-harness/` — reserved for future HyperTest integration.
+- `deepseek-harness/` — implemented native bundle for DSH `0.2.2-alpha.2`;
+  see the [installation and usage guide](../docs/DEEPSEEK_HARNESS.md).
+  Catalog availability remains `planned` until a public release; capability
+  support is declared separately in its manifest.
 
 All hosts should consume the same Protocol Bundle, ProtocolBinding semantics,
 Artifact/Evidence/Claim contracts, and AssessmentResult.
@@ -40,7 +45,16 @@ Artifact/Evidence/Claim contracts, and AssessmentResult.
 - `CONFORMANCE.md` — shared behavioral contract.
 - `../views/` — canonical Host Projection model.
 
-Target CLI:
+Implemented DSH CLI:
+
+```text
+bugate setup deepseek-harness --project ... --package ... --dsh-profile ...
+bugate doctor integrations --project ... --dsh-profile ...
+bugate remove deepseek-harness --project ... --dsh-profile ... [--rollback]
+bugate protocol prepare --task ... --json
+```
+
+The wider multi-host selector remains a separate migration target:
 
 ```text
 bugate setup <host>

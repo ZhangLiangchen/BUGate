@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bugate-core"
+version = "2.0.0a1"
+description = "Host-neutral BUGate protocol, evidence and claim assessment core"
+requires-python = ">=3.11"
+dependencies = ["jsonschema==4.23.0"]
+
+[project.scripts]
+bugate = "bugate.cli:main"
+
+[tool.hatch.build]
+exclude = ["**/__pycache__/**", "**/*.pyc", "**/.DS_Store"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bugate"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"protocol/v2" = "bugate/resources/protocol/v2"
+".shared/skills/bugate" = "bugate/resources/.shared/skills/bugate"
+"scripts" = "bugate/resources/scripts"
+"bugate.config.yaml" = "bugate/resources/bugate.config.yaml"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/bugate", "protocol/v2", ".shared/skills/bugate", "scripts", "bugate.config.yaml", "pyproject.toml"]

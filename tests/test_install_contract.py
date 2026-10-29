@@ -969,5 +969,27 @@ class InstallContractTests(unittest.TestCase):
                     contract.validate_installed_lock(tampered)
 
 
+class NativeDevelopmentDependencyTests(unittest.TestCase):
+    """The development fallback excludes dependencies, not unsafe source links."""
+
+    def test_native_dependency_directories_and_links_are_not_release_inputs(self):
+        with tempfile.TemporaryDirectory(prefix="bugate-native-dev-") as directory:
+            root = Path(directory)
+            _write(root, "adapters/plugin/node_modules/package/index.js", "dependency")
+            _write(root, "adapters/plugin/src/index.ts", "source")
+            (root / "node_modules").symlink_to(root / "adapters/plugin/node_modules", target_is_directory=True)
+            self.assertEqual(contract._default_release_paths(root), {"adapters/plugin/src/index.ts"})
+            entries = contract.build_archive_inventory(root)
+            self.assertFalse(any("node_modules" in item["path"].split("/") for item in entries))
+
+    def test_non_dependency_absolute_source_symlink_is_still_rejected(self):
+        with tempfile.TemporaryDirectory(prefix="bugate-native-link-") as directory:
+            root = Path(directory)
+            _write(root, "source.txt", "source")
+            (root / "unsafe-source").symlink_to(root / "source.txt")
+            with self.assertRaisesRegex(contract.ContractError, "symlink target must be relative POSIX"):
+                contract.build_archive_inventory(root)
+
+
 if __name__ == "__main__":
     unittest.main()

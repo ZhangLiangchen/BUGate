@@ -9,6 +9,14 @@ dist/
 .venv/
 venv/
 
+# Native host adapter dependencies and generated package payloads
+node_modules/
+node_modules
+/adapters/deepseek-harness/plugin/lib/
+/adapters/deepseek-harness/plugin/resources/
+/adapters/deepseek-harness/plugin/python/
+*.tgz
+
 # OS / editor
 .DS_Store
 Thumbs.db
