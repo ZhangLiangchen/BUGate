@@ -28,8 +28,16 @@ executed regression evidence in the delivery report.
 | DSH-R14 | A child completed a managed write after the parent's awaited preparation; the real model received only `CONTEXT_INVALIDATED`, without canonical constraints, and the turn completed. / 子 Agent 在父 Agent 准备完成后写入，真实模型收到只有失效错误、缺少 canonical 约束的上下文，turn 仍完成。 | Rehydrate at the actual awaited request seam and reject invalidated admission before inference; verify the race against the real Agent loop. / 在真实请求的可等待接缝重新加载，并在推理前拒绝已失效请求；用真实 Agent loop 验证并发反例。 |
 | DSH-R15 | The real filesystem provider returned a different binding, or the same binding with a different business artifact, from the subprocess world; the Agent still sent a satisfactory context to its model. / 真实 filesystem provider 与 subprocess 所见绑定不同，或绑定相同但业务工件不同，Agent 仍向模型发送满意上下文。 | Verify execution-world agreement for the governed binding and applicable facts before admitting context or managed operations. / 在接受上下文和受管操作前，核对受治理绑定与适用事实的执行环境一致性。 |
 | DSH-R16 | The new filesystem witness included the provider's transient atomic session-pin directory; simultaneous child creation failed when that directory disappeared. / 新文件清单纳入 provider 写 session pin 的瞬时原子目录，并发创建子 Agent 时目录消失导致失败。 | Isolate runtime bookkeeping from governed facts and exclude that bounded, non-authoritative namespace consistently; retain exact artifact/source checks. / 将运行记账隔离到无事实权威的专用目录并一致排除，保留工件和来源精确核对。 |
+| DSH-R17 | Archive-native acceptance rejected a machine-specific home path literal in the new packaging hygiene checker. / 原生归档验收拒绝了新打包卫生检查中的本机 home 路径字面量。 | Derive the home path at runtime and retain the original strict archive check; rebuild and retest both archive formats. / 运行时获取 home 路径，保持原归档检查严格度，重新构建并验证两种归档。 |
 
 These findings were sent to the owning implementers before integration. Their
 test identifiers and final disposition are recorded in the acceptance evidence.
 
 以上发现已在集成前发给对应实现者；测试编号与最终处理结果由验收证据记录。
+
+All seventeen findings are closed by executed regressions in the
+[delivery report](../reports/DEEPSEEK_HARNESS_DELIVERY_2026-10-29.md).
+Original failures remain retained; no assertion was relaxed to produce a pass.
+
+十七项发现均已由[交付报告](../reports/DEEPSEEK_HARNESS_DELIVERY_2026-10-29.zh-CN.md)
+中的实际回归关闭。原失败证据保留，未通过放宽断言制造通过。

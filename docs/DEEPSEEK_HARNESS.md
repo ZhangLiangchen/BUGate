@@ -186,3 +186,6 @@ fixture, and optional live-model testing. A deterministic fixture driving the
 real DSH Agent loop is not a measurement of DeepSeek model effectiveness. Exact
 commands, artifact hashes, 49-item HC/AC mapping and remaining gaps belong in the
 delivery report, not in capability claims inferred from tool registration.
+
+The [2026-10-29 delivery report](reports/DEEPSEEK_HARNESS_DELIVERY_2026-10-29.md)
+records the executed 49-item acceptance matrix, package checksums and proof boundaries.

@@ -157,3 +157,6 @@ DSH session pin 及其原子临时文件位于该目录，受管模型写入不�
 验收区分 Python 契约、真实 DSH 加确定性模型 fixture，以及可选 live-model 测试。
 确定性 fixture 驱动真实 DSH Agent loop 不等于 DeepSeek 模型效果评测。精确命令、
 产物摘要、49 项 HC/AC 映射和真实缺口以交付报告为准，不能由工具注册成功推断。
+
+[2026-10-29 交付报告](reports/DEEPSEEK_HARNESS_DELIVERY_2026-10-29.zh-CN.md)
+记录了实际运行的 49 项验收、安装包校验和与验证边界。
