@@ -1,15 +1,29 @@
-# 安装本次 v2 + DSH 构建
+# 安装 DSH v2.0.0-dev.2
 
 [English](INSTALL_DSH_PROMPT.md) | 简体中文
 
-此 Prompt 使用本次新构建的本地产物，不下载旧 release。产物位于 BUGate checkout 的 `dist/v2-dsh-only/`，可整体复制到匹配所记录 Python/平台 ABI 的机器。
+此 Prompt 安装 [dsh-v2.0.0-dev.2 预发布](https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.2)附带的精确产物，无需 BUGate 源码仓库。内置 wheelhouse 必须与所记录的 Python/平台 ABI 匹配。
 
 ```text
-从以下本地构建产物安装 BUGate v2 DeepSeek Harness 原生插件：
-ARTIFACT_DIR=/Users/zhangliangchen/PycharmProjects/BUGate/dist/v2-dsh-only
-使用同目录 bugate-deepseek-harness-2.0.0-dev.2.tgz、install_dsh.py、build-manifest.json、
-source-manifest.json 和 SHA256SUMS，不得替换成历史发布资产。
-先核对 SHA256SUMS 每一项，读取 bundle 的 python/inventory.json，检查目标平台/ABI、
+从这个精确 GitHub release 安装 BUGate v2 DeepSeek Harness 原生插件：
+https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.2
+
+新建本地下载目录，从以下地址前缀下载全部六个文件：
+https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.2/
+使用 HTTPS、跟随重定向并检查 HTTP 错误：
+- bugate-deepseek-harness-2.0.0-dev.2.tgz
+- bugate_core-2.0.0a2-py3-none-any.whl
+- install_dsh.py
+- build-manifest.json
+- source-manifest.json
+- SHA256SUMS
+
+六个文件保持同目录，在该目录校验 SHA256SUMS 的每一项
+（macOS 用 shasum -a 256 -c SHA256SUMS，Linux 用 sha256sum -c SHA256SUMS）。
+预期 bundle SHA-256 为：
+1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0。
+文件缺失、下载失败或摘要不符时停止，不替换其他 release。将 ARTIFACT_DIR 设为
+这个已校验目录的绝对路径。读取 bundle 的 python/inventory.json，检查目标平台/ABI、
 DSH 0.2.2-alpha.2、Node >=24.9.0 和匹配的 Python runtime。
 
 使用用户明确选定的外部测试项目、DSH profile、DSH home，以及新建或 BUGate-owned

@@ -1,19 +1,34 @@
-# Install this v2 + DSH build
+# Install DSH v2.0.0-dev.2
 
 English | [简体中文](INSTALL_DSH_PROMPT.zh-CN.md)
 
-This prompt uses newly built local assets, not a prior release download. The
-artifact directory is `dist/v2-dsh-only/` in the BUGate checkout; it may be copied
-as a unit to another machine with the recorded Python/platform ABI.
+This prompt installs the exact assets attached to the
+[dsh-v2.0.0-dev.2 prerelease](https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.2).
+No BUGate checkout is required. The bundled wheelhouse must match the recorded
+Python/platform ABI.
 
 ```text
-Install BUGate v2 native DeepSeek Harness from these local build artifacts:
-ARTIFACT_DIR=/Users/zhangliangchen/PycharmProjects/BUGate/dist/v2-dsh-only
-Use bugate-deepseek-harness-2.0.0-dev.2.tgz, install_dsh.py, build-manifest.json,
-source-manifest.json and SHA256SUMS from that directory. Do not substitute an older
-published asset. First verify every SHA256SUMS entry and inspect the bundle's
-python/inventory.json for target platform/ABI. Verify DSH 0.2.2-alpha.2, Node >=24.9.0
-and a matching Python runtime.
+Install BUGate v2 native DeepSeek Harness from this exact GitHub release:
+https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.2
+
+Create a new local download directory. Download all six files below from
+https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.2/
+using HTTPS with redirects and HTTP-error checking:
+- bugate-deepseek-harness-2.0.0-dev.2.tgz
+- bugate_core-2.0.0a2-py3-none-any.whl
+- install_dsh.py
+- build-manifest.json
+- source-manifest.json
+- SHA256SUMS
+
+Keep the files in the same directory and verify every SHA256SUMS entry there
+(shasum -a 256 -c SHA256SUMS on macOS, or sha256sum -c SHA256SUMS on Linux).
+The expected bundle SHA-256 is
+1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0.
+Stop on a missing asset, download error or digest mismatch; do not substitute
+another release. Set ARTIFACT_DIR to this verified directory's absolute path.
+Inspect the bundle's python/inventory.json for target platform/ABI. Verify
+DSH 0.2.2-alpha.2, Node >=24.9.0 and a matching Python runtime.
 
 Use the user's explicitly selected external test project, DSH profile, DSH home,
 and new or BUGate-owned bootstrap venv. If these targets are absent from the chat,
