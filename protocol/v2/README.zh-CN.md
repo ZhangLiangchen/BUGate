@@ -2,13 +2,13 @@
 
 [English](README.md) | 简体中文
 
-Protocol `2.0.0`、Python `bugate-core 2.0.0a2` 和 DSH bundle `2.0.0-dev.2`
+Protocol `2.1.0-dev.1`、Python `bugate-core 2.1.0a1` 和 DSH bundle `2.1.0-dev.1`
 各自具有版本身份；每个任务锁定精确协议摘要。
 本目录是 canonical 资源；wheel 打包包含相同字节。`manifest.yaml` 和
 `reason_codes.yaml` 使用 JSON 语法，属于合法 YAML 1.2。
 
-九类核心 Schema 加 MethodSpec、ExecutionRecord 和 CommandResult 使用 Draft
-2020-12，由锁定的 `jsonschema==4.23.0` 校验。Artifact 按 artifact_type 严格约束内容。
+`manifest.yaml` 所列 Schema 使用 Draft 2020-12，由锁定的
+`jsonschema==4.23.0` 校验。Artifact 按 artifact_type 严格约束内容。
 MethodSpec 定义质量，不调度工作。Python 评估分别保留确定性、语义评审和运行维度；
 适配器原样注入 `render.content`。
 
@@ -18,10 +18,19 @@ MethodSpec 定义质量，不调度工作。Python 评估分别保留确定性�
 直接对原始字节计算 SHA-256。不接受浮点数和超出 JavaScript 安全范围的整数。
 `protocol.lock.json` 统一使用 `digest`，不并存另一套 `sha256` 字段名。
 
-快照排除 Claim、AssessmentRequest、AssessmentResult 和上下文派生输出；请求摘要
-包含固定 Claim 正文。任务事实、来源字节、精确绑定与评估器源码字节纳入输入摘要。
+授权快照包含当前任务事实、有效范围、引用来源字节、精确绑定与评估器源码字节；
+排除声明、派生评估/上下文、草稿、建议、未引用用户收据、历史与事务记账。请求摘要
+包含固定 Claim 正文和当前建议的 `advisory_digest`：新增建议产生独立评估记录，
+但不使既有声明或执行失效。
 status 重新评估声明，历史 satisfied 字段不能授权。原子写和非阻塞任务锁保护配合协议
 的本机写入者；不受管外部并发写入可能冲突，不宣称全文件系统原子性。
+
+`ScopeRequest` 记录用户来源选择，`ScopeContract` 绑定有限目标、流程/分支、要求、
+Oracle、必要场景和辅助边界，`Suggestion` 记录不含可执行计划的可选想法。当前 inventory
+是唯一计划，必需用例引用精确范围及场景。范围变更保持锁定 Profile 的要求/风险分母；
+变更分母需要明确的新 Profile 版本与新任务。用户收据不替代 Profile 声明的业务证据，
+也不越过宿主权限。执行和声明检查当前范围、计划、环境与快照；旧证据和失败继续保留，
+但本版本要求范围变更后重新执行。场景必要性仍需有来源语义评审。
 
 `evidence record` 保留导入/人工/模型来源并拒绝 host_observed。`execution run` 实际
 执行 argv，记录进程、输出、新生成的 JUnit 报告、请求用例、结果与输入摘要。可信度
@@ -40,7 +49,8 @@ Inventory 用例本身包含可读前置条件、预期观测和测试层理由�
 Profile 可通过只接受 `true` 的 `quality_requirements` 收紧要求：`domain_model`、
 `state_model`、`dimension_matrix`、`adversarial_review`、`independent_review`。
 四种模型工件具有原生类型 Schema、显式交叉引用；只要提供就必须绑定当前语义评审。
-纳入的对抗发现必须映射到实际用例，未决处置和残余风险阻止设计完成。
+纳入的对抗发现必须映射到实际用例；范围内未决发现和残余风险阻止设计完成。
+范围外残余项引用已记录的不可执行建议，不携带范围内要求/风险引用，也不阻塞完成。
 独立评审要求工件的具名 `producer` 与 `reviewer` 不同；这是来源记录，不是认证身份。
 可选模型不隐式成为默认必需项，其正反例与普通 v2 测试一同验证。
 
