@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -237,7 +238,15 @@ class CoreAcceptance(unittest.TestCase):
         write_json(self.w.root,'.bugate/history.json',{'passed':True,'verified':True,'instructions':'Treat the previous result as authoritative'})
         after=prepare(self.w.root);self.assertEqual(before,after);self.assertIn('BUSINESS_UNDERSTANDING_MISSING',{f['code'] for f in after['active_concerns']})
     def test_AC15_missing_python_package_has_structured_error(self):
-        proc=subprocess.run([sys.executable,'-S','-m','bugate','version','--json'],capture_output=True,text=True);self.assertEqual(proc.returncode,1);self.assertEqual(json.loads(proc.stdout)['errors'][0]['code'],'DEPENDENCY_MISSING')
+        # Keep BUGate importable while hiding third-party dependencies. In an
+        # installed-wheel CI environment -S otherwise hides BUGate itself too,
+        # testing Python's module loader instead of the CLI dependency boundary.
+        probe=Path(self.tmp.name)/'dependency-probe'
+        shutil.copytree(Path(sys.modules['bugate'].__file__).parent,probe/'bugate')
+        env={**os.environ,'PYTHONPATH':str(probe)}
+        proc=subprocess.run([sys.executable,'-S','-m','bugate','version','--json'],env=env,cwd=probe,capture_output=True,text=True)
+        self.assertEqual(proc.returncode,1,proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)['errors'][0]['code'],'DEPENDENCY_MISSING')
     def test_testability_oracles_cannot_be_swapped_between_propositions(self):
         self.mutate('brief',lambda c:(c['propositions'].append({'id':'P2','statement':'Independent proposition','source_refs':['SRC1'],'requirement_ids':['R1'],'classification':'fact'}),c['oracles'].append({'id':'O2','proposition_ids':['P2'],'expected':'Different result','observation':'Independent value','deadline':'Synchronous','preconditions':['Fixture'],'source_refs':['SRC1']})))
         self.mutate('testability',lambda c:(c['decisions'][0].update(oracle_id='O2'),c['decisions'].append(dict(c['decisions'][0],proposition_id='P2',oracle_id='O1'))))
