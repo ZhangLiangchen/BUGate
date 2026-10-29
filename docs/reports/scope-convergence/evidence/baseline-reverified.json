@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-29",
+  "verified_commit": "fe3e29b82059504cd47893b72005051489c0810f",
+  "is_current_head_ancestor": true,
+  "head_at_correction": "000d3be46068cdc0e64f60f454342c78892361a8",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "git_blob": "dbe2656853bdc9db040ee190152b08aa7de322c8",
+      "sha256": "b74d12951c2f93326461430a71b78bac881acf989c49c88425dd83031ca7045e"
+    },
+    {
+      "path": "docs/qa-methodology/METHOD.md",
+      "git_blob": "26b3a8cef162671b85d294357e1748c09006f4f9",
+      "sha256": "844025a9209714e595275aefc10594ca5a975bfa31037fee20f8bbe97f7bc85a"
+    },
+    {
+      "path": "docs/qa-methodology/SOP.md",
+      "git_blob": "2da13f68f1bee9c9f80b334fa632ba2394a1ea8c",
+      "sha256": "24d2b4b59590e1a2519a84cff17bdb537b260599dedc2431f1eb854832099bbc"
+    },
+    {
+      "path": "docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md",
+      "git_blob": "a762c16960180435955fb9d208769848acd95269",
+      "sha256": "04f23cc57e0af78c782d9be58036021d1df8017fe658b5504cb102a41e5e1ae5"
+    },
+    {
+      "path": "protocol/v2/rules/quality.json",
+      "git_blob": "239964b54eaa5d58d15d6e7c030e3c0f1874928d",
+      "sha256": "4cda88af2857865f7d0ee5a325051e9dbb3a2bf9a400154a6a2ed7b2d45691d5"
+    },
+    {
+      "path": "protocol/v2/schemas/profile.schema.json",
+      "git_blob": "04f4d37de4f03492bfd45e3136497b89bf65e284",
+      "sha256": "0398ed5febe0e74dbde31a42bd6b18e20f4f426a3628e73ba31df264cdb886ea"
+    },
+    {
+      "path": "protocol/v2/schemas/protocol_binding.schema.json",
+      "git_blob": "e7fb4c016c5703e1ccbb37a8041f0c73f25786f4",
+      "sha256": "4dc1b6cf3d100f2501fd417374c34813c324efd4139c7c7337e82235879553cc"
+    },
+    {
+      "path": "src/bugate/workspace.py",
+      "git_blob": "a1a05608b56bac167587ec4a0789fb5901a2e50a",
+      "sha256": "4900cfb698bb624b95e799f0e61010c3765cc184e83bace1af7f05572aabbd34"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "git_blob": "2085c260e3f8f2a9b9e964036387f462bf0b4313",
+      "sha256": "0a34334dddb8dc649e5d67c9d30ef889b7212b6b2201790fbcaadb10eee3e20b"
+    }
+  ],
+  "interpretation": "These are pre-change contracts. Current uncommitted changes and commit 000d3be are implementation output, not original requirement authority."
+}

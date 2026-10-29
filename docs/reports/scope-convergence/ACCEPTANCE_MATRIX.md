@@ -1,35 +1,27 @@
-# Frozen acceptance matrix
+# Source-verified formal acceptance matrix — revision 2
 
 English | [简体中文](ACCEPTANCE_MATRIX.zh-CN.md)
 
-Source: user request SC-01–SC-18, 2026-10-29. This matrix is the development
-acceptance oracle. Results and concrete test names are recorded separately after
-execution; no case is presumed passed here.
+The source classes U1/U2/B0/D/C are defined in [CONTRACT](CONTRACT.md).
+F-01–F-08 below are formal requirements grouped by the necessary behavior, not by
+candidate count. SC labels in retained test names are historical identifiers only.
+The examples are replaceable neutral fixtures. The [historical mapping](SOURCE_CORRECTION.md)
+records their disposition. Final results must cite actual command logs and exact
+installed artifact digests; the pending evidence column is not a pass assertion.
 
-| Case | Requirement | Required observation | Layer |
-|---|---|---|---|
-| SC-01 | R1/R3 | Ordinary-user order creation has only necessary flow cases and real business-result observations; no automatic security/fuzz/concurrency/performance matrix. | core + fixture |
-| SC-02 | R2 | User-requested cross-tenant denial is required and verified as expected rejection. | core + fixture |
-| SC-03 | R2 | Explicit normal/boundary/failure variants all remain required. | core |
-| SC-04 | R5/R10 | Login/setup/read evidence/cleanup are lawful auxiliary activities, not goals. | core + DSH |
-| SC-05 | R3/R4 | Unrelated proposal remains a suggestion; promotion/execution is refused without valid scope change. | core + DSH |
-| SC-06 | R4 | Fully observed passing main flow completes despite multiple suggestions and no extra rework. | core + DSH |
-| SC-07 | R8/R11 | Fully observed genuine failure permits execution completion, fails business verification, retains assertions/failure. | core + DSH |
-| SC-08 | R1/R11 | Missing key business evidence blocks closure despite structure/model pass. | core + DSH |
-| SC-09 | R5 | Diagnosis ties to current failure, stops at declared bound, preserves results/blocking reason. | core + DSH |
-| SC-10 | R6/R7 | Explicit user expansion creates version/history, invalidates old plan and adds required cases. | core + DSH |
-| SC-11 | R6/R8 | Failure-driven agent scope shrink or invented approval cannot authorize completion. | core + DSH |
-| SC-12 | R9 | Restart/cold/compact/child/preset recover same effective contract. | real DSH |
-| SC-13 | R7 | Old scope/plan/snapshot assessment cannot authorize new claim or execution. | core + DSH |
-| SC-14 | R9 | Parallel tasks keep plans/suggestions/evidence/assessments isolated. | core + DSH |
-| SC-15 | R1/R3/R6 | Exclusion conflicts and unsourced necessity yield explicit gaps without guessing. | core |
-| SC-16 | R4/R7/R12 | Actual installed DSH runtime model fixture tries expansion; guard rejects, suggestion persists, evidence persists, completion converges. | installed real DSH |
-| SC-17 | R12 | Source-denied clean installation runs core scope flow, repeat/doctor/upgrade/rollback/remove validated. | package + OS boundary |
-| SC-18 | R4/R8/R11 | Report states exact scope, execution completion, functional verdict, blockers, suggestions and limited conclusion separately. | core + report |
+| ID | Requirement / invariant | Actual source | Why necessary | Observable Oracle | Minimum sufficient check and test mapping | Actual evidence |
+|---|---|---|---|---|---|---|
+| F-01 | One first-class, versioned acceptance scope is consumed by core, CLI, PreparedContext and DSH; finite goals/branches, required and auxiliary activities, suggestions, provenance and completion rules. | U2 II/VII; retained U1 IV/IX; B0 AGENTS authority/layout. | A prompt-only rule cannot bind plan/execution/claims to one scope. | Schema-valid scope records have exact identity/digest; all consumers expose the same current refs. | Scope schema/CLI/core tests, source-backed authoring through real DSH tools, packaged resource equality. `tests/v2/test_scope.py`, adapter workflow fixture, distribution tests. | Pending final core/runtime/package logs. |
+| F-02 | Goals determine breadth; necessary in-scope assertions remain sufficient; suggestions neither enter executable inventory nor block completion. | U2 II/VII; U1 III/V/VI; B0 METHOD source-backed Oracles. | Without admission and nonblocking isolation, an extra idea still expands the task indirectly. | Unrelated plan extension is denied/recorded as suggestion; suggestion and its draft do not invalidate completion; explicitly included rejection/boundary behavior is retained. | Real temporary normal and expected-rejection assertions; attempted extra case; complete then add suggestions and re-evaluate. Existing order/integer examples are replaceable. | Pending final scope tests and real runtime logs. |
+| F-03 | Actual user provenance, explicit changes/history, fixed Profile denominators and semantic/source review; no fabricated consent or failure-driven shrink. | U2 III/IV/VI; U1 IV/VII; B0 AGENTS, Profile/Binding schemas and workspace.py. | Otherwise an agent can redefine the target or manufacture permission to pass. | Uncaptured/altered/synthetic user authority rejected; revisions invalidate old plan; denominator mismatch rejected with explicit new Profile/task path; unresolved necessity remains a gap. | Scope/request authoring negatives; authorized same-denominator revision; source-bound semantic review; DSH subagent/rework provenance tests. | Pending final core/runtime logs. |
+| F-04 | Execution completeness is separate from functional verification; all in-scope business evidence and actual failures/skips/xfails/unknowns are preserved. | U2 III/VII/VIII; U1 III/VIII; B0 quality rules and assessment/evidence semantics. | A completed test can reveal a defect; structural success cannot stand in for business evidence. | Real failing run may satisfy execution closure but not requirement verification; missing observation cannot close; report fields agree with evidence. | Managed temporary SUT run, deliberate business failure, missing/zero/skipped report negatives, report consistency tests, selected-evidence omission checks. Existing v2 core regression plus scope tests. | Pending final core/runtime logs. |
+| F-05 | DSH enforces observable admission, lawful auxiliary operations and bounded diagnosis through real supported lifecycle/provider interfaces. | U2 III/VII; U1 VI/XI; B0 AGENTS/SOP/protocol guide. | Runtime consumption is required to make scope govern execution without blocking its own evidence gathering or adding a scheduler. | Awaited authorization precedes synchronous guard; evidence is durable on return; aux reads/setup/cleanup work; diagnosis needs valid current failure and stops at its bound. | Actual DSH deterministic model drives installed tools and real local commands; guard, aux, diagnostic, cancellation, timeout, provider and barrier regressions. | Pending final installed-runtime logs; live model not run. |
+| F-06 | Exact snapshots, scope/plan/version bindings, recovery, child isolation, task isolation, paths and concurrency remain valid. | U2 III/VII; U1 VI/VII/IX; B0 AGENTS, ProtocolBinding, workspace identity and existing runtime tests. | New scope state must not authorize a stale or different task, including across supported DSH lifecycle seams. | Old refs/snapshots reject; cold/compact/child contexts retain current refs; cross-task input cannot authorize; atomic conflicts fail visibly. | Existing v2/runtime regression plus targeted changed-scope/plan and cross-task checks; no unrelated new platform matrix. | Pending final core/runtime logs. |
+| F-07 | Independently installable current v2/DSH package, finite resources, verified supported installation lifecycle, no source/legacy dependency. | U2 III/VII/VIII; U1 IX/XI/XII; B0 AGENTS/CI/packaging. | A source-only implementation does not deliver the required native product. | Built wheel/native resource digests match; clean install/doctor/repeat/upgrade/rollback/remove work; installed runtime uses package while checkout is inaccessible. | Existing distribution/install suites, source-denial probe, actual archive lifecycle and installed runtime. | Baseline results retained; final package evidence pending. |
+| F-08 | Bilingual docs, reviewable code/artifacts/checksums/install prompt and honest bounded report with corrected provenance. | U2 V/VIII; U1 XII; B0 AGENTS bilingual/delivery rule. | Users need to install the tested bytes and understand exactly what the observations establish. | Current docs/API/package agree; final report separates coverage/function/blockers/suggestions and deterministic/live-model levels; no SC-count gate or blanket product claim. | Source/projection/CI text audit, link check, evidence reconciliation, checksum verification and reviewable commits. | Source correction and baseline re-verification saved; final delivery reconciliation pending. |
 
-Applicable regression: actual execution provenance; no execution/model pass/hash
-shortcut; snapshots and claim digests; durable evidence barriers; cancellation and
-timeout; paths/symlinks; concurrency/conflicts; execution-world mapping; installation
-ownership/lifecycle; recovery and child isolation. Existing runtime and core suites
-remain acceptance inputs. Required replacement of unconditional negative-case
-matrix rules must retain explicit negative/permission/boundary cases (SC-02/03).
+The pre-change unconditional negative-case-per-proposition rule conflicts with
+U2's explicit finite-goal objective and retained U1 III/V. Its replacement is
+scope-derived case necessity, preserving explicit negative/boundary requirements.
+This is an authorized protocol change, not evidence that the new rule existed in
+B0. Existing non-conflicting authenticity, snapshot and installation tests remain.
