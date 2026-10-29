@@ -73,14 +73,102 @@ suggestions, and state: **“This conclusion covers only the agreed scope.”**
 
 ## Current released architecture and authority
 
+### How the plugin takes effect in DSH
+
+Install into the profile that DSH actually starts, initialize a task with its
+Profile, and select it through `taskPath` when discovery is ambiguous. Installation
+and doctor establish configuration/integrity; an actual Agent session establishes
+runtime hydration. Without a bound task this path does not activate; the plugin
+does not initialize one automatically. The following path describes
+`mode: managed` (the default).
+`advisory` omits managed write admission, while assessment semantics and the
+scope checks inside `bugate_run_test` still apply.
+
 ```mermaid
-flowchart LR
-    P["Protocol v2: machine authority"] --> C["Python core + CLI"]
-    C -->|"Prepared context and assessments"| A["Native DSH adapter"]
-    H["DSH: Agent lifecycle and tools"] <--> A
-    A -->|"Managed execution and durable evidence"| W["External test workspace"]
-    W -->|"Current facts and claims"| C
+flowchart TD
+    A["Install verified bundle into selected DSH profile"] --> B["Cordis loads plugin and validates bundled resources"]
+    B --> S["Register Skill and native tools"]
+    B --> T["Agent lifecycle: resolve task and capture eligible user requests"]
+    T --> P["Await Python-core preparation; verify exact binding"]
+    P --> C["Synchronous context returns unchanged prepared content"]
+    S -. "Available to the Agent" .-> M["DSH model and tool pipeline"]
+    C --> M
+    M --> Q["bugate_run_test(command_id): await current admission"]
+    Q --> G{"Synchronous guard: ticket still valid?"}
+    G -->|"No"| N["Deny with gap or conflict"]
+    G -->|"Valid ticket; host also permits"| X["DSH provider starts Python collector<br/>Core rechecks scope/plan, then runs configured command"]
+    X --> E["Collector durably publishes evidence before tool return"]
+    E -. "Agent explicitly submits with submit: true" .-> F["bugate_assess: current claim"]
+    F --> H["At turn stopping: reassess submitted claim"]
+    H --> Z["Satisfied or repair limit reached: no further rework<br/>Otherwise repair in-scope gaps"]
 ```
+
+The Skill is registered at plugin load, not rebuilt after every preparation or
+necessarily invoked by the model every turn. Awaited lifecycle refresh supplies
+`PreparedProtocolContext`; synchronous context and guard callbacks only consume
+completed state. A model-admission check rejects context invalidated in a race.
+Each resumed/child session prepares its own binding rather than inheriting a
+parent's local guard.
+
+Managed test/activity calls accept a host-configured `command_id`, not arbitrary
+model argv. The core rechecks scope/plan applicability and preserves real outputs
+before returning. Known managed write tools have admission controls. For a bound
+task, managed admission rejects native `bash` calls rather than inferring their
+business meaning; use configured commands for execution.
+Other tools remain subject to host policy. Filesystem/subprocess providers define
+the execution world; opaque targets are not local paths.
+
+Automatic completion checking applies after `bugate_assess` with `submit: true`.
+Without submission, this completion-rework path does not start and DSH may stop
+normally. At turn stopping the plugin reassesses a submitted claim; repair is
+bounded by attempt/time limits and stops on repeated gaps or cancellation. A
+stopped turn does not imply a satisfied verdict. BUGate supplies findings and
+steering; DSH owns scheduling and the Agent loop.
+
+### How this supports test development
+
+The Agent still reasons about requirements and writes tests. BUGate makes the
+scope, design prerequisites and proof needed for its conclusions explicit:
+
+```mermaid
+flowchart TD
+    U["User goal and declared Profile sources"] --> S["Versioned finite scope"]
+    S --> O["Source-backed propositions and observable Oracles"]
+    O --> K["Required cases, testability and semantic review"]
+    K --> D{"Current test design accepted?"}
+    D -->|"No"| B["Resolve in-scope gap or report blocked"]
+    D -->|"Yes"| I["Implement necessary tests and execute managed commands"]
+    I --> E["Actual evidence and reports"]
+    E --> V{"Required evidence sufficient?"}
+    V -->|"Yes"| R["Report whether execution is complete and the functional verdict separately"]
+    V -->|"No"| P["Bounded repair of missing or invalid evidence"]
+    P --> Q["Reassess current claims or report incomplete / blocked"]
+    E -. "Observed failure" .-> F["Preserve failure; bounded diagnosis when the contract requires it"]
+    F -->|"Include findings and remaining blockers"| V
+    S -. "Unrelated idea" .-> A["Suggestion only: no automatic execution or completion blocker"]
+```
+
+Reading requirements, preparing data, inspecting evidence and cleanup remain
+available as lawful auxiliary work; incomplete business evidence does not block
+all such operations. Diagnostic commands require a current related failure and
+remaining agreed budget. Reaching the bound preserves findings or a blocker.
+Neither repair nor diagnosis permits shrinking goals, lowering assertions or
+adding unrelated tests to turn a real failure green.
+
+| Step | What BUGate adds | Boundary |
+|---|---|---|
+| Scope | Traceable goals, necessary branches and a separate suggestion channel. | No automatic full risk matrix or expansion of the Profile denominator. |
+| Design | Source/Oracle/case links and a current design assessment before governed implementation. | Structural validity and reviewer opinion do not prove business truth. |
+| Execution | Current bindings, managed collection and a durable evidence barrier. | Declared tools/providers, not a universal shell or OS sandbox. |
+| Conclusion | Separate execution completeness, functional results, blockers and suggestions. | A real failure remains a failure; missing observations cannot become verification. |
+
+These are implemented mechanisms, not measured claims of better model efficiency
+or defect yield. Details: [workflow](docs/qa-methodology/SOP.md),
+[configuration and limits](adapters/deepseek-harness/plugin/README.md),
+[native lifecycle code](adapters/deepseek-harness/plugin/src/index.ts) and
+[execution collector](src/bugate/evidence.py).
+
+### Where the rules and implementation live
 
 | Location | Responsibility |
 |---|---|
@@ -90,14 +178,6 @@ flowchart LR
 | [`views/skills/bugate/`](views/skills/bugate/) | Small entry projection; the build appends canonical MethodSpec resources and seals their digest. |
 | [`packaging/`](packaging/) | Explicit resource inventory, standalone wheel/native bundle and owned installation lifecycle. |
 | [`docs/qa-methodology/`](docs/qa-methodology/) | Explanations of the protocol and workflow. |
-
-`PreparedProtocolContext` carries the exact current binding and actionable gaps.
-Resumed sessions, children and independent presets prepare their own binding.
-The adapter awaits preparation and durable evidence publication at supported DSH
-seams; synchronous context/guard callbacks consume completed state. Execution
-uses configured filesystem/subprocess providers and declared case/activity
-identities. These checks govern observable managed operations; they do not infer
-every business meaning from arbitrary shell text or override host permissions.
 
 ## Install and start a task
 
