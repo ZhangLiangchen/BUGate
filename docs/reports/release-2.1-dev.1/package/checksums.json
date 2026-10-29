@@ -1,0 +1,35 @@
+{
+  "status": "PASS",
+  "assets": [
+    {
+      "name": "SHA256SUMS",
+      "sha256": "8e8d0302f8d45e2c58159be9be5b76437f10faeafc59e11caf3bde01b3da4a4d",
+      "size_bytes": 463
+    },
+    {
+      "name": "bugate-deepseek-harness-2.1.0-dev.1.tgz",
+      "sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+      "size_bytes": 656258
+    },
+    {
+      "name": "bugate_core-2.1.0a1-py3-none-any.whl",
+      "sha256": "e932749f78cc708608d3368cfe75957d9610e1726244862e04ea627d68a0db8c",
+      "size_bytes": 82322
+    },
+    {
+      "name": "build-manifest.json",
+      "sha256": "f0f6f0c9c620ede6014553e144425cc36f7067b0018eea3ad2744bad00fd5765",
+      "size_bytes": 599
+    },
+    {
+      "name": "install_dsh.py",
+      "sha256": "2ea459ed326ddde989a16bb9153fd5536a117838dd5d6f5f3a8a3c7bfca2604a",
+      "size_bytes": 8023
+    },
+    {
+      "name": "source-manifest.json",
+      "sha256": "904bdb73a3193bc9366c0ea553674505904067a2bc04a091047033d643627333",
+      "size_bytes": 6338
+    }
+  ]
+}

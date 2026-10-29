@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "source_inputs": 57,
+  "asset_count": 6,
+  "bundle_sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+  "runtime_digest_match": true,
+  "runtime_both_results_preserved": true,
+  "prompts_have_pinned_digest_and_six_assets": true,
+  "release_note_tag_blob_targets_exist": true
+}

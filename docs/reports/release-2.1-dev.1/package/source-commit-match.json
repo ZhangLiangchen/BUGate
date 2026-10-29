@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "source_commit": "062b03f2895a7ddabe7ee848d5b8f047a1826da5",
+  "files_verified": 57,
+  "mismatches": [],
+  "changed_from_implementation_commit": [
+    "protocol/v2/README.md",
+    "protocol/v2/README.zh-CN.md"
+  ]
+}

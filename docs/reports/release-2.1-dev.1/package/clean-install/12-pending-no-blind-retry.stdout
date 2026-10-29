@@ -1,0 +1,1 @@
+{"apiVersion":"bugate.io/v2","kind":"CommandResult","operation":"setup","request_id":"91108b6e-dcc3-40bb-b9e1-f7158f18cd2a","invocation":"invalid_input","data":null,"errors":[{"code":"PENDING_RECOVERY_REQUIRED","message":"An interrupted operation requires remove --rollback reconciliation","details":null}]}

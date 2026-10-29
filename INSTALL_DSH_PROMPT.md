@@ -1,19 +1,20 @@
-# Install the local DSH 2.1.0-dev.1 build
+# Install the DSH 2.1.0-dev.1 prerelease
 
 English | [简体中文](INSTALL_DSH_PROMPT.zh-CN.md)
 
-This prompt uses the current local delivery, not a new public release. The six
-files are in `dist/scope-convergence/`; they can be copied together to any artifact
-directory without the BUGate source checkout. This build targets the Python ABI
-and platform recorded in the tarball's `python/inventory.json`.
+This prompt installs the six exact assets from the fixed
+[dsh-v2.1.0-dev.1 prerelease](https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.1.0-dev.1).
+No BUGate checkout is required. The Python ABI and platform are recorded in the
+tarball's `python/inventory.json`.
 
 ```text
-Install the BUGate native DeepSeek Harness build delivered in this artifact directory:
-/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence
-If the user supplies a copied artifact directory, use that directory instead.
-Do not download a release or substitute a different version.
+Install BUGate native DeepSeek Harness from this exact GitHub prerelease:
+https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.1.0-dev.1
 
-Require all six files from this same build:
+Create a new local download directory and download all six files below using
+HTTPS, redirects and HTTP-error checking from this fixed prefix:
+https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.1.0-dev.1/
+Do not substitute another version, use latest, or rebuild from source:
 - bugate-deepseek-harness-2.1.0-dev.1.tgz
 - bugate_core-2.1.0a1-py3-none-any.whl
 - install_dsh.py
@@ -23,7 +24,7 @@ Require all six files from this same build:
 
 Verify every SHA256SUMS entry (shasum -a 256 -c SHA256SUMS on macOS,
 or sha256sum -c SHA256SUMS on Linux). The expected bundle SHA-256 is:
-4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2
+0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c
 Stop if a file is absent or a digest differs. Set ARTIFACT_DIR to the verified
 absolute artifact directory. Inspect python/inventory.json in the bundle and
 verify a matching Python runtime, DSH 0.2.2-alpha.2 and Node >=24.9.0.
@@ -47,6 +48,9 @@ user-request receipts; author a finite acceptance scope from those receipts and
 Profile-declared domain evidence. Keep the Profile requirement/risk denominator
 fixed for every revision. A changed denominator requires an explicit new Profile
 version and init of a new task; preserve the old task, evidence and failures.
+This release corrects packaged version documentation and has different protocol
+and evaluator digests from the earlier local 2.1 delivery. Preserve those earlier
+tasks and initialize a new task explicitly; do not silently reuse their bindings.
 Suggestions do not expand the executable plan or block completion. Report actual
 scope, execution closure, functional results, blockers and suggestions separately.
 

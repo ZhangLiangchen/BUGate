@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "source_denied": "/Users/zhangliangchen/PycharmProjects/BUGate",
+  "command_count": 20,
+  "every_command_has_os_denial": true,
+  "probe": "clean-install/00-source-denial-probe.stdout",
+  "probe_result": "source access denied",
+  "metadata_matches_actual_policy": true
+}

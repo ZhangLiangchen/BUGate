@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "old_frozen_evidence_files": 381,
+  "old_evidence_changed": [],
+  "release_build_input_files": 57,
+  "release_input_drift": [],
+  "documentation_commit": "2470d0a91955209d7130763dddcc58a34d2a7e83",
+  "note": "Read-only reconciliation. Earlier local artifact and all frozen observations remain unchanged; fresh release package uses its own manifest and runtime record."
+}

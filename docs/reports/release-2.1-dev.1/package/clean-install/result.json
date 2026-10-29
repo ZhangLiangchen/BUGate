@@ -1,0 +1,39 @@
+{
+  "status": "PASS",
+  "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted",
+  "package_sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+  "dsh_version": "0.2.2-alpha.2",
+  "source_denied": "/Users/zhangliangchen/PycharmProjects/BUGate",
+  "tests": 20,
+  "mapping": {
+    "HC-01": [
+      "02-repeat"
+    ],
+    "HC-02": [
+      "03-doctor"
+    ],
+    "HC-11": [
+      "05-stale-projection"
+    ],
+    "HC-14": [
+      "07-rollback",
+      "09-remove",
+      "13-explicit-pending-rollback",
+      "18-post-record-recovery"
+    ],
+    "AC-19": [
+      "01-clean-bootstrap"
+    ],
+    "AC-20": [
+      "01-clean-bootstrap",
+      "03-doctor"
+    ],
+    "AC-31": [
+      "02-repeat",
+      "06-upgrade",
+      "07-rollback",
+      "09-remove",
+      "14-reinstall-after-recovery"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "active_markdown_files": 55,
+  "local_links_checked": 278,
+  "broken_links": [],
+  "assets_verified": 6,
+  "release_sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+  "limits": "Local link target existence; remote URLs and anchors checked separately only where publication requires them.",
+  "runtime_evidence_hashes_verified": 146,
+  "whitespace_check": {
+    "source_and_documents": "PASS",
+    "raw_log_note": "native-build.stdout contains the original terminal blank line at EOF; retained unchanged."
+  }
+}

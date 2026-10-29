@@ -1,0 +1,70 @@
+{
+  "status": "READY_FOR_PUBLISHER",
+  "release_tag": "dsh-v2.1.0-dev.1",
+  "prerelease": true,
+  "build_source_commit": "062b03f2895a7ddabe7ee848d5b8f047a1826da5",
+  "assets_directory": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/release-2.1-dev.1",
+  "assets": [
+    {
+      "name": "SHA256SUMS",
+      "sha256": "8e8d0302f8d45e2c58159be9be5b76437f10faeafc59e11caf3bde01b3da4a4d",
+      "size_bytes": 463
+    },
+    {
+      "name": "bugate-deepseek-harness-2.1.0-dev.1.tgz",
+      "sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+      "size_bytes": 656258
+    },
+    {
+      "name": "bugate_core-2.1.0a1-py3-none-any.whl",
+      "sha256": "e932749f78cc708608d3368cfe75957d9610e1726244862e04ea627d68a0db8c",
+      "size_bytes": 82322
+    },
+    {
+      "name": "build-manifest.json",
+      "sha256": "f0f6f0c9c620ede6014553e144425cc36f7067b0018eea3ad2744bad00fd5765",
+      "size_bytes": 599
+    },
+    {
+      "name": "install_dsh.py",
+      "sha256": "2ea459ed326ddde989a16bb9153fd5536a117838dd5d6f5f3a8a3c7bfca2604a",
+      "size_bytes": 8023
+    },
+    {
+      "name": "source-manifest.json",
+      "sha256": "904bdb73a3193bc9366c0ea553674505904067a2bc04a091047033d643627333",
+      "size_bytes": 6338
+    }
+  ],
+  "new_package_verification": {
+    "build_source_inputs": 57,
+    "source_and_bundle_boundaries": "PASS",
+    "source_denied_install_commands": 20,
+    "real_installed_runtime": {
+      "passed": 1,
+      "failed": 0,
+      "workflows": [
+        "passed",
+        "failed"
+      ],
+      "level": "real DSH runtime with deterministic model fixtures",
+      "evidence": "runtime/installed-runtime-result.json"
+    },
+    "live_model": "NOT_RUN"
+  },
+  "historical_evidence": {
+    "commit": "bb6153efc7a334172c36f069c2c160504df8f375",
+    "bundle_sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+    "separation": "Core123/distribution4/installer15/DSH24+2/old-package20/actual-prior-v2-upgrade9 remain historical; not rerun against new release bytes."
+  },
+  "exact_byte_checks": "package/checksums.json",
+  "digest_transition": "package/digest-transition.json",
+  "publication_actions_by_this_agent": [],
+  "publisher_owned_actions": [
+    "fast-forward and push main",
+    "verify hosted main CI",
+    "create new prerelease without overwriting history",
+    "upload the six exact assets",
+    "download and verify published asset bytes"
+  ]
+}

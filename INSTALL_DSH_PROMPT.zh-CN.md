@@ -1,15 +1,16 @@
-# 安装本地 DSH 2.1.0-dev.1 构建
+# 安装 DSH 2.1.0-dev.1 预发布
 
 [English](INSTALL_DSH_PROMPT.md) | 简体中文
 
-此 Prompt 使用本次本地交付，不指向新的公开 release。六个文件位于 `dist/scope-convergence/`，可整体复制到任何产物目录，产品运行不需要 BUGate 源码。Python ABI 与平台以 tarball 内 `python/inventory.json` 为准。
+此 Prompt 使用固定 [dsh-v2.1.0-dev.1 预发布](https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.1.0-dev.1)的六份精确产物，无需 BUGate 源码 checkout。Python ABI 与平台以 tarball 内 `python/inventory.json` 为准。
 
 ```text
-请安装此产物目录中的 BUGate DeepSeek Harness 原生构建：
-/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence
-若用户提供已复制的产物目录，使用该目录；不要下载 release 或替换版本。
+请从固定 GitHub 预发布安装 BUGate DeepSeek Harness 原生包：
+https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.1.0-dev.1
 
-必须使用同次构建的全部六个文件：
+新建本地下载目录，使用 HTTPS、重定向及 HTTP 错误检查，从以下固定前缀下载全部六个文件：
+https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.1.0-dev.1/
+不要替换版本、改用 latest 或从源码重新构建：
 - bugate-deepseek-harness-2.1.0-dev.1.tgz
 - bugate_core-2.1.0a1-py3-none-any.whl
 - install_dsh.py
@@ -19,7 +20,7 @@
 
 逐项验证 SHA256SUMS（macOS 使用 shasum -a 256 -c SHA256SUMS，Linux 使用
 sha256sum -c SHA256SUMS）。预期 bundle SHA-256：
-4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2
+0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c
 缺文件或摘要不符立即停止。ARTIFACT_DIR 设为已验证产物目录绝对路径。
 检查包内 python/inventory.json，核对匹配的 Python、DSH 0.2.2-alpha.2
 和 Node >=24.9.0。产品不需要源码 checkout 或 editable install。
@@ -38,6 +39,8 @@ ARTIFACT_DIR/bugate-deepseek-harness-2.1.0-dev.1.tgz --venv BOOTSTRAP_VENV
 仅针对本轮明确的当前 Profile 初始化任务。DSH 捕获用户直接请求收据，根据收据和
 Profile 声明的领域证据形成有限验收范围。每个范围版本保持 Profile 需求/风险分母；
 分母变化须显式新 Profile 版本并 init 新任务，原任务、证据与失败保留。
+本次发布修正包内版本说明，protocol/evaluator 摘要与此前本地 2.1 交付不同。
+保留此前任务并显式初始化新任务，不静默复用旧绑定。
 范围外建议不扩展执行计划或阻塞完成。分别报告实际范围、执行闭环、功能结果、阻塞和建议。
 
 失败时保留精确错误和有所有权的 pending 操作状态，不删除用户文件或改目标重试。

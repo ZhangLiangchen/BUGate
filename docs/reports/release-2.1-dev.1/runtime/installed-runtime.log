@@ -1,0 +1,10 @@
+{"evidence":"/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-LPCM8E/result.json","log":"/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-LPCM8E/runtime.log","requests":47,"installed":"/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-release-062b03f-nckpukan/clean-install/dsh-home/profiles/bugate-package-acceptance/node_modules/@bugate/deepseek-harness","python":"/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-release-062b03f-nckpukan/clean-install/bootstrap/bin/python"}
+✔ AC-19/20/21 installed tarball and isolated Python run real DSH authoring and execution outside the checkout (171800.51575ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 171831.425417

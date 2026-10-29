@@ -1,0 +1,78 @@
+{
+  "status": "LOCAL_RELEASE_PREPARATION_VERIFIED",
+  "planned_tag": "dsh-v2.1.0-dev.1",
+  "prerelease": true,
+  "asset_policy": "Upload the exact six existing assets; no rebuild or overwrite of prior tags/releases.",
+  "product_source_commit": "c9d2b8213f1ce9e0c3ea462ddb7d621ea12bbf60",
+  "fixed_local_evidence_commit": "bb6153efc7a334172c36f069c2c160504df8f375",
+  "build_inputs_verified": 57,
+  "build_input_mismatches": [],
+  "assets": [
+    {
+      "name": "SHA256SUMS",
+      "size_bytes": 463,
+      "sha256": "50225d2d2d294824e329c47ba779d3fc5b021104ddc73d9360b23917611a5c35",
+      "path": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence/SHA256SUMS"
+    },
+    {
+      "name": "bugate-deepseek-harness-2.1.0-dev.1.tgz",
+      "size_bytes": 654647,
+      "sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+      "path": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence/bugate-deepseek-harness-2.1.0-dev.1.tgz"
+    },
+    {
+      "name": "bugate_core-2.1.0a1-py3-none-any.whl",
+      "size_bytes": 81450,
+      "sha256": "89061edf1f560f5ce7c0d79366faf329bf8186d73f5115959ae00ddebd06dafa",
+      "path": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence/bugate_core-2.1.0a1-py3-none-any.whl"
+    },
+    {
+      "name": "build-manifest.json",
+      "size_bytes": 599,
+      "sha256": "949578bfb9e09f3098025b33d9cee41254f3d576be473de1c16b7ba78a73688b",
+      "path": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence/build-manifest.json"
+    },
+    {
+      "name": "install_dsh.py",
+      "size_bytes": 8023,
+      "sha256": "2ea459ed326ddde989a16bb9153fd5536a117838dd5d6f5f3a8a3c7bfca2604a",
+      "path": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence/install_dsh.py"
+    },
+    {
+      "name": "source-manifest.json",
+      "size_bytes": 6338,
+      "sha256": "4b9e57d7a6ac9ac2150956bd8db4ba7337525b9b86f9f119113c029e814a6691",
+      "path": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence/source-manifest.json"
+    }
+  ],
+  "compatibility": {
+    "adapter_version": "2.1.0-dev.1",
+    "core_version": "2.1.0a1",
+    "protocol_version": "2.1.0-dev.1",
+    "dsh_version": "0.2.2-alpha.2",
+    "dsh_commit": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3"
+  },
+  "wheel_target": {
+    "apiVersion": "bugate.wheelhouse/v1",
+    "python": "3.13.3",
+    "platform": "darwin",
+    "machine": "arm64",
+    "platform_tag": "macosx-15.0-arm64",
+    "soabi": "cpython-313-darwin"
+  },
+  "local_checks": {
+    "exact_six_assets": "PASS",
+    "SHA256SUMS_all_five_listed_content_files": "PASS",
+    "all_six_asset_hashes_recorded": "PASS",
+    "57_current_worktree_and_git_blob_digests": "PASS"
+  },
+  "publication_checks": {
+    "remote_tag_absence": "Publisher reported verified: no dsh-v2.1.0-dev.1 exists; latest dsh-v2.0.0-dev.2 is a prerelease.",
+    "main_push": "PENDING_PUBLISHER",
+    "release_commit_hosted_CI": "PENDING_PUBLISHER",
+    "release_creation_and_six_asset_upload": "PENDING_PUBLISHER",
+    "downloaded_asset_byte_verification": "PENDING_PUBLISHER"
+  },
+  "mutations_performed": "Documentation and preparation evidence only; no rebuild, push, tag or release mutation.",
+  "superseded_by": "Publisher identified stale version text in packaged protocol README files; authorized documentation-only rebuild into dist/release-2.1-dev.1. These hashes remain the verified historical scope-convergence assets, not the planned publication bytes."
+}

@@ -1,0 +1,27 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "adapters/deepseek-harness/tests/standalone-package.test.mjs"
+  ],
+  "cwd": "/Users/zhangliangchen/PycharmProjects/BUGate",
+  "environment": {
+    "BUGATE_INSTALLED_PLUGIN": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-release-062b03f-nckpukan/clean-install/dsh-home/profiles/bugate-package-acceptance/node_modules/@bugate/deepseek-harness",
+    "BUGATE_INSTALLED_PYTHON": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-release-062b03f-nckpukan/clean-install/bootstrap/bin/python",
+    "BUGATE_DSH_MODULES": "/tmp/bugate-dsh-runtime/node_modules",
+    "BUGATE_DENY_SOURCE_ROOT": "/Users/zhangliangchen/PycharmProjects/BUGate"
+  },
+  "source_commit": "062b03f2895a7ddabe7ee848d5b8f047a1826da5",
+  "package": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-release-062b03f-nckpukan/assets/bugate-deepseek-harness-2.1.0-dev.1.tgz",
+  "package_sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+  "started_at": "2026-10-29T08:31:30.981373+00:00",
+  "driver_sha256": {
+    "adapters/deepseek-harness/tests/standalone-package.test.mjs": "d1a25cc0630ad34907317642b4ba5fdb28f33fb44e22d7994ca64e9c94a92933",
+    "adapters/deepseek-harness/tests/standalone-runner.mjs": "6e7f82ca027cd4a76d4a950ac8fa9a2d8775181e4d2acc2cd095300e868fa5c4",
+    "adapters/deepseek-harness/tests/host.mjs": "4f8017afe432cef1b33b389dd38b56f4cd4f9bc009093fa869cc54ba50f2e6df",
+    "adapters/deepseek-harness/tests/workflow-fixture.mjs": "c6b5df073ccd6b3e176e950d72ba6dec5af599bc67a2ed6cdb005e96aa3666a3"
+  },
+  "exit_code": 0,
+  "duration_seconds": 171.85725804208778,
+  "finished_at": "2026-10-29T08:34:22.834868+00:00"
+}

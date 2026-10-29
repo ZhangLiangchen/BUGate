@@ -1,0 +1,59 @@
+00-source-denial-probe PASS
+01-clean-bootstrap PASS
+02-repeat PASS
+03-doctor PASS
+04-task-rebind-rejected PASS
+05-stale-projection PASS
+06-upgrade PASS
+07-rollback PASS
+08-doctor-after-rollback PASS
+09-remove PASS
+10-repeat-remove PASS
+11-real-host-add-patch-failure PASS
+12-pending-no-blind-retry PASS
+13-explicit-pending-rollback PASS
+14-reinstall-after-recovery PASS
+15-final-doctor PASS
+16-unowned-bootstrap-rejected PASS
+17-real-upgrade-record-failure PASS
+18-post-record-recovery PASS
+19-post-record-doctor PASS
+{
+  "status": "PASS",
+  "level": "real DSH CLI + standalone wheel/bundle; runtime hydration not asserted",
+  "package_sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+  "dsh_version": "0.2.2-alpha.2",
+  "source_denied": "/Users/zhangliangchen/PycharmProjects/BUGate",
+  "tests": 20,
+  "mapping": {
+    "HC-01": [
+      "02-repeat"
+    ],
+    "HC-02": [
+      "03-doctor"
+    ],
+    "HC-11": [
+      "05-stale-projection"
+    ],
+    "HC-14": [
+      "07-rollback",
+      "09-remove",
+      "13-explicit-pending-rollback",
+      "18-post-record-recovery"
+    ],
+    "AC-19": [
+      "01-clean-bootstrap"
+    ],
+    "AC-20": [
+      "01-clean-bootstrap",
+      "03-doctor"
+    ],
+    "AC-31": [
+      "02-repeat",
+      "06-upgrade",
+      "07-rollback",
+      "09-remove",
+      "14-reinstall-after-recovery"
+    ]
+  }
+}

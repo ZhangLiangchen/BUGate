@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "source_commit": "062b03f2895a7ddabe7ee848d5b8f047a1826da5",
+  "source_inputs_verified": 57,
+  "asset_directory": "dist/release-2.1-dev.1",
+  "bundle_sha256": "0e9f87a6e9f3b21744e4b9f865ac7e698110a3c556fe43a70b9f34c37f74ea0c",
+  "checks": {
+    "native_build": "PASS",
+    "standalone_build": "PASS",
+    "source_distribution_boundary": "PASS",
+    "bundle_distribution_boundary": "PASS",
+    "source_commit_matching": "PASS",
+    "six_asset_checksums": "PASS",
+    "source_denied_lifecycle": {
+      "status": "PASS",
+      "commands": 20
+    },
+    "doctor": {
+      "status": "healthy",
+      "observations": 4
+    }
+  },
+  "prior_archive_upgrade_nine_commands": "NOT_RERUN: prior implementation-delivery archive evidence remains separate",
+  "runtime_hydration": "owned separately in ../runtime/installed-runtime-result.json",
+  "live_model": "NOT_RUN",
+  "release_publication": "owned by parent publisher"
+}

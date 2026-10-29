@@ -1,0 +1,1 @@
+{"apiVersion":"bugate.io/v2","kind":"CommandResult","operation":"setup","request_id":"bbf43481-0153-44fd-bc6a-7b322c2062fd","invocation":"invalid_input","data":null,"errors":[{"code":"BINDING_MISMATCH","message":"Selected task has no exact protocol binding","details":null}]}

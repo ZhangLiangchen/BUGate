@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "derivation": "protocol.py protocol_identity/evaluator_identity canonical byte rules applied to wheel entries",
+  "core_python_bytes_unchanged": true,
+  "changed_protocol_files": [
+    "README.md",
+    "README.zh-CN.md"
+  ],
+  "old_local_delivery": {
+    "wheel": "dist/scope-convergence/bugate_core-2.1.0a1-py3-none-any.whl",
+    "protocol": {
+      "id": "bugate",
+      "version": "2.1.0-dev.1",
+      "digest": "sha256:3b5f0cb8bb6121e51f1ab752a29de935ca66543e1d2914ba5eb2749bad5bd2b7"
+    },
+    "evaluator": "sha256:ae21a25662b21227576c7d7ea355baa92706755682305b42a6b2a0eed91e8c11"
+  },
+  "new_release": {
+    "wheel": "dist/release-2.1-dev.1/bugate_core-2.1.0a1-py3-none-any.whl",
+    "protocol": {
+      "id": "bugate",
+      "version": "2.1.0-dev.1",
+      "digest": "sha256:be1bcf919c65ca07efdc6f0461416390b19c3287d8cb0427165baf62ef3ed444"
+    },
+    "evaluator": "sha256:683e55243d84e47fca1323fa6041c9f948bf114a5556173d9ebf7fa47800fb6e"
+  },
+  "binding_consequence": "Different protocol and evaluator digests; old local 2.1 tasks require explicit new task initialization, retaining old history."
+}
