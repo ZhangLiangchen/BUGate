@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-BUGate is a host-neutral Python quality evaluator and v2 protocol with one native
+The current released BUGate is a host-neutral Python quality evaluator and v2 protocol with one native
 product host, DeepSeek Harness. Start with the current guides below. The
 canonical machine authority is [Protocol v2](../protocol/v2/manifest.yaml), not
 a delivery report or a historical acceptance matrix.
@@ -21,6 +21,14 @@ a delivery report or a historical acceptance matrix.
 The architecture guide retains its `BUGATE_2_0_PROTOCOL_GUIDE` filename for link
 continuity; its content describes the current v2 architecture. Current exact
 component versions are in the protocol manifest and distribution metadata.
+
+## Accepted next architecture
+
+The [TypeScript/Cordis plan](plans/TYPESCRIPT_CORDIS.md) records the user's accepted
+direction: full TypeScript product/toolchain, unified Node CLI and native Cordis
+service/plugin in DSH. **Implementation is planned, not started.** This future
+target is separate from the current guides and release observations; the plan
+changes no machine contract or published artifact and claims no migration tests.
 
 ## Verification records
 

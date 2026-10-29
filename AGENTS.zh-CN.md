@@ -7,7 +7,7 @@ BUGate 定义测试质量并评估事实。DeepSeek Harness（DSH）是唯一产
 ## 权威与目录
 
 - `protocol/v2/` 是唯一机器规范：Schema、MethodSpec、规则和 reason codes。
-- `src/bugate/` 是宿主无关 Python 核心与统一 CLI。
+- `src/bugate/` 是当前已发布的宿主无关 Python 核心与统一 CLI。
 - `adapters/deepseek-harness/` 保存原生适配器与真实宿主验收。
 - `views/skills/bugate/` 是精简入口；构建追加 canonical MethodSpec 并校验摘要。
 - `packaging/` 保存明确资源清单与独立安装器。
@@ -16,6 +16,8 @@ BUGate 定义测试质量并评估事实。DeepSeek Harness（DSH）是唯一产
 非平凡修改前阅读 [METHOD](docs/qa-methodology/METHOD.zh-CN.md)、[SOP](docs/qa-methodology/SOP.zh-CN.md) 和[协议指南](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md)。保留未提交工作与其他写者修改；委派时明确文件所有权。把决策、发现和命令存为可审查任务产物，不依赖记忆服务或 hook。
 
 ## 工程不变量
+
+用户已接受 [TypeScript/Cordis 路线](docs/plans/TYPESCRIPT_CORDIS.zh-CN.md)：共享 TypeScript 核心、统一 Node CLI 与 Cordis 原生服务/插件，DSH 保持唯一宿主。实施计划中、尚未开始；现有 Python 发布在验证切换前仍可维护。迁移前阅读计划；计划不修改当前机器契约、不授权新发布，也不把历史测试数量变成通用门槛。实现语言变化须保持下述不变量，并使用实际配置的 execution world。
 
 Core 保持 SUT-neutral。真实产品源码、API、秘密、环境、fixture 与现场证据留在外部测试工作区；本仓测试动态生成通用临时 fixture。领域事实必须绑定 Profile 声明的证据来源。
 

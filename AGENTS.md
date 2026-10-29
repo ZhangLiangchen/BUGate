@@ -10,7 +10,7 @@ for that tool.
 ## Authority and layout
 
 - `protocol/v2/` is the sole machine authority: Schemas, MethodSpec, rules and reason codes.
-- `src/bugate/` is the host-neutral Python evaluator and unified CLI.
+- `src/bugate/` is the current released host-neutral Python evaluator and unified CLI.
 - `adapters/deepseek-harness/` is the native adapter and real-runtime acceptance.
 - `views/skills/bugate/` is the small entry projection; the build appends canonical MethodSpec resources and seals their digest.
 - `packaging/` owns the explicit resource inventory and standalone installer.
@@ -23,6 +23,14 @@ explicit file ownership when delegating. Save decisions, findings and commands
 as reviewable task artifacts; no memory daemon or hook is required.
 
 ## Engineering invariants
+
+The user has accepted the [TypeScript/Cordis roadmap](docs/plans/TYPESCRIPT_CORDIS.md):
+shared TypeScript core, unified Node CLI and native Cordis service/plugin, with
+DSH remaining the only host. Implementation is planned, not started. The current
+Python release remains maintainable until verified cutover. Read the plan before
+migration work; it does not change current machine contracts, authorize a new
+release or make historical test counts universal gates. Preserve the invariants
+below across the implementation change and use actual configured execution worlds.
 
 Keep the core SUT-neutral. Real product sources, APIs, secrets, environments,
 fixtures and evidence belong in external test workspaces; tests here create

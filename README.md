@@ -13,6 +13,12 @@ Python core, a versioned protocol and a unified CLI. Its native DSH plugin uses
 those evaluations to constrain managed execution and completion. DSH owns the
 Agent loop, tools, scheduling, session lifecycle and bounded rework.
 
+**Current release:** Python core and native TypeScript DSH plugin, as described
+below. **Accepted next architecture:** full TypeScript core/toolchain, unified
+Node CLI and Cordis native service/plugin. That migration is **planned, not
+started**; current installation instructions and released assets remain unchanged.
+See the [TypeScript/Cordis plan](docs/plans/TYPESCRIPT_CORDIS.md).
+
 ## Acceptance follows the user's goal
 
 The default is the smallest sufficient evidence closure for the agreed goals.
@@ -65,7 +71,7 @@ Verifying one named requirement does not mark other required work complete.
 Reports identify actual coverage, functional results, execution blockers and
 suggestions, and state: **“This conclusion covers only the agreed scope.”**
 
-## Architecture and authority
+## Current released architecture and authority
 
 ```mermaid
 flowchart LR
