@@ -7,6 +7,11 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {host,SessionId,requestText,load} from './host.mjs';
 import {initializeProject,authorAndExecute} from './workflow-fixture.mjs';
 assert.equal(process.env.PYTHONPATH,undefined);
+let sourceIsolation='environment-clean; installed module paths verified';
+if(process.env.BUGATE_DENY_SOURCE_ROOT){
+ await assert.rejects(readFile(join(process.env.BUGATE_DENY_SOURCE_ROOT,'pyproject.toml')),error=>error.code==='EPERM'||error.code==='EACCES');
+ sourceIsolation='OS sandbox denied checkout reads, verified before runtime loading';
+}
 const python=process.env.BUGATE_INSTALLED_PYTHON;
 const installed=process.env.BUGATE_INSTALLED_PLUGIN;
 const pythonIdentity=JSON.parse(execFileSync(python,['-c',"import bugate,sys,json;print(json.dumps({'module':bugate.__file__,'prefix':sys.prefix,'base_prefix':sys.base_prefix,'version':bugate.__version__}))"],{encoding:'utf8'}));
@@ -32,6 +37,6 @@ try{
  const result=await authorAndExecute(h,agent,task,{execute:true});
  assert.ok(h.model.requests.every(r=>requestText(r).includes('BUGate')));
  const compatibility=JSON.parse(await readFile(join(installed,'resources/compatibility.json')));
- await writeFile(join(process.cwd(),'result.json'),JSON.stringify({verification:'real-dsh-runtime-deterministic-model-installed-package',module_identity:identity,python_identity:pythonIdentity,profile_directory:profileDir,compatibility,installed,python,task,...result},null,2));
+ await writeFile(join(process.cwd(),'result.json'),JSON.stringify({verification:'real-dsh-runtime-deterministic-model-installed-package',source_isolation:sourceIsolation,module_identity:identity,python_identity:pythonIdentity,profile_directory:profileDir,compatibility,installed,python,task,...result},null,2));
  console.log(JSON.stringify({verification:'real-dsh-runtime-deterministic-model-installed-package',requests:result.requests,evidence_id:result.evidence.id,execution:result.evidence.execution.status,task,compatibility}));
 }finally{await h.ctx.fiber.dispose();}

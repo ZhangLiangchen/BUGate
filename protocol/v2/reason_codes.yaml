@@ -3,6 +3,14 @@
   "kind": "ReasonCodeCatalog",
   "version": "2.0.0",
   "codes": {
+    "ADVERSARIAL_CASE_UNMAPPED": {
+      "meaning": "An included adversarial finding lacks matching inventory coverage.",
+      "stable": true
+    },
+    "ADVERSARIAL_UNRESOLVED": {
+      "meaning": "An adversarial finding or residual risk remains unresolved.",
+      "stable": true
+    },
     "ALL_TESTS_SKIPPED": {
       "meaning": "all tests skipped",
       "stable": true
@@ -214,16 +222,12 @@
       "meaning": "knowledge missing",
       "stable": true
     },
-    "LEGACY_CHECKER_FAILURE": {
-      "meaning": "legacy checker failure",
+    "LAYER_DECISION_MISMATCH": {
+      "meaning": "A case and its proposition testability decision select different layers.",
       "stable": true
     },
-    "LEGACY_PRECODE_INVALID": {
-      "meaning": "legacy precode invalid",
-      "stable": true
-    },
-    "LEGACY_PRECODE_WARNING": {
-      "meaning": "legacy precode warning",
+    "MODEL_REFERENCE_INVALID": {
+      "meaning": "A quality model refers to an unknown or unrelated semantic identity.",
       "stable": true
     },
     "NEGATIVE_COVERAGE_MISSING": {
@@ -325,6 +329,10 @@
       "meaning": "python timeout",
       "stable": true
     },
+    "QUALITY_MODEL_MISSING": {
+      "meaning": "Profile requires a quality model that is absent.",
+      "stable": true
+    },
     "REFERENCE_DIGEST_MISMATCH": {
       "meaning": "reference digest mismatch",
       "stable": true
@@ -362,6 +370,10 @@
       "meaning": "resource missing",
       "stable": true
     },
+    "REVIEW_INDEPENDENCE_MISSING": {
+      "meaning": "Profile-required reviewer independence is not evidenced.",
+      "stable": true
+    },
     "RISK_UNCOVERED": {
       "meaning": "risk uncovered",
       "stable": true
@@ -392,12 +404,20 @@
       "meaning": "scope denominator changed",
       "stable": true
     },
+    "SEMANTIC_PLACEHOLDER": {
+      "meaning": "A required quality value is an unresolved placeholder.",
+      "stable": true
+    },
     "SEMANTIC_REVIEW_MISSING": {
       "meaning": "semantic review missing",
       "stable": true
     },
     "SEMANTIC_REVIEW_STALE": {
       "meaning": "semantic review stale",
+      "stable": true
+    },
+    "SOURCE_PLAN_MISSING": {
+      "meaning": "A quality artifact or case lacks a resolved declared source plan.",
       "stable": true
     },
     "STRUCTURE_INVALID": {
@@ -423,6 +443,10 @@
     },
     "TESTABILITY_GAP": {
       "meaning": "testability gap",
+      "stable": true
+    },
+    "TESTABILITY_ORACLE_UNMAPPED": {
+      "meaning": "A business oracle has no testability decision.",
       "stable": true
     },
     "TEST_REPORT_EXISTS": {

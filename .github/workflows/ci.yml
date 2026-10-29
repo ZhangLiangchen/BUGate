@@ -1,323 +1,10 @@
-name: CI
+name: v2 + DeepSeek Harness
 
 on:
   push:
   pull_request:
 
-env:
-  BUGATE_RELEASE_VERSION: "0.4.5"
-
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Enforce repository, plugin, updater, and tag version consistency
-        run: |
-          python3 - <<'PY'
-          import ast
-          import json
-          import os
-          import subprocess
-          from pathlib import Path
-
-          version = os.environ["BUGATE_RELEASE_VERSION"]
-          plugin_versions = {
-              path: json.loads(Path(path).read_text(encoding="utf-8"))["version"]
-              for path in (
-                  ".codex-plugin/plugin.json",
-                  ".claude-plugin/plugin.json",
-              )
-          }
-
-          updater_path = Path("scripts/bugate_update.py")
-          tree = ast.parse(
-              updater_path.read_text(encoding="utf-8"),
-              filename=str(updater_path),
-          )
-          updater_versions = []
-          for node in tree.body:
-              if isinstance(node, ast.Assign):
-                  targets = node.targets
-                  value = node.value
-              elif isinstance(node, ast.AnnAssign):
-                  targets = [node.target]
-                  value = node.value
-              else:
-                  continue
-              if any(
-                  isinstance(target, ast.Name) and target.id == "UPDATER_VERSION"
-                  for target in targets
-              ):
-                  updater_versions.append(ast.literal_eval(value))
-          if updater_versions != [version]:
-              raise SystemExit(
-                  f"updater/repository version mismatch: "
-                  f"repository={version!r}, updater={updater_versions!r}"
-              )
-          mismatched = {
-              path: value
-              for path, value in plugin_versions.items()
-              if value != version
-          }
-          if mismatched:
-              raise SystemExit(
-                  f"plugin/repository version mismatch: "
-                  f"repository={version!r}, plugins={mismatched!r}"
-              )
-
-          for suffix in (".md", ".zh-CN.md"):
-              note = Path(f"docs/releases/v{version}{suffix}")
-              if not note.is_file():
-                  raise SystemExit(f"missing bilingual release note: {note}")
-
-          native = json.loads(Path("adapters/deepseek-harness/plugin/package.json").read_text())["version"]
-          native_note = Path(f"docs/releases/dsh-v{native}.md")
-          if not native_note.is_file() or not native_note.with_suffix(".zh-CN.md").is_file():
-              raise SystemExit("missing bilingual DSH release notes")
-
-          if os.environ.get("GITHUB_REF_TYPE") == "tag":
-              tag = os.environ.get("GITHUB_REF_NAME", "")
-              # DSH prereleases have an independent version line. Both lines
-              # retain exact version, annotated-tag and peeled-commit checks.
-              expected = f"dsh-v{native}" if tag.startswith("dsh-") else f"v{version}"
-              if tag != expected:
-                  raise SystemExit(
-                      f"tag/repository version mismatch: "
-                      f"repository={version!r}, tag={tag!r}"
-                  )
-              tag_ref = f"refs/tags/{tag}"
-              # actions/checkout can materialize a tag-push ref locally as a
-              # lightweight commit ref even when the remote object is an
-              # annotated tag. Fetch the exact remote tag object before
-              # checking its type; --force replaces only this local tag ref.
-              subprocess.run(
-                  [
-                      "git",
-                      "fetch",
-                      "--force",
-                      "--no-tags",
-                      "origin",
-                      f"{tag_ref}:{tag_ref}",
-                  ],
-                  check=True,
-              )
-              tag_type = subprocess.check_output(
-                  ["git", "cat-file", "-t", tag_ref], text=True
-              ).strip()
-              if tag_type != "tag":
-                  raise SystemExit(f"release ref must be an annotated tag: {tag}")
-              peeled = subprocess.check_output(
-                  ["git", "rev-parse", f"{tag}^{{commit}}"], text=True
-              ).strip()
-              head = subprocess.check_output(
-                  ["git", "rev-parse", "HEAD"], text=True
-              ).strip()
-              if peeled != head:
-                  raise SystemExit(
-                      f"release tag does not peel to checked-out commit: "
-                      f"tag={peeled}, HEAD={head}"
-                  )
-
-          print(
-              f"release version agreement: repository/plugins/updater"
-              + ("/tag" if os.environ.get("GITHUB_REF_TYPE") == "tag" else "")
-              + f" = {version}"
-          )
-          PY
-
-      - name: Verify seven formal legacy tags
-        run: |
-          python3 - <<'PY'
-          import re
-          import subprocess
-          import sys
-
-          sys.path.insert(0, "scripts")
-          import bugate_install_contract as contract
-
-          expected = (
-              "v0.3.0",
-              "v0.3.1",
-              "v0.3.2",
-              "v0.3.4",
-              "v0.3.5",
-              "v0.4.0",
-              "v0.4.1",
-          )
-          if tuple(contract.SUPPORTED_LEGACY_TAGS) != expected:
-              raise SystemExit(
-                  "legacy-tag contract drift: "
-                  f"expected={expected!r}, actual={contract.SUPPORTED_LEGACY_TAGS!r}"
-              )
-          for tag in expected:
-              ref = f"refs/tags/{tag}"
-              kind = subprocess.check_output(
-                  ["git", "cat-file", "-t", ref], text=True
-              ).strip()
-              if kind != "tag":
-                  raise SystemExit(f"legacy source is not an annotated tag: {tag}")
-              commit = subprocess.check_output(
-                  ["git", "rev-parse", f"{tag}^{{commit}}"], text=True
-              ).strip()
-              if re.fullmatch(r"[0-9a-f]{40,64}", commit) is None:
-                  raise SystemExit(f"legacy tag does not peel to a commit: {tag}")
-              print(f"verified annotated legacy tag: {tag} -> {commit}")
-          PY
-
-      - name: Compile all gate scripts
-        run: python3 -m py_compile scripts/*.py
-
-      - name: Brief semantics gate
-        run: python3 scripts/check_bugate_brief_semantics.py .shared/skills/bugate/templates
-
-      - name: Layer-2 semantics gate
-        run: python3 scripts/check_bugate_layer2_semantics.py .shared/skills/bugate/templates
-
-      - name: Inventory semantics gate
-        run: python3 scripts/check_bugate_inventory_semantics.py .shared/skills/bugate/templates
-
-      - name: V13 pre-code semantics gate
-        run: python3 scripts/check_bugate_v13_semantics.py .shared/skills/bugate/templates --scope pre-code
-
-      # De-SUT guard (CHARTER A1: block seepage, not mention) — two hygiene
-      # readings run here; the meta-test that proves every red/green verdict
-      # (incl. the second-SUT profile-declared defense) runs in the test loop
-      # below with the rest of tests/test_*.py.
-      - name: De-SUT guard — general hygiene (kit tree, no term list)
-        run: python3 scripts/check_no_sut_terms.py
-
-      - name: De-SUT guard — legacy origin-SUT regression (fixture terms)
-        run: python3 scripts/check_no_sut_terms.py --terms-file tests/fixtures/legacy-sut-terms.txt
-
-      # Meta-tests and ephemeral-fixture acceptances (imported-mode purity: the
-      # repo ships no committed example SUT trees, so each fabricates its own
-      # fixtures at run time). One loop runs every tests/test_*.py, echoes each
-      # file, and fails the job if any test fails, so a new test file is picked
-      # up automatically.
-      - name: Meta-tests and acceptances (every tests/test_*.py)
-        run: |
-          rc=0
-          for t in tests/test_*.py; do
-            echo "== $t =="
-            python3 "$t" || rc=1
-          done
-          exit $rc
-
-      - name: bugate init end-to-end (ephemeral SUT repo, R4 negative control)
-        run: |
-          sut="$(mktemp -d)"
-          python3 scripts/bugate_init.py "$sut"
-          # enable the guard the way an adopter would
-          python3 - "$sut" <<'PY'
-          import pathlib, sys
-          p = pathlib.Path(sys.argv[1]) / "bugate.profile.yaml"
-          p.write_text(p.read_text().replace(
-              "guarded_path_regex: []",
-              'guarded_path_regex:\n  - "(^|/)tests/(?P<uc>[^/]+)/[^/]+[.]py$"'))
-          PY
-          cd "$sut"
-          if python3 .bugate/scripts/check_bugate.py tests/pay/test_pay.py </dev/null; then
-            echo "negative control failed: ungated UC was not blocked"; exit 1
-          fi
-          python3 .bugate/scripts/check_no_sut_terms.py   # vendored kit self-scan
-          cd - >/dev/null && rm -rf "$sut"
-
-      - name: Wave 0 / Wave 8 degrade gracefully without a profile spec
-        run: |
-          python3 scripts/check_prd_health.py --gate | grep -q "profile_required"
-          python3 scripts/oracle_falsification.py --gate | grep -q "profile_required"
-
-      - name: Orchestrator init smoke (full SDTD)
-        run: |
-          tmp="$(mktemp -d)"
-          python3 scripts/sdtd_orchestrator.py "$tmp" --init --full-sdtd
-          python3 scripts/check_bugate_v13_semantics.py "$tmp" --scope pre-code
-          rm -rf "$tmp"
-
-      - name: Core stays stdlib-only
-        run: |
-          python3 - <<'PY'
-          import ast, sys, pathlib
-          repo_mods = {p.stem for p in pathlib.Path("scripts").glob("*.py")}
-          allowed = set(sys.stdlib_module_names) | repo_mods
-          bad = []
-          for p in sorted(pathlib.Path("scripts").glob("*.py")):
-              tree = ast.parse(p.read_text(encoding="utf-8"))
-              for node in ast.walk(tree):
-                  if isinstance(node, ast.Import):
-                      for a in node.names:
-                          if a.name.split(".")[0] not in allowed:
-                              bad.append(f"{p.name}: import {a.name}")
-                  elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                      if node.module.split(".")[0] not in allowed:
-                          bad.append(f"{p.name}: from {node.module}")
-          if bad:
-              print("Third-party imports found in core:")
-              for b in bad:
-                  print(" ", b)
-              sys.exit(1)
-          print("Core is stdlib-only: OK")
-          PY
-
-      - name: Build and checksum actual repository release archives
-        run: |
-          if [ -n "$(git status --porcelain=v1 --untracked-files=all)" ]; then
-            echo "release archive build requires a clean checkout" >&2
-            git status --short >&2
-            exit 1
-          fi
-          release_dir="$RUNNER_TEMP/bugate-release"
-          python3 scripts/build_release_archives.py \
-            --version "$BUGATE_RELEASE_VERSION" \
-            --out-dir "$release_dir"
-          (
-            cd "$release_dir"
-            test "$(find . -maxdepth 1 -type f | wc -l | tr -d ' ')" = "3"
-            shasum -a 256 -c "bugate-${BUGATE_RELEASE_VERSION}.SHA256SUMS"
-          )
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
-
-      - name: Archive-native v0.3.2 update acceptance (synthetic CI runtime)
-        run: |
-          release_dir="$RUNNER_TEMP/bugate-release"
-          python3 tests/accept_release_assets.py \
-            --tar "$release_dir/bugate-${BUGATE_RELEASE_VERSION}.tar.gz" \
-            --zip "$release_dir/bugate-${BUGATE_RELEASE_VERSION}.zip" \
-            --checksums "$release_dir/bugate-${BUGATE_RELEASE_VERSION}.SHA256SUMS" \
-            --version "$BUGATE_RELEASE_VERSION" \
-            --repo-root "$GITHUB_WORKSPACE" \
-            --full-check-mode smoke \
-            --full-check-archive both \
-            --full-check-timeout 180 \
-            --report "$RUNNER_TEMP/bugate-release-acceptance.json"
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
-
-      # CI audit retention only. Publication remains a separate, gated manual
-      # action after main/tag/archive-native acceptance.
-      - name: Upload verified release archives for audit
-        uses: actions/upload-artifact@v4
-        with:
-          name: bugate-${{ env.BUGATE_RELEASE_VERSION }}-verified-release-archives
-          path: |
-            ${{ runner.temp }}/bugate-release/bugate-${{ env.BUGATE_RELEASE_VERSION }}.tar.gz
-            ${{ runner.temp }}/bugate-release/bugate-${{ env.BUGATE_RELEASE_VERSION }}.zip
-            ${{ runner.temp }}/bugate-release/bugate-${{ env.BUGATE_RELEASE_VERSION }}.SHA256SUMS
-            ${{ runner.temp }}/bugate-release-acceptance.json
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 14
-
   protocol-dsh:
     runs-on: ubuntu-latest
     steps:
@@ -328,7 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24.9.0"
-      - name: Install exact host and build dependencies outside the checkout
+      - name: Install exact host and isolated build dependencies
         run: |
           runtime="$RUNNER_TEMP/dsh-runtime"
           mkdir -p "$runtime"
@@ -336,25 +23,29 @@ jobs:
           npm install --global pnpm@11.28.5
           ln -s "$runtime/node_modules" adapters/deepseek-harness/plugin/node_modules
           python3 -m pip install .
-      - name: Shared core and installation boundaries
+      - name: Core, source distribution and installation boundaries
         run: |
           python3 -m unittest discover -s tests/v2 -v
+          python3 -m unittest discover -s tests/distribution -v
           python3 tests/integration_install/test_install_boundaries.py
-      - name: Compile against the locked DSH types and test the actual runtime
+          python3 scripts/check_distribution.py
+      - name: Compile against locked DSH types and execute actual runtime
         run: |
           npm run build --prefix adapters/deepseek-harness/plugin
           node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs
-      - name: Build the native bundle and offline wheelhouse
-        run: python3 packaging/build_dsh.py --out-dir "$RUNNER_TEMP/bugate-dsh-package"
-      - name: Standalone clean installation, idempotence, upgrade, rollback and removal
+      - name: Build finite native bundle and offline wheelhouse
         run: |
-          python3 tests/integration_install/accept_package.py \
-            --package "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.0.0-dev.1.tgz" \
-            --dsh "$RUNNER_TEMP/dsh-runtime/node_modules/.bin/dsh" \
-            --out-dir "$RUNNER_TEMP/bugate-dsh-acceptance"
+          python3 packaging/build_dsh.py --out-dir "$RUNNER_TEMP/bugate-dsh-package"
+          python3 scripts/check_distribution.py --bundle "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.0.0-dev.2.tgz"
           cd "$RUNNER_TEMP/bugate-dsh-package"
           sha256sum -c SHA256SUMS
-      - name: Real DSH runtime from the standalone installed package
+      - name: Standalone clean installation and v2 lifecycle
+        run: |
+          python3 tests/integration_install/accept_package.py \
+            --package "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.0.0-dev.2.tgz" \
+            --dsh "$RUNNER_TEMP/dsh-runtime/node_modules/.bin/dsh" \
+            --out-dir "$RUNNER_TEMP/bugate-dsh-acceptance"
+      - name: Real DSH runtime from installed package
         env:
           BUGATE_INSTALLED_PLUGIN: ${{ runner.temp }}/bugate-dsh-acceptance/dsh-home/profiles/bugate-package-acceptance/node_modules/@bugate/deepseek-harness
           BUGATE_INSTALLED_PYTHON: ${{ runner.temp }}/bugate-dsh-acceptance/bootstrap/bin/python
@@ -363,7 +54,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bugate-dsh-package-and-acceptance
+          name: bugate-v2-dsh-package-and-acceptance
           path: |
             ${{ runner.temp }}/bugate-dsh-package
             ${{ runner.temp }}/bugate-dsh-acceptance/*.json

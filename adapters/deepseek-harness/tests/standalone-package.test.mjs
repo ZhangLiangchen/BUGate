@@ -10,7 +10,12 @@ test('AC-19/20/21 installed tarball and isolated Python run real DSH authoring a
  const directory=await realpath(await mkdtemp(join(tmpdir(),'bugate-installed-dsh-')));
  for(const name of ['standalone-runner.mjs','host.mjs','workflow-fixture.mjs'])await copyFile(new URL(name,import.meta.url),join(directory,name));
  const env={...process.env};delete env.PYTHONPATH;delete env.BUGATE_TEST_PYTHON;delete env.NODE_PATH;
- const child=spawn(process.execPath,[join(directory,'standalone-runner.mjs')],{cwd:directory,env,stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>output+=x);
+ let executable=process.execPath,args=[join(directory,'standalone-runner.mjs')];
+ if(env.BUGATE_DENY_SOURCE_ROOT){
+  assert.equal(process.platform,'darwin','source-denial mode requires the macOS sandbox');
+  executable='/usr/bin/sandbox-exec';args=['-p',`(version 1) (allow default) (deny file-read* (subpath ${JSON.stringify(env.BUGATE_DENY_SOURCE_ROOT)}))`,process.execPath,...args];
+ }
+ const child=spawn(executable,args,{cwd:directory,env,stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>output+=x);
  const code=await new Promise(resolve=>child.on('exit',resolve));await writeFile(join(directory,'runtime.log'),output);assert.equal(code,0,output+`\nRetained evidence: ${directory}`);
  const result=JSON.parse(await readFile(join(directory,'result.json')));assert.equal(result.evidence.source_type,'host_observed');assert.equal(result.evidence.execution.status,'passed');
  console.log(JSON.stringify({evidence:join(directory,'result.json'),log:join(directory,'runtime.log'),requests:result.requests,installed:result.installed,python:result.python}));

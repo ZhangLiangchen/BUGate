@@ -2,7 +2,8 @@
 
 [English](README.md) | 简体中文
 
-Protocol `2.0.0`、Python `bugate-core 2.0.0a1` 与 legacy 仓库发布版本各自独立。
+Protocol `2.0.0`、Python `bugate-core 2.0.0a2` 和 DSH bundle `2.0.0-dev.2`
+各自具有版本身份；每个任务锁定精确协议摘要。
 本目录是 canonical 资源；wheel 打包包含相同字节。`manifest.yaml` 和
 `reason_codes.yaml` 使用 JSON 语法，属于合法 YAML 1.2。
 
@@ -28,8 +29,20 @@ status 重新评估声明，历史 satisfied 字段不能授权。原子写和�
 不证明事实为真。产品失败可满足执行/交付声明，失败需求仍不可标已验证；零用例、
 全跳过和仅 xfail 的运行不能建立验证结论。
 
-legacy_precode 工件通过显式中立配置的子进程复用原有 `check(...) -> GateReport`，
-以结构化 failures/warnings 返回。旧脚本的 CLI 与 stdlib-only 依赖契约保持原样。
+评估器只接受原生 v2 对象。历史文件格式与 `legacy_precode` 由 Schema 明确拒绝，
+没有转换器或降级路径。公共质量不变量与声明适用维度唯一保存在 `rules/quality.json`；
+MethodSpec 引用该约束集合，上下文与 Skill 投影读取相同来源。
+
+业务事实必须有声明来源和当前语义评审。每个 Oracle 必须有可测性策略；用例继承
+inventory 的来源计划，也可用显式 `source_refs` 收窄。必需正文不能为空白或未决占位词。
+Inventory 用例本身包含可读前置条件、预期观测和测试层理由。
+
+Profile 可通过只接受 `true` 的 `quality_requirements` 收紧要求：`domain_model`、
+`state_model`、`dimension_matrix`、`adversarial_review`、`independent_review`。
+四种模型工件具有原生类型 Schema、显式交叉引用；只要提供就必须绑定当前语义评审。
+纳入的对抗发现必须映射到实际用例，未决处置和残余风险阻止设计完成。
+独立评审要求工件的具名 `producer` 与 `reviewer` 不同；这是来源记录，不是认证身份。
+可选模型不隐式成为默认必需项，其正反例与普通 v2 测试一同验证。
 
 `tests/v2/test_core.py` 运行时生成并校验示例，fixture 和执行日志位于外部临时 SUT
 目录。普通 prepare/validate/assess 不依赖 Memory Bus。

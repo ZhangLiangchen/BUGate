@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bugate-core"
-version = "2.0.0a1"
+version = "2.0.0a2"
 description = "Host-neutral BUGate protocol, evidence and claim assessment core"
 requires-python = ">=3.11"
 dependencies = ["jsonschema==4.23.0"]
@@ -19,10 +19,30 @@ exclude = ["**/__pycache__/**", "**/*.pyc", "**/.DS_Store"]
 packages = ["src/bugate"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"protocol/v2" = "bugate/resources/protocol/v2"
-".shared/skills/bugate" = "bugate/resources/.shared/skills/bugate"
-"scripts" = "bugate/resources/scripts"
-"bugate.config.yaml" = "bugate/resources/bugate.config.yaml"
+"protocol/v2/README.md" = "bugate/resources/protocol/v2/README.md"
+"protocol/v2/README.zh-CN.md" = "bugate/resources/protocol/v2/README.zh-CN.md"
+"protocol/v2/manifest.yaml" = "bugate/resources/protocol/v2/manifest.yaml"
+"protocol/v2/methods/business_understanding.json" = "bugate/resources/protocol/v2/methods/business_understanding.json"
+"protocol/v2/methods/diagnosis.json" = "bugate/resources/protocol/v2/methods/diagnosis.json"
+"protocol/v2/methods/execution.json" = "bugate/resources/protocol/v2/methods/execution.json"
+"protocol/v2/methods/implementation.json" = "bugate/resources/protocol/v2/methods/implementation.json"
+"protocol/v2/methods/knowledge.json" = "bugate/resources/protocol/v2/methods/knowledge.json"
+"protocol/v2/methods/test_design.json" = "bugate/resources/protocol/v2/methods/test_design.json"
+"protocol/v2/methods/testability.json" = "bugate/resources/protocol/v2/methods/testability.json"
+"protocol/v2/reason_codes.yaml" = "bugate/resources/protocol/v2/reason_codes.yaml"
+"protocol/v2/rules/quality.json" = "bugate/resources/protocol/v2/rules/quality.json"
+"protocol/v2/schemas/artifact.schema.json" = "bugate/resources/protocol/v2/schemas/artifact.schema.json"
+"protocol/v2/schemas/assessment_request.schema.json" = "bugate/resources/protocol/v2/schemas/assessment_request.schema.json"
+"protocol/v2/schemas/assessment_result.schema.json" = "bugate/resources/protocol/v2/schemas/assessment_result.schema.json"
+"protocol/v2/schemas/claim.schema.json" = "bugate/resources/protocol/v2/schemas/claim.schema.json"
+"protocol/v2/schemas/command_result.schema.json" = "bugate/resources/protocol/v2/schemas/command_result.schema.json"
+"protocol/v2/schemas/evidence.schema.json" = "bugate/resources/protocol/v2/schemas/evidence.schema.json"
+"protocol/v2/schemas/execution_record.schema.json" = "bugate/resources/protocol/v2/schemas/execution_record.schema.json"
+"protocol/v2/schemas/method_spec.schema.json" = "bugate/resources/protocol/v2/schemas/method_spec.schema.json"
+"protocol/v2/schemas/prepared_protocol_context.schema.json" = "bugate/resources/protocol/v2/schemas/prepared_protocol_context.schema.json"
+"protocol/v2/schemas/profile.schema.json" = "bugate/resources/protocol/v2/schemas/profile.schema.json"
+"protocol/v2/schemas/protocol_binding.schema.json" = "bugate/resources/protocol/v2/schemas/protocol_binding.schema.json"
+"protocol/v2/schemas/test_task.schema.json" = "bugate/resources/protocol/v2/schemas/test_task.schema.json"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/bugate", "protocol/v2", ".shared/skills/bugate", "scripts", "bugate.config.yaml", "pyproject.toml"]
+include = ["src/bugate", "protocol/v2", "packaging/resources.json", "pyproject.toml", "LICENSE"]

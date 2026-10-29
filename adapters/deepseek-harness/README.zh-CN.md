@@ -3,8 +3,8 @@
 # DeepSeek Harness 适配器
 
 原生 `@bugate/deepseek-harness` bundle 面向 DSH **0.2.2-alpha.2**，已核对官方源码
-`f3803c96974ad4a94195fb97e5c637e9c2a3afe3`，使用共享 Python 核心 **2.0.0a1**
-和规范协议 **2.0.0**。尚未公开发布，因此 manifest 的发行状态保留 `planned`。
+`f3803c96974ad4a94195fb97e5c637e9c2a3afe3`，使用共享 Python 核心 **2.0.0a2**
+和规范协议 **2.0.0**。这是当前唯一产品适配器。dev.2 是本次本地交付；本次重构不发布或替换公开版本。
 
 参见[安装使用](../../docs/DEEPSEEK_HARNESS.zh-CN.md)、
 [插件配置](plugin/README.zh-CN.md)和[运行时测试](tests/README.zh-CN.md)。

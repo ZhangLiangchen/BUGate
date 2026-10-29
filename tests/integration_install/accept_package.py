@@ -54,15 +54,15 @@ def main():
     # Controlled upgrade fixture changes only release metadata, not quality rules.
     with tarfile.open(package,'r:gz') as archive:
         members={m.name:archive.extractfile(m).read() for m in archive if m.isfile()}
-    metadata=json.loads(members['package/package.json']);metadata['version']='2.0.0-dev.2';members['package/package.json']=(json.dumps(metadata,indent=2)+'\n').encode()
+    metadata=json.loads(members['package/package.json']);original_version=metadata['version'];upgrade_version=original_version+'.upgrade-fixture';metadata['version']=upgrade_version;members['package/package.json']=(json.dumps(metadata,indent=2)+'\n').encode()
     inventory=json.loads(members['package/inventory.json']);inventory['files']['package.json']=hashlib.sha256(members['package/package.json']).hexdigest();members['package/inventory.json']=(json.dumps(inventory,indent=2)+'\n').encode()
     upgrade=out/'upgrade-fixture.tgz'
     with tarfile.open(upgrade,'w:gz') as archive:
         for name,payload in sorted(members.items()):
             info=tarfile.TarInfo(name);info.size=len(payload);info.mode=0o644;archive.addfile(info,io.BytesIO(payload))
     upgraded=run('06-upgrade',cli+['setup','deepseek-harness',*common,'--package',str(upgrade)]);assert upgraded['data']['status']=='upgraded'
-    assert upgraded['data']['integration']['package_version']=='2.0.0-dev.2'
-    rolled=run('07-rollback',cli+['remove','deepseek-harness',*common,'--rollback']);assert rolled['data']['integration']['package_version']=='2.0.0-dev.1' and rolled['data']['integration']['previous'] is None
+    assert upgraded['data']['integration']['package_version']==upgrade_version
+    rolled=run('07-rollback',cli+['remove','deepseek-harness',*common,'--rollback']);assert rolled['data']['integration']['package_version']==original_version and rolled['data']['integration']['previous'] is None
     run('08-doctor-after-rollback',cli+['doctor','integrations',*common])
     assert user in patch.read_bytes() and json.loads(manifest.read_text())['user_owned_setting']=={'keep':True}
     run('09-remove',cli+['remove','deepseek-harness',*common]);assert b'BEGIN BUGATE' not in patch.read_bytes()
@@ -106,7 +106,7 @@ except OSError as e: print(str(e));sys.exit(72)
     run('17-real-upgrade-record-failure',[python,'-c',commit_fault,str(project),profile,str(upgrade),args.dsh,str(home)],72)
     assert (state/'pending.json').is_file() and (state/'installed.json').is_file()
     run('18-post-record-recovery',cli+['remove','deepseek-harness',*common,'--rollback'])
-    assert json.loads((state/'installed.json').read_text())['package_version']=='2.0.0-dev.1'
+    assert json.loads((state/'installed.json').read_text())['package_version']==original_version
     run('19-post-record-doctor',cli+['doctor','integrations',*common])
     result={'status':'PASS','level':'real DSH CLI + standalone wheel/bundle; runtime hydration not asserted','package_sha256':hashlib.sha256(package.read_bytes()).hexdigest(),
             'dsh_version':'0.2.2-alpha.2','tests':len(records),'mapping':{'HC-01':['02-repeat'],'HC-02':['03-doctor'],'HC-11':['05-stale-projection'],'HC-14':['07-rollback','09-remove','13-explicit-pending-rollback','18-post-record-recovery'],'AC-19':['01-clean-bootstrap'],'AC-20':['01-clean-bootstrap','03-doctor'],'AC-31':['02-repeat','06-upgrade','07-rollback','09-remove','14-reinstall-after-recovery']}}

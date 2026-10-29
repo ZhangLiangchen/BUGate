@@ -1,6 +1,4 @@
-# ── BUGate core .gitignore (SUT-neutral) ──
-
-# Python
+# Build outputs and isolated dependencies
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -8,8 +6,6 @@ build/
 dist/
 .venv/
 venv/
-
-# Native host adapter dependencies and generated package payloads
 node_modules/
 node_modules
 /adapters/deepseek-harness/plugin/lib/
@@ -17,7 +13,14 @@ node_modules
 /adapters/deepseek-harness/plugin/python/
 *.tgz
 
-# OS / editor
+# Existing independent worktrees and local state are never distribution inputs.
+/.claude/worktrees/
+/.claude/settings.local.json
+/.memory_bus/
+/.shared/
+/.codex/
+
+# Editor and machine-local files
 .DS_Store
 Thumbs.db
 .idea/
@@ -25,21 +28,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local agent + memory state — machine/local only, never part of core
-.memory_bus/
-.shared/memory/
-.shared/progress/
-.shared/memory-service-archive/
-.codex/memories/
-.claude/memory/
-# Personal, per-clone Claude Code overrides — never committed (Claude Code
-# ignores it globally too; this makes the ignore portable to every clone).
-.claude/settings.local.json
-
-# Secrets / environments — never commit
+# Product facts and credentials belong outside BUGate core.
+/sut/
 .env
 .env.*
-!.env.example
 **/secrets.*
 **/*.secret
 *.pem
@@ -48,30 +40,16 @@ id_rsa*
 *_keypair*
 *mnemonic*
 
-# SUT repos live outside BUGate core; imported repos carry their own profile
-/sut/
-
-# Onboarding scratch output is a local output dir; only its README belongs in core
-/.shared/skills/bugate/integration/scratch-output/*
-!/.shared/skills/bugate/integration/scratch-output/README.md
-
-# Logs / artifacts / temp
+# Temporary output; selected delivery logs are reviewable evidence.
 *.log
 /artifacts/
 /tmp/
 *.tmp
 *.bak
+!docs/reports/v2-dsh-only/evidence/*.log
 
-# Default report outputs from the scorers when run without explicit --*-output
-# (oracle_falsification.py / check_prd_health.py / generate_assertion_coverage_matrix.py).
+# Preserve pre-existing local historical outputs; not current product inputs.
 /oracle_falsification_result.json
 /oracle_falsification_result.md
 /prd_health_result.json
 /prd_health_report.md
-/assertion_coverage_matrix.md
-/self_healing.json
-/self_healing.md
-/self_healing_repair_plan.md
-
-# Only the engine repo's own root core config (a SUT repo commits its own).
-/bugate.config.yaml

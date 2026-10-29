@@ -43,3 +43,12 @@ runner 使用官方 profile runtime resolution，断言插件与宿主共享同�
 lib/resources 与独立核心，并执行真实 authoring 和命令采集。缺失安装参数明确失败，
 不会跳过。输出保留的 result JSON 和日志路径，包含安装路径、兼容元数据、请求次数和
 执行证据。这里证明确定性运行时集成，不冒充 live-model 分析质量。
+
+macOS 的独立包测试可设置 `BUGATE_DENY_SOURCE_ROOT=/absolute/BUGate`。
+测试子进程在操作系统 sandbox 内运行，禁止读取源码仓库；加载安装插件前，
+先断言读取源码确实返回权限错误，再验证真实 runtime 可独立运行。
+
+`tests/integration_install/accept_published_upgrade.py` 显式接收旧版与候选归档，
+并核对旧版公开 SHA256。它实际安装 dev.1、升级 dev.2、拒绝旧任务绑定且保持字节不变、
+准备新 v2 任务，再回滚到保留的 dev.1 原始归档。该测试与 `accept_package.py` 中
+只修改版本元数据的事务/崩溃恢复 fixture 分开报告。不支持 v0.x 导入或自动任务迁移。

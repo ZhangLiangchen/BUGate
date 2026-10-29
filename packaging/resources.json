@@ -1,0 +1,29 @@
+{
+  "apiVersion": "bugate.distribution/v1",
+  "protocol_files": [
+    "protocol/v2/README.md",
+    "protocol/v2/README.zh-CN.md",
+    "protocol/v2/manifest.yaml",
+    "protocol/v2/methods/business_understanding.json",
+    "protocol/v2/methods/diagnosis.json",
+    "protocol/v2/methods/execution.json",
+    "protocol/v2/methods/implementation.json",
+    "protocol/v2/methods/knowledge.json",
+    "protocol/v2/methods/test_design.json",
+    "protocol/v2/methods/testability.json",
+    "protocol/v2/reason_codes.yaml",
+    "protocol/v2/rules/quality.json",
+    "protocol/v2/schemas/artifact.schema.json",
+    "protocol/v2/schemas/assessment_request.schema.json",
+    "protocol/v2/schemas/assessment_result.schema.json",
+    "protocol/v2/schemas/claim.schema.json",
+    "protocol/v2/schemas/command_result.schema.json",
+    "protocol/v2/schemas/evidence.schema.json",
+    "protocol/v2/schemas/execution_record.schema.json",
+    "protocol/v2/schemas/method_spec.schema.json",
+    "protocol/v2/schemas/prepared_protocol_context.schema.json",
+    "protocol/v2/schemas/profile.schema.json",
+    "protocol/v2/schemas/protocol_binding.schema.json",
+    "protocol/v2/schemas/test_task.schema.json"
+  ]
+}

@@ -87,9 +87,11 @@ def protocol_identity():
 
 def evaluator_identity():
     files={p.name:content_digest(p.read_bytes()) for p in sorted(Path(__file__).parent.glob('*.py')) if p.name!='integrations.py'}
-    from .legacy import legacy_root
-    legacy={p.name:content_digest(p.read_bytes()) for p in sorted((legacy_root()/'scripts').glob('*.py'))}
-    return digest({'version':__version__,'files':files,'legacy':legacy},'evaluator/v1')
+    return digest({'version':__version__,'files':files,'protocol':protocol_identity()},'evaluator/v2')
+
+def quality_rules():
+    return load_json(resource_root()/'rules/quality.json')
+
 
 def methods():
     values=[validate_schema(load_json(p),'MethodSpec') for p in sorted((resource_root()/'methods').glob('*.json'))]

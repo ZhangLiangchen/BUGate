@@ -113,6 +113,23 @@ class InstallBoundaries(unittest.TestCase):
         self.assertEqual(caught.exception.exit_code, 2)
         self.assertIn('actual', caught.exception.details)
 
+    def test_v2_bundle_core_pin_and_legacy_version_rejection(self):
+        resources = self.root / 'resources'
+        resources.mkdir()
+        compatibility = {'core_version': '2.0.0a2', 'protocol_version': '2.0.0',
+                         'dsh_version': integration.HOST_VERSION}
+        target = resources / 'compatibility.json'
+        target.write_text(json.dumps(compatibility))
+        self.assertEqual(integration._bundle_core_version(self.root), '2.0.0a2')
+        for key, value in [('core_version', '0.4.3'), ('core_version', '2.0.0;echo bad'),
+                           ('protocol_version', '1.3'), ('dsh_version', '0.0.0')]:
+            with self.subTest(key=key, value=value):
+                target.write_text(json.dumps({**compatibility, key: value}))
+                with self.assertRaises(integration.IntegrationError) as caught:
+                    integration._bundle_core_version(self.root)
+                self.assertEqual(caught.exception.code, 'VERSION_MISMATCH')
+                self.assertEqual(caught.exception.exit_code, 2)
+
     def test_missing_unselected_host_is_nonfatal(self):
         value = integration.doctor(self.root, dsh='/does/not/exist')
         self.assertEqual(value['host'], 'missing')

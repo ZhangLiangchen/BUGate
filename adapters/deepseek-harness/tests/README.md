@@ -59,3 +59,15 @@ printed retained result JSON and runtime log identify exact installed paths,
 compatibility metadata, request count and execution evidence.
 
 These tests establish deterministic runtime integration, not live-model quality.
+
+On macOS, set `BUGATE_DENY_SOURCE_ROOT=/absolute/BUGate` for the standalone test.
+The runner is then launched under the OS sandbox with checkout reads denied;
+it asserts an actual permission error before loading the installed plugin.
+This proves independent runtime operation even when the source cannot be read.
+
+`tests/integration_install/accept_published_upgrade.py` takes explicit previous
+and candidate archives plus the published previous SHA256. It installs dev.1,
+upgrades to dev.2, rejects the old task binding without modifying it, prepares a
+new v2 task, and rolls back to the exact retained dev.1 archive. This is distinct
+from the metadata-only upgrade fixture in `accept_package.py`, which tests
+transaction/crash recovery. No v0.x import or automatic task migration is supported.

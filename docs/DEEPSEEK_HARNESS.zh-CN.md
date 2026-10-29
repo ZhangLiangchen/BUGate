@@ -3,16 +3,15 @@
 [English](DEEPSEEK_HARNESS.md) | 简体中文
 
 原生适配器调用 BUGate Python 核心评估任务当前事实。DeepSeek Harness（DSH）负责
-Agent 循环、工具执行和有界返工。任务工件保存在外部测试仓库，现有 Claude/Codex
-0.4.5 安装与治理入口保持独立。
+Agent 循环、工具执行和有界返工。任务工件保存在外部测试仓库。此路线是唯一当前产品入口。
 
 ## 版本与分发
 
 | 组件 | 兼容目标 |
 |---|---|
-| Python 分发 | `bugate-core==2.0.0a1`，Python 3.11+ |
+| Python 分发 | `bugate-core==2.0.0a2`，Python 3.11+ |
 | Protocol | 精确 `2.0.0` bundle 摘要，不自动迁移 |
-| 原生包 | `@bugate/deepseek-harness@2.0.0-dev.1` |
+| 原生包 | `@bugate/deepseek-harness@2.0.0-dev.2` |
 | DSH | `0.2.2-alpha.2`，源码 `f3803c96974ad4a94195fb97e5c637e9c2a3afe3` |
 | Node | DSH 要求 24.9.0+ |
 
@@ -32,7 +31,7 @@ DSH 本身须已安装为精确目标版本。以下示例路径需替换为选�
 ```sh
 shasum -a 256 -c SHA256SUMS
 python3 install_dsh.py \
-  --package ./bugate-deepseek-harness-2.0.0-dev.1.tgz \
+  --package ./bugate-deepseek-harness-2.0.0-dev.2.tgz \
   --venv /absolute/path/bugate-bootstrap \
   --project /absolute/path/test-repo \
   --dsh-profile bugate \
@@ -151,12 +150,15 @@ DSH session pin 及其原子临时文件位于该目录，受管模型写入不�
 ## 开发与验证证据
 
 在独立 Python 环境安装本项目；进入 `adapters/deepseek-harness/plugin` 运行
-`npm run build`，随后运行 `python packaging/build_dsh.py --out-dir dist/deepseek-harness`。
-开发依赖不进入安装包。CI 保留完整 legacy 链，并增加独立 Protocol/DSH job。
+`npm run build`，随后运行 `python packaging/build_dsh.py --out-dir dist/v2-dsh-only`。
 
 验收区分 Python 契约、真实 DSH 加确定性模型 fixture，以及可选 live-model 测试。
 确定性 fixture 驱动真实 DSH Agent loop 不等于 DeepSeek 模型效果评测。精确命令、
 产物摘要、49 项 HC/AC 映射和真实缺口以交付报告为准，不能由工具注册成功推断。
 
-[2026-10-29 交付报告](reports/DEEPSEEK_HARNESS_DELIVERY_2026-10-29.zh-CN.md)
-记录了实际运行的 49 项验收、安装包校验和与验证边界。
+
+## 本次范围与升级边界
+
+当前仅交付 v2 + DSH；旧宿主自动入口、安装器与格式已退役，不支持 v0.x 自动迁移。
+当前验收以[合同](reports/v2-dsh-only/CONTRACT.md)与[逐项矩阵](reports/v2-dsh-only/acceptance.json)为准。AC-33 因本次范围变更退役，不标 PASS。
+支持 v2 bundle 安装升级和按留存安装归档 rollback；core 或协议摘要变化不会静默迁移现有任务，应按当前 v2 输入建立新任务。

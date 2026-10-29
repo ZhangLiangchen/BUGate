@@ -50,11 +50,10 @@
       "minItems": 1,
       "uniqueItems": true
     },
-    "hard_constraints": {
+    "hard_constraint_refs": {
       "type": "array",
       "items": {
-        "type": "string",
-        "minLength": 1
+        "const": "core-quality-invariants"
       },
       "minItems": 1,
       "uniqueItems": true
@@ -69,6 +68,6 @@
     "quality_dimensions",
     "required_outputs",
     "recommended_considerations",
-    "hard_constraints"
+    "hard_constraint_refs"
   ]
 }

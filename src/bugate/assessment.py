@@ -3,17 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from . import API_VERSION, __version__
 from .errors import BugateError
-from .protocol import digest, object_digest, content_digest, load_json, validate_schema, evaluator_identity, canonical
+from .semantics import check_sources_and_placeholders, quality_models
+from .protocol import digest, object_digest, content_digest, load_json, validate_schema, evaluator_identity, canonical, quality_rules
 from .workspace import Workspace, within, write_json, locked, safe_id, execution_input_manifest, filesystem_manifest
 
-CLAIM_DIMENSIONS={
- 'business_understanding_complete':('business_understanding',),
- 'test_design_complete':('business_understanding','testability','test_design'),
- 'test_implementation_complete':('business_understanding','testability','test_design','implementation'),
- 'execution_complete':('execution',),
- 'requirement_verified':('business_understanding','testability','test_design','implementation','execution','verification'),
- 'task_delivery_complete':(),
-}
 
 def finding(code,subject,message,dimension='integrity',*,blocking=True,basis=None,remediation='Correct the referenced input and reassess the current snapshot.'):
     return {'code':code,'subject':str(subject),'dimension':dimension,'severity':'error' if blocking else 'warning','blocking':blocking,'message':message,'basis':basis or [],'remediation':remediation}
@@ -49,6 +42,7 @@ class Facts:
                     self.add('EVIDENCE_UNTRUSTED',e['id'],'No matching local collector receipt; source labels do not authenticate execution')
                 if not ex or ex.get('collector')!='bugate.execution/v1':self.add('EVIDENCE_UNTRUSTED',e['id'],'Host observation requires a managed execution record')
         self._indexes()
+        check_sources_and_placeholders(self)
         identities=set(self.sources)|set(self.artifacts)|set(self.evidence)|set(self.props)|set(self.oracles)|set(self.cases)
         for a in self.artifacts.values():
             for ref in a['relations']:
@@ -58,13 +52,6 @@ class Facts:
                 for ref in hypothesis['supporting_evidence']+hypothesis['contradicting_evidence']:
                     if ref not in self.evidence:self.add('REFERENCE_MISSING',a['id'],'Diagnosis evidence is absent',basis=[ref])
                 if hypothesis['status']=='confirmed' and not hypothesis['supporting_evidence']:self.add('EVIDENCE_UNTRUSTED',a['id'],'A confirmed diagnosis requires supporting evidence')
-        for a in self.by_type.get('legacy_precode',[]):
-            from .legacy import check_precode
-            try:
-                report=check_precode(w.root,a['content']['directory'])
-                for message in report['failures']:self.add('LEGACY_PRECODE_INVALID',a['id'],message,'legacy_precode')
-                for message in report['warnings']:self.add('LEGACY_PRECODE_WARNING',a['id'],message,'legacy_precode',blocking=False)
-            except BugateError as exc:self.add(exc.code,a['id'],exc.message,'legacy_precode')
 
     def add(self,code,subject,message,dimension='integrity',**kw):self.findings.append(finding(code,subject,message,dimension,**kw))
     def check_ref(self,ref,root,subject,dimension='integrity'):
@@ -85,6 +72,9 @@ class Facts:
             for src in c['source_refs']:
                 if src not in self.sources:self.add('REFERENCE_MISSING',a['id'],'Reviewer source is undeclared','semantic_review',basis=[src]);valid=False
             for aid,expected in c['artifact_digests'].items():
+                reviewed = self.artifacts.get(aid)
+                if reviewed and self.w.profile.get('quality_requirements', {}).get('independent_review') and (not reviewed.get('producer') or reviewed['producer'] == c['reviewer']):
+                    self.add('REVIEW_INDEPENDENCE_MISSING', a['id'], 'Profile requires a named producer distinct from the reviewer', 'semantic_review', basis=[aid]);valid=False
                 if aid not in self.artifacts or self.artifacts[aid]['digest']!=expected:
                     self.add('SEMANTIC_REVIEW_STALE',a['id'],'Review does not bind current artifact content','semantic_review',basis=[aid]);valid=False
             if valid:self.reviewed.update(c['artifact_digests'])
@@ -111,6 +101,7 @@ class Facts:
             if a['content']['unknowns']:self.add('BUSINESS_SEMANTICS_UNRESOLVED',a['id'],'Business brief contains unresolved unknowns','business_understanding',basis=a['content']['unknowns'])
         if self.w.task['unknowns'] or self.w.profile['unknowns']:self.add('BUSINESS_SEMANTICS_UNRESOLVED','task','Task/Profile has unresolved unknowns','business_understanding')
         self.require_review(('business_brief',))
+        quality_models(self, 'business_understanding')
 
     def require_review(self,types):
         for t in types:
@@ -118,24 +109,28 @@ class Facts:
                 if a['id'] not in self.reviewed:self.add('SEMANTIC_REVIEW_MISSING',a['id'],'Current source-backed semantic review is required','semantic_review',remediation='Provide a reviewer artifact bound to current artifact digests; structural validity is not business correctness.')
 
     def design(self):
-        decisions={}
+        decisions={}; mapped_oracles=set(); decision_pairs={}
         for a in self.by_type.get('testability',[]):
             if a['content']['gaps']:self.add('TESTABILITY_GAP',a['id'],'Unresolved observability or prerequisite gaps','testability',basis=a['content']['gaps'])
             for d in a['content']['decisions']:
                 pid=d['proposition_id']
-                if pid in decisions:self.add('DUPLICATE_ID',pid,'Multiple testability decisions','testability')
-                decisions[pid]=d
+                if (pid,d['oracle_id']) in decision_pairs:self.add('DUPLICATE_ID',pid,'Duplicate proposition/oracle testability decision','testability')
+                decision_pairs[(pid,d['oracle_id'])]=d['layer']; decisions.setdefault(pid,set()).add(d['layer']); mapped_oracles.add(d['oracle_id'])
                 if pid not in self.props or d['oracle_id'] not in self.oracles:self.add('REFERENCE_MISSING',pid,'Testability proposition or oracle missing','testability')
                 elif pid not in self.oracles[d['oracle_id']]['proposition_ids']:self.add('ORACLE_BINDING_INVALID',pid,'Testability oracle belongs to a different proposition','testability',basis=[d['oracle_id']])
                 if d['layer'] not in ('unit','component','integration','api','e2e','static','probe'):self.add('TESTABILITY_GAP',pid,'Unknown test layer is not an evaluated strategy','testability')
         for pid in self.props:
             if pid not in decisions:self.add('TESTABILITY_GAP',pid,'No explicit observation/layer decision','testability')
+        for oid in sorted(set(self.oracles)-mapped_oracles):self.add('TESTABILITY_ORACLE_UNMAPPED',oid,'Business oracle has no explicit testability decision','testability')
         if not self.cases:self.add('CASE_MISSING','inventory','No concrete test cases','test_design')
         covered_p=set();covered_r=set();covered_o=set();negative=set()
         for c in self.cases.values():
             covered_p.update(c['proposition_ids']);covered_r.update(c['risk_ids']);covered_o.update(c['oracle_ids'])
             if c['negative']:negative.update(c['proposition_ids'])
             for pid in c['proposition_ids']:
+                for oid in c['oracle_ids']:
+                    if oid in self.oracles and pid in self.oracles[oid]['proposition_ids'] and decision_pairs.get((pid,oid)) != c['layer']:
+                        self.add('LAYER_DECISION_MISMATCH',c['id'],'Case test layer differs from its proposition/oracle testability decision','test_design',basis=[pid,oid])
                 if pid not in self.props:self.add('REFERENCE_MISSING',c['id'],'Case proposition is missing','test_design',basis=[pid])
             for oid in c['oracle_ids']:
                 if oid not in self.oracles:self.add('ORACLE_MISSING',c['id'],'Case oracle is missing','test_design',basis=[oid])
@@ -151,6 +146,7 @@ class Facts:
         for a in self.by_type.get('inventory',[]):
             if set(a['content']['requirement_scope'])!=set(self.w.task['requirements']) or set(a['content']['risk_scope'])!=set(self.w.task['risks']):self.add('SCOPE_DENOMINATOR_CHANGED',a['id'],'Inventory scope differs from frozen task requirements/risks','test_design')
         self.require_review(('testability','inventory'))
+        quality_models(self, 'test_design')
 
     def implementation(self):
         if not self.cases:self.add('CASE_MISSING','inventory','Implementation requires case/oracle mapping','implementation')
@@ -224,7 +220,7 @@ def evaluate(w:Workspace,claim):
     for eid in claim['evidence_ids']:
         if eid not in f.evidence:f.add('REFERENCE_MISSING',claim['id'],'Claim evidence is unavailable',basis=[eid])
     if claim['known_gaps'] or claim['open_questions']:f.add('CLAIM_HAS_GAPS',claim['id'],'Claim declares unresolved gaps',basis=claim['known_gaps']+claim['open_questions'])
-    dims=CLAIM_DIMENSIONS[claim['claim_type']]
+    dims=quality_rules()['claim_dimensions'][claim['claim_type']]
     if claim['claim_type']=='task_delivery_complete':
         dims=tuple({'business_understanding':'business_understanding','test_design':'test_design','implementation':'implementation','execution':'execution','report':'report','knowledge':'knowledge'}[x] for x in w.task['delivery_criteria'])
         if any(d in dims for d in ('test_design','implementation')):dims=tuple(set(dims)|{'business_understanding','testability','test_design'})
@@ -236,8 +232,8 @@ def evaluate(w:Workspace,claim):
     if 'report' in dims or 'knowledge' in dims:f.reports(claim,include_report='report' in dims,include_knowledge='knowledge' in dims)
     # A claim cannot omit the inputs whose semantics were used to satisfy it.
     types=set()
-    if 'business_understanding' in dims:types|={'business_brief','semantic_review'}
-    if 'test_design' in dims:types|={'testability','inventory','semantic_review'}
+    if 'business_understanding' in dims:types|={'business_brief','semantic_review','domain_model','state_model'}
+    if 'test_design' in dims:types|={'testability','inventory','semantic_review','adversarial_review','dimension_matrix'}
     if 'report' in dims:types.add('execution_report')
     if 'knowledge' in dims:types.add('knowledge')
     for a in f.artifacts.values():

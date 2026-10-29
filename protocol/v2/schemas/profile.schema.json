@@ -17,7 +17,8 @@
     },
     "version": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "sources": {
       "type": "array",
@@ -31,7 +32,8 @@
           },
           "path": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "digest": {
             "type": "string",
@@ -39,7 +41,8 @@
           },
           "description": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
         "required": [
@@ -72,7 +75,8 @@
     },
     "goal": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "delivery_criteria": {
       "type": "array",
@@ -99,7 +103,8 @@
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "pattern": "\\S"
             },
             "minItems": 1
           },
@@ -114,7 +119,8 @@
           },
           "report": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "purpose": {
             "enum": [
@@ -143,7 +149,8 @@
         },
         "notes": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "\\S"
         }
       },
       "required": [
@@ -156,10 +163,33 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "\\S"
       },
       "minItems": 0,
       "uniqueItems": true
+    },
+    "quality_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "independent_review": {
+          "const": true
+        },
+        "adversarial_review": {
+          "const": true
+        },
+        "domain_model": {
+          "const": true
+        },
+        "state_model": {
+          "const": true
+        },
+        "dimension_matrix": {
+          "const": true
+        }
+      },
+      "required": []
     }
   },
   "required": [

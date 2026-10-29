@@ -1,4 +1,6 @@
-# BUGate Host Adapter Conformance
+# BUGate DSH Conformance
+
+English | [简体中文](CONFORMANCE.zh-CN.md)
 
 Every first-class BUGate Host Adapter is evaluated against one shared behavioral
 contract. Host-native APIs may differ; observable BUGate semantics must not.
@@ -23,41 +25,14 @@ contract. Host-native APIs may differ; observable BUGate semantics must not.
 | HC-14 | Rollback removes only BUGate-owned projection/integration state. |
 | HC-15 | Context Runtime content never overrides Protocol or live Workspace authority. |
 
-## Capability states
+## Current scope
 
-A host manifest may declare a capability as:
+The only product host is DeepSeek Harness. HC-15 remains applicable as an authority
+invariant: historical text never overrides current task facts, although there is
+no Context Runtime service. Shared multi-host setup and prior compatibility tests
+are retired. AC-33 is marked retired, not passed, in the acceptance matrix.
 
-- `required`
-- `supported`
-- `unsupported`
-- `reserved`
-
-`unsupported` requires a rationale. Missing declarations are invalid.
-
-The suite tests semantics, not hook names. For example, one Host may hydrate
-through `UserPromptSubmit`, another through `beforeAgentStart`, and another
-through a model-step middleware. All satisfy the same
-`automatic_hydration` contract if the prepared context is present before
-relevant reasoning.
-
-## Multi-host setup behavior
-
-`bugate setup select --host ...` must isolate sibling failures. One selected
-Host failing setup does not prevent another selected Host from being attempted.
-The overall command fails when any selected Host fails.
-
-Unselected Hosts are skipped even if their CLI is present.
-
-## Doctor behavior
-
-`bugate doctor integrations` treats a missing Host as non-fatal. A Host that
-is present but has a broken BUGate integration is fatal.
-
-A stable JSON report should distinguish:
-
-- host presence;
-- native CLI/package status;
-- plugin/package status;
-- projection status;
-- ProtocolBinding status;
-- hydration status.
+The manifest records supported capabilities and explicit limits. Setup/doctor/
+remove target one explicit DSH profile. Doctor distinguishes host availability,
+plugin/resources, projection, binding and observed hydration. A successful package
+installation is not evidence of an active governed session.

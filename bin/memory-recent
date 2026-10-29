@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# Newest agent-visible memories. Delegates to scripts/memory_bus.py recent.
-set -euo pipefail
-
-# Engine root: bin/ sits one level below the engine tree root.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec python3 "$ROOT/scripts/memory_bus.py" recent "$@"

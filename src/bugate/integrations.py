@@ -61,6 +61,11 @@ def _atomic(path: Path, data: bytes):
             out.flush()
             os.fsync(out.fileno())
         os.replace(name, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     finally:
         if os.path.exists(name):
             os.unlink(name)
@@ -269,6 +274,17 @@ def _unpack(package: Path, destination: Path) -> dict:
     return manifest
 
 
+def _bundle_core_version(bundle):
+    """Each v2 archive pins its own core; upgrade/rollback never reinterpret facts."""
+    compatibility = _json(bundle / "resources" / "compatibility.json")
+    version = compatibility.get("core_version")
+    if (not isinstance(version, str) or not re.fullmatch(r"2\.\d+\.\d+(?:(?:a|b|rc)\d+)?", version)
+            or compatibility.get("protocol_version") != "2.0.0"
+            or compatibility.get("dsh_version") != HOST_VERSION):
+        raise IntegrationError("VERSION_MISMATCH", "Bundle must pin a supported v2 core/protocol and exact DSH version", 2)
+    return version
+
+
 def _marker(root):
     return _hash(str(root).encode())[:16]
 
@@ -320,12 +336,12 @@ def _check_wheel_target(python, inventory, root, env):
     return target
 
 
-def _python_health(python, root, env):
+def _python_health(python, root, env, expected_version="2.0.0a2"):
     code = "import importlib.metadata,json; from importlib.resources import files; p=files('bugate').joinpath('resources/protocol/v2'); print(json.dumps({'version':importlib.metadata.version('bugate-core'),'protocol':str(p),'resources':p.joinpath('schemas/prepared_protocol_context.schema.json').is_file()}))"
     stdout, _ = _run([str(python), "-c", code], cwd=root, env=env, timeout=20)
     try:
         value = json.loads(stdout)
-        if value.get("version") != "2.0.0a1" or not value.get("resources"):
+        if value.get("version") != expected_version or not value.get("resources"):
             raise ValueError("core version/resources mismatch")
     except (ValueError, AttributeError) as exc:
         raise IntegrationError("PYTHON_INVALID_RESPONSE", "Python package handshake failed") from exc
@@ -377,21 +393,22 @@ def setup(project, dsh_profile, *, package=None, dsh="dsh", dsh_home=None, pytho
         bundle = runtime / "bundle"
         bundle.mkdir(exist_ok=True)
         manifest = _unpack(archive, bundle)
+        core_version = _bundle_core_version(bundle)
         _check_wheel_target(python or sys.executable, _json(bundle / "python" / "inventory.json"), root, env)
         venv = _safe(root, runtime / "venv")
         python_bin = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         if not python_bin.exists():
             _run([python or sys.executable, "-m", "venv", str(venv)], cwd=root, env=env)
             wheels = bundle / "python" / "wheels"
-            _run([str(python_bin), "-m", "pip", "install", "--no-index", "--find-links", str(wheels), "bugate-core==2.0.0a1"], cwd=root, env=env)
-        health = _python_health(python_bin, root, env)
+            _run([str(python_bin), "-m", "pip", "install", "--no-index", "--find-links", str(wheels), f"bugate-core=={core_version}"], cwd=root, env=env)
+        health = _python_health(python_bin, root, env, core_version)
         block = _block(root, python_bin, task_path)
         prior = {key: value for key, value in existing.items() if key != "previous"} if existing else None
         record = {"apiVersion": STATE_VERSION, "project": str(root), "dsh_home": str(home),
                   "profile": dsh_profile, "package_name": PACKAGE, "package_version": manifest["version"],
                   "package_digest": package_digest, "archive": str(archive), "python": str(python_bin),
                   "host_version": host_version, "block_digest": _hash(block), "task_path": task_path,
-                  "previous": prior, "python_health": health}
+                  "previous": prior, "python_health": health, "core_version": core_version}
         journal = {"apiVersion": STATE_VERSION, "operation": "setup", "status": "pending", "phase": "host_add_started",
                    "target": record, "previous": prior, "profile": dsh_profile, "dsh_home": str(home), "project": str(root)}
         _write(state / "pending.json", journal)
@@ -460,12 +477,13 @@ def doctor(project, *, dsh_profile=None, dsh="dsh", dsh_home=None):
         expected_bundle = Path(directory)
         _unpack(archive, expected_bundle)
         package_inventory = _json(expected_bundle / "inventory.json")["files"]
+        core_version = _bundle_core_version(expected_bundle)
     installed_bundle = profile_dir / "node_modules" / "@bugate" / "deepseek-harness"
     for relative, digest in package_inventory.items():
         target = installed_bundle / relative
         if not target.is_file() or _hash(target.read_bytes()) != digest:
             raise IntegrationError("PROJECTION_STALE", f"Installed projection differs: {relative}")
-    health = _python_health(record["python"], root, env)
+    health = _python_health(record["python"], root, env, core_version)
     dump, _ = _run([executable, "--profile", dsh_profile, "--dump-config"], cwd=root, env=env)
     if PACKAGE not in dump or record["python"] not in dump:
         raise IntegrationError("CONTEXT_NOT_ENABLED", "Composed config does not include the owned adapter")

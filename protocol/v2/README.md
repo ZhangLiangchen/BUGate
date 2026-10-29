@@ -2,8 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Protocol `2.0.0`, Python `bugate-core 2.0.0a1`, and the legacy repository release
-are independent versions. This directory is the canonical package resource;
+Protocol `2.0.0`, Python `bugate-core 2.0.0a2`, and DSH bundle `2.0.0-dev.2`
+have separate version identities. Every task locks the exact protocol digest. This directory is the canonical package resource;
 wheel construction includes these exact bytes. `manifest.yaml` and
 `reason_codes.yaml` use JSON syntax, which is valid YAML 1.2.
 
@@ -37,10 +37,25 @@ not truth. A failed product test may satisfy execution/delivery scope while its
 requirement remains unverified. Zero, entirely skipped and xfail-only runs do not
 establish verification.
 
-Existing legacy `check(...) -> GateReport` logic is reused for a
-`legacy_precode` artifact through a subprocess with explicit neutral configuration;
-stdout returns its structured failures/warnings. Legacy scripts keep their
-original CLI and stdlib-only dependency contract.
+The evaluator consumes only native v2 objects. Historical file dialects and
+`legacy_precode` are rejected by Schema; no conversion or fallback exists.
+Public quality invariants and claim applicability live once in `rules/quality.json`;
+MethodSpecs reference that constraint set. Context and Skill projections read it.
+
+Business facts require declared sources and current semantic review. Every oracle
+needs a testability strategy; cases use the inventory source plan or narrower
+explicit `source_refs`. Required prose cannot be blank or unresolved placeholders.
+Inventory cases carry readable preconditions, expected observations and layer reasons.
+
+Profiles may tighten requirements with `quality_requirements` flags set to `true`:
+`domain_model`, `state_model`, `dimension_matrix`, `adversarial_review`, and
+`independent_review`. The four model artifacts have native typed schemas, explicit
+cross-references and current semantic-review requirements whenever supplied.
+Included adversarial findings must map to actual cases; unresolved dispositions and
+residual risks prevent design completion. Independent review requires named artifact
+`producer` values distinct from `reviewer`; this is provenance, not authenticated identity.
+Optional models are not implicit default requirements. Their schema and negative
+controls live alongside the ordinary v2 tests.
 
 Examples are generated and schema-checked by `tests/v2/test_core.py`; fixtures and
 execution logs live in temporary external SUT directories. Ordinary operations

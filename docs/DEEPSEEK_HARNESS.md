@@ -4,16 +4,15 @@ English | [简体中文](DEEPSEEK_HARNESS.zh-CN.md)
 
 The native adapter uses BUGate's Python core to assess a task's current facts.
 DeepSeek Harness (DSH) owns the Agent loop, tool execution and bounded rework.
-Task artifacts stay in an external test repository. The existing Claude/Codex
-0.4.5 installation and governance interfaces remain separate.
+Task artifacts stay in an external test repository. This is the only product route. Previous host integrations and v0.x formats are retired; no automatic migration is provided.
 
 ## Versions and distribution
 
 | Component | Compatibility target |
 |---|---|
-| Python distribution | `bugate-core==2.0.0a1`, Python 3.11+ |
+| Python distribution | `bugate-core==2.0.0a2`, Python 3.11+ |
 | Protocol | Exact `2.0.0` bundle digest; no automatic migration |
-| Native package | `@bugate/deepseek-harness@2.0.0-dev.1` |
+| Native package | `@bugate/deepseek-harness@2.0.0-dev.2` |
 | DSH | `0.2.2-alpha.2`, source `f3803c96974ad4a94195fb97e5c637e9c2a3afe3` |
 | Node | DSH requires 24.9.0+ |
 
@@ -35,7 +34,7 @@ target version. Replace the example paths below with your chosen directories.
 ```sh
 shasum -a 256 -c SHA256SUMS
 python3 install_dsh.py \
-  --package ./bugate-deepseek-harness-2.0.0-dev.1.tgz \
+  --package ./bugate-deepseek-harness-2.0.0-dev.2.tgz \
   --venv /absolute/path/bugate-bootstrap \
   --project /absolute/path/test-repo \
   --dsh-profile bugate \
@@ -177,9 +176,8 @@ missing unselected host is nonfatal; a broken selected integration fails.
 
 Install the Python project in a dedicated environment; build the adapter with
 `npm run build` in `adapters/deepseek-harness/plugin`, then run
-`python packaging/build_dsh.py --out-dir dist/deepseek-harness`. Development
-dependencies are not shipped. CI retains the entire legacy chain and adds an
-independent Protocol/DSH job.
+`python packaging/build_dsh.py --out-dir dist/v2-dsh-only`. Development
+dependencies are not shipped. CI executes only current v2 core, distribution and native DSH acceptance.
 
 Acceptance distinguishes Python contracts, real DSH plus a deterministic model
 fixture, and optional live-model testing. A deterministic fixture driving the
@@ -187,5 +185,10 @@ real DSH Agent loop is not a measurement of DeepSeek model effectiveness. Exact
 commands, artifact hashes, 49-item HC/AC mapping and remaining gaps belong in the
 delivery report, not in capability claims inferred from tool registration.
 
-The [2026-10-29 delivery report](reports/DEEPSEEK_HARNESS_DELIVERY_2026-10-29.md)
-records the executed 49-item acceptance matrix, package checksums and proof boundaries.
+The [current delivery contract](reports/v2-dsh-only/CONTRACT.md) and
+[acceptance matrix](reports/v2-dsh-only/acceptance.json) record applicability and actual evidence.
+AC-33 is retired by the explicit v2-only scope decision, not reported as PASS.
+
+Supported v2 bundle upgrade/rollback preserves prior installation archives.
+A changed core or protocol digest never silently migrates an existing task.
+Create a new task using current v2 inputs; old-format conversion is unsupported.

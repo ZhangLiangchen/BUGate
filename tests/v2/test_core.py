@@ -195,22 +195,11 @@ class CoreAcceptance(unittest.TestCase):
         initialized=initialize(other,'knowledge-task',other/'profile-input.json');w=Workspace(initialized['task_root'])
         put_artifact(w.root,'learning','knowledge',{'entries':[{'statement':'Source defines a zero boundary','source_refs':['SRC1'],'scope':'Synthetic contract','status':'draft'}]})
         claim(w,'task_delivery_complete');self.assertEqual(assess(w.root,'claims/claim1.json')['verdict'],'satisfied')
-    def test_legacy_check_functions_are_reused_with_isolated_environment(self):
-        import shutil
-        from bugate.legacy import legacy_root
-        target=self.w.root/'legacy';target.mkdir()
-        import ast
-        existing=Path(__file__).resolve().parents[1]/'test_orchestrator_role_governance.py'
-        tree=ast.parse(existing.read_text())
-        fn=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='write_accepted_precode')
-        assignment=next(n for n in fn.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='artifacts' for t in n.targets))
-        for name,body in ast.literal_eval(assignment.value).items():(target/name).write_text(body)
-        put_artifact(self.w.root,'legacy','legacy_precode',{'directory':'legacy'})
-        with patch.dict(os.environ,{'BUGATE_PROFILE':'/nonexistent/untrusted','BUGATE_PROJECT_ROOT':'/nonexistent'}):
-            result=validation(self.w.root)
-        self.assertTrue(result['valid'],result['findings'])
-        (target/'03_inventory.yaml').write_text('gate_status: passed\ncases: []\n')
-        self.assertIn('LEGACY_PRECODE_INVALID',{x['code'] for x in validation(self.w.root)['findings']})
+    def test_retired_artifact_format_is_explicitly_rejected(self):
+        value=put_artifact(self.w.root,'retired','legacy_precode',{'directory':'old-files'})
+        with self.assertRaises(BugateError) as cm:validate_schema(value,'Artifact')
+        self.assertEqual(cm.exception.code,'STRUCTURE_INVALID')
+        self.assertFalse(validation(self.w.root)['valid'])
     def test_delivery_cannot_list_unexecuted_case_as_complete(self):
         script=self.w.root/'tests.py';script.write_text(script.read_text().replace("if mode=='zero':continue","if mode=='zero' or (mode=='one' and name=='test_negative'):continue"))
         self.mutate('inventory',lambda c:[item['implementation'].update(digest=content_digest(script.read_bytes())) for item in c['cases']]);review(self.w.root)

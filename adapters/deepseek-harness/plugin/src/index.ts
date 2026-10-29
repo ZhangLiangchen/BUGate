@@ -107,6 +107,9 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   const preparedValidator = preparedSchemaValidator as ValidateFunction<PreparedContext>;
   const skill = await read(resource('SKILL.md'));
   const projection = object(JSON.parse(await read(resource('projection.json'))));
+  const compatibility = object(JSON.parse(await read(resource('compatibility.json'))));
+  string(compatibility.core_version, 'compatibility.core_version');
+  string(compatibility.protocol_version, 'compatibility.protocol_version');
   if (projection.skill_digest !== digest(skill)) throw new BridgeError('PROJECTION_STALE', 'Bundled Skill differs from its generated projection digest');
   const protocolFiles: Record<string, string> = {};
   async function indexResources(directory: string, prefix = ''): Promise<void> {
@@ -259,7 +262,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
       const handshake = await call(['version'], task, signal);
       if (handshake.invocation !== 'completed') throw new BridgeError('DEPENDENCY_MISSING', JSON.stringify(handshake.errors));
       const version = object(handshake.data);
-      if (version.core_version !== '2.0.0a1' || version.protocol_version !== '2.0.0') throw new BridgeError('VERSION_MISMATCH', 'Installed core/protocol differs from adapter compatibility target');
+      if (version.core_version !== compatibility.core_version || version.protocol_version !== compatibility.protocol_version) throw new BridgeError('VERSION_MISMATCH', 'Installed core/protocol differs from adapter compatibility target');
       if (version.protocol_digest !== projection.protocol_digest) throw new BridgeError('PROJECTION_STALE', 'Bundled Skill/Schema projection differs from the installed canonical protocol');
       const lock = await read(paths(task).join(task, '.bugate/protocol.lock.json'), signal);
       let filesystemBinding: Record<string, unknown>;

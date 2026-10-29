@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# Query memories. Ensures the bus is up, then delegates to memory_bus.py search.
-set -euo pipefail
-
-# Engine root: bin/ sits one level below the engine tree root.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-"$ROOT/bin/memory-bus-ensure" >/dev/null 2>&1 || true
-exec python3 "$ROOT/scripts/memory_bus.py" search "$@"

@@ -20,6 +20,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / 'adapters/deepseek-harness/plugin'
+from distribution import check_source, check_wheel, check_bundle, resource_files
 
 
 def run(argv, *, cwd):
@@ -42,6 +43,7 @@ def check_name(name):
 
 
 def validate_wheel(path):
+    check_wheel(path.read_bytes(), resource_files(ROOT))
     with zipfile.ZipFile(path) as archive:
         for info in archive.infolist():
             check_name(info.filename)
@@ -51,7 +53,19 @@ def validate_wheel(path):
             raise SystemExit(f'core wheel missing members: {sorted(required - names)}')
 
 
+def source_inventory():
+    names = set(resource_files(ROOT))
+    names.update(p.relative_to(ROOT).as_posix() for p in (ROOT / 'src/bugate').glob('*.py'))
+    names.update(p.relative_to(ROOT).as_posix() for p in (PLUGIN / 'src').glob('*.ts'))
+    names.update(p.relative_to(ROOT).as_posix() for p in (ROOT / 'packaging').glob('*.py'))
+    names.update({'pyproject.toml', 'LICENSE', 'packaging/resources.json', 'views/skills/bugate/SKILL.md'})
+    names.update('adapters/deepseek-harness/plugin/' + p for p in ('package.json', 'build.mjs', 'tsconfig.json', 'cordis.patch.yml', 'README.md', 'README.zh-CN.md'))
+    return {name: digest(ROOT / name) for name in sorted(names)}
+
+
 def build(out, python):
+    check_source(ROOT)
+    source_files = source_inventory()
     out.mkdir(parents=True, exist_ok=True)
     if not (PLUGIN / 'lib/index.js').is_file():
         raise SystemExit('Compile the native plugin before packaging: npm run build in adapters/deepseek-harness/plugin')
@@ -131,11 +145,16 @@ def build(out, python):
                 check_name(member.name)
                 if not (member.isfile() or member.isdir()):
                     raise SystemExit(f'unsupported package member type: {member.name}')
+        check_bundle(package, resource_files(ROOT))
         shutil.copy2(core_wheels[0], out / core_wheels[0].name)
         shutil.copy2(Path(__file__).with_name('install_dsh.py'), out / 'install_dsh.py')
+        if source_files != source_inventory():
+            raise SystemExit('Release source changed while building; rebuild from stable inputs')
+        source_manifest = {'apiVersion': 'bugate.build-source/v1', 'files': source_files}
+        (out / 'source-manifest.json').write_text(json.dumps(source_manifest, indent=2) + '\n')
         manifest = {'package': package.name, 'version': metadata['version'],
                     'core_wheel': core_wheels[0].name, 'dsh': metadata['engines']['dsh'],
-                    'files': {p.name: digest(p) for p in (package, out / core_wheels[0].name, out / 'install_dsh.py')}}
+                    'files': {p.name: digest(p) for p in (package, out / core_wheels[0].name, out / 'install_dsh.py', out / 'source-manifest.json')}}
         (out / 'build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         checksums = {**manifest['files'], 'build-manifest.json': digest(out / 'build-manifest.json')}
         (out / 'SHA256SUMS').write_text(''.join(f'{value}  {name}\n' for name, value in sorted(checksums.items())))

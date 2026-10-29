@@ -1,21 +1,38 @@
-# BUGate DSH one-prompt installation
+# Install this v2 + DSH build
 
-[简体中文](INSTALL_DSH_PROMPT.zh-CN.md)
+English | [简体中文](INSTALL_DSH_PROMPT.zh-CN.md)
 
-Copy the following into an Agent chat in the external test repository.
+This prompt uses newly built local assets, not a prior release download. The
+artifact directory is `dist/v2-dsh-only/` in the BUGate checkout; it may be copied
+as a unit to another machine with the recorded Python/platform ABI.
 
 ```text
-Install BUGate DSH v2.0.0-dev.1 in the current external test repository and verify installation. This authorizes execution, not advice only.
+Install BUGate v2 native DeepSeek Harness from these local build artifacts:
+ARTIFACT_DIR=/Users/zhangliangchen/PycharmProjects/BUGate/dist/v2-dsh-only
+Use bugate-deepseek-harness-2.0.0-dev.2.tgz, install_dsh.py, build-manifest.json,
+source-manifest.json and SHA256SUMS from that directory. Do not substitute an older
+published asset. First verify every SHA256SUMS entry and inspect the bundle's
+python/inventory.json for target platform/ABI. Verify DSH 0.2.2-alpha.2, Node >=24.9.0
+and a matching Python runtime.
 
-Release: https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.1
-Asset base: https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.1
+Use the user's explicitly selected external test project, DSH profile, DSH home,
+and new or BUGate-owned bootstrap venv. If these targets are absent from the chat,
+ask for them before installation; do not infer them from past tasks or use BUGate
+core as the SUT. Preserve unrelated profiles/plugins and task facts.
 
-1. Confirm this is the intended external test repository, not BUGate core. Preserve dirty work and existing Claude/Codex/DSH configuration. Require macOS arm64, CPython 3.13, Node >=24.9.0 and npm. Report missing prerequisites or ABI/platform mismatch instead of substituting another package.
-2. Create or reuse an explicitly owned project-local .bugate-dsh-2.0.0-dev.1/ state directory. Keep downloads, host, venv and DSH home there, record ownership and never overwrite an unowned directory. Do not commit generated files.
-3. Download bugate-deepseek-harness-2.0.0-dev.1.tgz, bugate_core-2.0.0a1-py3-none-any.whl, install_dsh.py, build-manifest.json and SHA256SUMS from the asset base. Verify all four checksum entries. Also require tgz SHA-256 0a4f7ddbcb0a035f603823f82da14e399ffa6bd236afeed3879625e8f626baab and installer SHA-256 5680d650f4e72e705e19f3e3618076999341e58f84eefe94a6aceff5b7f3bdd2. Execute no downloaded code before verification.
-4. npm install --prefix into state/host using exact @deepseek-ai/dsh@0.2.2-alpha.2 and pnpm@11.28.5. Temporarily prepend host/node_modules/.bin to this process PATH; do not upgrade global DSH.
-5. Run the verified install_dsh.py with python3.13: --package <downloaded tgz>, --python <absolute Python3.13>, --venv <state/bootstrap>, --project <current repository>, --dsh-profile bugate, --dsh <isolated host dsh>, --dsh-home <state/dsh-home>.
-6. Run bootstrap/bin/bugate doctor integrations with the identical project/profile/dsh/dsh-home and --json. Repeat identical installation to verify idempotence. Retain installation/doctor JSON, versions, paths and checksum results.
-7. Do not invent a SUT Profile, requirements, Oracles or test results; do not connect retired HyperTest services. Ordinary v2 operations need no Memory service. Installation can complete without a business Profile; real task initialization requires sourced inputs. Preserve hydration=unobserved instead of claiming E2E acceptance.
-8. Report installation status, exact CLI/DSH/profile paths, doctor result and launch command for the same DSH home/profile. Multiple tasks require explicit task-path selection. On failure retain journals and facts, report the concrete error and recovery entrypoint; do not blindly reinstall or delete evidence.
+Run python3 ARTIFACT_DIR/install_dsh.py --package
+ARTIFACT_DIR/bugate-deepseek-harness-2.0.0-dev.2.tgz --venv BOOTSTRAP_VENV
+--project TEST_PROJECT --dsh-profile PROFILE --dsh DSH_EXECUTABLE
+--dsh-home DSH_HOME, substituting each explicit absolute path and quoting safely.
+Then use BOOTSTRAP_VENV/bin/bugate doctor integrations with those same target flags
+and --json. Report installation and hydration separately. Initialize a task only
+when its v2 Profile and scope are supplied; do not convert v0.x/old task formats.
+
+On failure save the exact error and owned pending-operation state. Do not delete
+user files or retry by inventing a new target. Explain remove deepseek-harness and
+--rollback for owned integration recovery. Do not publish any release.
 ```
+
+The bundle contains an offline Python wheelhouse. DSH peer dependency resolution
+can require registry access. See [installation](docs/DEEPSEEK_HARNESS.md) for exact
+commands and the tested execution boundary.

@@ -1,156 +1,56 @@
-# BUGate Agent Entry
+# BUGate contributor protocol
 
-This repository is the SUT-neutral home of BUGate: an AI-assisted black-box
-test analysis and test-case governance framework.
+English | [简体中文](AGENTS.zh-CN.md)
 
-- Keep agent behavior rules here.
-- Keep reusable methodology in `docs/qa-methodology/`.
-- Keep shared runtime instructions in `.shared/skills/bugate/`.
-- Keep SUT-specific source, API dumps, secrets, environments, fixtures, live
-  evidence, and project memories outside BUGate core.
-- Treat the imported SUT test repo as the only place where BUGate governs real
-  SUT tests. BUGate core development stays pure: do not mount a SUT inside this
-  repository or point this repository's committed config at a SUT.
-- `CLAUDE.md` must remain a symlink to this file.
+BUGate defines testing quality and evaluates facts. DeepSeek Harness (DSH) is the
+only product host and owns execution, scheduling, agent lifecycle and bounded
+rework. Developing this repository with another tool does not add product support
+for that tool.
 
-## Roles
+## Authority and layout
 
-| Path | Role |
-|---|---|
-| `AGENTS.md` | Shared agent protocol for Codex and Claude. |
-| `CLAUDE.md` | Symlink to `AGENTS.md`. |
-| `bugate.config.yaml` | Core default config. SUT profiles override it. |
-| `docs/qa-methodology/` | SUT-neutral method and operating guidance. |
-| `.shared/skills/bugate/` | Shared BUGate skill, references, templates, and adapters. |
-| `.codex/` | Codex-only hook and skill discovery bridge. |
-| `.claude/` | Claude-only hook and skill discovery bridge. |
+- `protocol/v2/` is the sole machine authority: Schemas, MethodSpec, rules and reason codes.
+- `src/bugate/` is the host-neutral Python evaluator and unified CLI.
+- `adapters/deepseek-harness/` is the native adapter and real-runtime acceptance.
+- `views/skills/bugate/` is the small entry projection; the build appends canonical MethodSpec resources and seals their digest.
+- `packaging/` owns the explicit resource inventory and standalone installer.
+- `docs/qa-methodology/` explains the protocol; it does not create parallel rules.
 
-## Core Rules
+Read [METHOD](docs/qa-methodology/METHOD.md), [SOP](docs/qa-methodology/SOP.md)
+and the [protocol guide](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md) before
+non-trivial changes. Preserve dirty worktrees and other writers' changes. Use
+explicit file ownership when delegating. Save decisions, findings and commands
+as reviewable task artifacts; no memory daemon or hook is required.
 
-1. Do not add SUT source code, product API snapshots, environment secrets,
-   credentials, generated caches, or project-specific fixtures to BUGate core.
-2. Put SUT paths, resource policies, environment names, auth rules, and tool
-   commands in a SUT profile or the imported SUT test repo.
-3. Treat BUGate artifacts as pre-code governance: business brief, testability
-   decision, inventory/oracle mapping, readable test cases, adversarial review,
-   execution report, and knowledge update.
-4. A test implementation must not be generated before the configured pre-code
-   artifacts are present and accepted for that SUT profile.
-5. If a rule requires SUT-specific facts, stop at the profile boundary and ask
-   for a profile in the imported SUT test repo instead of inventing details.
+## Engineering invariants
 
-## Documentation Language Policy
+Keep the core SUT-neutral. Real product sources, APIs, secrets, environments,
+fixtures and evidence belong in external test workspaces; tests here create
+neutral temporary fixtures. Bind domain facts to Profile-declared evidence.
 
-Framework-facing guidance for users or contributors must stay bilingual. When
-updating a primary English document such as `README.md`, `CONTRIBUTING.md`, or
-`INIT.md`, update the matching `*.zh-CN.md` mirror in the same change, and keep
-language-switch links at the top of both files.
+Build source-backed propositions and observable Oracles before governed test
+implementation. Check business semantics as well as structure. Placeholders,
+unresolved blocking gaps and deferred probes cannot authorize implementation.
+Keep requirement/risk coverage denominators fixed by the Profile.
 
-## Startup
+Model-reported pass flags and hashes are not execution proof. A previous
+assessment cannot authorize a changed claim or snapshot. Preserve actual product
+failures, skips, xfails and unobserved outcomes; do not weaken assertions to make
+a test green. Separate infrastructure defects from product defects and hypotheses
+from confirmed findings. Use exact expected errors, source-backed assertions and
+project path helpers.
 
-For non-trivial BUGate work:
+Use synchronous DSH context/guard interfaces only for completed snapshots; await
+preparation and durable evidence publication at supported lifecycle seams. Never
+infer child guard inheritance or treat an opaque filesystem key as a host path.
+Use the configured filesystem/subprocess execution world.
 
-1. Read `.shared/skills/bugate/SKILL.md`.
-2. Read `docs/qa-methodology/METHOD.md` when method rationale is needed.
-3. Read `docs/qa-methodology/SOP.md` when execution procedure is needed.
-4. Inspect the active SUT profile only inside an imported SUT test repo, or when
-   reviewing a generated imported-repo fixture.
+Do not restore retired hooks, host adapters, old-format conversion, installer
+compatibility, role daemons or scheduling loops. Existing Git history and public
+releases remain historical records. v0.x and pre-refactor task formats are rejected.
 
-For governance/runtime refactoring, also read the
-[implementation guide](docs/qa-methodology/BUGATE_GOVERNANCE_REFACTOR_GUIDE.md).
-治理/运行时改造前还须阅读[中文改造指导](docs/qa-methodology/BUGATE_GOVERNANCE_REFACTOR_GUIDE.zh-CN.md)；
-其中工作包是待实施计划，不代表已经落地，也不替代冻结协议。
-
-## Hook Policy
-
-Codex and Claude hooks call only SUT-neutral scripts from `scripts/`. Hook
-commands must not depend on git metadata: hooks locate the engine by walking up
-for `scripts/bugate_core.py`, and gate scripts resolve the active project root
-by walking up from CWD to the nearest `bugate.config.yaml`
-(`BUGATE_PROJECT_ROOT` overrides; the `AGENTS.md` + `.shared/` sentinel remains
-as the self-development fallback).
-
-Changing `.codex/hooks.json` can require Codex Desktop to re-trust the project
-hook hash before hooks become active.
-
-## State Discipline
-
-Memory is agent-driven, not automatic. The Stop hook only writes a liveness
-heartbeat; a heartbeat is bookkeeping, never a recorded finding.
-
-1. Record progress at milestones, not only at session start or stop. After a
-   real decision, finding, completed step, blocker, or handoff, write it through
-   the memory bus (`scripts/memory_bus.py note`).
-2. Write durable conclusions as `type:decision` or `type:finding` with
-   `status:confirmed`; keep working notes, hypotheses, and handoffs as
-   `status:draft` until confirmed.
-3. If a task changes collaboration state, gate state, current blockers, or the
-   next action, persist it immediately rather than waiting for session end.
-4. Recall before acting: pull prior context at session start and search the bus
-   by topic before re-deriving state from files.
-
-See `docs/qa-methodology/EXPERIENCE_PROMOTION_PROTOCOL.md` for the full
-record / recall / promote loop and the dual (SUT / core) namespace boundary.
-
-## Incident Discipline
-
-1. When a defect or material risk is found, do not only record progress; create
-   or update the durable defect record and write a `type:finding` or
-   `type:blocker` memory that references it.
-2. Distinguish a test-infrastructure defect from a defect in the system under
-   test before asking developers to act on it.
-3. If a root cause is not evidenced, label it a hypothesis. Do not record a
-   speculative root cause as confirmed fact.
-
-## Testing Discipline
-
-The purpose of a test is to find defects, not to manufacture green runs.
-
-1. Do not adapt an assertion to incorrect system-under-test behavior just to
-   make it pass.
-2. PASS, FAIL, XFAIL, SKIP, and a fake-green run are different signals; preserve
-   the distinction between them.
-3. For a read-only known defect, prefer `xfail` so a later fix surfaces as an
-   unexpected pass. For a known write-side defect that would pollute an
-   environment, prefer `skip` with a defect id and an explicit restore
-   condition.
-4. New business assertions must be evidence-first: read source, contracts, live
-   responses, or probe output before encoding an expectation. Do not let an
-   agent invent identifiers, addresses, secrets, account handles, or record ids;
-   bind them to a profile-declared evidence source instead.
-5. Resolve file paths through a project/test helper; do not hard-code fragile
-   relative-path math.
-
-## Assertion Precision
-
-1. Avoid broad "any-of-these-exceptions" assertions that hide which layer
-   actually failed; assert the exact expected outcome with evidence.
-2. Avoid asserting only that an outcome is "not the success code"; assert the
-   exact expected status or error with evidence.
-3. Distinguish a validation-layer rejection from a business-layer rejection. If
-   a request is stopped by an auth, signature, or precondition check before it
-   reaches the target layer, the test has not exercised the intended behavior.
-
-## Gate Boundaries
-
-These are SUT-neutral invariants over the pre-code gate flow. A SUT profile may
-make them stricter but must not weaken them.
-
-1. `gate_status: passed` must mean implementation (Layer 4) is unblocked. Do not
-   hide remaining blockers behind fields such as a "prerequisites" list.
-2. Placeholders, deferred probes, and assertion stubs are not valid pass
-   conditions for a layer unless the gate explicitly treats them as non-blocking
-   and the user accepts that boundary.
-3. The structural write-guard check is necessary but not sufficient; a semantic
-   review must still confirm evidence, traceability, marker correctness, and
-   absence of stale wording before a layer is accepted.
-4. User stories, acceptance criteria, personas, assumptions, and risks are
-   Layer 1 inputs only; convert them into propositions, business oracles,
-   boundaries, states, gaps, and traceability before moving to Layer 2.
-5. Do not reuse one use-case identifier for a different requirement. When several
-   artifact directories share an identifier, bind a test to the directory whose
-   slug exactly matches the test filename; with no exact match, fail closed and
-   list the candidates rather than guessing.
-6. Treat the recorded design invariants as outranking any individual checklist
-   item; a reviewer who wants to relax a check must reconcile it against those
-   invariants first.
+Framework-facing documentation must have matching English/Chinese files with
+language links. Run applicable tests, source/package boundary checks and actual
+DSH acceptance before claiming complete delivery. Tests existing in the tree are
+not evidence that they ran. Report deterministic-runtime and live-model results
+separately. Do not publish or overwrite a release without explicit authorization.

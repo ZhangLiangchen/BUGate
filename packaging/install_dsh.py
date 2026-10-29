@@ -101,7 +101,7 @@ def main():
             if found.get('status') != 'installed' or found.get('package_sha256') != package_digest:
                 integration._write(marker, {**identity, 'status': 'pending', 'package_sha256': package_digest})
                 integration._run([str(python), '-m', 'pip', 'install', '--no-index', '--find-links', str(stage),
-                                  '--force-reinstall', 'bugate-core==2.0.0a1'], cwd=stage, env=env, timeout=180)
+                                  '--force-reinstall', 'bugate-core==2.0.0a2'], cwd=stage, env=env, timeout=180)
             integration._python_health(python, stage, env)
             integration._write(marker, {**identity, 'status': 'installed', 'package_sha256': package_digest})
             command = [str(python), '-m', 'bugate', 'setup', 'deepseek-harness', '--project', str(project),

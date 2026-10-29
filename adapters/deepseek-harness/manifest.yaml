@@ -3,7 +3,7 @@ kind: HostAdapterManifest
 host:
   id: deepseek-harness
   label: DeepSeek Harness
-availability: planned
+availability: implemented
 install:
   kind: plugin
 projections:
