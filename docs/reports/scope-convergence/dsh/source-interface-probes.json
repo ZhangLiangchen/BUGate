@@ -1,0 +1,60 @@
+[
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/tmp/bugate-dsh-source",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "stdout": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/tmp/bugate-dsh-source",
+      "status",
+      "--short"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "rg",
+      "-n",
+      "turn-stopping|pre-step|agent/request'|agent/created'",
+      "/tmp/bugate-dsh-source/packages/core/agent/src/runtime-types.ts"
+    ],
+    "exit_code": 0,
+    "stdout": "132: * cancellable pre-step processing and lasts while the driver drains,\n263:   * Queue model-facing context for the next pre-step without waking the\n266:   * wakes them. It may miss a request whose pre-step already claimed its\n290:    'agent/created'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource; signal?: AbortSignal }): undefined | Promise<undefined>\n350:    'agent/pre-step'(this: Scoped<Agent>, payload: { agent: Agent; messages: UserMessage[]; turn: number; step: number; signal: AbortSignal; modelSelection: Readonly<ModelSelection> }, next: () => Promise<PreStepDecision>): Promise<PreStepDecision>\n373:    'agent/request'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>\n417:    'agent/turn-stopping'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; signal: AbortSignal }): Promise<void> | void\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "rg",
+      "-n",
+      "type ToolGuard|context\\(context|readonly text:",
+      "/tmp/bugate-dsh-source/packages/core/tools/src/contracts.ts",
+      "/tmp/bugate-dsh-source/packages/core/system-prompt/src/index.ts"
+    ],
+    "exit_code": 0,
+    "stdout": "/tmp/bugate-dsh-source/packages/core/system-prompt/src/index.ts:66:  readonly text: string | ((context: AssembleContext) => string)\n/tmp/bugate-dsh-source/packages/core/system-prompt/src/index.ts:85:  readonly text: string | ((context: AssembleContext) => string)\n/tmp/bugate-dsh-source/packages/core/system-prompt/src/index.ts:518:  context(context: PromptContext): () => void {\n/tmp/bugate-dsh-source/packages/core/tools/src/contracts.ts:391:export type ToolGuard = (execution: Readonly<ToolExecution>) => string | undefined\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "rg",
+      "-n",
+      "source: \\{ kind: 'user' \\}",
+      "/tmp/bugate-dsh-source/packages/subagent/subagent/src/manager.ts"
+    ],
+    "exit_code": 0,
+    "stdout": "464:          { source: { kind: 'user' }, signal: spec.signal, delivery: 'queue' },\n",
+    "stderr": ""
+  }
+]

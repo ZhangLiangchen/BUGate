@@ -1,0 +1,268 @@
+{
+  "record_type": "task-delivery-evidence-index",
+  "date": "2026-10-29",
+  "status": "COMPLETE",
+  "conclusion_scope": "Only the agreed BUGate v2 scope governance implementation and applicable integration/delivery invariants.",
+  "authority": "CONTRACT.md revision 2; user correction takes precedence; this record is an output, not a protocol or independent source of requirements.",
+  "baseline_commit": "fe3e29b82059504cd47893b72005051489c0810f",
+  "product_source_commit": "c9d2b8213f1ce9e0c3ea462ddb7d621ea12bbf60",
+  "local_branch": "codex/scope-convergence",
+  "protocol_version": "2.1.0-dev.1",
+  "python_version": "2.1.0a1",
+  "adapter_version": "2.1.0-dev.1",
+  "formal_matrix": "ACCEPTANCE_MATRIX.md",
+  "source_correction": "SOURCE_CORRECTION.md",
+  "formal_items": [
+    {
+      "id": "F-01",
+      "status": "PASS",
+      "sources": [
+        "U2:II,VII",
+        "U1:IV,IX",
+        "B0:AGENTS authority/layout"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-01"
+      },
+      "evidence": [
+        "evidence/core-mapping.json",
+        "dsh/runtime-after-named-scope-fix-result.json",
+        "dsh/installed-runtime-result.json",
+        "packaging/bundle-boundaries.json"
+      ]
+    },
+    {
+      "id": "F-02",
+      "status": "PASS",
+      "sources": [
+        "U2:II,VII",
+        "U1:III,V,VI",
+        "B0:METHOD source-backed Oracles"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-02"
+      },
+      "evidence": [
+        "evidence/core-mapping.json",
+        "dsh/installed-runtime-result.json",
+        "dsh/installed-passing/suggestion-reassessment-proof.json",
+        "dsh/installed-failure/suggestion-reassessment-proof.json"
+      ]
+    },
+    {
+      "id": "F-03",
+      "status": "PASS",
+      "sources": [
+        "U2:III,IV,VI",
+        "U1:IV,VII",
+        "B0:AGENTS/Profile/Binding/workspace"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-03"
+      },
+      "evidence": [
+        "evidence/core-mapping.json",
+        "dsh/runtime-result.json",
+        "dsh/environment-and-interfaces.json",
+        "REVIEW.md"
+      ]
+    },
+    {
+      "id": "F-04",
+      "status": "PASS",
+      "sources": [
+        "U2:III,VII,VIII",
+        "U1:III,VIII",
+        "B0:quality/assessment/evidence"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-04"
+      },
+      "evidence": [
+        "evidence/core-tests.result.json",
+        "evidence/independent-review.json",
+        "dsh/installed-runtime-result.json"
+      ]
+    },
+    {
+      "id": "F-05",
+      "status": "PASS",
+      "sources": [
+        "U2:III,VII",
+        "U1:VI,XI",
+        "B0:AGENTS/SOP/protocol guide"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-05"
+      },
+      "evidence": [
+        "dsh/runtime-result.json",
+        "dsh/installed-runtime-result.json",
+        "dsh/source-interface-probes.json"
+      ]
+    },
+    {
+      "id": "F-06",
+      "status": "PASS",
+      "sources": [
+        "U2:III,VII",
+        "U1:VI,VII,IX",
+        "B0:AGENTS/Binding/workspace/runtime tests"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-06"
+      },
+      "evidence": [
+        "evidence/core-mapping.json",
+        "dsh/runtime-result.json",
+        "dsh/runtime-source-manifest.json",
+        "dsh/runtime-source-manifest-after-named-scope-fix.json"
+      ]
+    },
+    {
+      "id": "F-07",
+      "status": "PASS",
+      "sources": [
+        "U2:III,VII,VIII",
+        "U1:IX,XI,XII",
+        "B0:AGENTS/CI/packaging"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-07"
+      },
+      "evidence": [
+        "packaging/verification-summary.json",
+        "packaging/source-denial-attestation.json",
+        "packaging/source-commit-match.json",
+        "dsh/installed-runtime-result.json"
+      ]
+    },
+    {
+      "id": "F-08",
+      "status": "PASS",
+      "sources": [
+        "U2:V,VIII",
+        "U1:XII",
+        "B0:AGENTS bilingual/delivery"
+      ],
+      "necessity_oracle_and_minimal_validation": {
+        "file": "ACCEPTANCE_MATRIX.md",
+        "row_id": "F-08"
+      },
+      "evidence": [
+        "SOURCE_CORRECTION.md",
+        "SOURCE_CORRECTION.zh-CN.md",
+        "evidence/final-checksums.json",
+        "evidence/final-reconciliation.json",
+        "DELIVERY.md",
+        "DELIVERY.zh-CN.md"
+      ]
+    }
+  ],
+  "candidate_status": "SC-01 through SC-18 have no independent gate effect. Dispositions are recorded in SOURCE_CORRECTION.md; no unused candidate is labelled PASS.",
+  "actual_runs": [
+    {
+      "name": "final core v2",
+      "tests": 123,
+      "status": "PASS",
+      "evidence": "evidence/core-tests.result.json"
+    },
+    {
+      "name": "full real DSH regression",
+      "tests": 24,
+      "status": "PASS",
+      "snapshot_note": "Before final named-claim correction, exact source manifest retained.",
+      "evidence": "dsh/runtime-result.json"
+    },
+    {
+      "name": "final named-claim affected real DSH paths",
+      "tests": 2,
+      "status": "PASS",
+      "evidence": "dsh/runtime-after-named-scope-fix-result.json"
+    },
+    {
+      "name": "final exact installed package real DSH",
+      "tests": 1,
+      "complete_workflows": 2,
+      "status": "PASS",
+      "evidence": "dsh/installed-runtime-result.json"
+    },
+    {
+      "name": "distribution",
+      "tests": 4,
+      "status": "PASS",
+      "evidence": "packaging/distribution-tests.stdout"
+    },
+    {
+      "name": "installation boundaries",
+      "tests": 15,
+      "status": "PASS",
+      "evidence": "packaging/install-boundaries.stdout"
+    },
+    {
+      "name": "source-denied installation lifecycle",
+      "commands": 20,
+      "status": "PASS",
+      "evidence": "packaging/clean-install/commands.json",
+      "metadata_correction": "packaging/source-denial-attestation.json"
+    },
+    {
+      "name": "actual prior archive upgrade and rollback",
+      "commands": 9,
+      "status": "PASS",
+      "evidence": "packaging/actual-upgrade/commands.json"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "dist/scope-convergence/SHA256SUMS",
+      "sha256": "50225d2d2d294824e329c47ba779d3fc5b021104ddc73d9360b23917611a5c35",
+      "bytes": 463
+    },
+    {
+      "path": "dist/scope-convergence/bugate-deepseek-harness-2.1.0-dev.1.tgz",
+      "sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+      "bytes": 654647
+    },
+    {
+      "path": "dist/scope-convergence/bugate_core-2.1.0a1-py3-none-any.whl",
+      "sha256": "89061edf1f560f5ce7c0d79366faf329bf8186d73f5115959ae00ddebd06dafa",
+      "bytes": 81450
+    },
+    {
+      "path": "dist/scope-convergence/build-manifest.json",
+      "sha256": "949578bfb9e09f3098025b33d9cee41254f3d576be473de1c16b7ba78a73688b",
+      "bytes": 599
+    },
+    {
+      "path": "dist/scope-convergence/install_dsh.py",
+      "sha256": "2ea459ed326ddde989a16bb9153fd5536a117838dd5d6f5f3a8a3c7bfca2604a",
+      "bytes": 8023
+    },
+    {
+      "path": "dist/scope-convergence/source-manifest.json",
+      "sha256": "4b9e57d7a6ac9ac2150956bd8db4ba7337525b9b86f9f119113c029e814a6691",
+      "bytes": 6338
+    }
+  ],
+  "live_model": "NOT_RUN",
+  "hosted_ci": "UPDATED_NOT_TRIGGERED",
+  "public_release": "NOT_PUBLISHED",
+  "remote_push": "NOT_PERFORMED",
+  "known_boundaries": [
+    "Deterministic model drives actual DSH runtime, not live-model reasoning quality validation.",
+    "Bundled offline wheels target CPython 3.13/macOS arm64; DSH peer dependency resolution may need registry access.",
+    "Enforcement covers observable managed tools and configured commands, not arbitrary shell business semantics.",
+    "Local receipts/hashes do not authenticate against a hostile principal with the same filesystem ownership.",
+    "Profile denominator changes require explicit new Profile and task; scope changes conservatively invalidate evidence and require new execution."
+  ],
+  "unresolved_in_scope_blockers": [],
+  "unfinished_agreed_items": []
+}

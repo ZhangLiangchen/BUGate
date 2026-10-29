@@ -1,0 +1,16 @@
+{
+  "verification": "real-dsh-runtime-deterministic-model-after-final-named-requirement-fix",
+  "command": "BUGATE_TEST_PYTHON=/Users/zhangliangchen/PycharmProjects/BUGate/.venv/bin/python node --test --test-name-pattern='source-backed authoring|Scope invariants' adapters/deepseek-harness/tests/runtime.test.mjs",
+  "exit_code": 0,
+  "tests": 2,
+  "passed": 2,
+  "failed": 0,
+  "skipped": 0,
+  "duration_ms": 204563.788583,
+  "source_manifest": "runtime-source-manifest-after-named-scope-fix.json",
+  "workflow_results": [
+    "source-final-passing/result.json",
+    "source-final-failure/result.json"
+  ],
+  "log": "runtime-after-named-scope-fix.log"
+}

@@ -1,0 +1,12 @@
+✔ AC-15 actual provider rejects missing Python, malformed JSON and oversized output (2251.809167ms)
+✔ AC-15 envelope operation and exit semantics cannot be forged (1530.908ms)
+✔ AC-16 timeout and cancellation terminate real managed processes (3453.12875ms)
+✔ AC-30 provider has opaque targets and rejects unmapped installation (611.075667ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7972.530792

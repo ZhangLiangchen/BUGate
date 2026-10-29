@@ -1,0 +1,17 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests/v2",
+    "-v"
+  ],
+  "environment": {
+    "PYTHONPATH": "src"
+  },
+  "exit_code": 0,
+  "duration_seconds": 38.469,
+  "scope": "Current v2 regression and source-derived scope invariants after independent named-claim correction; SC names are candidate examples, not acceptance authority."
+}

@@ -1,0 +1,12 @@
+✔ AC-21/27 source-backed authoring starts empty and records digests through the shared core (43284.971333ms)
+{"scope_fixture":"/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-dsh-task-sro6RJ/scope-runtime-result.json","product_failure":false,"requests":47}
+{"scope_fixture":"/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-dsh-task-L6SxgS/scope-runtime-result.json","product_failure":true,"requests":51}
+✔ Scope invariants: real model tool calls reject scope expansion, preserve product failures and converge with suggestions (161138.938333ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 204563.788583

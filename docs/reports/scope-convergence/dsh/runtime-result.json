@@ -1,0 +1,39 @@
+{
+  "verification": "real DSH 0.2.2-alpha.2 + deterministic model fixture; live model not run",
+  "command": "BUGATE_TEST_PYTHON=/Users/zhangliangchen/PycharmProjects/BUGate/.venv/bin/python node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs",
+  "exit_code": 0,
+  "tests": 24,
+  "passed": 24,
+  "failed": 0,
+  "skipped": 0,
+  "duration_ms": 307986.298542,
+  "formal_requirements": [
+    "F-01",
+    "F-02",
+    "F-03",
+    "F-04",
+    "F-05",
+    "F-06"
+  ],
+  "scope_workflows": [
+    {
+      "product_failure": false,
+      "model_requests": 47,
+      "execution_complete": "satisfied",
+      "requirement_verified": "satisfied",
+      "suggestions": 4
+    },
+    {
+      "product_failure": true,
+      "model_requests": 51,
+      "execution_complete": "satisfied",
+      "requirement_verified": "unsatisfied",
+      "suggestions": 4,
+      "diagnostic_runs": 2,
+      "further_diagnosis": "denied"
+    }
+  ],
+  "source_manifest": "runtime-source-manifest.json",
+  "log": "runtime-final.log",
+  "note": "Subsequent named-requirement core review fix is verified separately; this full runtime result is preserved with its exact source hash manifest."
+}

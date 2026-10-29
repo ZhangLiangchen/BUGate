@@ -1,0 +1,26 @@
+[
+  {
+    "claim_digest": "sha256:f982594a6fdd648d633a387da0b20aad46ced9d80605bcecae520094055c791b",
+    "workspace_snapshot": "sha256:3f9af6da547dc633692167f670ba99e0be0c8fa25eecb522621a8a767950cbd6",
+    "request_digest": "sha256:43f65906da6201f80d05e4a09132102631686190e739e5036c14bc3d2cc21169",
+    "advisory_digest": "sha256:5b8ecd23ca5c90b30cca1998bbfdeefda49ba3073bdae469dc4d44752d5b01f5",
+    "verdict": "satisfied",
+    "suggestion_ids": [
+      "extension-3378dd5a726ad200d3f5cec493b3baa4",
+      "security-suggestion"
+    ]
+  },
+  {
+    "claim_digest": "sha256:f982594a6fdd648d633a387da0b20aad46ced9d80605bcecae520094055c791b",
+    "workspace_snapshot": "sha256:3f9af6da547dc633692167f670ba99e0be0c8fa25eecb522621a8a767950cbd6",
+    "request_digest": "sha256:a1b0fce8ae88aaa96db4c0b1c9e546609fb6cc17b896c63d905d2b2c481388b6",
+    "advisory_digest": "sha256:5558c265bc324e40cb6f3efeb2b0aae5b2a28f66fbab9b81aee07303a8218c93",
+    "verdict": "satisfied",
+    "suggestion_ids": [
+      "compatibility-suggestion",
+      "extension-3378dd5a726ad200d3f5cec493b3baa4",
+      "performance-suggestion",
+      "security-suggestion"
+    ]
+  }
+]

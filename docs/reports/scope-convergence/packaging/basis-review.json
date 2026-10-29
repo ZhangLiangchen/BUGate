@@ -1,0 +1,42 @@
+{
+  "baseline": "fe3e29b82059504cd47893b72005051489c0810f",
+  "reviewed": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "b74d12951c2f93326461430a71b78bac881acf989c49c88425dd83031ca7045e",
+      "command": "git show fe3e29b:AGENTS.md"
+    },
+    {
+      "path": "docs/qa-methodology/METHOD.md",
+      "sha256": "844025a9209714e595275aefc10594ca5a975bfa31037fee20f8bbe97f7bc85a",
+      "command": "git show fe3e29b:docs/qa-methodology/METHOD.md"
+    },
+    {
+      "path": "docs/qa-methodology/SOP.md",
+      "sha256": "24d2b4b59590e1a2519a84cff17bdb537b260599dedc2431f1eb854832099bbc",
+      "command": "git show fe3e29b:docs/qa-methodology/SOP.md"
+    },
+    {
+      "path": "docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md",
+      "sha256": "04f23cc57e0af78c782d9be58036021d1df8017fe658b5504cb102a41e5e1ae5",
+      "command": "git show fe3e29b:docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md"
+    },
+    {
+      "path": "protocol/v2/rules/quality.json",
+      "sha256": "4cda88af2857865f7d0ee5a325051e9dbb3a2bf9a400154a6a2ed7b2d45691d5",
+      "command": "git show fe3e29b:protocol/v2/rules/quality.json"
+    },
+    {
+      "path": "protocol/v2/methods/test_design.json",
+      "sha256": "ce9d89af9f8e160920003b348fd3625144e29f56b0e6c02bc1296cc1356e616b",
+      "command": "git show fe3e29b:protocol/v2/methods/test_design.json"
+    },
+    {
+      "path": "src/bugate/assessment.py",
+      "sha256": "1a549a80cf61e0175c0774c1f5818a7f4000c40cc48bb2f2e7b7986fa151b171",
+      "command": "git show fe3e29b:src/bugate/assessment.py"
+    }
+  ],
+  "authority_note": "Original user product requirements plus later correction: SC-01 through SC-18 are candidate examples, not a mandatory checklist or fixed completion threshold. New docs are implementation outputs, not independent authority.",
+  "profile_denominator": "Every scope revision preserves the locked Profile denominator. Authorized changes within it create a scope revision; changed denominators require explicit new Profile version and init of a new task, preserving old tasks/history/failures. ScopeRequest establishes user choice, never replacement domain evidence."
+}

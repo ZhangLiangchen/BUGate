@@ -1,0 +1,8 @@
+{
+  "classification": "intermediate build superseded by functional-result consistency correction",
+  "bundle_sha256": "67884700a4f54e042a24958d4bd201509e24cb400e1b007ff3d6041a374e3946",
+  "installation_lifecycle": "PASS: 20 observed commands including OS source-denial probe",
+  "actual_archive_upgrade": "PASS: 9 observed commands",
+  "final_delivery_evidence": false,
+  "reason": "Core acceptance.functional_result being corrected to include still-applicable failure evidence outside selected runs. Rebuild and repeat required before final delivery."
+}

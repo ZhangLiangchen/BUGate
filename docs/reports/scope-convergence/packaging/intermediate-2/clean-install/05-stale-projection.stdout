@@ -1,0 +1,1 @@
+{"apiVersion":"bugate.io/v2","kind":"CommandResult","operation":"doctor","request_id":"d50a0367-158a-4c10-b75d-47c5415a4b84","invocation":"runtime_error","data":null,"errors":[{"code":"PROJECTION_STALE","message":"Installed projection differs: lib/index.js","details":null}]}

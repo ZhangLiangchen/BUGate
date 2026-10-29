@@ -1,0 +1,57 @@
+{
+  "verification": "local published DSH package source/types inspected",
+  "dsh_version": "0.2.2-alpha.2",
+  "node_version": "v26.8.1",
+  "python_version": "3.13.3",
+  "runtime_modules": "/tmp/bugate-dsh-runtime/node_modules",
+  "sources": {
+    "system_prompt": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-system-prompt/lib/types/index.d.ts",
+      "sha256": "32d1ce35d3438f080f71534f5f0bd2f87f804b27a119b43d7bb8e84f64b35268",
+      "contract": "context text is synchronous; context registration"
+    },
+    "tool_guard": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/types/contracts.d.ts",
+      "sha256": "f0f4b71173ab97a28b1da0a748a9b1f6a33033f25ea5c3499c9701d3393381d3",
+      "contract": "ToolGuard synchronous monotonic denial"
+    },
+    "tool_pre_execute": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/types/events.d.ts",
+      "sha256": "d9b88e373fb94f038c2ee76a30c45fdcd34bd8cca39cef7cd09a8d56de352ac9",
+      "contract": "awaited pre-execute waterfall"
+    },
+    "agent_lifecycle": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/types/runtime-types.d.ts",
+      "sha256": "225971d216a0f6cede3e988cc779cf0ff91187cfe0977417d17ebcea293ee514",
+      "contract": "awaited created/pre-step/request/turn-stopping; source messages"
+    },
+    "filesystem": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-fs/lib/types/index.d.ts",
+      "sha256": "e3695ded49b42d128638cc1a03163117126862af8a32e78dd08dc8dc781066d4",
+      "contract": "processPath and processPathFromHostPath; opaque target keys"
+    },
+    "subprocess": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-subprocess/lib/types/index.d.ts",
+      "sha256": "db2a5a1cd508f8ed6a74af98497a7a524f0631d120a191b2d0bd573de20e6fee",
+      "contract": "configured spawn and terminate"
+    },
+    "runtime_loop": {
+      "path": "/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js",
+      "sha256": "a6fa8e0c7c90191caf5f4a3bb5c624a86e9845cf3c79d020b71420d0e20ae4c1",
+      "contract": "published executable runtime, not fake host"
+    }
+  },
+  "live_model": "not run; deterministic LLM boundary drives actual DSH services",
+  "trust_boundary": "Host-owned user messages and collector; no hostile same-user filesystem authentication",
+  "source_checkout": {
+    "path": "/tmp/bugate-dsh-source",
+    "commit": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3",
+    "status": "clean"
+  },
+  "source_contracts": {
+    "lifecycle": "packages/core/agent/src/runtime-types.ts",
+    "synchronous_guard": "packages/core/tools/src/contracts.ts",
+    "synchronous_context": "packages/core/system-prompt/src/index.ts",
+    "subagent_user_tag": "packages/subagent/subagent/src/manager.ts"
+  }
+}

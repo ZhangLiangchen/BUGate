@@ -1,0 +1,1 @@
+{"apiVersion":"bugate.io/v2","kind":"CommandResult","operation":"remove","request_id":"5f272258-4516-43d3-a152-3b4ffda4c9cd","invocation":"completed","data":{"status":"recovered","restored":"previous","profile":"bugate-package-acceptance"},"errors":[]}

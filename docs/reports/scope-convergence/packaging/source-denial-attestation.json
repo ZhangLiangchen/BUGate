@@ -1,0 +1,122 @@
+{
+  "status": "PASS",
+  "source_root_denied": "/Users/zhangliangchen/PycharmProjects/BUGate",
+  "bundle_sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+  "verified_command_count": 20,
+  "source_read_probe": "PermissionError caught; source access denied; exit 0",
+  "commands": [
+    {
+      "name": "00-source-denial-probe",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "01-clean-bootstrap",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "02-repeat",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "03-doctor",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "04-task-rebind-rejected",
+      "sandbox_prefix_matches": true,
+      "returncode": 2
+    },
+    {
+      "name": "05-stale-projection",
+      "sandbox_prefix_matches": true,
+      "returncode": 1
+    },
+    {
+      "name": "06-upgrade",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "07-rollback",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "08-doctor-after-rollback",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "09-remove",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "10-repeat-remove",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "11-real-host-add-patch-failure",
+      "sandbox_prefix_matches": true,
+      "returncode": 71
+    },
+    {
+      "name": "12-pending-no-blind-retry",
+      "sandbox_prefix_matches": true,
+      "returncode": 2
+    },
+    {
+      "name": "13-explicit-pending-rollback",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "14-reinstall-after-recovery",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "15-final-doctor",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "16-unowned-bootstrap-rejected",
+      "sandbox_prefix_matches": true,
+      "returncode": 2
+    },
+    {
+      "name": "17-real-upgrade-record-failure",
+      "sandbox_prefix_matches": true,
+      "returncode": 72
+    },
+    {
+      "name": "18-post-record-recovery",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    },
+    {
+      "name": "19-post-record-doctor",
+      "sandbox_prefix_matches": true,
+      "returncode": 0
+    }
+  ],
+  "evidence_sha256": {
+    "clean-install/commands.json": "53dd33697e7958f75215d7a8440612969e628312666b2779ccf64ce5a6e2657b",
+    "clean-install/result.json": "ff4bfe4ec09b8a78ad2d9913af129215f0b1f8cd08ca53ebb2658481ca1b3e8a",
+    "clean-install/00-source-denial-probe.stdout": "24b8e986b69308af49c000bab4cc7546291c94e5d9f44ba648b3b57f297088e4"
+  },
+  "raw_result_preserved": true,
+  "raw_result_metadata_defect": {
+    "field": "source_denied",
+    "cause": "Test runner reused denied for the unowned-bootstrap rejection argv after constructing and applying the correct sandbox prefix. The raw field therefore contains that argv string rather than the source root.",
+    "effect": "Reporting metadata only; all executed commands retained the original source-denial sandbox policy.",
+    "correction": "tests/integration_install/accept_package.py now uses denied_bootstrap_command for the rejection argv. No product code or bundle bytes changed; no installation re-execution claimed."
+  },
+  "verification_method": "Read each saved command argv and compare its sandbox prefix to the exact root-denial policy; require the saved negative read probe to have succeeded by catching PermissionError."
+}

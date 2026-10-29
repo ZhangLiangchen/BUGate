@@ -1,0 +1,1 @@
+{"apiVersion":"bugate.io/v2","kind":"CommandResult","operation":"assess","request_id":"12cda737-859f-427c-94c6-0763363642aa","invocation":"invalid_input","data":null,"errors":[{"code":"CONCURRENT_CONFLICT","message":"Identity already has different immutable content","details":null}]}

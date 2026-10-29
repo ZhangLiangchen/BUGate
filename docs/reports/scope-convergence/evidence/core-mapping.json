@@ -1,0 +1,797 @@
+{
+  "result": "PASS",
+  "tests_executed": 123,
+  "log": "core-tests.stderr",
+  "result_record": "core-tests.result.json",
+  "test_inventory": [
+    {
+      "test": "test_core.CoreAcceptance.test_AC01_complete_traceable_real_execution",
+      "file": "tests/v2/test_core.py",
+      "line": 32
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC02_missing_oracle_rejected",
+      "file": "tests/v2/test_core.py",
+      "line": 39
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC02_semantics_require_current_review",
+      "file": "tests/v2/test_core.py",
+      "line": 42
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC02_stale_review_rejected",
+      "file": "tests/v2/test_core.py",
+      "line": 44
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC03_code_without_execution",
+      "file": "tests/v2/test_core.py",
+      "line": 46
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC04_zero_tests_exit_zero",
+      "file": "tests/v2/test_core.py",
+      "line": 48
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC04_all_skipped_exit_zero",
+      "file": "tests/v2/test_core.py",
+      "line": 50
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC04_all_xfail_not_verified",
+      "file": "tests/v2/test_core.py",
+      "line": 52
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC05_real_product_failure_completes_delivery_not_verification",
+      "file": "tests/v2/test_core.py",
+      "line": 54
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC06_import_cannot_upgrade_source",
+      "file": "tests/v2/test_core.py",
+      "line": 61
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC06_forged_host_record_without_receipt",
+      "file": "tests/v2/test_core.py",
+      "line": 65
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC07_external_history_retains_provenance",
+      "file": "tests/v2/test_core.py",
+      "line": 68
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC08_evidence_truncated",
+      "file": "tests/v2/test_core.py",
+      "line": 71
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC08_evidence_deleted",
+      "file": "tests/v2/test_core.py",
+      "line": 73
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC08_same_path_implementation_changed",
+      "file": "tests/v2/test_core.py",
+      "line": 75
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC09_protocol_mismatch",
+      "file": "tests/v2/test_core.py",
+      "line": 77
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC09_profile_mismatch",
+      "file": "tests/v2/test_core.py",
+      "line": 81
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC09_source_revision_mismatch",
+      "file": "tests/v2/test_core.py",
+      "line": 85
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC10_assessment_outputs_do_not_self_invalidate",
+      "file": "tests/v2/test_core.py",
+      "line": 87
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC10_current_claim_mutation_cannot_reuse_old_satisfaction",
+      "file": "tests/v2/test_core.py",
+      "line": 89
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC10_forged_result_not_authority",
+      "file": "tests/v2/test_core.py",
+      "line": 91
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC11_expected_snapshot_conflict",
+      "file": "tests/v2/test_core.py",
+      "line": 93
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC11_binding_change_detected_in_existing_workspace",
+      "file": "tests/v2/test_core.py",
+      "line": 97
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC11_concurrent_lock_rejects_second_writer",
+      "file": "tests/v2/test_core.py",
+      "line": 101
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC12_same_task_id_different_workspace",
+      "file": "tests/v2/test_core.py",
+      "line": 106
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC13_traversal_and_symlink",
+      "file": "tests/v2/test_core.py",
+      "line": 110
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC14_content_is_data_and_utf8_budget",
+      "file": "tests/v2/test_core.py",
+      "line": 117
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC15_missing_process",
+      "file": "tests/v2/test_core.py",
+      "line": 121
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC15_invalid_json_cli",
+      "file": "tests/v2/test_core.py",
+      "line": 124
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC15_output_limit",
+      "file": "tests/v2/test_core.py",
+      "line": 127
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC16_timeout_terminates_process",
+      "file": "tests/v2/test_core.py",
+      "line": 130
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC16_cancel_cli_terminates_process",
+      "file": "tests/v2/test_core.py",
+      "line": 134
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC17_run_idempotency",
+      "file": "tests/v2/test_core.py",
+      "line": 140
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC17_unknown_execution_is_not_replayed",
+      "file": "tests/v2/test_core.py",
+      "line": 142
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC17_atomic_failure_keeps_previous",
+      "file": "tests/v2/test_core.py",
+      "line": 146
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC18_no_memory_service_dependency",
+      "file": "tests/v2/test_core.py",
+      "line": 151
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_frozen_scope_cannot_be_shrunk",
+      "file": "tests/v2/test_core.py",
+      "line": 154
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_inventory_scope_cannot_be_shrunk",
+      "file": "tests/v2/test_core.py",
+      "line": 158
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_HC02_04_05_canonical_schema_binding_context",
+      "file": "tests/v2/test_core.py",
+      "line": 160
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_HC03_task_ambiguity_is_explicit",
+      "file": "tests/v2/test_core.py",
+      "line": 162
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC08_new_runtime_input_invalidates_prior_execution",
+      "file": "tests/v2/test_core.py",
+      "line": 166
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC09_changed_oracle_cannot_reuse_prior_execution",
+      "file": "tests/v2/test_core.py",
+      "line": 170
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC11_change_between_evaluation_and_commit_is_conflict",
+      "file": "tests/v2/test_core.py",
+      "line": 173
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_scope_task_risk_reduction_rejected",
+      "file": "tests/v2/test_core.py",
+      "line": 182
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_implementation_delivery_applies_design_dependencies",
+      "file": "tests/v2/test_core.py",
+      "line": 186
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_knowledge_only_delivery_does_not_require_execution_report",
+      "file": "tests/v2/test_core.py",
+      "line": 192
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_retired_artifact_format_is_explicitly_rejected",
+      "file": "tests/v2/test_core.py",
+      "line": 198
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_delivery_cannot_list_unexecuted_case_as_complete",
+      "file": "tests/v2/test_core.py",
+      "line": 203
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_diagnosis_and_relation_dangling_references_rejected",
+      "file": "tests/v2/test_core.py",
+      "line": 208
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_junit_aggregate_mismatch_is_not_pass",
+      "file": "tests/v2/test_core.py",
+      "line": 211
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_historical_failure_does_not_block_fixed_current_run",
+      "file": "tests/v2/test_core.py",
+      "line": 215
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_HC15_historical_memory_cannot_override_current_facts",
+      "file": "tests/v2/test_core.py",
+      "line": 225
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC15_missing_python_package_has_structured_error",
+      "file": "tests/v2/test_core.py",
+      "line": 229
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_testability_oracles_cannot_be_swapped_between_propositions",
+      "file": "tests/v2/test_core.py",
+      "line": 239
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_multi_proposition_case_requires_oracle_for_each_proposition",
+      "file": "tests/v2/test_core.py",
+      "line": 243
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC13_report_symlink_created_during_execution_is_rejected",
+      "file": "tests/v2/test_core.py",
+      "line": 247
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC17_evidence_publication_failure_does_not_authorize",
+      "file": "tests/v2/test_core.py",
+      "line": 252
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC16_cancel_terminates_process_group_child",
+      "file": "tests/v2/test_core.py",
+      "line": 268
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_artifact_authoring_computes_digests_and_requires_CAS",
+      "file": "tests/v2/test_core.py",
+      "line": 277
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_artifact_authoring_review_and_new_record_cli",
+      "file": "tests/v2/test_core.py",
+      "line": 284
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_evidence_authoring_computes_digest_without_promoting_source",
+      "file": "tests/v2/test_core.py",
+      "line": 287
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_CLI_and_library_assessment_semantic_parity",
+      "file": "tests/v2/test_core.py",
+      "line": 291
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC30_filesystem_witness_covers_bytes_path_set_and_declared_sources",
+      "file": "tests/v2/test_core.py",
+      "line": 295
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC30_filesystem_witness_excludes_only_runtime_pins_and_lock",
+      "file": "tests/v2/test_core.py",
+      "line": 314
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_AC30_filesystem_witness_is_bounded",
+      "file": "tests/v2/test_core.py",
+      "line": 323
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_all_schemas_positive_and_negative_examples",
+      "file": "tests/v2/test_core.py",
+      "line": 328
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_reason_catalog_covers_implemented_findings",
+      "file": "tests/v2/test_core.py",
+      "line": 350
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_schema_negative_extra_properties",
+      "file": "tests/v2/test_core.py",
+      "line": 360
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_adapter_reason_codes_are_registered",
+      "file": "tests/v2/test_core.py",
+      "line": 364
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_repeated_argv_is_valid",
+      "file": "tests/v2/test_core.py",
+      "line": 374
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_business_claim_does_not_require_future_execution",
+      "file": "tests/v2/test_core.py",
+      "line": 376
+    },
+    {
+      "test": "test_core.CoreAcceptance.test_CLI_envelope_operations_and_quality_exit",
+      "file": "tests/v2/test_core.py",
+      "line": 377
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC01_minimum_order_flow_has_real_business_evidence",
+      "file": "tests/v2/test_scope.py",
+      "line": 95
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC02_explicit_tenant_denial_is_required_and_has_no_side_effect",
+      "file": "tests/v2/test_scope.py",
+      "line": 101
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC03_all_explicit_normal_boundary_failure_branches_remain",
+      "file": "tests/v2/test_scope.py",
+      "line": 105
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC04_auxiliary_can_repair_missing_oracles_without_new_goal",
+      "file": "tests/v2/test_scope.py",
+      "line": 108
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC05_unrelated_plan_extension_is_advisory_and_cannot_execute",
+      "file": "tests/v2/test_scope.py",
+      "line": 114
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC06_suggestions_do_not_invalidate_or_block_completed_scope",
+      "file": "tests/v2/test_scope.py",
+      "line": 120
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC07_real_failure_completes_execution_not_functional_acceptance",
+      "file": "tests/v2/test_scope.py",
+      "line": 127
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC08_missing_business_evidence_never_closes_execution",
+      "file": "tests/v2/test_scope.py",
+      "line": 131
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC09_diagnosis_has_real_failure_link_and_consumable_bound",
+      "file": "tests/v2/test_scope.py",
+      "line": 135
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC10_explicit_expansion_versions_scope_and_invalidates_old_plan",
+      "file": "tests/v2/test_scope.py",
+      "line": 140
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC11_agent_shrink_and_fabricated_consent_do_not_authorize",
+      "file": "tests/v2/test_scope.py",
+      "line": 160
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC12_cold_process_restores_exact_scope_and_required_scenarios",
+      "file": "tests/v2/test_scope.py",
+      "line": 168
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC13_old_plan_snapshot_and_scope_refs_cannot_authorize",
+      "file": "tests/v2/test_scope.py",
+      "line": 172
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC14_parallel_tasks_do_not_share_scope_evidence_or_suggestions",
+      "file": "tests/v2/test_scope.py",
+      "line": 176
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC15_conflicts_and_missing_necessity_are_explicit_gaps",
+      "file": "tests/v2/test_scope.py",
+      "line": 187
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_SC18_report_separates_coverage_function_result_blockers_and_advice",
+      "file": "tests/v2/test_scope.py",
+      "line": 191
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_wrong_environment_and_redundant_scenario_are_denied",
+      "file": "tests/v2/test_scope.py",
+      "line": 195
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_scope_cannot_be_omitted_or_user_text_be_forged",
+      "file": "tests/v2/test_scope.py",
+      "line": 199
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_explicit_old_version_and_foreign_scope_drafts_are_rejected",
+      "file": "tests/v2/test_scope.py",
+      "line": 204
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_untrusted_failure_cannot_open_diagnostic_channel",
+      "file": "tests/v2/test_scope.py",
+      "line": 211
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_scope_flow_cycles_are_rejected",
+      "file": "tests/v2/test_scope.py",
+      "line": 215
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_profile_denominator_change_requires_explicit_new_profile_task",
+      "file": "tests/v2/test_scope.py",
+      "line": 221
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_omitted_current_failure_cannot_be_reported_as_functional_pass",
+      "file": "tests/v2/test_scope.py",
+      "line": 229
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_nonzero_process_without_failed_oracle_is_incomplete_not_product_failure",
+      "file": "tests/v2/test_scope.py",
+      "line": 235
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_old_artifact_and_old_profile_are_rejected",
+      "file": "tests/v2/test_semantics.py",
+      "line": 42
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_blank_business_statement_is_not_valid",
+      "file": "tests/v2/test_semantics.py",
+      "line": 47
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_placeholder_oracle_does_not_pass_even_with_current_review",
+      "file": "tests/v2/test_semantics.py",
+      "line": 51
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_quoted_placeholder_in_requirement_is_data",
+      "file": "tests/v2/test_semantics.py",
+      "line": 55
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_inventory_requires_resolved_source_plan",
+      "file": "tests/v2/test_semantics.py",
+      "line": 58
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_case_source_must_be_declared",
+      "file": "tests/v2/test_semantics.py",
+      "line": 61
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_every_oracle_needs_testability_mapping",
+      "file": "tests/v2/test_semantics.py",
+      "line": 64
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_multiple_oracles_per_proposition_are_supported",
+      "file": "tests/v2/test_semantics.py",
+      "line": 69
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_oracle_specific_layer_cannot_borrow_another_oracle_layer",
+      "file": "tests/v2/test_semantics.py",
+      "line": 79
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_case_layer_matches_testability",
+      "file": "tests/v2/test_semantics.py",
+      "line": 88
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_optional_models_do_not_change_default_requirements",
+      "file": "tests/v2/test_semantics.py",
+      "line": 91
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_profile_can_only_tighten_model_requirements",
+      "file": "tests/v2/test_semantics.py",
+      "line": 92
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_profile_required_model_missing_is_visible",
+      "file": "tests/v2/test_semantics.py",
+      "line": 95
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_full_native_model_is_reviewed_and_traceable",
+      "file": "tests/v2/test_semantics.py",
+      "line": 97
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_model_review_is_required",
+      "file": "tests/v2/test_semantics.py",
+      "line": 100
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_state_model_cannot_invent_objects_or_oracles",
+      "file": "tests/v2/test_semantics.py",
+      "line": 102
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_domain_invariant_references_real_propositions",
+      "file": "tests/v2/test_semantics.py",
+      "line": 104
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_included_adversarial_finding_requires_actual_case",
+      "file": "tests/v2/test_semantics.py",
+      "line": 106
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_unresolved_adversarial_risk_is_not_hidden_by_review",
+      "file": "tests/v2/test_semantics.py",
+      "line": 108
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_out_of_scope_typed_residual_is_nonblocking_advice",
+      "file": "tests/v2/test_semantics.py",
+      "line": 110
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_ambiguous_residual_cannot_be_silently_reclassified",
+      "file": "tests/v2/test_semantics.py",
+      "line": 115
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_excluded_adversarial_finding_requires_rationale",
+      "file": "tests/v2/test_semantics.py",
+      "line": 118
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_dimension_candidates_must_be_absorbed",
+      "file": "tests/v2/test_semantics.py",
+      "line": 121
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_independence_requires_distinct_named_producer",
+      "file": "tests/v2/test_semantics.py",
+      "line": 123
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_unique_canonical_constraints_and_claim_dimensions",
+      "file": "tests/v2/test_semantics.py",
+      "line": 130
+    },
+    {
+      "test": "test_semantics.NativeSemantics.test_evaluator_has_only_v2_inputs",
+      "file": "tests/v2/test_semantics.py",
+      "line": 139
+    },
+    {
+      "test": "test_scope.ScopeAcceptance.test_named_requirement_verification_preserves_unobserved_task_scope",
+      "file": "tests/v2/test_scope.py",
+      "line": 241
+    }
+  ],
+  "source_authority": "U2 actual user correction; retained non-conflicting U1 objectives/invariants; B0 fe3e29b v2 baseline; explicit necessary engineering deductions. SC identifiers are retained candidate example names, never authority or a completeness count.",
+  "changes_to_existing_assertions": [
+    {
+      "file": "tests/v2/test_semantics.py",
+      "change": "Residual risk prose replaced by explicit in-scope risk/requirement references or a real Suggestion reference. In-scope unresolved risk still blocks; advisory-only residual does not.",
+      "basis": "User distinction between agreed scope and nonblocking recommendations."
+    },
+    {
+      "file": "tests/v2/test_core.py",
+      "change": "Raw managed subprocess controls explicitly use declared auxiliary activity probe. Timeout, cancellation, output, publication and unknown-outcome assertions are unchanged.",
+      "basis": "Explicit activity admission preserves lawful auxiliary execution and scope binding."
+    },
+    {
+      "file": "tests/v2/helpers.py",
+      "change": "Fixtures explicitly author ScopeRequest, ScopeContract, current inventory binding and semantic scope decisions. New required schema fields do not have a compatibility fallback.",
+      "basis": "First-class protocol entity and exact-current authorization."
+    },
+    {
+      "file": "tests/v2/test_semantics.py",
+      "change": "The additional Oracle positive test explicitly revises scope before authoring its new case Oracle.",
+      "basis": "Current scope contract must bind expected business evidence."
+    }
+  ],
+  "limits": [
+    "Scope/Profile/user receipts are protected by managed tooling, not authenticated against a same-UID filesystem owner.",
+    "Semantic necessity is a source-bound review judgement; populated fields and cryptographic digests do not establish business truth.",
+    "Every scope revision preserves locked Profile requirements/risks. A changed denominator needs an explicitly sourced new Profile version and new task; no in-place Profile migration.",
+    "Changed scope or plan conservatively invalidates older execution inputs; no selective evidence reuse implemented.",
+    "Core subprocess admission cannot infer arbitrary shell business meaning; DSH uses fixed configured commands and actual filesystem/subprocess provider."
+  ],
+  "formal_matrix": "docs/reports/scope-convergence/ACCEPTANCE_MATRIX.md revision 2",
+  "formal_mapping": {
+    "F-01": {
+      "core_tests": [
+        "test_core.CoreAcceptance.test_all_schemas_positive_and_negative_examples",
+        "test_core.CoreAcceptance.test_CLI_envelope_operations_and_quality_exit",
+        "test_scope.ScopeAcceptance.test_SC12_cold_process_restores_exact_scope_and_required_scenarios",
+        "test_scope.ScopeAcceptance.test_scope_cannot_be_omitted_or_user_text_be_forged"
+      ],
+      "coverage_boundary": "Core evidence only; real DSH/installation/docs proof is separately owned and must be combined."
+    },
+    "F-02": {
+      "core_tests": [
+        "test_scope.ScopeAcceptance.test_SC01_minimum_order_flow_has_real_business_evidence",
+        "test_scope.ScopeAcceptance.test_SC02_explicit_tenant_denial_is_required_and_has_no_side_effect",
+        "test_scope.ScopeAcceptance.test_SC03_all_explicit_normal_boundary_failure_branches_remain",
+        "test_scope.ScopeAcceptance.test_SC05_unrelated_plan_extension_is_advisory_and_cannot_execute",
+        "test_scope.ScopeAcceptance.test_SC06_suggestions_do_not_invalidate_or_block_completed_scope",
+        "test_semantics.NativeSemantics.test_out_of_scope_typed_residual_is_nonblocking_advice",
+        "test_semantics.NativeSemantics.test_ambiguous_residual_cannot_be_silently_reclassified"
+      ],
+      "coverage_boundary": "Executed deterministic core source-derived controls and neutral examples."
+    },
+    "F-03": {
+      "core_tests": [
+        "test_core.CoreAcceptance.test_AC02_semantics_require_current_review",
+        "test_scope.ScopeAcceptance.test_SC10_explicit_expansion_versions_scope_and_invalidates_old_plan",
+        "test_scope.ScopeAcceptance.test_SC11_agent_shrink_and_fabricated_consent_do_not_authorize",
+        "test_scope.ScopeAcceptance.test_SC15_conflicts_and_missing_necessity_are_explicit_gaps",
+        "test_scope.ScopeAcceptance.test_explicit_old_version_and_foreign_scope_drafts_are_rejected",
+        "test_scope.ScopeAcceptance.test_scope_flow_cycles_are_rejected",
+        "test_scope.ScopeAcceptance.test_profile_denominator_change_requires_explicit_new_profile_task",
+        "test_semantics.NativeSemantics.test_independence_requires_distinct_named_producer"
+      ],
+      "coverage_boundary": "Executed deterministic core source-derived controls and neutral examples."
+    },
+    "F-04": {
+      "core_tests": [
+        "test_core.CoreAcceptance.test_AC03_code_without_execution",
+        "test_core.CoreAcceptance.test_AC04_zero_tests_exit_zero",
+        "test_core.CoreAcceptance.test_AC04_all_skipped_exit_zero",
+        "test_core.CoreAcceptance.test_AC04_all_xfail_not_verified",
+        "test_core.CoreAcceptance.test_AC05_real_product_failure_completes_delivery_not_verification",
+        "test_core.CoreAcceptance.test_AC06_import_cannot_upgrade_source",
+        "test_core.CoreAcceptance.test_AC06_forged_host_record_without_receipt",
+        "test_core.CoreAcceptance.test_AC07_external_history_retains_provenance",
+        "test_core.CoreAcceptance.test_delivery_cannot_list_unexecuted_case_as_complete",
+        "test_scope.ScopeAcceptance.test_SC07_real_failure_completes_execution_not_functional_acceptance",
+        "test_scope.ScopeAcceptance.test_SC08_missing_business_evidence_never_closes_execution",
+        "test_scope.ScopeAcceptance.test_SC18_report_separates_coverage_function_result_blockers_and_advice",
+        "test_scope.ScopeAcceptance.test_omitted_current_failure_cannot_be_reported_as_functional_pass",
+        "test_scope.ScopeAcceptance.test_nonzero_process_without_failed_oracle_is_incomplete_not_product_failure"
+      ],
+      "coverage_boundary": "Executed deterministic core source-derived controls and neutral examples."
+    },
+    "F-05": {
+      "core_tests": [
+        "test_core.CoreAcceptance.test_AC15_missing_process",
+        "test_core.CoreAcceptance.test_AC15_invalid_json_cli",
+        "test_core.CoreAcceptance.test_AC15_output_limit",
+        "test_core.CoreAcceptance.test_AC16_timeout_terminates_process",
+        "test_core.CoreAcceptance.test_AC16_cancel_cli_terminates_process",
+        "test_core.CoreAcceptance.test_AC17_run_idempotency",
+        "test_core.CoreAcceptance.test_AC17_unknown_execution_is_not_replayed",
+        "test_core.CoreAcceptance.test_AC17_atomic_failure_keeps_previous",
+        "test_core.CoreAcceptance.test_AC15_missing_python_package_has_structured_error",
+        "test_core.CoreAcceptance.test_AC17_evidence_publication_failure_does_not_authorize",
+        "test_core.CoreAcceptance.test_AC16_cancel_terminates_process_group_child",
+        "test_scope.ScopeAcceptance.test_SC04_auxiliary_can_repair_missing_oracles_without_new_goal",
+        "test_scope.ScopeAcceptance.test_SC09_diagnosis_has_real_failure_link_and_consumable_bound",
+        "test_scope.ScopeAcceptance.test_untrusted_failure_cannot_open_diagnostic_channel"
+      ],
+      "coverage_boundary": "Core evidence only; real DSH/installation/docs proof is separately owned and must be combined."
+    },
+    "F-06": {
+      "core_tests": [
+        "test_core.CoreAcceptance.test_AC08_evidence_truncated",
+        "test_core.CoreAcceptance.test_AC08_evidence_deleted",
+        "test_core.CoreAcceptance.test_AC08_same_path_implementation_changed",
+        "test_core.CoreAcceptance.test_AC09_protocol_mismatch",
+        "test_core.CoreAcceptance.test_AC09_profile_mismatch",
+        "test_core.CoreAcceptance.test_AC09_source_revision_mismatch",
+        "test_core.CoreAcceptance.test_AC10_assessment_outputs_do_not_self_invalidate",
+        "test_core.CoreAcceptance.test_AC10_current_claim_mutation_cannot_reuse_old_satisfaction",
+        "test_core.CoreAcceptance.test_AC10_forged_result_not_authority",
+        "test_core.CoreAcceptance.test_AC11_expected_snapshot_conflict",
+        "test_core.CoreAcceptance.test_AC11_binding_change_detected_in_existing_workspace",
+        "test_core.CoreAcceptance.test_AC11_concurrent_lock_rejects_second_writer",
+        "test_core.CoreAcceptance.test_AC12_same_task_id_different_workspace",
+        "test_core.CoreAcceptance.test_AC13_traversal_and_symlink",
+        "test_core.CoreAcceptance.test_AC08_new_runtime_input_invalidates_prior_execution",
+        "test_core.CoreAcceptance.test_AC09_changed_oracle_cannot_reuse_prior_execution",
+        "test_core.CoreAcceptance.test_AC11_change_between_evaluation_and_commit_is_conflict",
+        "test_core.CoreAcceptance.test_AC13_report_symlink_created_during_execution_is_rejected",
+        "test_core.CoreAcceptance.test_AC30_filesystem_witness_covers_bytes_path_set_and_declared_sources",
+        "test_core.CoreAcceptance.test_AC30_filesystem_witness_excludes_only_runtime_pins_and_lock",
+        "test_core.CoreAcceptance.test_AC30_filesystem_witness_is_bounded",
+        "test_scope.ScopeAcceptance.test_SC12_cold_process_restores_exact_scope_and_required_scenarios",
+        "test_scope.ScopeAcceptance.test_SC13_old_plan_snapshot_and_scope_refs_cannot_authorize",
+        "test_scope.ScopeAcceptance.test_SC14_parallel_tasks_do_not_share_scope_evidence_or_suggestions",
+        "test_scope.ScopeAcceptance.test_wrong_environment_and_redundant_scenario_are_denied"
+      ],
+      "coverage_boundary": "Core evidence only; real DSH/installation/docs proof is separately owned and must be combined."
+    },
+    "F-07": {
+      "core_tests": [
+        "test_core.CoreAcceptance.test_all_schemas_positive_and_negative_examples",
+        "test_core.CoreAcceptance.test_reason_catalog_covers_implemented_findings",
+        "test_core.CoreAcceptance.test_adapter_reason_codes_are_registered"
+      ],
+      "coverage_boundary": "Core evidence only; real DSH/installation/docs proof is separately owned and must be combined."
+    },
+    "F-08": {
+      "core_tests": [
+        "test_core.CoreAcceptance.test_CLI_and_library_assessment_semantic_parity",
+        "test_scope.ScopeAcceptance.test_SC06_suggestions_do_not_invalidate_or_block_completed_scope",
+        "test_scope.ScopeAcceptance.test_SC18_report_separates_coverage_function_result_blockers_and_advice"
+      ],
+      "coverage_boundary": "Core evidence only; real DSH/installation/docs proof is separately owned and must be combined."
+    }
+  },
+  "persistence_fix": {
+    "problem": "Advisory result view changed while the immutable assessment request digest remained identical.",
+    "solution": "AssessmentRequest.advisory_digest binds only the advisory rendering snapshot; it changes record identity without changing claim, workspace or execution authorization snapshots.",
+    "regression": "test_scope.ScopeAcceptance.test_SC06_suggestions_do_not_invalidate_or_block_completed_scope",
+    "verified": [
+      "identical original claim bytes",
+      "identical workspace snapshot",
+      "identical execution_input_manifest",
+      "different assessment request digests",
+      "two immutable result records coexist",
+      "current claim remains fresh and satisfied",
+      "all current suggestions appear in result"
+    ]
+  },
+  "independent_review": {
+    "record": "independent-review.json",
+    "finding": "RV-01",
+    "result": "FIXED; pre-fix targeted FAIL, post-fix PASS, final full suite PASS",
+    "formal_requirements": [
+      "F-04",
+      "F-06"
+    ]
+  }
+}

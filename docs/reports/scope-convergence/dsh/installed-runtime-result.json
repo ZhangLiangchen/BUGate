@@ -1,0 +1,1247 @@
+{
+  "verification": "real-dsh-runtime-deterministic-model-installed-package",
+  "formal_requirement_ids": [
+    "F-01",
+    "F-02",
+    "F-04",
+    "F-05",
+    "F-07"
+  ],
+  "verified_invariants": [
+    "scope-bound execution",
+    "non-executable suggestions",
+    "suggestions do not block completion",
+    "functional failure preserved",
+    "bounded diagnosis",
+    "installed runtime independent of source"
+  ],
+  "source_isolation": "OS sandbox denied checkout reads, verified before runtime loading",
+  "module_identity": {
+    "host": "/private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-llm/lib/index.js",
+    "plugin": "/private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-llm/lib/index.js"
+  },
+  "python_identity": {
+    "module": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/bootstrap/lib/python3.13/site-packages/bugate/__init__.py",
+    "prefix": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/bootstrap",
+    "base_prefix": "/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13",
+    "version": "2.1.0a1"
+  },
+  "profile_directory": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/dsh-home/profiles/bugate-package-acceptance",
+  "compatibility": {
+    "adapter_version": "2.1.0-dev.1",
+    "core_version": "2.1.0a1",
+    "protocol_version": "2.1.0-dev.1",
+    "dsh_version": "0.2.2-alpha.2",
+    "dsh_commit": "f3803c96974ad4a94195fb97e5c637e9c2a3afe3"
+  },
+  "installed": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/dsh-home/profiles/bugate-package-acceptance/node_modules/@bugate/deepseek-harness",
+  "python": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/bootstrap/bin/python",
+  "task": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-MB4gC0/generated-project/test-task/same-task",
+  "requests": 47,
+  "scope_ref": {
+    "id": "acceptance",
+    "revision": 1,
+    "digest": "sha256:706120e6595e1d6c455a088c0c81b6a228a8324ee7896c9d138f70bc09aa5eb4"
+  },
+  "scope_exercise": true,
+  "product_failure": false,
+  "requirement_assessment": {
+    "apiVersion": "bugate.io/v2",
+    "kind": "AssessmentResult",
+    "id": "assessment-verified-requirement",
+    "task_id": "same-task",
+    "workspace_id": "sha256:b62dbe56b4691a69b45268f2c10e82cfe97373b23eadb392eef774d7e0c16000",
+    "claim_id": "verified-requirement",
+    "claim_type": "requirement_verified",
+    "claim_digest": "sha256:5ed1bc1e1820292e358f4f3a437cc4d3c678ef608ba214fb7a2f68d8ac028997",
+    "evaluator_version": "2.1.0a1",
+    "request_digest": "sha256:b687cf806ea2036a713a6d0d9f7da4dd3f082153546d9960dfd752aae3e84718",
+    "workspace_snapshot": "sha256:fa8fd38ffa05e04e872c50d858559c4471ace0f1372f6b2c74e52e649386c5a4",
+    "verdict": "satisfied",
+    "dimensions": {
+      "deterministic": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Schema and content hashes establish consistency, not the truth of supplied facts."
+        ]
+      },
+      "semantic_review": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Source-backed reviewer opinion is not a mathematical proof."
+        ]
+      },
+      "runtime_validation": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Managed local-process observation; same-permission filesystem owners can alter local evidence."
+        ]
+      }
+    },
+    "findings": [],
+    "evidence_ids": [
+      "run-dsh-636bf020321f0496c6fa711843404a02"
+    ],
+    "unknowns": [],
+    "scope": [
+      "R1"
+    ],
+    "quality_posture": "satisfactory",
+    "acceptance": {
+      "execution_complete": true,
+      "functional_result": "passed",
+      "requirement_ids": [
+        "R1"
+      ],
+      "blocking_codes": [],
+      "suggestion_ids": [
+        "extension-65fd53f0dc3b72f0bcbbab2c15c6db14",
+        "security-suggestion"
+      ],
+      "historical_failure_ids": [],
+      "coverage_statement": "This conclusion covers only the agreed acceptance scope."
+    }
+  },
+  "completion_assessment": {
+    "apiVersion": "bugate.io/v2",
+    "kind": "AssessmentResult",
+    "id": "assessment-complete-execution",
+    "task_id": "same-task",
+    "workspace_id": "sha256:b62dbe56b4691a69b45268f2c10e82cfe97373b23eadb392eef774d7e0c16000",
+    "claim_id": "complete-execution",
+    "claim_type": "execution_complete",
+    "claim_digest": "sha256:a81e1b679fa24cfc899311447260576803376fe39579fe4ee1d6389b1f46367f",
+    "evaluator_version": "2.1.0a1",
+    "request_digest": "sha256:b4718941058218db02387e146b481b288754a5633448e5fd923e56ff69dae025",
+    "workspace_snapshot": "sha256:fa8fd38ffa05e04e872c50d858559c4471ace0f1372f6b2c74e52e649386c5a4",
+    "verdict": "satisfied",
+    "dimensions": {
+      "deterministic": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Schema and content hashes establish consistency, not the truth of supplied facts."
+        ]
+      },
+      "semantic_review": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Source-backed reviewer opinion is not a mathematical proof."
+        ]
+      },
+      "runtime_validation": {
+        "status": "passed",
+        "applicable": true,
+        "basis": [
+          "canonical-rules/v2"
+        ],
+        "limitations": [
+          "Managed local-process observation; same-permission filesystem owners can alter local evidence."
+        ]
+      }
+    },
+    "findings": [],
+    "evidence_ids": [
+      "run-dsh-636bf020321f0496c6fa711843404a02"
+    ],
+    "unknowns": [],
+    "scope": [
+      "R1"
+    ],
+    "quality_posture": "satisfactory",
+    "acceptance": {
+      "execution_complete": true,
+      "functional_result": "passed",
+      "requirement_ids": [
+        "R1"
+      ],
+      "blocking_codes": [],
+      "suggestion_ids": [
+        "compatibility-suggestion",
+        "extension-65fd53f0dc3b72f0bcbbab2c15c6db14",
+        "performance-suggestion",
+        "security-suggestion"
+      ],
+      "historical_failure_ids": [],
+      "coverage_statement": "This conclusion covers only the agreed acceptance scope."
+    }
+  },
+  "suggestions": [
+    {
+      "apiVersion": "bugate.io/v2",
+      "description": "Possible separate compatibility review",
+      "digest": "sha256:48833d81bf4eccee9dd1a4d77cb8c73c00060c2d7ce17beedefc7880f16bc154",
+      "id": "compatibility-suggestion",
+      "kind": "Suggestion",
+      "rationale": "Not required by the finite current user objective",
+      "scope_ref": {
+        "digest": "sha256:706120e6595e1d6c455a088c0c81b6a228a8324ee7896c9d138f70bc09aa5eb4",
+        "id": "acceptance",
+        "revision": 1
+      },
+      "source_refs": [
+        "SRC1"
+      ],
+      "status": "suggested",
+      "task_id": "same-task",
+      "workspace_id": "sha256:b62dbe56b4691a69b45268f2c10e82cfe97373b23eadb392eef774d7e0c16000"
+    },
+    {
+      "apiVersion": "bugate.io/v2",
+      "description": "Proposed additional scenario S-security",
+      "digest": "sha256:d0cf8c0427d746fe2fae80715244196c99d9ed6f749e82deb0fbbb4f147263c1",
+      "id": "extension-65fd53f0dc3b72f0bcbbab2c15c6db14",
+      "kind": "Suggestion",
+      "rationale": "No required scenario in the current scope. Proposed executable details were not admitted.",
+      "scope_ref": {
+        "digest": "sha256:706120e6595e1d6c455a088c0c81b6a228a8324ee7896c9d138f70bc09aa5eb4",
+        "id": "acceptance",
+        "revision": 1
+      },
+      "source_refs": [
+        "SRC1"
+      ],
+      "status": "suggested",
+      "task_id": "same-task",
+      "workspace_id": "sha256:b62dbe56b4691a69b45268f2c10e82cfe97373b23eadb392eef774d7e0c16000"
+    },
+    {
+      "apiVersion": "bugate.io/v2",
+      "description": "Possible separate performance review",
+      "digest": "sha256:88f6c6e1acae596385b213b642315614af3fe666b181505217245923e7107711",
+      "id": "performance-suggestion",
+      "kind": "Suggestion",
+      "rationale": "Not required by the finite current user objective",
+      "scope_ref": {
+        "digest": "sha256:706120e6595e1d6c455a088c0c81b6a228a8324ee7896c9d138f70bc09aa5eb4",
+        "id": "acceptance",
+        "revision": 1
+      },
+      "source_refs": [
+        "SRC1"
+      ],
+      "status": "suggested",
+      "task_id": "same-task",
+      "workspace_id": "sha256:b62dbe56b4691a69b45268f2c10e82cfe97373b23eadb392eef774d7e0c16000"
+    },
+    {
+      "apiVersion": "bugate.io/v2",
+      "description": "A separate security review could examine additional threat categories",
+      "digest": "sha256:38a039d15263728304a6c202f9cab8f3510695e02580b12f695f92d211d5a37d",
+      "id": "security-suggestion",
+      "kind": "Suggestion",
+      "rationale": "This is outside the requested integer branches and has no current necessity source",
+      "scope_ref": {
+        "digest": "sha256:706120e6595e1d6c455a088c0c81b6a228a8324ee7896c9d138f70bc09aa5eb4",
+        "id": "acceptance",
+        "revision": 1
+      },
+      "source_refs": [
+        "SRC1"
+      ],
+      "status": "suggested",
+      "task_id": "same-task",
+      "workspace_id": "sha256:b62dbe56b4691a69b45268f2c10e82cfe97373b23eadb392eef774d7e0c16000"
+    }
+  ],
+  "observations": [
+    {
+      "tool": "read_requirement",
+      "isError": false
+    },
+    {
+      "tool": "bugate_scope",
+      "isError": false,
+      "invocation": "completed"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_scope",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "ScopeContract"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "bugate_status",
+      "isError": false,
+      "invocation": "completed"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_assess",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Artifact"
+    },
+    {
+      "tool": "bugate_status",
+      "isError": false,
+      "invocation": "completed"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_assess",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_artifact",
+      "isError": false,
+      "invocation": "invalid_input"
+    },
+    {
+      "tool": "bugate_run_test",
+      "isError": true,
+      "error": {
+        "message": "BUGate: [{\"code\":\"SCENARIO_OUT_OF_SCOPE\",\"subject\":\"C-security\",\"dimension\":\"scope\",\"severity\":\"error\",\"blocking\":true,\"message\":\"Only current inventory cases can execute as required acceptance\",\"basis\":[],\"remediation\":\"Correct the referenced input and reassess the current snapshot.\"}]"
+      }
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_suggestion",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Suggestion"
+    },
+    {
+      "tool": "bugate_run_test",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Evidence"
+    },
+    {
+      "tool": "bugate_status",
+      "isError": false,
+      "invocation": "completed"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_assess",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    },
+    {
+      "tool": "bugate_status",
+      "isError": false,
+      "invocation": "completed"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_assess",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_suggestion",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Suggestion"
+    },
+    {
+      "tool": "write",
+      "isError": false
+    },
+    {
+      "tool": "bugate_record_suggestion",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "Suggestion"
+    },
+    {
+      "tool": "bugate_assess",
+      "isError": false,
+      "invocation": "completed",
+      "kind": "AssessmentResult",
+      "verdict": "satisfied"
+    },
+    {
+      "tool": "bugate_scope",
+      "isError": false,
+      "invocation": "completed"
+    }
+  ],
+  "evidence": {
+    "apiVersion": "bugate.io/v2",
+    "kind": "Evidence",
+    "id": "run-dsh-636bf020321f0496c6fa711843404a02",
+    "task_id": "same-task",
+    "workspace_id": "sha256:b62dbe56b4691a69b45268f2c10e82cfe97373b23eadb392eef774d7e0c16000",
+    "source_type": "host_observed",
+    "evidence_type": "test_execution",
+    "description": "Managed execution capture",
+    "references": [
+      {
+        "path": "logs/dsh-636bf020321f0496c6fa711843404a02.stdout.log",
+        "digest": "sha256:7ad54db3b20bd85332078110322f37ae718690d50df72f55540febb6f3406537"
+      },
+      {
+        "path": "logs/dsh-636bf020321f0496c6fa711843404a02.stderr.log",
+        "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "logs/installed.xml",
+        "digest": "sha256:abd6af64a62b04a8e5da0d0c400637ec177009fb633f40296f4eecbccfaa0d5a"
+      }
+    ],
+    "applicability": {
+      "run_id": "dsh-636bf020321f0496c6fa711843404a02",
+      "current_task": true,
+      "limitations": [
+        "Local managed process observation; not tamper-proof against a same-permission filesystem owner.",
+        "A framework result does not prove the correctness of its business oracle."
+      ]
+    },
+    "execution": {
+      "scope_ref": {
+        "id": "acceptance",
+        "revision": 1,
+        "digest": "sha256:706120e6595e1d6c455a088c0c81b6a228a8324ee7896c9d138f70bc09aa5eb4"
+      },
+      "plan_ref": {
+        "id": "inventory",
+        "digest": "sha256:4d277f62a8e75afb5d10b092eea31d551b11d43043a4806fcc86dec8f54c0a8c"
+      },
+      "activity_id": null,
+      "environment_id": "local-fixture",
+      "run_id": "dsh-636bf020321f0496c6fa711843404a02",
+      "agent_id": "installed-runtime",
+      "session_id": "installed-runtime",
+      "call_id": "installed-runtime:workflow-29",
+      "parent_call_id": null,
+      "root_call_id": "workflow-29",
+      "argv": [
+        "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/bootstrap/bin/python",
+        "tests/runner.py",
+        "logs/installed.xml",
+        "normal"
+      ],
+      "cwd": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-MB4gC0/generated-project/test-task/same-task",
+      "started_at": "2026-10-29T07:46:39.275560+00:00",
+      "finished_at": "2026-10-29T07:46:39.297380+00:00",
+      "status": "passed",
+      "exit_code": 0,
+      "stdout": {
+        "path": "logs/dsh-636bf020321f0496c6fa711843404a02.stdout.log",
+        "digest": "sha256:7ad54db3b20bd85332078110322f37ae718690d50df72f55540febb6f3406537"
+      },
+      "stderr": {
+        "path": "logs/dsh-636bf020321f0496c6fa711843404a02.stderr.log",
+        "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "report": {
+        "path": "logs/installed.xml",
+        "digest": "sha256:abd6af64a62b04a8e5da0d0c400637ec177009fb633f40296f4eecbccfaa0d5a"
+      },
+      "statistics": {
+        "tests": 2,
+        "passed": 2,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfail": 0
+      },
+      "requested_case_ids": [
+        "C1",
+        "C2"
+      ],
+      "cases": [
+        {
+          "id": "C1",
+          "selector": "fixture.test_positive",
+          "outcome": "passed"
+        },
+        {
+          "id": "C2",
+          "selector": "fixture.test_negative",
+          "outcome": "passed"
+        }
+      ],
+      "input_snapshot": "sha256:e7a784903865968b904af3f692bb8a8675c34fa85fd77f229e0e35090dd6e376",
+      "input_manifest": {
+        "@protocol": "sha256:3b5f0cb8bb6121e51f1ab752a29de935ca66543e1d2914ba5eb2749bad5bd2b7",
+        "@profile": "sha256:03c89e6c060bd9ab2d483b10c44d5c4ba0d410c4a6a84fed651ad1d306ba7731",
+        "@evaluator": "sha256:ae21a25662b21227576c7d7ea355baa92706755682305b42a6b2a0eed91e8c11",
+        "@source/SRC1": "sha256:273d8bb934d83d46c6f2df4233f6dda130de7e522bffa88764f451397154b68e",
+        "artifacts/brief.json": "sha256:072512f4ef96629479a00c514905811280051051babc86a52bc2b53b226bf9dd",
+        "artifacts/inventory.json": "sha256:433e8077e4eed5ed06684a30e3cf86ee5a967b5c337f716d5886b19bbbbec7bf",
+        "artifacts/review.json": "sha256:3c88294675cdda181d8c43a65ae870251ccb5d03bde102ff9e1f2fddda4f6bc2",
+        "artifacts/testability.json": "sha256:ab96fd09a507182ecc9e6051eb902cfba5495b6b59fc97fa0e5fe1a51ac36b7f",
+        "profile.json": "sha256:9befb36df52ee7b530a785874bf1b5198ac41b9b66cfe8389affc2b08d19794f",
+        "scope/active.json": "sha256:f7d360333d2ae0eb0fcd876794c1ff2a7d50e7b645d96ddc110d5254ae929176",
+        "task.json": "sha256:b5e3a31ebf66a40044c3f1fd46ca74f1000af645d724028d56736f162956a3ab",
+        "tests/runner.py": "sha256:5cec9d318e640e8dd96814a3dd0e24374812e77a9d9505d7d681d218bc7a30d8"
+      },
+      "implementation_digests": {
+        "tests/runner.py": "sha256:5cec9d318e640e8dd96814a3dd0e24374812e77a9d9505d7d681d218bc7a30d8"
+      },
+      "collector": "bugate.execution/v1"
+    },
+    "digest": "sha256:2d61df0ced6e2147fa06d1be3bd10357e94d458eb71ae84496109973f09fdcd2"
+  },
+  "failure_result": {
+    "task": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-MB4gC0/generated-failure-project/test-task/same-task",
+    "requests": 51,
+    "scope_ref": {
+      "id": "acceptance",
+      "revision": 1,
+      "digest": "sha256:155e9331cbb37c20b9991fa36e3d6d01150b8ab821faa2d13247df4851cfd27e"
+    },
+    "scope_exercise": true,
+    "product_failure": true,
+    "requirement_assessment": {
+      "apiVersion": "bugate.io/v2",
+      "kind": "AssessmentResult",
+      "id": "assessment-verified-requirement",
+      "task_id": "same-task",
+      "workspace_id": "sha256:3b4d9ed74c7a9ea86c3fe83034a5d33d0f9b82bb1d50e016b5a4142a9b1e5019",
+      "claim_id": "verified-requirement",
+      "claim_type": "requirement_verified",
+      "claim_digest": "sha256:149036d5804487457fc90cb92cface9cd8583b655943f5b036113a56d57e68ea",
+      "evaluator_version": "2.1.0a1",
+      "request_digest": "sha256:f9983e75cda5e0fb5ddde070cfe7a652723f30c7ed56546dbba4ebb3ad150e76",
+      "workspace_snapshot": "sha256:3f9af6da547dc633692167f670ba99e0be0c8fa25eecb522621a8a767950cbd6",
+      "verdict": "unsatisfied",
+      "dimensions": {
+        "deterministic": {
+          "status": "passed",
+          "applicable": true,
+          "basis": [
+            "canonical-rules/v2"
+          ],
+          "limitations": [
+            "Schema and content hashes establish consistency, not the truth of supplied facts."
+          ]
+        },
+        "semantic_review": {
+          "status": "passed",
+          "applicable": true,
+          "basis": [
+            "canonical-rules/v2"
+          ],
+          "limitations": [
+            "Source-backed reviewer opinion is not a mathematical proof."
+          ]
+        },
+        "runtime_validation": {
+          "status": "failed",
+          "applicable": true,
+          "basis": [
+            "canonical-rules/v2"
+          ],
+          "limitations": [
+            "Managed local-process observation; same-permission filesystem owners can alter local evidence."
+          ]
+        }
+      },
+      "findings": [
+        {
+          "code": "REQUIREMENT_NOT_VERIFIED",
+          "subject": "C1",
+          "dimension": "verification",
+          "severity": "error",
+          "blocking": true,
+          "message": "Observed failure, skip, cancellation or uncertain run cannot verify requirement",
+          "basis": [],
+          "remediation": "Correct the referenced input and reassess the current snapshot."
+        },
+        {
+          "code": "REQUIREMENT_NOT_VERIFIED",
+          "subject": "C2",
+          "dimension": "verification",
+          "severity": "error",
+          "blocking": true,
+          "message": "Observed failure, skip, cancellation or uncertain run cannot verify requirement",
+          "basis": [],
+          "remediation": "Correct the referenced input and reassess the current snapshot."
+        },
+        {
+          "code": "REQUIREMENT_NOT_VERIFIED",
+          "subject": "run-dsh-6d8545d287d2b378af414e9035648e5c",
+          "dimension": "verification",
+          "severity": "error",
+          "blocking": true,
+          "message": "An applicable in-scope failure is preserved even when omitted from claim evidence",
+          "basis": [],
+          "remediation": "Correct the referenced input and reassess the current snapshot."
+        }
+      ],
+      "evidence_ids": [
+        "run-dsh-6d8545d287d2b378af414e9035648e5c",
+        "run-dsh-9a115e4fda68b5ee44e78d92fab82a41",
+        "run-dsh-9f492bd6440315df4f96c0e56e624ba4"
+      ],
+      "unknowns": [],
+      "scope": [
+        "R1"
+      ],
+      "quality_posture": "needs_improvement",
+      "acceptance": {
+        "execution_complete": true,
+        "functional_result": "failed",
+        "requirement_ids": [
+          "R1"
+        ],
+        "blocking_codes": [
+          "REQUIREMENT_NOT_VERIFIED"
+        ],
+        "suggestion_ids": [
+          "extension-3378dd5a726ad200d3f5cec493b3baa4",
+          "security-suggestion"
+        ],
+        "historical_failure_ids": [
+          "run-dsh-6d8545d287d2b378af414e9035648e5c"
+        ],
+        "coverage_statement": "This conclusion covers only the agreed acceptance scope."
+      }
+    },
+    "completion_assessment": {
+      "apiVersion": "bugate.io/v2",
+      "kind": "AssessmentResult",
+      "id": "assessment-complete-execution",
+      "task_id": "same-task",
+      "workspace_id": "sha256:3b4d9ed74c7a9ea86c3fe83034a5d33d0f9b82bb1d50e016b5a4142a9b1e5019",
+      "claim_id": "complete-execution",
+      "claim_type": "execution_complete",
+      "claim_digest": "sha256:f982594a6fdd648d633a387da0b20aad46ced9d80605bcecae520094055c791b",
+      "evaluator_version": "2.1.0a1",
+      "request_digest": "sha256:a1b0fce8ae88aaa96db4c0b1c9e546609fb6cc17b896c63d905d2b2c481388b6",
+      "workspace_snapshot": "sha256:3f9af6da547dc633692167f670ba99e0be0c8fa25eecb522621a8a767950cbd6",
+      "verdict": "satisfied",
+      "dimensions": {
+        "deterministic": {
+          "status": "passed",
+          "applicable": true,
+          "basis": [
+            "canonical-rules/v2"
+          ],
+          "limitations": [
+            "Schema and content hashes establish consistency, not the truth of supplied facts."
+          ]
+        },
+        "semantic_review": {
+          "status": "passed",
+          "applicable": true,
+          "basis": [
+            "canonical-rules/v2"
+          ],
+          "limitations": [
+            "Source-backed reviewer opinion is not a mathematical proof."
+          ]
+        },
+        "runtime_validation": {
+          "status": "passed",
+          "applicable": true,
+          "basis": [
+            "canonical-rules/v2"
+          ],
+          "limitations": [
+            "Managed local-process observation; same-permission filesystem owners can alter local evidence."
+          ]
+        }
+      },
+      "findings": [],
+      "evidence_ids": [
+        "run-dsh-6d8545d287d2b378af414e9035648e5c",
+        "run-dsh-9a115e4fda68b5ee44e78d92fab82a41",
+        "run-dsh-9f492bd6440315df4f96c0e56e624ba4"
+      ],
+      "unknowns": [],
+      "scope": [
+        "R1"
+      ],
+      "quality_posture": "satisfactory",
+      "acceptance": {
+        "execution_complete": true,
+        "functional_result": "failed",
+        "requirement_ids": [
+          "R1"
+        ],
+        "blocking_codes": [],
+        "suggestion_ids": [
+          "compatibility-suggestion",
+          "extension-3378dd5a726ad200d3f5cec493b3baa4",
+          "performance-suggestion",
+          "security-suggestion"
+        ],
+        "historical_failure_ids": [
+          "run-dsh-6d8545d287d2b378af414e9035648e5c"
+        ],
+        "coverage_statement": "This conclusion covers only the agreed acceptance scope."
+      }
+    },
+    "suggestions": [
+      {
+        "apiVersion": "bugate.io/v2",
+        "description": "Possible separate compatibility review",
+        "digest": "sha256:1416aa51020723b0cea5fc1d59d244765340714587209ea0aa2c237e7a91ede2",
+        "id": "compatibility-suggestion",
+        "kind": "Suggestion",
+        "rationale": "Not required by the finite current user objective",
+        "scope_ref": {
+          "digest": "sha256:155e9331cbb37c20b9991fa36e3d6d01150b8ab821faa2d13247df4851cfd27e",
+          "id": "acceptance",
+          "revision": 1
+        },
+        "source_refs": [
+          "SRC1"
+        ],
+        "status": "suggested",
+        "task_id": "same-task",
+        "workspace_id": "sha256:3b4d9ed74c7a9ea86c3fe83034a5d33d0f9b82bb1d50e016b5a4142a9b1e5019"
+      },
+      {
+        "apiVersion": "bugate.io/v2",
+        "description": "Proposed additional scenario S-security",
+        "digest": "sha256:e401abd4e2efac7b29c810ce01a4569ec959072e934800f310abb6a151af4552",
+        "id": "extension-3378dd5a726ad200d3f5cec493b3baa4",
+        "kind": "Suggestion",
+        "rationale": "No required scenario in the current scope. Proposed executable details were not admitted.",
+        "scope_ref": {
+          "digest": "sha256:155e9331cbb37c20b9991fa36e3d6d01150b8ab821faa2d13247df4851cfd27e",
+          "id": "acceptance",
+          "revision": 1
+        },
+        "source_refs": [
+          "SRC1"
+        ],
+        "status": "suggested",
+        "task_id": "same-task",
+        "workspace_id": "sha256:3b4d9ed74c7a9ea86c3fe83034a5d33d0f9b82bb1d50e016b5a4142a9b1e5019"
+      },
+      {
+        "apiVersion": "bugate.io/v2",
+        "description": "Possible separate performance review",
+        "digest": "sha256:6f095b9f4f942c6e788386c0cb07428d95e99363bd2485361887f023eb27e56a",
+        "id": "performance-suggestion",
+        "kind": "Suggestion",
+        "rationale": "Not required by the finite current user objective",
+        "scope_ref": {
+          "digest": "sha256:155e9331cbb37c20b9991fa36e3d6d01150b8ab821faa2d13247df4851cfd27e",
+          "id": "acceptance",
+          "revision": 1
+        },
+        "source_refs": [
+          "SRC1"
+        ],
+        "status": "suggested",
+        "task_id": "same-task",
+        "workspace_id": "sha256:3b4d9ed74c7a9ea86c3fe83034a5d33d0f9b82bb1d50e016b5a4142a9b1e5019"
+      },
+      {
+        "apiVersion": "bugate.io/v2",
+        "description": "A separate security review could examine additional threat categories",
+        "digest": "sha256:610016f5d27b4676beb8f3545bae0b7c2f105ec965341ccdcfffbe57158b0206",
+        "id": "security-suggestion",
+        "kind": "Suggestion",
+        "rationale": "This is outside the requested integer branches and has no current necessity source",
+        "scope_ref": {
+          "digest": "sha256:155e9331cbb37c20b9991fa36e3d6d01150b8ab821faa2d13247df4851cfd27e",
+          "id": "acceptance",
+          "revision": 1
+        },
+        "source_refs": [
+          "SRC1"
+        ],
+        "status": "suggested",
+        "task_id": "same-task",
+        "workspace_id": "sha256:3b4d9ed74c7a9ea86c3fe83034a5d33d0f9b82bb1d50e016b5a4142a9b1e5019"
+      }
+    ],
+    "observations": [
+      {
+        "tool": "read_requirement",
+        "isError": false
+      },
+      {
+        "tool": "bugate_scope",
+        "isError": false,
+        "invocation": "completed"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_scope",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "ScopeContract"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_artifact",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Artifact"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_artifact",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Artifact"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_artifact",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Artifact"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_artifact",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Artifact"
+      },
+      {
+        "tool": "bugate_status",
+        "isError": false,
+        "invocation": "completed"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_assess",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "AssessmentResult",
+        "verdict": "satisfied"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_artifact",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Artifact"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_artifact",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Artifact"
+      },
+      {
+        "tool": "bugate_status",
+        "isError": false,
+        "invocation": "completed"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_assess",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "AssessmentResult",
+        "verdict": "satisfied"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_artifact",
+        "isError": false,
+        "invocation": "invalid_input"
+      },
+      {
+        "tool": "bugate_run_test",
+        "isError": true,
+        "error": {
+          "message": "BUGate: [{\"code\":\"SCENARIO_OUT_OF_SCOPE\",\"subject\":\"C-security\",\"dimension\":\"scope\",\"severity\":\"error\",\"blocking\":true,\"message\":\"Only current inventory cases can execute as required acceptance\",\"basis\":[],\"remediation\":\"Correct the referenced input and reassess the current snapshot.\"}]"
+        }
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_suggestion",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Suggestion"
+      },
+      {
+        "tool": "bugate_run_test",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Evidence"
+      },
+      {
+        "tool": "bugate_run_test",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Evidence"
+      },
+      {
+        "tool": "bugate_run_test",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Evidence"
+      },
+      {
+        "tool": "bugate_run_test",
+        "isError": true,
+        "error": {
+          "message": "BUGate: [{\"code\":\"DIAGNOSTIC_LIMIT_REACHED\",\"subject\":\"diagnose\",\"dimension\":\"scope\",\"severity\":\"error\",\"blocking\":true,\"message\":\"Activity reached its agreed bound; preserve findings or report the blocking gap\",\"basis\":[],\"remediation\":\"Correct the referenced input and reassess the current snapshot.\"}]"
+        }
+      },
+      {
+        "tool": "bugate_status",
+        "isError": false,
+        "invocation": "completed"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_assess",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "AssessmentResult",
+        "verdict": "unsatisfied"
+      },
+      {
+        "tool": "bugate_status",
+        "isError": false,
+        "invocation": "completed"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_assess",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "AssessmentResult",
+        "verdict": "satisfied"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_suggestion",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Suggestion"
+      },
+      {
+        "tool": "write",
+        "isError": false
+      },
+      {
+        "tool": "bugate_record_suggestion",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "Suggestion"
+      },
+      {
+        "tool": "bugate_assess",
+        "isError": false,
+        "invocation": "completed",
+        "kind": "AssessmentResult",
+        "verdict": "satisfied"
+      },
+      {
+        "tool": "bugate_scope",
+        "isError": false,
+        "invocation": "completed"
+      }
+    ],
+    "evidence": {
+      "apiVersion": "bugate.io/v2",
+      "kind": "Evidence",
+      "id": "run-dsh-6d8545d287d2b378af414e9035648e5c",
+      "task_id": "same-task",
+      "workspace_id": "sha256:3b4d9ed74c7a9ea86c3fe83034a5d33d0f9b82bb1d50e016b5a4142a9b1e5019",
+      "source_type": "host_observed",
+      "evidence_type": "test_execution",
+      "description": "Managed execution capture",
+      "references": [
+        {
+          "path": "logs/dsh-6d8545d287d2b378af414e9035648e5c.stdout.log",
+          "digest": "sha256:7ad54db3b20bd85332078110322f37ae718690d50df72f55540febb6f3406537"
+        },
+        {
+          "path": "logs/dsh-6d8545d287d2b378af414e9035648e5c.stderr.log",
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/installed.xml",
+          "digest": "sha256:cea5d4877f881e689505ae9090970a00615e33747e68dcf74f671481da5506d2"
+        }
+      ],
+      "applicability": {
+        "run_id": "dsh-6d8545d287d2b378af414e9035648e5c",
+        "current_task": true,
+        "limitations": [
+          "Local managed process observation; not tamper-proof against a same-permission filesystem owner.",
+          "A framework result does not prove the correctness of its business oracle."
+        ]
+      },
+      "execution": {
+        "scope_ref": {
+          "id": "acceptance",
+          "revision": 1,
+          "digest": "sha256:155e9331cbb37c20b9991fa36e3d6d01150b8ab821faa2d13247df4851cfd27e"
+        },
+        "plan_ref": {
+          "id": "inventory",
+          "digest": "sha256:df3ee9bc35ea13cc697f6f38a4c7f8fbe3f30fc7f97740cf9f22a5061628a02d"
+        },
+        "activity_id": null,
+        "environment_id": "local-fixture",
+        "run_id": "dsh-6d8545d287d2b378af414e9035648e5c",
+        "agent_id": "installed-failure",
+        "session_id": "installed-failure",
+        "call_id": "installed-failure:workflow-29",
+        "parent_call_id": null,
+        "root_call_id": "workflow-29",
+        "argv": [
+          "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/bootstrap/bin/python",
+          "tests/runner.py",
+          "logs/installed.xml",
+          "broken"
+        ],
+        "cwd": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-MB4gC0/generated-failure-project/test-task/same-task",
+        "started_at": "2026-10-29T07:48:00.111052+00:00",
+        "finished_at": "2026-10-29T07:48:00.132714+00:00",
+        "status": "failed",
+        "exit_code": 1,
+        "stdout": {
+          "path": "logs/dsh-6d8545d287d2b378af414e9035648e5c.stdout.log",
+          "digest": "sha256:7ad54db3b20bd85332078110322f37ae718690d50df72f55540febb6f3406537"
+        },
+        "stderr": {
+          "path": "logs/dsh-6d8545d287d2b378af414e9035648e5c.stderr.log",
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "report": {
+          "path": "logs/installed.xml",
+          "digest": "sha256:cea5d4877f881e689505ae9090970a00615e33747e68dcf74f671481da5506d2"
+        },
+        "statistics": {
+          "tests": 2,
+          "passed": 1,
+          "failed": 1,
+          "errors": 0,
+          "skipped": 0,
+          "xfail": 0
+        },
+        "requested_case_ids": [
+          "C1",
+          "C2"
+        ],
+        "cases": [
+          {
+            "id": "C1",
+            "selector": "fixture.test_positive",
+            "outcome": "passed"
+          },
+          {
+            "id": "C2",
+            "selector": "fixture.test_negative",
+            "outcome": "failed"
+          }
+        ],
+        "input_snapshot": "sha256:436f7e7ccc21e1432bc02334477e94631fabdf88d71224ec61f0d6ae43a86667",
+        "input_manifest": {
+          "@protocol": "sha256:3b5f0cb8bb6121e51f1ab752a29de935ca66543e1d2914ba5eb2749bad5bd2b7",
+          "@profile": "sha256:03c89e6c060bd9ab2d483b10c44d5c4ba0d410c4a6a84fed651ad1d306ba7731",
+          "@evaluator": "sha256:ae21a25662b21227576c7d7ea355baa92706755682305b42a6b2a0eed91e8c11",
+          "@source/SRC1": "sha256:273d8bb934d83d46c6f2df4233f6dda130de7e522bffa88764f451397154b68e",
+          "artifacts/brief.json": "sha256:072512f4ef96629479a00c514905811280051051babc86a52bc2b53b226bf9dd",
+          "artifacts/inventory.json": "sha256:aa3e336029a9ad19bbff61f4ec1ad7c868e73b4914c711c3d03c63b999eb3c52",
+          "artifacts/review.json": "sha256:f8afaf42062fcd8b860d668ca0992fd05bfcf803810d44455a7af24d5943bcc1",
+          "artifacts/testability.json": "sha256:ab96fd09a507182ecc9e6051eb902cfba5495b6b59fc97fa0e5fe1a51ac36b7f",
+          "profile.json": "sha256:9befb36df52ee7b530a785874bf1b5198ac41b9b66cfe8389affc2b08d19794f",
+          "scope/active.json": "sha256:9955510c124ea929c261c1d98327236ee43bd51fad5d4e23da2aa50530f0e513",
+          "task.json": "sha256:1cf6a27fdd65b460256c3adb3a8b1f1f696fd2698de472efa934f5e61b857832",
+          "tests/runner.py": "sha256:5cec9d318e640e8dd96814a3dd0e24374812e77a9d9505d7d681d218bc7a30d8"
+        },
+        "implementation_digests": {
+          "tests/runner.py": "sha256:5cec9d318e640e8dd96814a3dd0e24374812e77a9d9505d7d681d218bc7a30d8"
+        },
+        "collector": "bugate.execution/v1"
+      },
+      "digest": "sha256:aebc6cbd227926ad0741335a6d6c7138ccbe57f0b4ff8a32f4791bfb5dc6c159"
+    }
+  },
+  "package_sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+  "source_commit": "c9d2b8213f1ce9e0c3ea462ddb7d621ea12bbf60",
+  "package": "/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence/bugate-deepseek-harness-2.1.0-dev.1.tgz",
+  "exit_code": 0,
+  "tests": 1,
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "duration_ms": 176165.611375,
+  "source_read_denial": {
+    "mechanism": "macOS sandbox-exec deny file-read* on checkout subpath",
+    "denied_root": "/Users/zhangliangchen/PycharmProjects/BUGate",
+    "probe": "read pyproject.toml must reject with EPERM or EACCES before installed plugin loading",
+    "result": "passed"
+  },
+  "retained_runtime": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-MB4gC0",
+  "command": {
+    "executable": "node",
+    "argv": [
+      "--test",
+      "adapters/deepseek-harness/tests/standalone-package.test.mjs"
+    ],
+    "environment": {
+      "BUGATE_INSTALLED_PLUGIN": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/dsh-home/profiles/bugate-package-acceptance/node_modules/@bugate/deepseek-harness",
+      "BUGATE_INSTALLED_PYTHON": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/clean-install/bootstrap/bin/python",
+      "BUGATE_DSH_MODULES": "/tmp/bugate-dsh-runtime/node_modules",
+      "BUGATE_DENY_SOURCE_ROOT": "/Users/zhangliangchen/PycharmProjects/BUGate"
+    }
+  },
+  "session_traces": "installed-session-traces/index.json"
+}

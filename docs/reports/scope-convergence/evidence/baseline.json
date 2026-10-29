@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-29",
+  "initial_head": "fe3e29b82059504cd47893b72005051489c0810f",
+  "initial_worktree_clean": true,
+  "origin_main_ahead_behind": [
+    0,
+    0
+  ],
+  "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "dsh": {
+    "argv": [
+      "dsh",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "0.2.2-alpha.2\n",
+    "stderr": ""
+  },
+  "node": {
+    "argv": [
+      "node",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "v26.8.1\n",
+    "stderr": ""
+  },
+  "python": {
+    "argv": [
+      "python3",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "Python 3.13.3\n",
+    "stderr": ""
+  },
+  "worktrees": {
+    "argv": [
+      "git",
+      "worktree",
+      "list",
+      "--porcelain"
+    ],
+    "exit_code": 0,
+    "stdout": "worktree /Users/zhangliangchen/PycharmProjects/BUGate\nHEAD 000d3be46068cdc0e64f60f454342c78892361a8\nbranch refs/heads/codex/scope-convergence\n\nworktree /Users/zhangliangchen/PycharmProjects/BUGate/.claude/worktrees/bugate-stage-11-s10-d02-6c5b49\nHEAD f76f22ab9468977677bc6637226a4aa3049ad8ca\ndetached\n\n",
+    "stderr": ""
+  }
+}

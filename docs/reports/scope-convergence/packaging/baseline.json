@@ -1,0 +1,23 @@
+{
+  "baseline": "fe3e29b82059504cd47893b72005051489c0810f",
+  "commands": [
+    {
+      "command": "python3 -m unittest discover -s tests/distribution -v",
+      "exit_code": 0,
+      "tests": 4,
+      "result": "PASS"
+    },
+    {
+      "command": "python3 tests/integration_install/test_install_boundaries.py",
+      "exit_code": 0,
+      "tests": 15,
+      "result": "PASS"
+    }
+  ],
+  "environment": {
+    "python": "3.13.3",
+    "node": "26.8.1",
+    "dsh": "0.2.2-alpha.2",
+    "dsh_modules": "/tmp/bugate-dsh-runtime/node_modules"
+  }
+}

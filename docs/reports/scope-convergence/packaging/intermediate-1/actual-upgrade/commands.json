@@ -1,0 +1,168 @@
+[
+  {
+    "name": "01-previous-archive-install",
+    "argv": [
+      "/opt/homebrew/opt/python@3.13/bin/python3.13",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/previous-assets/install_dsh.py",
+      "--package",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/previous-assets/bugate-deepseek-harness-2.0.0-dev.2.tgz",
+      "--project",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/dsh-home",
+      "--venv",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/previous-bootstrap"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.45
+  },
+  {
+    "name": "02-old-task-init",
+    "argv": [
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0/venv/bin/python",
+      "-m",
+      "bugate",
+      "init",
+      "--project",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project",
+      "--task",
+      "old-task",
+      "--sut-profile",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/profile.json",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.72
+  },
+  {
+    "name": "03-actual-candidate-upgrade",
+    "argv": [
+      "/opt/homebrew/opt/python@3.13/bin/python3.13",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/assets/install_dsh.py",
+      "--package",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/assets/bugate-deepseek-harness-2.1.0-dev.1.tgz",
+      "--project",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/dsh-home",
+      "--venv",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/candidate-bootstrap"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.17
+  },
+  {
+    "name": "04-old-binding-rejected-no-migration",
+    "argv": [
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/67884700a4f54e042a24958d4bd201509e24cb400e1b007ff3d6041a374e3946/venv/bin/python",
+      "-m",
+      "bugate",
+      "protocol",
+      "prepare",
+      "--task",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/test-task/old-task",
+      "--json"
+    ],
+    "exit_code": 2,
+    "elapsed_seconds": 0.61
+  },
+  {
+    "name": "05-new-v2-task-init",
+    "argv": [
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/67884700a4f54e042a24958d4bd201509e24cb400e1b007ff3d6041a374e3946/venv/bin/python",
+      "-m",
+      "bugate",
+      "init",
+      "--project",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project",
+      "--task",
+      "new-task",
+      "--sut-profile",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/profile.json",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.1
+  },
+  {
+    "name": "06-new-v2-task-prepare",
+    "argv": [
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/67884700a4f54e042a24958d4bd201509e24cb400e1b007ff3d6041a374e3946/venv/bin/python",
+      "-m",
+      "bugate",
+      "protocol",
+      "prepare",
+      "--task",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/test-task/new-task",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.12
+  },
+  {
+    "name": "07-actual-archive-rollback",
+    "argv": [
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/67884700a4f54e042a24958d4bd201509e24cb400e1b007ff3d6041a374e3946/venv/bin/python",
+      "-m",
+      "bugate",
+      "remove",
+      "deepseek-harness",
+      "--project",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/dsh-home",
+      "--json",
+      "--rollback"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.74
+  },
+  {
+    "name": "08-restored-old-binding-prepare",
+    "argv": [
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0/venv/bin/python",
+      "-m",
+      "bugate",
+      "protocol",
+      "prepare",
+      "--task",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/test-task/old-task",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.11
+  },
+  {
+    "name": "09-remove-preserves-both-tasks",
+    "argv": [
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project/.bugate/integrations/deepseek-harness/published-v2-upgrade/runtime/67884700a4f54e042a24958d4bd201509e24cb400e1b007ff3d6041a374e3946/venv/bin/python",
+      "-m",
+      "bugate",
+      "remove",
+      "deepseek-harness",
+      "--project",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/project",
+      "--dsh-profile",
+      "published-v2-upgrade",
+      "--dsh",
+      "/Users/zhangliangchen/.local/bin/dsh",
+      "--dsh-home",
+      "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-delivery-qkt4y8n6/actual-upgrade/dsh-home",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.52
+  }
+]

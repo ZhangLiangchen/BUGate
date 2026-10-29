@@ -1,0 +1,44 @@
+✔ AC-15 actual provider rejects missing Python, malformed JSON and oversized output (3408.74ms)
+✔ AC-15 envelope operation and exit semantics cannot be forged (303.047791ms)
+✔ AC-16 timeout and cancellation terminate real managed processes (3195.123667ms)
+✔ AC-30 provider has opaque targets and rejects unmapped installation (102.66675ms)
+✔ HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction (49430.145709ms)
+✔ AC-12/25 multi-workspace same task id has isolated contexts and evidence (4892.201125ms)
+✔ AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads (1966.571959ms)
+✔ AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly (4505.351667ms)
+✔ AC-29 completion submission rework is bounded and unchanged gaps stop (4676.028ms)
+✔ AC-32 non-BUGate workspace does not activate context or guard (718.646916ms)
+✔ HC-10/11 AC-09/30 invalid projection/world mapping fails before registration (4.316292ms)
+(node:29668) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication (4496.954959ms)
+✔ HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard (9181.550209ms)
+✔ HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context (2664.223541ms)
+✔ AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps (4316.25775ms)
+✔ AC-21/27 source-backed authoring starts empty and records digests through the shared core (41184.344625ms)
+✖ Scope invariants: real model tool calls reject scope expansion, preserve product failures and converge with suggestions (74759.24125ms)
+✔ Scope provenance: host user receipts exclude synthetic rework and actual subagent prompts (4960.628584ms)
+✔ HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it (3297.453333ms)
+✔ AC-28 configured source probe runs before design without turning zero cases into verification (2030.594375ms)
+✔ AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts (1975.510583ms)
+✔ HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world (1532.112375ms)
+✔ HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly (2240.227416ms)
+✔ HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model (3690.046916ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 23
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 222646.87125
+
+✖ failing tests:
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:228:1
+✖ Scope invariants: real model tool calls reject scope expansion, preserve product failures and converge with suggestions (74759.24125ms)
+  TypeError: Cannot read properties of null (reading 'verdict')
+      at authorAndExecute (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/workflow-fixture.mjs:102:112)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:239:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

@@ -1,53 +1,61 @@
-# Install DSH v2.0.0-dev.2
+# Install the local DSH 2.1.0-dev.1 build
 
 English | [简体中文](INSTALL_DSH_PROMPT.zh-CN.md)
 
-This prompt installs the exact assets attached to the
-[dsh-v2.0.0-dev.2 prerelease](https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.2).
-No BUGate checkout is required. The bundled wheelhouse must match the recorded
-Python/platform ABI.
+This prompt uses the current local delivery, not a new public release. The six
+files are in `dist/scope-convergence/`; they can be copied together to any artifact
+directory without the BUGate source checkout. This build targets the Python ABI
+and platform recorded in the tarball's `python/inventory.json`.
 
 ```text
-Install BUGate v2 native DeepSeek Harness from this exact GitHub release:
-https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.0.0-dev.2
+Install the BUGate native DeepSeek Harness build delivered in this artifact directory:
+/Users/zhangliangchen/PycharmProjects/BUGate/dist/scope-convergence
+If the user supplies a copied artifact directory, use that directory instead.
+Do not download a release or substitute a different version.
 
-Create a new local download directory. Download all six files below from
-https://github.com/ZhangLiangchen/BUGate/releases/download/dsh-v2.0.0-dev.2/
-using HTTPS with redirects and HTTP-error checking:
-- bugate-deepseek-harness-2.0.0-dev.2.tgz
-- bugate_core-2.0.0a2-py3-none-any.whl
+Require all six files from this same build:
+- bugate-deepseek-harness-2.1.0-dev.1.tgz
+- bugate_core-2.1.0a1-py3-none-any.whl
 - install_dsh.py
 - build-manifest.json
 - source-manifest.json
 - SHA256SUMS
 
-Keep the files in the same directory and verify every SHA256SUMS entry there
-(shasum -a 256 -c SHA256SUMS on macOS, or sha256sum -c SHA256SUMS on Linux).
-The expected bundle SHA-256 is
-1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0.
-Stop on a missing asset, download error or digest mismatch; do not substitute
-another release. Set ARTIFACT_DIR to this verified directory's absolute path.
-Inspect the bundle's python/inventory.json for target platform/ABI. Verify
-DSH 0.2.2-alpha.2, Node >=24.9.0 and a matching Python runtime.
+Verify every SHA256SUMS entry (shasum -a 256 -c SHA256SUMS on macOS,
+or sha256sum -c SHA256SUMS on Linux). The expected bundle SHA-256 is:
+4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2
+Stop if a file is absent or a digest differs. Set ARTIFACT_DIR to the verified
+absolute artifact directory. Inspect python/inventory.json in the bundle and
+verify a matching Python runtime, DSH 0.2.2-alpha.2 and Node >=24.9.0.
+No source checkout or editable installation is needed by the product.
 
 Use the user's explicitly selected external test project, DSH profile, DSH home,
-and new or BUGate-owned bootstrap venv. If these targets are absent from the chat,
-ask for them before installation; do not infer them from past tasks or use BUGate
-core as the SUT. Preserve unrelated profiles/plugins and task facts.
+and new or BUGate-owned bootstrap venv. If these target identities have not been
+provided, ask only for the missing targets before installation; do not guess a
+project from prior tasks. Preserve unrelated profiles/plugins and task facts.
 
 Run python3 ARTIFACT_DIR/install_dsh.py --package
-ARTIFACT_DIR/bugate-deepseek-harness-2.0.0-dev.2.tgz --venv BOOTSTRAP_VENV
+ARTIFACT_DIR/bugate-deepseek-harness-2.1.0-dev.1.tgz --venv BOOTSTRAP_VENV
 --project TEST_PROJECT --dsh-profile PROFILE --dsh DSH_EXECUTABLE
---dsh-home DSH_HOME, substituting each explicit absolute path and quoting safely.
-Then use BOOTSTRAP_VENV/bin/bugate doctor integrations with those same target flags
-and --json. Report installation and hydration separately. Initialize a task only
-when its v2 Profile and scope are supplied; do not convert v0.x/old task formats.
+--dsh-home DSH_HOME, substituting the explicit paths and quoting safely.
+Then run BOOTSTRAP_VENV/bin/bugate doctor integrations with the same target flags
+and --json. Report package/configuration installation separately from actual
+runtime hydration. Do not claim live-model validation from a fixture result.
 
-On failure save the exact error and owned pending-operation state. Do not delete
-user files or retry by inventing a new target. Explain remove deepseek-harness and
---rollback for owned integration recovery. Do not publish any release.
+Initialize a task only with the intended current Profile. DSH captures direct
+user-request receipts; author a finite acceptance scope from those receipts and
+Profile-declared domain evidence. Keep the Profile requirement/risk denominator
+fixed for every revision. A changed denominator requires an explicit new Profile
+version and init of a new task; preserve the old task, evidence and failures.
+Suggestions do not expand the executable plan or block completion. Report actual
+scope, execution closure, functional results, blockers and suggestions separately.
+
+On failure retain the exact error and owned pending-operation state. Do not delete
+user files or invent a new target to retry. Use remove deepseek-harness with
+--rollback only for the intended owned recovery. Do not publish or overwrite tags
+or releases, and do not restore retired host adapters or old task formats.
 ```
 
-The bundle contains an offline Python wheelhouse. DSH peer dependency resolution
-can require registry access. See [installation](docs/DEEPSEEK_HARNESS.md) for exact
-commands and the tested execution boundary.
+The Python wheelhouse installs offline; DSH host peer dependency resolution may
+need registry access. See [installation and recovery](docs/DEEPSEEK_HARNESS.md)
+and [scope examples](docs/ACCEPTANCE_SCOPE.md).

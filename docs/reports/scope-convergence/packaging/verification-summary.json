@@ -1,0 +1,69 @@
+{
+  "status": "PASS_PACKAGE_INSTALL_AND_INSTALLED_RUNTIME",
+  "formal_requirements": [
+    "F-07",
+    "F-08"
+  ],
+  "source_commit": "c9d2b8213f1ce9e0c3ea462ddb7d621ea12bbf60",
+  "bundle_sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+  "checks": [
+    {
+      "name": "distribution regression",
+      "command": "python3 -m unittest discover -s tests/distribution -v",
+      "exit_code": 0,
+      "tests": 4,
+      "evidence": "distribution-tests.stdout"
+    },
+    {
+      "name": "installation boundary regression",
+      "command": "python3 tests/integration_install/test_install_boundaries.py",
+      "exit_code": 0,
+      "tests": 15,
+      "evidence": "install-boundaries.stdout"
+    },
+    {
+      "name": "final package build/resource equality",
+      "exit_code": 0,
+      "evidence": "bundle-boundaries.json"
+    },
+    {
+      "name": "exact source commit",
+      "files": 57,
+      "evidence": "source-commit-match.json"
+    },
+    {
+      "name": "source-denied clean lifecycle",
+      "exit_code": 0,
+      "commands": 20,
+      "evidence": "clean-install/result.json"
+    },
+    {
+      "name": "actual archive upgrade and rollback",
+      "exit_code": 0,
+      "commands": 9,
+      "evidence": "actual-upgrade/result.json"
+    }
+  ],
+  "installed_runtime": {
+    "status": "PASS",
+    "level": "real-dsh-runtime-deterministic-model-installed-package",
+    "tests": 1,
+    "passing_and_genuine_failure_flows": true,
+    "source_read_denial": {
+      "mechanism": "macOS sandbox-exec deny file-read* on checkout subpath",
+      "denied_root": "/Users/zhangliangchen/PycharmProjects/BUGate",
+      "probe": "read pyproject.toml must reject with EPERM or EACCES before installed plugin loading",
+      "result": "passed"
+    },
+    "evidence": "../dsh/installed-runtime-result.json",
+    "package_sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2"
+  },
+  "live_model": "NOT_RUN",
+  "public_release": "NOT_PUBLISHED",
+  "intermediate_builds": [
+    "intermediate-1/status.json",
+    "intermediate-2/status.json"
+  ],
+  "source_denial_attestation": "source-denial-attestation.json",
+  "runner_metadata_correction": "Rename denied_bootstrap_command to avoid overwriting source root metadata; raw results preserved, sandbox enforcement verified from actual command records; no product bytes changed."
+}

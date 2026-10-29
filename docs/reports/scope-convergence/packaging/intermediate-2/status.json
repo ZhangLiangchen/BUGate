@@ -1,0 +1,8 @@
+{
+  "classification": "intermediate build superseded by advisory assessment identity correction",
+  "bundle_sha256": "06e79269e9ae5cc02655710584a9d1a13990dcf365979c61482d1fd1ae738b4d",
+  "installation_lifecycle": "PASS: 20 observed commands including OS source-denial probe",
+  "actual_archive_upgrade": "PASS: 9 observed commands",
+  "final_delivery_evidence": false,
+  "reason": "Real DSH discovered immutable assessment collision after a non-blocking suggestion changed result suggestion_ids while request_digest stayed the same. Final core/protocol correction and source runtime validation must precede final packaging."
+}

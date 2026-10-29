@@ -1,0 +1,8 @@
+{
+  "reason": "Functional result must include still-applicable failures outside claim-selected evidence",
+  "changed_build_sources": [
+    "src/bugate/assessment.py"
+  ],
+  "native_compile_reused": true,
+  "native_compile_log": "intermediate-1/build-native.stdout"
+}

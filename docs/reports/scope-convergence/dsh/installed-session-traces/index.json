@@ -1,0 +1,16 @@
+[
+  {
+    "workflow": "passing",
+    "path": "installed-session-traces/passing.session.v4.jsonl",
+    "original": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-MB4gC0/sessions/--private-var-folders-f2-78sk3lk55k32h_0mjpjbpd6h0000gn-T-bugate-installed-dsh-MB4gC0-generated-project-test-task-same-task--/installed-runtime/session.v4.jsonl",
+    "bytes": 382603,
+    "sha256": "5fb525b34b3d2734b92cc59a76b7452d4695e3575be796eef7aff0a0d2e23bec"
+  },
+  {
+    "workflow": "failure",
+    "path": "installed-session-traces/failure.session.v4.jsonl",
+    "original": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-installed-dsh-MB4gC0/failure-sessions/--private-var-folders-f2-78sk3lk55k32h_0mjpjbpd6h0000gn-T-bugate-installed-dsh-MB4gC0-generated-failure-project-test-task-same-task--/installed-failure/session.v4.jsonl",
+    "bytes": 436323,
+    "sha256": "5c8f73cd9beea2c932e7a932d66a3b7c62e58aacd918b5cdb6cf7e6a00192718"
+  }
+]

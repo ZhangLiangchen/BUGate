@@ -1,0 +1,80 @@
+{
+  "reviewer": "scope_review",
+  "base_commit": "fe3e29b82059504cd47893b72005051489c0810f",
+  "formal_requirements": [
+    "F-02",
+    "F-03",
+    "F-04",
+    "F-06"
+  ],
+  "scope": "Core scope/evaluation/authoring/execution/snapshot integration; no new SC obligations.",
+  "status": "FIXED_AND_VERIFIED",
+  "findings": [
+    {
+      "id": "RV-01",
+      "priority": "P2",
+      "file": "src/bugate/assessment.py",
+      "lines": [
+        180,
+        182
+      ],
+      "issue": "Global inventory completeness is incorrectly applied to a named requirement_verified claim.",
+      "source": "Baseline requirement_verified uses claim.requirement_ids; user requires execution completion and requirement verification to be evaluated separately.",
+      "reproduction": {
+        "fixture": "order_fixture(create,deny), a replaceable neutral two-requirement example",
+        "execution": "Run only C1, observe passed",
+        "claim": "requirement_verified, requirement_ids=[R1]",
+        "actual": "unsatisfied, only blocker CASE_NOT_EXECUTED C2",
+        "expected": "named R1 verdict satisfied; result.scope=[R1]; global acceptance still incomplete and undetermined"
+      },
+      "before_test": {
+        "command": "PYTHONPATH=src:tests/v2 .venv/bin/python -m unittest test_scope.ScopeAcceptance.test_named_requirement_verification_preserves_unobserved_task_scope -v",
+        "exit_code": 1,
+        "result": "FAIL",
+        "assertion": "'unsatisfied' != 'satisfied'; CASE_NOT_EXECUTED C2"
+      },
+      "baseline_evidence": "    def executions(self,claim):\n        runs=[]\n        for eid in claim['evidence_ids']:\n            e=self.evidence.get(eid)\n            if not e:continue\n            if e['source_type']!='host_observed' or not e['applicability']['current_task'] or e['task_id']!=self.w.task['id'] or e['workspace_id']!=self.w.id:\n                self.add('EVIDENCE_UNTRUSTED',eid,'Imported/model/historical evidence is not current host execution','execution');continue\n            ex=e['execution']\n            if not ex:continue\n            if any(f['subject']==eid and f['blocking'] for f in self.findings):continue\n            runs.append(ex)\n            observed={c['id'] for c in ex['cases']}\n            if set(ex['requested_case_ids'])!=observed:self.add('EXECUTION_CASE_MISSING',eid,'Framework report does not account for every requested case','execution',basis=sorted(set(ex['requested_case_ids'])-observed))\n            if ex['status'] in ('cancelled','timeout','blocked'):self.add('EXECUTION_INCOMPLETE',eid,'Execution did not reach a complete test result','execution',basis=[ex['status']])\n            if ex['statistics']['tests']==0:self.add('ZERO_TESTS',eid,'No test cases were executed','execution')\n            elif ex['statistics']['passed']+ex['statistics']['failed']+ex['statistics']['errors']==0:self.add('ALL_TESTS_SKIPPED',eid,'All observed cases were skipped or expected failures','execution')\n            if not ex['report']:self.add('TEST_REPORT_MISSING',eid,'A framework report is required for execution claims','execution')\n        if not runs:self.add('EXECUTION_NOT_RUN',claim['id'],'No applicable managed execution evidence','execution')\n        return runs\n\n    def verify_requirements(self,claim,runs):\n        requirements=claim['requirement_ids']\n        if not requirements:self.add('CLAIM_SCOPE_EMPTY',claim['id'],'Requirement verification must name requirements','verification')\n        for rid in requirements:\n            if rid not in self.w.task['requirements']:self.add('REFERENCE_MISSING',rid,'Requirement is not in frozen task scope','verification');continue\n            pids={pid for pid,p in self.props.items() if rid in p['requirement_ids']}\n            required={c['id'] for c in self.cases.values() if set(c['proposition_ids']) & pids}\n            if not required:self.add('CASE_MISSING',rid,'No cases trace this requirement','verification')\n            for cid in sorted(required):\n                observations=[(run,c) for run in runs for c in run['cases'] if c['id']==cid and c['selector']==self.cases[cid]['test_selector']]\n                if not observations:self.add('CASE_NOT_EXECUTED',cid,'No managed report observation for required case','verification')\n                elif any(c['outcome']!='passed' or run['status']!='passed' for run,c in observations):self.add('REQUIREMENT_NOT_VERIFIED',cid,'Observed failure, skip, cancellation or uncertain run cannot verify requirement','verification')\n\n",
+      "resolution": {
+        "changes": "Whole-inventory coverage applies only to execution_complete/task_delivery_complete; requirement_verified retains named-claim scope while global acceptance remains separately reported.",
+        "targeted_after": {
+          "exit_code": 0,
+          "result": "PASS"
+        },
+        "full_regression": {
+          "exit_code": 0,
+          "duration_seconds": 38.469,
+          "log": "core-tests.stderr",
+          "result_record": "core-tests.result.json",
+          "tests_executed": 123,
+          "unittest_reported_seconds": 38.376
+        },
+        "source_locations": [
+          "src/bugate/assessment.py:182-187",
+          "src/bugate/assessment.py:285-289",
+          "tests/v2/test_scope.py:241-256"
+        ],
+        "regression_semantics": "Named R1 passes with its real passing C1; named R2 remains unsatisfied; whole-task completion remains unsatisfied; global acceptance remains incomplete/undetermined."
+      }
+    }
+  ],
+  "checks_reviewed": [
+    "Suggestion advisory_digest participates only in immutable assessment identity; claim/workspace/execution manifests exclude suggestions.",
+    "Profile denominator equality is checked on each registered revision and assessment.",
+    "Scope changes bind new user request and previous digest, preserve history and invalidate current plan.",
+    "Collector receipt/input manifest/scope provenance continues to gate execution applicability."
+  ],
+  "limitations": [
+    "Read-only source audit and a bounded temporary-fixture reproduction, not live-model or installed-runtime proof.",
+    "Managed same-user filesystem trust boundary remains; this review does not claim hostile-owner authenticity."
+  ],
+  "unresolved_findings": [],
+  "reviewed_files": {
+    "src/bugate/scope.py": "ce6fe70b12a6197cb2db85f10f2d9a4e0ea15494d192054e169eec532af3b7e0",
+    "src/bugate/assessment.py": "b13002ed36a626d86f6f700e7b9ed78b8927975bd175c34e22ea92a8d7991475",
+    "src/bugate/authoring.py": "899c1d7d6ff42b92ada444599fb8117cb58b631a5f308747c0b0d3ab3bceeae6",
+    "src/bugate/evidence.py": "20e8969fa8f8347ffd0a4373feea61efc89f38c46c60a2374a02ce3b6b6f76b8",
+    "src/bugate/workspace.py": "57132bc018210dca2b1ef0743d5fb302bc91c73012c7e826b9c6aaf073503d4e",
+    "src/bugate/context.py": "7a63137f8a3789ccceef5a97e6e8d2fefb975273d570a7a16caa3550f26a5c1a"
+  },
+  "verification_boundary": "Core source and temporary-fixture regression only. Actual DSH and installed-package validation remains owned by the runtime/package agents."
+}

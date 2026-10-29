@@ -1,0 +1,4 @@
+usage: install_dsh.py [-h] --package PACKAGE --project PROJECT
+                      --dsh-profile DSH_PROFILE [--dsh DSH]
+                      [--dsh-home DSH_HOME] [--python PYTHON] --venv VENV
+install_dsh.py: error: existing environment is not owned by BUGate; choose a new --venv path

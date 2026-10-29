@@ -1,0 +1,20 @@
+test_ac11_second_process_lock_conflicts (__main__.InstallBoundaries.test_ac11_second_process_lock_conflicts) ... ok
+test_ac12_profile_cannot_rebind_other_project (__main__.InstallBoundaries.test_ac12_profile_cannot_rebind_other_project) ... ok
+test_ac13_archive_link_and_parent_escape (__main__.InstallBoundaries.test_ac13_archive_link_and_parent_escape) ... ok
+test_ac13_profile_path_escape (__main__.InstallBoundaries.test_ac13_profile_path_escape) ... ok
+test_ac13_symlink_scope_escape (__main__.InstallBoundaries.test_ac13_symlink_scope_escape) ... ok
+test_ac15_missing_python (__main__.InstallBoundaries.test_ac15_missing_python) ... ok
+test_ac15_output_bound (__main__.InstallBoundaries.test_ac15_output_bound) ... ok
+test_ac16_timeout_reaps_process (__main__.InstallBoundaries.test_ac16_timeout_reaps_process) ... ok
+test_ac17_atomic_write_does_not_follow_symlink (__main__.InstallBoundaries.test_ac17_atomic_write_does_not_follow_symlink) ... ok
+test_hc01_same_block_replacement_is_byte_idempotent (__main__.InstallBoundaries.test_hc01_same_block_replacement_is_byte_idempotent) ... ok
+test_hc14_edited_block_is_not_overwritten (__main__.InstallBoundaries.test_hc14_edited_block_is_not_overwritten) ... ok
+test_hc14_owned_block_remove_preserves_user_bytes (__main__.InstallBoundaries.test_hc14_owned_block_remove_preserves_user_bytes) ... ok
+test_missing_unselected_host_is_nonfatal (__main__.InstallBoundaries.test_missing_unselected_host_is_nonfatal) ... ok
+test_v2_bundle_core_pin_and_legacy_version_rejection (__main__.InstallBoundaries.test_v2_bundle_core_pin_and_legacy_version_rejection) ... ok
+test_wheel_abi_mismatch_is_explicit_before_install (__main__.InstallBoundaries.test_wheel_abi_mismatch_is_explicit_before_install) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.364s
+
+OK

@@ -1,0 +1,42 @@
+01-previous-archive-install PASS
+02-old-task-init PASS
+03-actual-candidate-upgrade PASS
+04-old-binding-rejected-no-migration PASS
+05-new-v2-task-init PASS
+06-new-v2-task-prepare PASS
+07-actual-archive-rollback PASS
+08-restored-old-binding-prepare PASS
+09-remove-preserves-both-tasks PASS
+{
+  "status": "PASS",
+  "verification": "published-v2-archive-upgrade-and-rollback; no task migration",
+  "previous_version": "2.0.0-dev.2",
+  "candidate_version": "2.1.0-dev.1",
+  "previous_core": "2.0.0a2",
+  "candidate_core": "2.1.0a1",
+  "previous_sha256": "1d51534de8c059a5828b9a551ec94f41f24df97069b65994dcc026d672ac71d0",
+  "candidate_sha256": "67884700a4f54e042a24958d4bd201509e24cb400e1b007ff3d6041a374e3946",
+  "tests": 9,
+  "mapping": {
+    "HC-01": [
+      "03-actual-candidate-upgrade"
+    ],
+    "HC-04": [
+      "04-old-binding-rejected-no-migration"
+    ],
+    "HC-10": [
+      "04-old-binding-rejected-no-migration"
+    ],
+    "HC-14": [
+      "07-actual-archive-rollback",
+      "09-remove-preserves-both-tasks"
+    ],
+    "AC-09": [
+      "04-old-binding-rejected-no-migration"
+    ],
+    "AC-31": [
+      "03-actual-candidate-upgrade",
+      "07-actual-archive-rollback"
+    ]
+  }
+}

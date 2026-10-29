@@ -97,8 +97,8 @@ except OSError as e: print(str(e));sys.exit(71)
     run('14-reinstall-after-recovery',cli+['setup','deepseek-harness',*common,'--package',str(package)])
     run('15-final-doctor',cli+['doctor','integrations',*common])
     unowned=out/'unowned-venv';unowned.mkdir();(unowned/'sentinel').write_text('preserve')
-    denied=bootstrap_command[:-1]+[str(unowned)]
-    run('16-unowned-bootstrap-rejected',denied,2);assert (unowned/'sentinel').read_text()=='preserve'
+    denied_bootstrap_command=bootstrap_command[:-1]+[str(unowned)]
+    run('16-unowned-bootstrap-rejected',denied_bootstrap_command,2);assert (unowned/'sentinel').read_text()=='preserve'
     # Crash after publishing installed.json while the recovery journal remains.
     commit_fault="""from bugate import integrations as i
 import sys

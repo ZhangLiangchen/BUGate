@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "date": "2026-10-29",
+  "formal_items": 8,
+  "formal_evidence_missing": [],
+  "active_markdown_files": 70,
+  "local_links_checked": 422,
+  "broken_local_links": [],
+  "build_input_files": 57,
+  "source_commit": "c9d2b8213f1ce9e0c3ea462ddb7d621ea12bbf60",
+  "changed_build_inputs": [],
+  "core_test_inventory": 123,
+  "core_raw_log": "Ran 123 tests; OK",
+  "installed_runtime": "1 integration test; 2 complete workflows; exact final archive matches; exit 0",
+  "checksum_command": {
+    "command": "shasum -a 256 -c SHA256SUMS",
+    "exit_code": 0,
+    "stdout": "bugate-deepseek-harness-2.1.0-dev.1.tgz: OK\nbugate_core-2.1.0a1-py3-none-any.whl: OK\nbuild-manifest.json: OK\ninstall_dsh.py: OK\nsource-manifest.json: OK\n"
+  },
+  "whitespace_check": {
+    "command": "git diff --cached --check",
+    "exit_code": 2,
+    "output": "docs/reports/scope-convergence/dsh/build-final.log:4: new blank line at EOF.\ndocs/reports/scope-convergence/dsh/runtime-regression.log:244: trailing whitespace.\n+  \ndocs/reports/scope-convergence/dsh/runtime-regression.log:246: trailing whitespace.\n+  \ndocs/reports/scope-convergence/dsh/runtime-regression.log:288: trailing whitespace.\n+  \ndocs/reports/scope-convergence/dsh/runtime-regression.log:290: trailing whitespace.\n+  \ndocs/reports/scope-convergence/packaging/intermediate-1/build-native.stdout:4: new blank line at EOF.\n",
+    "raw_observation_files_preserved": [
+      "docs/reports/scope-convergence/dsh/build-final.log",
+      "docs/reports/scope-convergence/dsh/runtime-regression.log",
+      "docs/reports/scope-convergence/packaging/intermediate-1/build-native.stdout"
+    ],
+    "source_and_document_check": {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check",
+        "--",
+        ".",
+        ":(exclude)docs/reports/scope-convergence/dsh/build-final.log",
+        ":(exclude)docs/reports/scope-convergence/dsh/runtime-regression.log",
+        ":(exclude)docs/reports/scope-convergence/packaging/intermediate-1/build-native.stdout"
+      ],
+      "exit_code": 0
+    },
+    "interpretation": "Only whitespace in immutable terminal logs is reported; source and document changes pass. Raw observations are not reformatted."
+  },
+  "authority_audit": {
+    "paths": [
+      ".github",
+      "protocol",
+      "src",
+      "views",
+      "packaging",
+      "docs/reports/scope-convergence"
+    ],
+    "result": "No active all-SC completion gate found; current mentions explain the user correction and historical candidate disposition."
+  },
+  "limits": [
+    "Local links checked for existence; Markdown anchors and remote URLs were not validated.",
+    "This is evidence reconciliation, not an additional test-suite run.",
+    "The metadata-only installer test correction was syntax-checked and actual prior sandbox commands audited, not falsely reported as a new installation run."
+  ],
+  "independent_final_review": "final-review.json"
+}

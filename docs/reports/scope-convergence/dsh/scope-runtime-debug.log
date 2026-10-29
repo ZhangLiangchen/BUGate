@@ -1,0 +1,41 @@
+✖ SC-05/06/07/16/18 real model tool calls reject scope expansion, preserve product failures and converge with suggestions (8871.419459ms)
+✖ SC-11/12 host user receipts exclude synthetic rework and actual subagent prompts (521.272292ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9479.754417
+
+✖ failing tests:
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:226:1
+✖ SC-05/06/07/16/18 real model tool calls reject scope expansion, preserve product failures and converge with suggestions (8871.419459ms)
+  TypeError [ERR_INVALID_ARG_TYPE]: The "message" argument must be one of type string or function. Received undefined
+      at innerFail (node:internal/assert/utils:135:11)
+      at strict.strictEqual (node:assert:360:5)
+      at authorAndExecute (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/workflow-fixture.mjs:56:93)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:236:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:242:1
+✖ SC-11/12 host user receipts exclude synthetic rework and actual subagent prompts (521.272292ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }

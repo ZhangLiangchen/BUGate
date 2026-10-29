@@ -1,0 +1,32 @@
+{
+  "source_commit": "c9d2b8213f1ce9e0c3ea462ddb7d621ea12bbf60",
+  "directory": "/private/var/folders/f2/78sk3lk55k32h_0mjpjbpd6h0000gn/T/bugate-scope-c9d2b82-cu5t1_z2/assets",
+  "entries": [
+    {
+      "file": "bugate-deepseek-harness-2.1.0-dev.1.tgz",
+      "sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+      "verified": true
+    },
+    {
+      "file": "bugate_core-2.1.0a1-py3-none-any.whl",
+      "sha256": "89061edf1f560f5ce7c0d79366faf329bf8186d73f5115959ae00ddebd06dafa",
+      "verified": true
+    },
+    {
+      "file": "build-manifest.json",
+      "sha256": "949578bfb9e09f3098025b33d9cee41254f3d576be473de1c16b7ba78a73688b",
+      "verified": true
+    },
+    {
+      "file": "install_dsh.py",
+      "sha256": "2ea459ed326ddde989a16bb9153fd5536a117838dd5d6f5f3a8a3c7bfca2604a",
+      "verified": true
+    },
+    {
+      "file": "source-manifest.json",
+      "sha256": "4b9e57d7a6ac9ac2150956bd8db4ba7337525b9b86f9f119113c029e814a6691",
+      "verified": true
+    }
+  ],
+  "status": "PASS"
+}

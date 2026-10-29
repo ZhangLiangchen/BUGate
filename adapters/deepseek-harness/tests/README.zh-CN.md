@@ -50,7 +50,7 @@ macOS 的独立包测试可设置 `BUGATE_DENY_SOURCE_ROOT=/absolute/BUGate`。
 
 `tests/integration_install/accept_published_upgrade.py` 显式接收旧版与候选归档，
 并核对旧版公开 SHA256。它实际安装指定旧归档、升级本次候选包、拒绝旧任务绑定且保持字节不变、
-准备新 v2 任务，再回滚到保留的 dev.1 原始归档。该测试与 `accept_package.py` 中
+准备新当前协议任务，再回滚到保留的旧版原始归档。该测试与 `accept_package.py` 中
 只修改版本元数据的事务/崩溃恢复 fixture 分开报告。不支持 v0.x 导入或自动任务迁移。
 
 范围收敛不变量验证使用真实模型工具调用链。确定性

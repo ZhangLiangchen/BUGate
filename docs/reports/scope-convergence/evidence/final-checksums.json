@@ -1,0 +1,14 @@
+{
+  "command": [
+    "shasum",
+    "-a",
+    "256",
+    "-c",
+    "SHA256SUMS"
+  ],
+  "cwd": "dist/scope-convergence",
+  "exit_code": 0,
+  "stdout": "bugate-deepseek-harness-2.1.0-dev.1.tgz: OK\nbugate_core-2.1.0a1-py3-none-any.whl: OK\nbuild-manifest.json: OK\ninstall_dsh.py: OK\nsource-manifest.json: OK\n",
+  "stderr": "",
+  "bundle_sha256": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2"
+}

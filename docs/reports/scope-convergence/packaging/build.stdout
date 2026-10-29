@@ -1,0 +1,12 @@
+{
+  "package": "bugate-deepseek-harness-2.1.0-dev.1.tgz",
+  "version": "2.1.0-dev.1",
+  "core_wheel": "bugate_core-2.1.0a1-py3-none-any.whl",
+  "dsh": "0.2.2-alpha.2",
+  "files": {
+    "bugate-deepseek-harness-2.1.0-dev.1.tgz": "4279c20cfb55a1f9f6f75f26a65b5bca02d826327cd8179b9f04d35bc47143c2",
+    "bugate_core-2.1.0a1-py3-none-any.whl": "89061edf1f560f5ce7c0d79366faf329bf8186d73f5115959ae00ddebd06dafa",
+    "install_dsh.py": "2ea459ed326ddde989a16bb9153fd5536a117838dd5d6f5f3a8a3c7bfca2604a",
+    "source-manifest.json": "4b9e57d7a6ac9ac2150956bd8db4ba7337525b9b86f9f119113c029e814a6691"
+  }
+}

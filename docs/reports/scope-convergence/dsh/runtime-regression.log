@@ -1,0 +1,311 @@
+✔ AC-15 actual provider rejects missing Python, malformed JSON and oversized output (988.874542ms)
+✔ AC-15 envelope operation and exit semantics cannot be forged (763.870166ms)
+✔ AC-16 timeout and cancellation terminate real managed processes (3292.807208ms)
+✔ AC-30 provider has opaque targets and rejects unmapped installation (201.264708ms)
+✖ HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction (1047.590292ms)
+✖ AC-12/25 multi-workspace same task id has isolated contexts and evidence (1283.636375ms)
+✖ AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads (534.010958ms)
+✖ AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly (651.864166ms)
+✖ AC-29 completion submission rework is bounded and unchanged gaps stop (541.733583ms)
+✔ AC-32 non-BUGate workspace does not activate context or guard (565.652125ms)
+✔ HC-10/11 AC-09/30 invalid projection/world mapping fails before registration (3.320125ms)
+✖ AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication (674.509209ms)
+✖ HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard (623.38425ms)
+✖ HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context (663.913708ms)
+✖ AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps (664.789167ms)
+✖ AC-21/27 source-backed authoring starts empty and records digests through the shared core (572.54725ms)
+✖ HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it (627.265125ms)
+✖ AC-28 configured source probe runs before design without turning zero cases into verification (483.342458ms)
+✖ AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts (637.627667ms)
+✖ HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world (629.9315ms)
+✖ HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly (627.267333ms)
+✖ HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model (719.985625ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 6
+ℹ fail 16
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11645.026042
+
+✖ failing tests:
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:21:1
+✖ HC-02/04/05/06/07/08/12/13/15 AC-22/23/34 real requests retain canonical context across 50 turns and compaction (1047.590292ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:44:1
+✖ AC-12/25 multi-workspace same task id has isolated contexts and evidence (1283.636375ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:47:12) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:56:1
+✖ AC-27/28 managed pre-execute ticket and sync guard preserve denial but permit analysis repair and reads (534.010958ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:68:1
+✖ AC-24/31 restart resumes exact binding, reload avoids duplicate tools, binding drift fails visibly (651.864166ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:71:12) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:84:1
+✖ AC-29 completion submission rework is bounded and unchanged gaps stop (541.733583ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:107:1
+✖ AC-01/17/26 real PTC nested execution persists evidence before result with stable lineage and deduplication (674.509209ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:116:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:132:1
+✖ HC-09 AC-24/25 actual spawn, fork and independent preset retain global binding and guard (623.38425ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1685:12 {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:182:1
+✖ HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior context (663.913708ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:200:1
+✖ AC-11/22/27 one task lease rejects competing child implementation and refreshes current model gaps (664.789167ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:216:1
+✖ AC-21/27 source-backed authoring starts empty and records digests through the shared core (572.54725ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:220:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:226:1
+✖ HC-09 AC-22/25 admission race rejects a changed child snapshot before the real model receives it (627.265125ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:241:1
+✖ AC-28 configured source probe runs before design without turning zero cases into verification (483.342458ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:251:1
+✖ AC-16/31 plugin disposal cancels a real in-flight command and preserves task facts (637.627667ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:262:1
+✖ HC-03/10 AC-30 valid and malformed filesystem bindings cannot disagree with the subprocess world (629.9315ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /disagree about the exact task binding/. Input:
+  
+  'BugateBridgeError: Bundled Skill/Schema projection differs from the installed canonical protocol'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:267:4)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: BugateBridgeError: Bundled Skill/Schema projection differs from the installed canonical protocol
+        at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+        at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+        at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+        at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+        at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+        at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+        at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+        at async waitForActual (node:assert:615:5),
+    expected: /disagree about the exact task binding/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:272:1
+✖ HC-05 AC-14 artifact instructions and template expressions remain data and context budgets fail visibly (627.267333ms)
+  Error [BugateBridgeError]: Bundled Skill/Schema projection differs from the installed canonical protocol
+      at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+      at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+      at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+      at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+      at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+      at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+      at async mounted (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:13:14) {
+    code: 'PROJECTION_STALE'
+  }
+
+test at adapters/deepseek-harness/tests/runtime.test.mjs:283:1
+✖ HC-03 AC-30 same-binding filesystem copies with different artifacts, sources or path sets never reach the model (719.985625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /file bytes differ|file absent|different task file or directory sets/. Input:
+  
+  'BugateBridgeError: Bundled Skill/Schema projection differs from the installed canonical protocol'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/tests/runtime.test.mjs:291:4)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: BugateBridgeError: Bundled Skill/Schema projection differs from the installed canonical protocol
+        at refresh (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:306:27)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async Object.<anonymous> (file:///Users/zhangliangchen/PycharmProjects/BUGate/adapters/deepseek-harness/plugin/lib/index.js:445:9)
+        at async Proxy.serial (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/cordis/lib/index.js:291:19)
+        at async Proxy.announce (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent/lib/index.js:710:4)
+        at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1579:6
+        at async file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:599:12
+        at async Proxy.initializeAgent (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1565:11)
+        at async Proxy.create (file:///private/tmp/bugate-dsh-runtime/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1618:12)
+        at async waitForActual (node:assert:615:5),
+    expected: /file bytes differ|file absent|different task file or directory sets/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
