@@ -2,7 +2,7 @@
 
 English | [简体中文](CONTRIBUTING.zh-CN.md)
 
-Read [AGENTS.md](AGENTS.md) and the current [contract](docs/reports/v2-dsh-only/CONTRACT.md).
+Read [AGENTS.md](AGENTS.md) and the current [contract](docs/reports/scope-convergence/CONTRACT.md).
 Use temporary generic fixtures; do not commit SUT sources or secrets. The Protocol
 is canonical. Changes to Schema, MethodSpec, reasons or snapshots require positive,
 negative and stale-input tests plus regenerated DSH projections.
@@ -23,8 +23,8 @@ Use Node 24.9.0+ and pnpm 11.28.5. The CI file records the reproducible commands
 ```sh
 npm run build --prefix adapters/deepseek-harness/plugin
 node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs
-.venv/bin/python packaging/build_dsh.py --out-dir dist/v2-dsh-only
-.venv/bin/python scripts/check_distribution.py --bundle dist/v2-dsh-only/bugate-deepseek-harness-2.0.0-dev.2.tgz
+.venv/bin/python packaging/build_dsh.py --out-dir dist/scope-convergence
+.venv/bin/python scripts/check_distribution.py --bundle dist/scope-convergence/bugate-deepseek-harness-2.1.0-dev.1.tgz
 ```
 
 Build on the target Python/platform ABI. Run standalone package installation and

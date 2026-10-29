@@ -7,11 +7,17 @@ BUGate is an evidence-first testing quality protocol and Python evaluator.
 understanding, testability, Oracle/case traceability and scoped completion;
 DSH executes tools and owns agent lifecycle.
 
-The current source delivers `bugate-core 2.0.0a2` and
-`@bugate/deepseek-harness 2.0.0-dev.2`, with exact Protocol `2.0.0` digest binding.
+The current source delivers `bugate-core 2.1.0a1` and
+`@bugate/deepseek-harness 2.1.0-dev.1`, with exact Protocol `2.1.0-dev.1` digest binding.
 This is a breaking prerelease. Old hooks, installers, adapters and artifact
 formats are retired. Automatic migration from v0.x or pre-refactor tasks is not
 supported. Existing releases/tags are preserved; this build does not replace them.
+
+The acceptance scope contract fixes the user’s finite goals and required branches.
+BUGate requires sufficient business evidence within that scope. Extra ideas stay
+non-blocking suggestions until an actual user request changes the contract.
+Execution completion and functional acceptance are reported separately. See
+[acceptance scope and examples](docs/ACCEPTANCE_SCOPE.md).
 
 ## Install and use
 
@@ -45,8 +51,9 @@ is required.
 - [Method](docs/qa-methodology/METHOD.md) and [workflow](docs/qa-methodology/SOP.md)
 - [Protocol architecture](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md)
 - [Contributor setup](CONTRIBUTING.md) and [development prompt](INIT.md)
-- [Delivery report](docs/reports/v2-dsh-only/DELIVERY.md) and [release notes](docs/releases/dsh-v2.0.0-dev.2.md)
-- [Current refactor contract and acceptance](docs/reports/v2-dsh-only/CONTRACT.md)
+- [Current implementation contract](docs/reports/scope-convergence/CONTRACT.md) and [acceptance matrix](docs/reports/scope-convergence/ACCEPTANCE_MATRIX.md)
+- [Scope architecture decisions](docs/reports/scope-convergence/ARCHITECTURE.md)
+- [Prior v2-only delivery](docs/reports/v2-dsh-only/DELIVERY.md)
 
 `protocol/v2/` is the sole specification source; `src/bugate/` evaluates it;
 `adapters/deepseek-harness/` supplies the native plugin; `packaging/` builds the

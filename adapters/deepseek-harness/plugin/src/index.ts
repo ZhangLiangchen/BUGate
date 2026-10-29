@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
-import { createUserMessage, isAgentLoopRequest } from '@deepseek-ai/dsh-llm';
+import { createUserMessage, isAgentLoopRequest, type UserMessage } from '@deepseek-ai/dsh-llm';
 import type {} from '@deepseek-ai/dsh-fs';
 import type {} from '@deepseek-ai/dsh-skill';
 import type {} from '@deepseek-ai/dsh-subprocess';
@@ -18,8 +18,13 @@ import { BridgeError, failure, json, object, string, type CommandResult, type Pr
 export const name = 'bugate';
 export const inject = ['agents', 'tools', 'systemPrompt', 'fs', 'subprocess', 'skills', 'workingDirectory', 'llm'];
 export interface ExecutionCommand {
-  argv: string[]; caseIds: string[]; report: string;
-  purpose?: 'test' | 'exploration'; timeoutSeconds?: number;
+  argv: string[]; caseIds: string[]; report?: string;
+  purpose?: 'test' | 'exploration' | 'auxiliary' | 'diagnostic'; activityId?: string; environmentId?: string; timeoutSeconds?: number;
+}
+// Rework is produced by this plugin, never by the human. DSH source kinds are
+// merge-extensible and preserved in its durable session log.
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap { 'bugate-rework': { kind: 'bugate-rework' } }
 }
 export interface Config {
   pythonExecutable?: string; projectRoot?: string; taskPath?: string;
@@ -33,7 +38,7 @@ interface State {
 }
 interface FileWitness { path: string; digest: string; bytes: number }
 interface FilesystemManifest { version: number; task_root: string; task_files: FileWitness[]; task_directories: string[]; sources: (FileWitness & { id: string })[]; excluded_runtime_files: { exact: string[]; patterns: string[] }; excluded_runtime_directories: string[]; limits: { max_files: number; max_directories: number; max_total_bytes: number } }
-interface Ticket { generation: number; epoch: number; task: string; allowed: boolean; reason?: string }
+interface Ticket { generation: number; epoch: number; task: string; allowed: boolean; reason?: string; scopeDigest?: string; planDigest?: string }
 const envelopeSchema: JsonSchemaNode = {
   type: 'object', additionalProperties: false,
   required: ['apiVersion', 'kind', 'operation', 'request_id', 'invocation', 'data', 'errors'],
@@ -69,11 +74,14 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   const bindingDigests = new Map<string, string>();
   const refreshQueues = new Map<string, Promise<void>>();
   const operations = new Set<Promise<unknown>>();
+  const capturedRequests = new Set<string>();
   const ajv = new Ajv2020({ strict: false, allErrors: true });
   const validators = new Map<string, ValidateFunction>();
   const commands = config.executionCommands ?? {};
   for (const [id, command] of Object.entries(commands)) {
-    if (!id || !Array.isArray(command.argv) || command.argv.length === 0 || command.argv.some(x => typeof x !== 'string') || !Array.isArray(command.caseIds) || typeof command.report !== 'string') throw new BridgeError('CONFIG_INVALID', `Invalid execution command ${id}`);
+    if (!id || !Array.isArray(command.argv) || command.argv.length === 0 || command.argv.some(x => typeof x !== 'string') || !Array.isArray(command.caseIds) || command.caseIds.some(x => typeof x !== 'string') || (command.report !== undefined && typeof command.report !== 'string') || (!command.activityId && typeof command.report !== 'string')) throw new BridgeError('CONFIG_INVALID', `Invalid execution command ${id}`);
+    if (command.activityId && command.caseIds.length) throw new BridgeError('CONFIG_INVALID', `Auxiliary command ${id} cannot claim acceptance cases`);
+    if (command.purpose && command.purpose !== 'test' && !command.activityId) throw new BridgeError('CONFIG_INVALID', `Auxiliary/diagnostic command ${id} requires a ScopeContract activityId`);
   }
 
   async function read(path: string, signal?: AbortSignal): Promise<string> {
@@ -308,13 +316,58 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     return state;
   }
 
+  async function captureRequests(agent: Agent, messages: readonly UserMessage[], signal?: AbortSignal): Promise<void> {
+    // DSH 0.2.2-alpha.2 tags the initial model-authored subagent prompt as
+    // source.kind=user. Its persisted origin disambiguates delegation; treating
+    // that prompt as human authorization would permit scope forgery by spawn.
+    if (agent.session.header.origin === 'subagent') return;
+    const task = await discover(agent, signal);
+    if (!task) return;
+    for (const message of messages) {
+      if (message.source.kind !== 'user') continue;
+      const text = message.content.filter(block => block.type === 'text').map(block => block.text).join('\n');
+      if (!text.trim()) continue;
+      const id = `dsh-request-${createHash('sha256').update(`${agent.session.id}:${message.id}`).digest('hex').slice(0, 32)}`;
+      const key = `${task}:${id}`;
+      if (capturedRequests.has(key)) continue;
+      const input = paths(task).join(task, '.bugate', 'runtime', 'deepseek-harness', `${id}.json`);
+      const receipt = JSON.stringify({ id, message: text, origin: 'user', session_id: String(agent.session.id), source_event_id: String(message.id) });
+      if (!await exists(input, signal)) {
+        try { await ctx.fs.writeText(await ctx.fs.resolve(input, { signal }), receipt, { kind: 'createIfAbsent' }, signal); }
+        catch (error) { if (await read(input, signal) !== receipt) throw new BridgeError('CONCURRENT_CONFLICT', error instanceof Error ? error.message : String(error)); }
+      } else if (await read(input, signal) !== receipt) throw new BridgeError('SCOPE_REQUEST_CONFLICT', 'Host request identity already has different content');
+      const result = await call(['scope', 'request', '--task', task, '--input', input], task, signal);
+      if (result.invocation !== 'completed') throw new BridgeError('SCOPE_REQUEST_CAPTURE_FAILED', JSON.stringify(result.errors));
+      capturedRequests.add(key);
+    }
+  }
+
+  function authorizationArgs(command: ExecutionCommand, task: string): string[] {
+    const argv = ['execution', 'authorize', '--task', task];
+    if (command.activityId) argv.push('--activity-id', command.activityId);
+    if (command.environmentId) argv.push('--environment-id', command.environmentId);
+    for (const caseId of command.caseIds) argv.push('--case', caseId);
+    return argv;
+  }
+  async function authorize(command: ExecutionCommand, task: string, signal?: AbortSignal): Promise<{ scopeDigest: string; planDigest?: string }> {
+    const result = await call(authorizationArgs(command, task), task, signal);
+    if (result.invocation !== 'completed') throw new BridgeError('SCOPE_ACTIVITY_DENIED', JSON.stringify(result.errors));
+    const value = object(result.data);
+    if (value.allowed !== true) throw new BridgeError('SCOPE_ACTIVITY_DENIED', JSON.stringify(value.findings ?? value));
+    return { scopeDigest: string(object(value.scope_ref).digest, 'scope_ref.digest'), ...(value.plan_ref ? { planDigest: string(object(value.plan_ref).digest, 'plan_ref.digest') } : {}) };
+  }
+
   ctx.systemPrompt.section({ name: 'bugate:bootstrap', order: 850, interpolate: false, text: ({ agent }) => agent && states.has(agent) ? 'BUGate is enabled. Use the exact bound protocol and current task facts. Completion claims require current scoped assessment; tool success is not test success.' : '' });
   ctx.systemPrompt.context({ name: 'bugate:protocol', order: 850, required: true, interpolate: false, text: ({ agent }) => {
     const state = agent ? states.get(agent) : undefined;
     return state?.prepared?.render.content ?? (state?.error ? `BUGate context unavailable: ${JSON.stringify(state.error.errors)}. Previous quality conclusions are invalid. Repair the binding or runtime.` : '');
   } });
-  ctx.on('agent/created', async ({ agent, signal }) => { await refresh(agent, signal); return undefined; });
-  ctx.on('agent/pre-step', async ({ agent, signal }, next) => { await refresh(agent, signal); return next(); });
+  ctx.on('agent/created', async ({ agent, signal }) => {
+    const messages = agent.session.snapshotEvents().flatMap(event => event.type === 'user/message' && event.seq >= agent.session.inheritedEventCount ? [event.data] : []);
+    await captureRequests(agent, messages, signal);
+    await refresh(agent, signal); return undefined;
+  });
+  ctx.on('agent/pre-step', async ({ agent, messages, signal }, next) => { await captureRequests(agent, messages, signal); await refresh(agent, signal); return next(); });
   ctx.on('agent/request', async ({ agent, signal }, next) => {
     const request = await next();
     await refresh(agent, signal);
@@ -340,7 +393,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   ctx.on('agent/disposed', ({ agent }) => { states.delete(agent); });
 
   function managed(exec: ToolExecution): boolean {
-    return ['write', 'edit', 'str_replace_editor', 'bash', 'bugate_run_test', 'bugate_assess', 'bugate_record_evidence', 'bugate_record_artifact'].includes(exec.name);
+    return ['write', 'edit', 'str_replace_editor', 'bash', 'bugate_run_test', 'bugate_assess', 'bugate_record_evidence', 'bugate_record_artifact', 'bugate_record_scope', 'bugate_record_suggestion'].includes(exec.name);
   }
   ctx.on('tools/pre-execute', async (exec, next) => {
     callIds.set(exec.token, `${exec.agent?.id ?? 'agentless'}:${exec.callId}`);
@@ -358,13 +411,15 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
       const state = await requireState(exec.agent, exec.signal);
       const args = object(exec.arguments);
       let needsDesign = true;
+      let authorization: { scopeDigest: string; planDigest?: string } | undefined;
       if (exec.name === 'bash') throw new BridgeError('UNCLASSIFIED_MANAGED_WRITE', 'Use a configured bugate_run_test exploration command; arbitrary shell writes are outside the managed policy');
-      if (exec.name === 'bugate_assess' || exec.name === 'bugate_record_evidence' || exec.name === 'bugate_record_artifact') {
+      if (exec.name === 'bugate_assess' || exec.name === 'bugate_record_evidence' || exec.name === 'bugate_record_artifact' || exec.name === 'bugate_record_scope' || exec.name === 'bugate_record_suggestion') {
         needsDesign = false;
       } else if (exec.name === 'bugate_run_test') {
         const command = commands[string(args.command_id, 'command_id')];
         if (!command) throw new BridgeError('COMMAND_NOT_CONFIGURED', 'Unknown host-configured command');
-        needsDesign = command.purpose !== 'exploration';
+        authorization = await authorize(command, task, exec.signal);
+        needsDesign = !command.activityId;
       } else {
         if (exec.name === 'str_replace_editor' && args.command === 'view') needsDesign = false;
         const target = await contained(task, string(args.file_path ?? args.path, 'file_path'), exec.signal);
@@ -376,7 +431,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
         const status = await call(['status', '--task', task], task, exec.signal);
         if (status.invocation !== 'completed' || object(status.data).implementation_ready !== true) throw new BridgeError('DESIGN_NOT_ACCEPTED', 'A current satisfied test_design_complete claim is required before implementation or governed tests');
       }
-      tickets.set(exec.token, { task, epoch, generation: state.generation, allowed: true });
+      tickets.set(exec.token, { task, epoch, generation: state.generation, allowed: true, ...authorization });
     } catch (error) {
       tickets.set(exec.token, { task, epoch, generation: states.get(exec.agent)?.generation ?? -1, allowed: false, reason: error instanceof Error ? error.message : String(error) });
     }
@@ -423,6 +478,22 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   register('bugate_prepare', 'Prepare the current exact-bound quality protocol context.', {}, [], async (_args, _exec, state) => ({ apiVersion: 'bugate.io/v2', kind: 'CommandResult', operation: 'protocol.prepare', request_id: randomUUID(), invocation: 'completed', data: json(state.prepared), errors: [] }));
   register('bugate_status', 'Read derived quality facts and assessment freshness.', {}, [], async (_args, exec, state) => call(['status', '--task', state.task], state.task, exec.signal));
   register('bugate_validate', 'Validate current task structure, references and deterministic rules.', {}, [], async (_args, exec, state) => call(['validate', '--task', state.task], state.task, exec.signal));
+  register('bugate_scope', 'Read the active acceptance scope, its source receipts and history. Scope is the finite user objective, not a default test matrix.', {}, [], async (_args, exec, state) => call(['scope', 'show', '--task', state.task], state.task, exec.signal));
+  register('bugate_check_scope', 'Check the current scope and plan references, conflicts and source gaps; structural validity does not establish semantic necessity.', {}, [], async (_args, exec, state) => call(['scope', 'check', '--task', state.task], state.task, exec.signal));
+  register('bugate_record_scope', 'Record a source-backed acceptance scope draft or an explicitly sourced revision. User authorization must reference host-captured requests; an agent statement of consent is not authority.', { input: { type: 'string' }, expected_digest: { type: 'string' } }, ['input'], async (args, exec, state) => {
+    const input = await contained(state.task, string(args.input, 'input'), exec.signal);
+    const argv = ['scope', 'record', '--task', state.task, '--input', input];
+    if (args.expected_digest !== undefined) argv.push('--expected-digest', string(args.expected_digest, 'expected_digest'));
+    const result = await call(argv, state.task, exec.signal);
+    if (exec.agent) await refresh(exec.agent, exec.signal);
+    return result;
+  });
+  register('bugate_record_suggestion', 'Record a non-executable out-of-scope suggestion. Suggestions neither authorize tests nor block acceptance completion; do not expand them into test plans.', { input: { type: 'string' } }, ['input'], async (args, exec, state) => {
+    const input = await contained(state.task, string(args.input, 'input'), exec.signal);
+    const result = await call(['suggestion', 'record', '--task', state.task, '--input', input], state.task, exec.signal);
+    if (exec.agent) await refresh(exec.agent, exec.signal);
+    return result;
+  });
   register('bugate_assess', 'Assess a persisted task-local claim; submit=true asks for bounded completion rework.', { claim: { type: 'string' }, submit: { type: 'boolean' } }, ['claim'], async (args, exec, state) => {
     const claim = await contained(state.task, string(args.claim, 'claim'), exec.signal);
     const result = await call(['assess', '--task', state.task, '--claim', claim], state.task, exec.signal);
@@ -444,15 +515,22 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     if (exec.agent) await refresh(exec.agent, exec.signal);
     return result;
   });
-  register('bugate_run_test', 'Run one host-configured test or exploration command and durably collect its actual outcome.', { command_id: { type: 'string' } }, ['command_id'], async (args, exec, state) => {
+  register('bugate_run_test', 'Run a host-configured required scenario or a scope-declared auxiliary/diagnostic activity. The core checks the exact current scope and plan and durably preserves actual failures before returning.', { command_id: { type: 'string' } }, ['command_id'], async (args, exec, state) => {
     const command = commands[string(args.command_id, 'command_id')];
     if (!command) throw new BridgeError('COMMAND_NOT_CONFIGURED', 'Command must be configured by the host');
-    const report = await contained(state.task, command.report, exec.signal);
+    const ticket = tickets.get(exec.token);
+    const authorization = ticket?.scopeDigest ? { scopeDigest: ticket.scopeDigest, planDigest: ticket.planDigest } : await authorize(command, state.task, exec.signal);
+    const report = command.report ? await contained(state.task, command.report, exec.signal) : undefined;
     const runId = `dsh-${createHash('sha256').update(`${exec.agent?.id}:${exec.rootCallId}:${exec.callId}`).digest('hex').slice(0, 32)}`;
-    const argv = ['execution', 'run', '--task', state.task, '--run-id', runId, '--agent-id', String(exec.agent?.id), '--session-id', String(exec.agent?.id), '--call-id', callIds.get(exec.token) ?? String(exec.callId), '--root-call-id', String(exec.rootCallId), '--timeout', String(command.timeoutSeconds ?? 20), '--report', report];
+    const argv = ['execution', 'run', '--task', state.task, '--run-id', runId, '--agent-id', String(exec.agent?.id), '--session-id', String(exec.agent?.id), '--call-id', callIds.get(exec.token) ?? String(exec.callId), '--root-call-id', String(exec.rootCallId), '--timeout', String(command.timeoutSeconds ?? 20)];
+    if (report) argv.push('--report', report);
     const parent = exec.parent ? callIds.get(exec.parent) : undefined;
     if (exec.parent && !parent) throw new BridgeError('CALL_LINEAGE_MISSING', 'Nested parent identity is unavailable');
     if (parent) argv.push('--parent-call-id', parent);
+    argv.push('--expected-scope-digest', authorization.scopeDigest);
+    if (authorization.planDigest) argv.push('--expected-plan-digest', authorization.planDigest);
+    if (command.activityId) argv.push('--activity-id', command.activityId);
+    if (command.environmentId) argv.push('--environment-id', command.environmentId);
     for (const caseId of command.caseIds) argv.push('--case', caseId);
     const result = checked(await bridge.call([...argv, '--json', '--', ...command.argv], state.task, exec.signal));
     if (exec.agent) await refresh(exec.agent, exec.signal);
@@ -468,7 +546,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     const gap = digest(JSON.stringify([result.errors, data.findings ?? []]));
     if (state.attempts >= maxRework || Date.now() - state.reworkStart >= maxReworkMs || state.lastGap === gap || signal.aborted) { state.pendingClaim = undefined; return; }
     state.attempts++; state.lastGap = gap;
-    agent.steer(createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: `BUGate completion claim is not satisfied. Repair these current findings or report BLOCKED/INCOMPLETE with evidence. Rework ${state.attempts}/${maxRework}: ${JSON.stringify(result)}` }] }));
+    agent.steer(createUserMessage({ source: { kind: 'bugate-rework' }, content: [{ type: 'text', text: `BUGate completion claim is not satisfied. Repair only missing, invalid or inconsistent evidence within the current acceptance scope, or report BLOCKED/INCOMPLETE. Out-of-scope suggestions do not require execution or user decisions. Preserve real failures; execution completion does not mean requirements passed. Rework ${state.attempts}/${maxRework}: ${JSON.stringify(result)}` }] }));
   });
-  ctx.effect(() => async () => { await bridge.dispose(); await Promise.allSettled([...operations]); states.clear(); tickets.clear(); callIds.clear(); bindingDigests.clear(); refreshQueues.clear(); epochs.clear(); leases.clear(); callTasks.clear(); });
+  ctx.effect(() => async () => { await bridge.dispose(); await Promise.allSettled([...operations]); states.clear(); tickets.clear(); callIds.clear(); bindingDigests.clear(); refreshQueues.clear(); epochs.clear(); leases.clear(); callTasks.clear(); capturedRequests.clear(); });
 }

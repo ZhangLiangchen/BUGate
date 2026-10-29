@@ -11,6 +11,8 @@ export interface PreparedContext {
   apiVersion: string; kind: string;
   protocol: { id: string; version: string; digest: string };
   workspace: { task_id: string; workspace_digest?: string | null };
+  scope_ref?: { id: string; revision: number; digest: string } | null;
+  plan_ref?: { id: string; digest: string } | null;
   quality_posture: Record<string, string>;
   active_concerns: { code: string; subject?: string; severity?: string; message?: string }[];
   render: { media_type: string; bytes: number; content: string };

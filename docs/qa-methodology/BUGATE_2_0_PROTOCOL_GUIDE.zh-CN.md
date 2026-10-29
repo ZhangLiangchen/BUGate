@@ -16,10 +16,12 @@
 
 工作区快照排除派生评估和事务记账；请求摘要额外覆盖声明、绑定、评估器与参数。对象摘要排除自身摘要字段。内容变化或并发提交冲突使旧授权失效。核心不拥有 Agent loop、current-stage、调度器或必需长期记忆服务。
 
-原生 v2 语义覆盖有来源命题、可观测 Oracle、可测性、固定分母覆盖、负例、实现引用、评审新鲜度及 Profile 要求的可选建模。旧产物格式明确拒绝，不运行转换器或降级 checker。
+版本化范围契约引用用户请求证据、有限目标及已有要求/Oracle 事实，inventory 用例绑定其当前版本和摘要。建议与必需覆盖、完成阻塞隔离，辅助活动具有明确边界，见[范围语义](../ACCEPTANCE_SCOPE.zh-CN.md)。
+
+原生 v2 语义覆盖有来源命题、可观测 Oracle、可测性、固定范围分母覆盖、明确要求的负例、实现引用、评审新鲜度及 Profile 要求的可选建模。旧产物格式明确拒绝，不运行转换器或降级 checker。
 
 只有受管采集器创建宿主观测；导入/模型材料保留来源。原子写、锁和持久化屏障保障一致性，不认证控制同权限全部文件的恶意行为。真实产品失败可以完成测试交付，而失败需求仍未验证。
 
 DSH `context.text` 与 `tools.guard` 保持同步；准备和证据持久化使用可等待生命周期/工具接缝。适配器校验并原样注入核心 `render.content`；子 Agent 和恢复会话独立验证精确绑定。文件与执行使用配置的 provider/execution-world 映射，opaque key 不当路径。实现前提缺失时仍允许读取、分析和合法探索。
 
-文档和投影不复制机器权威。原生构建向 Skill 入口追加 canonical MethodSpec 并记录协议/内容摘要；打包校验 Python 与原生资源一致。参见[安装](../DEEPSEEK_HARNESS.zh-CN.md)、[方法](METHOD.zh-CN.md)及[验收](../reports/v2-dsh-only/acceptance.json)。
+文档和投影不复制机器权威。原生构建向 Skill 入口追加 canonical MethodSpec 并记录协议/内容摘要；打包校验 Python 与原生资源一致。参见[安装](../DEEPSEEK_HARNESS.zh-CN.md)、[方法](METHOD.zh-CN.md)及[验收](../reports/scope-convergence/ACCEPTANCE_MATRIX.zh-CN.md)。

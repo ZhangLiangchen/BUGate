@@ -114,7 +114,7 @@ class Workspace:
             raise BugateError('CONCURRENT_CONFLICT','Task, Profile or Binding changed after workspace resolution')
         for p in sorted(self.root.rglob('*')):
             rel=p.relative_to(self.root)
-            if rel.parts[0] in ('claims','assessments','.bugate') or any(x.startswith('.pending-') for x in rel.parts):continue
+            if rel.parts[0] in ('claims','assessments','.bugate','suggestions') or any(x.startswith('.pending-') for x in rel.parts):continue
             if p.is_symlink():raise BugateError('PATH_SYMLINK',f'Task contains a symbolic link: {rel}')
             if p.is_file():
                 if p.suffix=='.json' and rel.parts[0] not in ('artifacts','evidence'):
@@ -167,7 +167,7 @@ def execution_input_manifest(w):
         values['@source/'+source['id']]=content_digest(within(w.project,source['path'],must_exist=True).read_bytes())
     for p in sorted(w.root.rglob('*')):
         rel=p.relative_to(w.root)
-        if rel.parts[0] in ('evidence','claims','assessments','logs','.bugate') or any(x in ('__pycache__','.pytest_cache','.mypy_cache','.ruff_cache') for x in rel.parts):continue
+        if rel.parts[0] in ('evidence','claims','assessments','logs','.bugate','suggestions') or any(x in ('__pycache__','.pytest_cache','.mypy_cache','.ruff_cache') for x in rel.parts):continue
         if p.is_symlink():raise BugateError('PATH_SYMLINK','Execution input contains symbolic link')
         if not p.is_file():continue
         if p.suffix=='.json':

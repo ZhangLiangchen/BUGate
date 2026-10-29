@@ -43,7 +43,7 @@ export class PythonBridge {
       if (![0, 1, 2, 3, 124, 130].includes(outcome.exitCode ?? -1)) throw new BridgeError('PYTHON_EXIT_ERROR', `Core exited unexpectedly: ${outcome.exitCode}/${outcome.signal}`);
       const expectedInvocation = new Map([[0, 'completed'], [3, 'completed'], [2, 'invalid_input'], [1, 'runtime_error'], [124, 'timeout'], [130, 'cancelled']]);
       if (expectedInvocation.get(outcome.exitCode ?? -1) !== invocation) throw new BridgeError('PYTHON_INVALID_RESPONSE', 'Exit code and invocation disagree');
-      const expectedOperation = ['protocol', 'evidence', 'execution', 'artifact'].includes(argv[0] ?? '') ? `${argv[0]}.${argv[1]}` : argv[0];
+      const expectedOperation = ['protocol', 'evidence', 'execution', 'artifact', 'scope', 'suggestion'].includes(argv[0] ?? '') ? `${argv[0]}.${argv[1]}` : argv[0];
       if (result.operation !== expectedOperation) throw new BridgeError('PYTHON_INVALID_RESPONSE', 'Response operation differs from invoked command');
       string(result.request_id, 'request_id');
       for (const value of result.errors) { const e = object(value); string(e.code, 'error code'); string(e.message, 'error message'); }

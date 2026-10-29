@@ -3,7 +3,7 @@
   "kind": "ProtocolManifest",
   "metadata": {
     "id": "bugate",
-    "version": "2.0.0"
+    "version": "2.1.0-dev.1"
   },
   "status": "implemented",
   "schemas": {
@@ -18,9 +18,13 @@
     "prepared_protocol_context": "schemas/prepared_protocol_context.schema.json",
     "profile": "schemas/profile.schema.json",
     "protocol_binding": "schemas/protocol_binding.schema.json",
-    "test_task": "schemas/test_task.schema.json"
+    "test_task": "schemas/test_task.schema.json",
+    "scope_contract": "schemas/scope_contract.schema.json",
+    "scope_request": "schemas/scope_request.schema.json",
+    "suggestion": "schemas/suggestion.schema.json"
   },
   "methods": [
+    "methods/acceptance_scope.json",
     "methods/business_understanding.json",
     "methods/diagnosis.json",
     "methods/execution.json",
@@ -35,7 +39,7 @@
     "domain_separator": "UTF-8 domain then NUL then JSON",
     "json": "sorted object keys, UTF-8, no whitespace, no floating point; integers within JS safe range",
     "object_digest": "exclude top-level digest and request_digest",
-    "workspace_snapshot": "task facts and referenced source bytes; excludes claims, assessments, derived outputs and transaction metadata",
+    "workspace_snapshot": "current task facts, active scope and referenced sources; excludes suggestions, unreferenced user requests, history, assessments and transaction bookkeeping",
     "assurance": "local managed process observation, not hostile-worker authentication"
   }
 }

@@ -5,9 +5,12 @@
 1. 将原生包安装到明确的外部项目与 DSH profile，运行 doctor，见[安装指南](../DEEPSEEK_HARNESS.zh-CN.md)。
 2. 读取需求，按 canonical Schema 建立有来源的 Profile，再用 `bugate init` 初始化任务；不发明资源标识或复制过期绑定。
 3. 通过 `bugate protocol prepare` / `bugate_prepare` 取得当前精确绑定、MethodSpec 约束和可补足缺口。
-4. 编写 JSON 草稿，再以 `artifact record` / `bugate_record_artifact` 登记。核心验证 Schema 并计算摘要；更新必须提供当前预期摘要，摘要不代表语义批准。
-5. 建立业务理解、可测性、Oracle/用例映射和必要语义评审，在受管实现前评估当前 `test_design_complete` 声明。Profile 要求的可选建模使用原生工件。
-6. 通过 `bugate_run_test` 执行配置命令，探索材料保留真实来源；等待证据持久化，保留产品失败并区分基础设施问题。
-7. 按 Profile 生成诊断、执行和知识工件；提交限定范围声明，运行 assess 并报告真实结论。在宿主预算内修复可处理缺口，阻塞或取消不能静默标为完成。
+4. 先采集真实用户请求并登记有版本的范围契约，再推导必需用例；关联有限目标、流程/分支与 Oracle，显式保留未确定假设，额外想法保持不阻塞建议，见[范围示例](../ACCEPTANCE_SCOPE.zh-CN.md)。
+5. 编写 JSON 草稿，再以 `artifact record` / `bugate_record_artifact` 登记。核心验证 Schema 并计算摘要；更新必须提供当前预期摘要，摘要不代表语义批准。
+6. 建立业务理解、可测性、Oracle/用例映射和必要语义评审，在受管实现前评估当前 `test_design_complete` 声明。Profile 要求的可选建模使用原生工件。
+7. 通过 `bugate_run_test` 执行配置命令，探索材料保留真实来源；等待证据持久化，保留产品失败并区分基础设施问题。
+8. 按 Profile 生成诊断、执行和知识工件；提交限定范围声明，运行 assess 并报告真实结论。在宿主预算内只修复范围内可处理缺口，阻塞或取消不能静默标为完成。
 
 不以任意 shell 写入修改已登记权威事实，不假设变更后历史评估仍适用。恢复校验精确 Protocol/Profile/评估器绑定，失配必须显式处理，不自动转换。受管实现被阻断时，正常读取和分析仍可继续。
+
+锁定 Profile 同分母内用户授权的变更新建契约版本并重新评估计划和声明。分母变化须显式新 Profile 版本和新任务，保留旧任务与失败；用户收据不替代 Profile 领域证据。不得缩小范围、删除失败或降低断言获取通过。报告分别表达执行闭环、功能验收、阻塞与建议，写明“本结论仅覆盖本次约定范围”并列出实际目标。

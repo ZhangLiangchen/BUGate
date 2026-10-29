@@ -30,7 +30,8 @@ await writeFile(new URL('resources/projection.json', import.meta.url), JSON.stri
 const coreVersion = (await readFile(resolve(root, 'pyproject.toml'), 'utf8')).match(/^version = "([^"]+)"$/mu)?.[1];
 if (!coreVersion) throw new Error('Canonical Python package version is missing');
 const manifest = JSON.parse(await readFile(new URL('package.json', import.meta.url), 'utf8'));
+const protocolVersion = JSON.parse(await readFile(resolve(root, 'protocol/v2/manifest.yaml'), 'utf8')).metadata.version;
 await writeFile(new URL('resources/compatibility.json', import.meta.url), JSON.stringify({
-  adapter_version: manifest.version, core_version: coreVersion, protocol_version: '2.0.0',
+  adapter_version: manifest.version, core_version: coreVersion, protocol_version: protocolVersion,
   dsh_version: '0.2.2-alpha.2', dsh_commit: 'f3803c96974ad4a94195fb97e5c637e9c2a3afe3',
 }, null, 2) + '\n');

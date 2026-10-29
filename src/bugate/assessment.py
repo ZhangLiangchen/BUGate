@@ -5,6 +5,7 @@ from . import API_VERSION, __version__
 from .errors import BugateError
 from .semantics import check_sources_and_placeholders, quality_models
 from .protocol import digest, object_digest, content_digest, load_json, validate_schema, evaluator_identity, canonical, quality_rules
+from .scope import active_scope, scope_ref, plan_ref, check_scope, suggestions, COVERAGE_STATEMENT
 from .workspace import Workspace, within, write_json, locked, safe_id, execution_input_manifest, filesystem_manifest
 
 
@@ -13,7 +14,11 @@ def finding(code,subject,message,dimension='integrity',*,blocking=True,basis=Non
 
 class Facts:
     def __init__(self,w:Workspace):
-        self.w=w;self.findings=[];self.artifacts={};self.evidence={}
+        self.w=w;self.findings=[];self.artifacts={};self.evidence={};self.scope=None
+        try:self.scope=active_scope(w,False)
+        except BugateError as exc:self.add(exc.code,'scope',exc.message,'scope')
+        self.requirements=w.profile['requirements']
+        self.risks=w.profile['risks']
         for folder,kind,container in [('artifacts','Artifact',self.artifacts),('evidence','Evidence',self.evidence)]:
             try:
                 for o in w.objects(folder,kind):
@@ -33,6 +38,7 @@ class Facts:
             for ref in e['references']:self.check_ref(ref,w.root,e['id'])
             ex=e.get('execution')
             if ex:
+                if self.scope and ex.get('scope_ref')!=scope_ref(self.scope):self.add('SCOPE_STALE',e['id'],'Evidence belongs to another scope revision','execution')
                 if ex['input_manifest']!=execution_input_manifest(w):self.add('EXECUTION_INPUTS_CHANGED',e['id'],'Execution inputs or their path set changed; rerun against current design and source bytes','execution')
                 for ref in [ex['stdout'],ex['stderr']]+([ex['report']] if ex['report'] else []):self.check_ref(ref,w.root,e['id'])
                 for name,h in ex['implementation_digests'].items():self.check_ref({'path':name,'digest':h},w.root,e['id'])
@@ -81,7 +87,7 @@ class Facts:
 
     def business(self):
         if not self.props:self.add('BUSINESS_UNDERSTANDING_MISSING','business_brief','No source-backed business propositions','business_understanding')
-        requirements=set(self.w.task['requirements']);covered=set()
+        requirements=set(self.requirements);covered=set()
         for p in self.props.values():
             covered.update(p['requirement_ids'])
             if p['classification']!='fact':self.add('BUSINESS_SEMANTICS_UNRESOLVED',p['id'],'Proposition remains inference or unknown','business_understanding')
@@ -109,6 +115,7 @@ class Facts:
                 if a['id'] not in self.reviewed:self.add('SEMANTIC_REVIEW_MISSING',a['id'],'Current source-backed semantic review is required','semantic_review',remediation='Provide a reviewer artifact bound to current artifact digests; structural validity is not business correctness.')
 
     def design(self):
+        check_scope(self)
         decisions={}; mapped_oracles=set(); decision_pairs={}
         for a in self.by_type.get('testability',[]):
             if a['content']['gaps']:self.add('TESTABILITY_GAP',a['id'],'Unresolved observability or prerequisite gaps','testability',basis=a['content']['gaps'])
@@ -138,13 +145,12 @@ class Facts:
             oracle_props={pid for oid in c['oracle_ids'] if oid in self.oracles for pid in self.oracles[oid]['proposition_ids']}
             for pid in sorted(set(c['proposition_ids'])-oracle_props):self.add('ORACLE_BINDING_INVALID',c['id'],'Case proposition is not covered by any referenced oracle','test_design',basis=[pid])
             for rid in c['risk_ids']:
-                if rid not in self.w.task['risks']:self.add('REFERENCE_MISSING',c['id'],'Case risk is outside frozen scope','test_design',basis=[rid])
+                if rid not in self.risks:self.add('REFERENCE_MISSING',c['id'],'Case risk is outside frozen scope','test_design',basis=[rid])
         for p in sorted(set(self.props)-covered_p):self.add('PROPOSITION_UNCOVERED',p,'Proposition has no case','test_design')
         for o in sorted(set(self.oracles)-covered_o):self.add('ORACLE_UNCOVERED',o,'Oracle has no case','test_design')
-        for r in sorted(set(self.w.task['risks'])-covered_r):self.add('RISK_UNCOVERED',r,'Frozen risk has no case','test_design')
-        for p in sorted(set(self.props)-negative):self.add('NEGATIVE_COVERAGE_MISSING',p,'No negative/boundary case for proposition','test_design')
+        for r in sorted(set(self.risks)-covered_r):self.add('RISK_UNCOVERED',r,'Frozen risk has no case','test_design')
         for a in self.by_type.get('inventory',[]):
-            if set(a['content']['requirement_scope'])!=set(self.w.task['requirements']) or set(a['content']['risk_scope'])!=set(self.w.task['risks']):self.add('SCOPE_DENOMINATOR_CHANGED',a['id'],'Inventory scope differs from frozen task requirements/risks','test_design')
+            if set(a['content']['requirement_scope'])!=set(self.requirements) or set(a['content']['risk_scope'])!=set(self.risks):self.add('SCOPE_DENOMINATOR_CHANGED',a['id'],'Inventory scope differs from frozen task requirements/risks','test_design')
         self.require_review(('testability','inventory'))
         quality_models(self, 'test_design')
 
@@ -164,13 +170,21 @@ class Facts:
             ex=e['execution']
             if not ex:continue
             if any(f['subject']==eid and f['blocking'] for f in self.findings):continue
+            # Auxiliary captures remain evidence, but are not acceptance test cases.
+            if ex.get('activity_id') is not None:continue
             runs.append(ex)
             observed={c['id'] for c in ex['cases']}
             if set(ex['requested_case_ids'])!=observed:self.add('EXECUTION_CASE_MISSING',eid,'Framework report does not account for every requested case','execution',basis=sorted(set(ex['requested_case_ids'])-observed))
-            if ex['status'] in ('cancelled','timeout','blocked'):self.add('EXECUTION_INCOMPLETE',eid,'Execution did not reach a complete test result','execution',basis=[ex['status']])
+            if ex['status'] in ('cancelled','timeout','blocked') or ex['statistics']['errors'] or (ex['status']=='failed' and not ex['statistics']['failed']):self.add('EXECUTION_INCOMPLETE',eid,'Execution did not reach a complete test result','execution',basis=[ex['status']])
             if ex['statistics']['tests']==0:self.add('ZERO_TESTS',eid,'No test cases were executed','execution')
             elif ex['statistics']['passed']+ex['statistics']['failed']+ex['statistics']['errors']==0:self.add('ALL_TESTS_SKIPPED',eid,'All observed cases were skipped or expected failures','execution')
             if not ex['report']:self.add('TEST_REPORT_MISSING',eid,'A framework report is required for execution claims','execution')
+        # Whole-task closure accounts for every required scenario. A named
+        # requirement_verified claim is checked against its own requirements
+        # by verify_requirements; it does not claim execution closure for others.
+        required=set(self.cases) if claim['claim_type'] in ('execution_complete','task_delivery_complete') else set()
+        observed={c['id'] for run in runs for c in run['cases'] if c['outcome'] in ('passed','failed')}
+        for cid in sorted(required-observed):self.add('CASE_NOT_EXECUTED',cid,'Required scenario lacks a conclusive current execution observation','execution')
         if not runs:self.add('EXECUTION_NOT_RUN',claim['id'],'No applicable managed execution evidence','execution')
         return runs
 
@@ -178,7 +192,7 @@ class Facts:
         requirements=claim['requirement_ids']
         if not requirements:self.add('CLAIM_SCOPE_EMPTY',claim['id'],'Requirement verification must name requirements','verification')
         for rid in requirements:
-            if rid not in self.w.task['requirements']:self.add('REFERENCE_MISSING',rid,'Requirement is not in frozen task scope','verification');continue
+            if rid not in self.requirements:self.add('REFERENCE_MISSING',rid,'Requirement is not in frozen task scope','verification');continue
             pids={pid for pid,p in self.props.items() if rid in p['requirement_ids']}
             required={c['id'] for c in self.cases.values() if set(c['proposition_ids']) & pids}
             if not required:self.add('CASE_MISSING',rid,'No cases trace this requirement','verification')
@@ -187,17 +201,31 @@ class Facts:
                 if not observations:self.add('CASE_NOT_EXECUTED',cid,'No managed report observation for required case','verification')
                 elif any(c['outcome']!='passed' or run['status']!='passed' for run,c in observations):self.add('REQUIREMENT_NOT_VERIFIED',cid,'Observed failure, skip, cancellation or uncertain run cannot verify requirement','verification')
 
+            # Do not hide an applicable failure by omitting its evidence id from a new pass claim.
+            for e in self.evidence.values():
+                if e.get('execution') and e['source_type']=='host_observed' and not any(x['subject']==e['id'] and x['code'] not in ('REQUIREMENT_NOT_VERIFIED',) for x in self.findings):
+                    if any(c['id'] in required and c['outcome'] in ('failed','error') for c in e['execution']['cases']):self.add('REQUIREMENT_NOT_VERIFIED',e['id'],'An applicable in-scope failure is preserved even when omitted from claim evidence','verification')
+
     def reports(self,claim,*,include_report=True,include_knowledge=True):
         reports=self.by_type.get('execution_report',[]) if include_report else []
         if include_report and not reports:self.add('EXECUTION_REPORT_MISSING','execution_report','Task delivery requires an execution report','report')
         for a in reports:
+            c=a['content']
+            if c['scope_ref']!=scope_ref(self.scope):self.add('SCOPE_STALE',a['id'],'Report belongs to another scope revision','report')
+            if set(c['requirement_ids'])!=set(self.requirements):self.add('REPORT_SCOPE_INVALID',a['id'],'Report must list exactly the current acceptance requirements','report')
+            if c['coverage_statement']!=COVERAGE_STATEMENT:self.add('REPORT_SCOPE_INVALID',a['id'],'Report must state its bounded coverage','report')
             for eid in a['content']['evidence_ids']:
                 if eid not in self.evidence or eid not in claim['evidence_ids']:self.add('REFERENCE_MISSING',a['id'],'Report evidence is missing from claim','report',basis=[eid])
             if set(a['content']['case_ids'])!=set(self.cases):self.add('REPORT_COVERAGE_INCOMPLETE',a['id'],'Report must account for all inventory cases','report')
             observed={c['id'] for e in self.evidence.values() if e['id'] in claim['evidence_ids'] and e['source_type']=='host_observed' and e.get('execution') and e['applicability']['current_task'] and not any(f['subject']==e['id'] and f['blocking'] for f in self.findings) for c in e['execution']['cases']}
             for cid in sorted(set(self.cases)-observed):self.add('CASE_NOT_EXECUTED',cid,'Delivery report lists a case without applicable managed execution','report')
-            failures=any(e.get('execution') and e['execution']['status']=='failed' for e in self.evidence.values() if e['id'] in claim['evidence_ids'])
-            if failures and a['content']['outcome']=='passed':self.add('FAILURE_HIDDEN',a['id'],'Report marks failed execution as passed','report')
+            failures=any(e.get('execution') and not e['execution'].get('activity_id') and any(c['outcome']=='failed' for c in e['execution']['cases']) for e in self.evidence.values() if e['id'] in claim['evidence_ids'] or (e['source_type']=='host_observed' and not any(x['subject']==e['id'] for x in self.findings)))
+            applicable=[e['execution'] for e in self.evidence.values() if e['id'] in claim['evidence_ids'] and e['source_type']=='host_observed' and e.get('execution') and not e['execution'].get('activity_id') and not any(f['subject']==e['id'] and f['blocking'] for f in self.findings)]
+            conclusive={c['id'] for run in applicable if run['status'] in ('passed','failed') for c in run['cases'] if c['outcome'] in ('passed','failed')}
+            complete=bool(self.cases) and set(self.cases)<=conclusive and all(run['status'] in ('passed','failed') and not run['statistics']['errors'] and (run['status']!='failed' or run['statistics']['failed']>0) for run in applicable)
+            expected_functional='failed' if failures else 'passed' if complete else 'undetermined'
+            if a['content']['execution_complete']!=complete or a['content']['functional_result']!=expected_functional:self.add('REPORT_RESULT_INCONSISTENT',a['id'],'Report completion and functional result differ from managed observations','report')
+            if failures and (a['content']['functional_result']=='passed' or a['content']['outcome']=='passed'):self.add('FAILURE_HIDDEN',a['id'],'Report marks failed execution as passed','report')
         if include_knowledge and not self.by_type.get('knowledge'):self.add('KNOWLEDGE_MISSING','knowledge','Task delivery requires sourced knowledge notes','knowledge')
         for a in self.by_type.get('knowledge',[]):
             for entry in a['content']['entries']:
@@ -210,6 +238,9 @@ def evaluate(w:Workspace,claim):
     if claim['task_id']!=w.task['id'] or claim['workspace_id']!=w.id:raise BugateError('WORKSPACE_MISMATCH','Claim belongs to another task/workspace')
     current=w.snapshot()
     f=Facts(w)
+    if claim['scope_ref']!=scope_ref(f.scope):f.add('SCOPE_STALE',claim['id'],'Claim does not bind the current scope revision','scope')
+    if claim['plan_ref']!=plan_ref(f):f.add('PLAN_STALE',claim['id'],'Claim does not bind the current inventory','scope')
+    if not f.scope:f.add('SCOPE_MISSING',claim['id'],'A ScopeContract is required','scope')
     selected_evidence=set(claim['evidence_ids'])
     for issue in f.findings:
         if issue['subject'] in f.evidence and issue['subject'] not in selected_evidence:
@@ -224,7 +255,10 @@ def evaluate(w:Workspace,claim):
     if claim['claim_type']=='task_delivery_complete':
         dims=tuple({'business_understanding':'business_understanding','test_design':'test_design','implementation':'implementation','execution':'execution','report':'report','knowledge':'knowledge'}[x] for x in w.task['delivery_criteria'])
         if any(d in dims for d in ('test_design','implementation')):dims=tuple(set(dims)|{'business_understanding','testability','test_design'})
-    if 'business_understanding' in dims:f.business()
+    if 'business_understanding' in dims:
+        f.business()
+        if 'test_design' not in dims:check_scope(f,plan=False)
+    if 'execution' in dims and 'test_design' not in dims:check_scope(f)
     if 'test_design' in dims:f.design()
     if 'implementation' in dims:f.implementation()
     runs=f.executions(claim) if 'execution' in dims else []
@@ -240,7 +274,7 @@ def evaluate(w:Workspace,claim):
         if a['artifact_type'] in types and a['id'] not in claim['artifact_ids']:f.add('CLAIM_INPUT_MISSING',claim['id'],'Used artifact is not referenced by claim',basis=[a['id']])
     deduplicated={canonical(item):item for item in f.findings}
     findings=sorted(deduplicated.values(),key=lambda x:(x['dimension'],x['code'],x['subject'],x['message']))
-    semantic=any(x in dims for x in ('business_understanding','test_design'))
+    semantic=any(x in dims for x in ('business_understanding','test_design','execution'))
     runtime='execution' in dims
     blocked=[x for x in findings if x['blocking']]
     inconclusive=bool(blocked) and all(x['code'] in ('SEMANTIC_REVIEW_MISSING','BUSINESS_SEMANTICS_UNRESOLVED','EXECUTION_NOT_RUN','EVIDENCE_UNTRUSTED') for x in blocked)
@@ -248,12 +282,23 @@ def evaluate(w:Workspace,claim):
     def dimension(name,applicable,limitations):
         problems=[x for x in findings if x['blocking'] and (x['dimension']==name if name!='deterministic' else x['dimension'] not in ('semantic_review','execution','verification'))]
         return {'status':('failed' if problems else 'passed') if applicable else 'not_applicable','applicable':applicable,'basis':sorted({x['code']+':'+x['subject'] for x in problems}) if problems else ['canonical-rules/v2'] if applicable else ['claim-type applicability/v2'],'limitations':limitations}
-    request={'apiVersion':API_VERSION,'kind':'AssessmentRequest','id':'request-'+claim['id'],'task_id':w.task['id'],'workspace_id':w.id,'binding':w.binding['protocol'],'profile':w.binding['profile'],'claim':claim,'workspace_snapshot':current,'evaluator_version':__version__,'rules_digest':evaluator_identity()}
+    advisory_view=suggestions(w)
+    reported_scope=claim['requirement_ids'] if claim['claim_type']=='requirement_verified' else f.requirements
+    request={'advisory_digest':digest(advisory_view,'assessment-advisory-view/v1'),'apiVersion':API_VERSION,'kind':'AssessmentRequest','id':'request-'+claim['id'],'task_id':w.task['id'],'workspace_id':w.id,'binding':w.binding['protocol'],'profile':w.binding['profile'],'claim':claim,'workspace_snapshot':current,'evaluator_version':__version__,'rules_digest':evaluator_identity()}
     request['request_digest']=object_digest(request);validate_schema(request)
-    result={'apiVersion':API_VERSION,'kind':'AssessmentResult','id':'assessment-'+claim['id'],'task_id':w.task['id'],'workspace_id':w.id,'claim_id':claim['id'],'claim_type':claim['claim_type'],'claim_digest':object_digest(claim),'evaluator_version':__version__,'request_digest':request['request_digest'],'workspace_snapshot':current,'verdict':verdict,'dimensions':{'deterministic':dimension('deterministic',True,['Schema and content hashes establish consistency, not the truth of supplied facts.']),'semantic_review':dimension('semantic_review',semantic,['Source-backed reviewer opinion is not a mathematical proof.']),'runtime_validation':dimension('execution',runtime,['Managed local-process observation; same-permission filesystem owners can alter local evidence.'])},'findings':findings,'evidence_ids':claim['evidence_ids'],'unknowns':claim['open_questions']+claim['known_gaps'],'scope':claim['requirement_ids'] or [claim['claim_type']],'quality_posture':'satisfactory' if verdict=='satisfied' else 'uncertain' if verdict=='inconclusive' else 'needs_improvement'}
+    result={'apiVersion':API_VERSION,'kind':'AssessmentResult','id':'assessment-'+claim['id'],'task_id':w.task['id'],'workspace_id':w.id,'claim_id':claim['id'],'claim_type':claim['claim_type'],'claim_digest':object_digest(claim),'evaluator_version':__version__,'request_digest':request['request_digest'],'workspace_snapshot':current,'verdict':verdict,'dimensions':{'deterministic':dimension('deterministic',True,['Schema and content hashes establish consistency, not the truth of supplied facts.']),'semantic_review':dimension('semantic_review',semantic,['Source-backed reviewer opinion is not a mathematical proof.']),'runtime_validation':dimension('execution',runtime,['Managed local-process observation; same-permission filesystem owners can alter local evidence.'])},'findings':findings,'evidence_ids':claim['evidence_ids'],'unknowns':claim['open_questions']+claim['known_gaps'],'scope':reported_scope,'quality_posture':'satisfactory' if verdict=='satisfied' else 'uncertain' if verdict=='inconclusive' else 'needs_improvement'}
     if runtime and not runs:result['dimensions']['runtime_validation']['status']='not_run'
     if semantic and any(x['code'] in ('SEMANTIC_REVIEW_MISSING','SEMANTIC_REVIEW_STALE') for x in findings):result['dimensions']['semantic_review']['status']='not_run'
     if runtime and runs and any(x['dimension']=='verification' for x in findings):result['dimensions']['runtime_validation']['status']='failed'
+    observed={c['id'] for run in runs if run['status'] in ('passed','failed') for c in run['cases'] if c['outcome'] in ('passed','failed')}
+    execution_closed=bool(f.cases) and set(f.cases)<=observed and not any(x['blocking'] and x['dimension'] not in ('verification','report','knowledge') for x in findings)
+    def authentic_failure(e,historical=False):
+        ex=e.get('execution')
+        if e['source_type']!='host_observed' or not ex or ex.get('activity_id') or ex['status']!='failed' or not any(c['outcome']=='failed' for c in ex['cases']):return False
+        ignored={'REQUIREMENT_NOT_VERIFIED'} | ({'EXECUTION_INPUTS_CHANGED','SCOPE_STALE'} if historical else set())
+        return not any(x['subject']==e['id'] and x['code'] not in ignored for x in findings)
+    failures=any(c['outcome']=='failed' for run in runs for c in run['cases']) or any(authentic_failure(e) for e in f.evidence.values())
+    result['acceptance']={'execution_complete':execution_closed if runtime else None,'functional_result':('failed' if failures else 'passed' if execution_closed else 'undetermined') if runtime else 'not_assessed','requirement_ids':f.requirements,'blocking_codes':sorted({x['code'] for x in findings if x['blocking']}),'suggestion_ids':[x['id'] for x in advisory_view],'historical_failure_ids':[e['id'] for e in f.evidence.values() if authentic_failure(e,True)],'coverage_statement':COVERAGE_STATEMENT}
     validate_schema(result)
     return request,result
 
@@ -297,12 +342,13 @@ def status(task):
     witness=filesystem_manifest(w)
     if witness!=filesystem_manifest(w) or w.snapshot()!=snap:
         raise BugateError('CONCURRENT_CONFLICT','Workspace changed during execution-world verification')
-    return {'task_id':w.task['id'],'workspace_id':w.id,'workspace_snapshot':snap,'binding':w.binding,'quality_posture':{'overall':quality},'implementation_ready':ready,'execution_state':_execution_state(f),'findings':f.findings,'assessments':results,'filesystem_manifest':witness}
+    return {'scope_ref':scope_ref(f.scope),'plan_ref':plan_ref(f),'acceptance_scope':f.scope,'suggestions':suggestions(w),'coverage_statement':COVERAGE_STATEMENT,'task_id':w.task['id'],'workspace_id':w.id,'workspace_snapshot':snap,'binding':w.binding,'quality_posture':{'overall':quality},'implementation_ready':ready,'execution_state':_execution_state(f),'findings':f.findings,'assessments':results,'filesystem_manifest':witness}
 
 def _execution_state(f):
-    runs=[x['execution'] for x in f.evidence.values() if x['source_type']=='host_observed' and x['execution'] and not any(y['subject']==x['id'] for y in f.findings)]
+    runs=[x['execution'] for x in f.evidence.values() if x['source_type']=='host_observed' and x['execution'] and not x['execution'].get('activity_id') and not any(y['subject']==x['id'] for y in f.findings)]
     if not runs:return 'not_run'
-    if any(x['status']=='failed' for x in runs):return 'failed'
+    if any(x['statistics']['failed'] for x in runs):return 'failed'
+    if any(x['status']=='failed' for x in runs):return 'blocked'
     if any(x['status'] in ('cancelled','timeout','blocked') for x in runs):return 'blocked'
     if any(x['statistics']['tests']==0 or x['statistics']['passed']+x['statistics']['failed']+x['statistics']['errors']==0 for x in runs):return 'blocked'
     return 'passed'

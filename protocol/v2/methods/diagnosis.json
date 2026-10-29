@@ -2,7 +2,7 @@
   "apiVersion": "bugate.io/v2",
   "kind": "MethodSpec",
   "id": "diagnosis",
-  "version": "2.0.0",
+  "version": "2.1.0-dev.1",
   "objective": "Separate observed symptoms from hypotheses and discriminating evidence.",
   "quality_dimensions": [
     "evidence_support",

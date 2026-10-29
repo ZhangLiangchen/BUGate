@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from bugate import API_VERSION
+from bugate import API_VERSION,PROTOCOL_VERSION
 from bugate.protocol import content_digest,object_digest,canonical
 from bugate.workspace import initialize,Workspace,write_json
 
@@ -14,6 +14,7 @@ def fixture(project:Path, *, with_artifacts=True):
     profile={'apiVersion':API_VERSION,'kind':'Profile','id':'neutral-profile','version':'1','sources':[{'id':'SRC1','path':'requirements.md','digest':content_digest((project/'requirements.md').read_bytes()),'description':'Fixture requirement contract'}],'requirements':['R1'],'risks':['K1'],'goal':'Verify the bounded integer function','delivery_criteria':['business_understanding','test_design','implementation','execution','report','knowledge'],'resource_boundaries':{'network':False,'destructive':False,'notes':'Temporary generated fixture only'},'unknowns':[]}
     (project/'profile-input.json').write_bytes(canonical(profile))
     initialized=initialize(project,'same-task',project/'profile-input.json');root=Path(initialized['task_root'])
+    create_scope(Workspace(root))
     if not with_artifacts:return Workspace(root)
     (root/'sut.py').write_text('def bounded(value):\n    return max(0, value)\n')
     runner='''import importlib.util, sys, xml.etree.ElementTree as E
@@ -49,7 +50,21 @@ sys.exit(1 if failed else 0)
 
 
 def put_artifact(root,aid,kind,content):
-    value={'apiVersion':API_VERSION,'kind':'Artifact','id':aid,'artifact_type':kind,'schema_version':'2.0.0','revision':'1','source_refs':['SRC1'],'relations':[],'content':content}
+    from bugate.scope import active_scope,scope_ref,COVERAGE_STATEMENT
+    scope=active_scope(Workspace(root),False)
+    if kind=='inventory':
+        content.setdefault('scope_ref',scope_ref(scope))
+        for case in content['cases']:
+            case.setdefault('scenario_id',case['id']);case.setdefault('classification','required')
+    if kind=='semantic_review':
+        content.setdefault('scope_digest',scope['digest'] if scope else None)
+        content.setdefault('scope_decisions',[{'scenario_id':c['id'],'necessity':'accepted','reasoning':'Fixture source explicitly specifies this branch and its exact Oracle.','source_refs':scope['source_refs']} for c in scope['scenarios']] if scope else [])
+        content.setdefault('change_authorization','not_applicable' if not scope or scope['revision']==1 else 'accepted')
+    if kind=='execution_report':
+        content.setdefault('scope_ref',scope_ref(scope));content.setdefault('coverage_statement',COVERAGE_STATEMENT)
+        content.setdefault('requirement_ids',[r['id'] for r in scope['requirements']]);content.setdefault('suggestion_ids',[])
+        content.setdefault('execution_complete',True);content.setdefault('functional_result','failed' if content['outcome']=='product_failure' else 'passed')
+    value={'apiVersion':API_VERSION,'kind':'Artifact','id':aid,'artifact_type':kind,'schema_version':PROTOCOL_VERSION,'revision':'1','source_refs':['SRC1'],'relations':[],'content':content}
     value['digest']=object_digest(value);write_json(root,'artifacts/'+aid+'.json',value);return value
 
 
@@ -59,7 +74,9 @@ def review(root):
 
 
 def claim(w,kind='requirement_verified',cid='claim1',evidence_ids=None,requirements=None):
-    value={'apiVersion':API_VERSION,'kind':'Claim','id':cid,'claim_type':kind,'task_id':w.task['id'],'workspace_id':w.id,'statement':'The named claim has the referenced facts','requirement_ids':['R1'] if requirements is None else requirements,'artifact_ids':[a['id'] for a in w.objects('artifacts','Artifact')],'evidence_ids':evidence_ids if evidence_ids is not None else [e['id'] for e in w.objects('evidence','Evidence')],'workspace_snapshot':w.snapshot(),'known_gaps':[],'open_questions':[]}
+    from bugate.scope import active_scope,scope_ref,plan_ref
+    from bugate.assessment import Facts
+    value={'scope_ref':scope_ref(active_scope(w,False)),'plan_ref':plan_ref(Facts(w)),'apiVersion':API_VERSION,'kind':'Claim','id':cid,'claim_type':kind,'task_id':w.task['id'],'workspace_id':w.id,'statement':'The named claim has the referenced facts','requirement_ids':['R1'] if requirements is None else requirements,'artifact_ids':[a['id'] for a in w.objects('artifacts','Artifact')],'evidence_ids':evidence_ids if evidence_ids is not None else [e['id'] for e in w.objects('evidence','Evidence')],'workspace_snapshot':w.snapshot(),'known_gaps':[],'open_questions':[]}
     write_json(w.root,'claims/'+cid+'.json',value);return value
 
 
@@ -71,3 +88,29 @@ def run(w,run_id='one',mode='normal',**kwargs):
 def delivery_artifacts(w,evidence):
     put_artifact(w.root,'report','execution_report',{'evidence_ids':[evidence['id']],'case_ids':['C1','C2'],'outcome':'product_failure' if evidence['execution']['status']=='failed' else 'passed','findings':['Fixture defect reproduced'] if evidence['execution']['status']=='failed' else [],'limitations':['Local generated fixture only'],'analysis':'Managed execution and per-case oracle results preserved.'})
     put_artifact(w.root,'knowledge','knowledge',{'entries':[{'statement':'The fixture boundary is covered by C2','source_refs':[evidence['id']],'scope':'Generated fixture','status':'confirmed'}]})
+
+
+def create_scope(w, *, request_text=None, scenarios=None):
+    """Explicit fixture authoring, never a runtime fallback for missing scope."""
+    from bugate.scope import record_request,record_scope
+    request_text=request_text or 'Verify positive integers retain their value and negative integers produce zero. Include both the normal and negative boundary branches.'
+    request={'id':'user-request-1','message':request_text,'origin':'user','session_id':'fixture-human-session','source_event_id':'fixture-user-message-1'}
+    write_json(w.root,'.bugate/drafts/request.json',request);record_request(w.root,'.bugate/drafts/request.json')
+    citation={'request_id':request['id'],'quote':request_text}
+    basis={'kind':'user_explicit','request_refs':[citation],'explanation':'The user explicitly requested the finite acceptance branches in the source.'}
+    scenarios=scenarios or [{'id':cid,'requirement_ids':['R1'],'flow_id':'main','oracle_ids':['O1'],'expected_evidence':['Exact result matches O1'],'necessity':basis} for cid in ('C1','C2')]
+    value={'id':'acceptance','revision':1,'request_refs':[citation],'source_refs':['SRC1'],'objectives':[{'id':'goal','statement':w.profile['goal'],'request_refs':[citation]}],'subject':{'object':'Generated neutral fixture','environment_ids':['local'],'context_boundaries':['Temporary project only; no external services or credentials']},'flows':[{'id':'main','objective_ids':['goal'],'entry':'Known fixture input','key_nodes':['Invoke operation','Observe exact business state'],'terminal':'Agreed business outcome observed','branch_of':None}],'requirements':[{'id':rid,'objective_ids':['goal'],'oracle_ids':['O1'],'basis':basis} for rid in w.profile['requirements']],'risk_ids':w.profile['risks'],'scenarios':scenarios,'exclusions':[],'auxiliary':[{'id':aid,'purpose':purpose,'description':'Bounded '+purpose,'related_scenario_ids':['C1','C2'] if purpose=='diagnosis' else [],'max_runs':2 if purpose=='diagnosis' else 100,'stop_condition':'Stop at the declared bound and preserve the observed result'} for aid,purpose in [('probe','analysis'),('slow','analysis'),('read','requirements_read'),('prepare','data_preparation'),('cleanup','cleanup'),('diagnose','diagnosis')]],'assumptions':[],'completion':{'execution_complete':'all_required_scenarios_observed','functional_pass':'all_required_oracles_passed','suggestions_block':False,'preserve_failures':True},'change':{'previous_digest':None,'request_refs':[],'impact':'Initial finite scope from the direct user request'}}
+    write_json(w.root,'.bugate/drafts/scope.json',value);return record_scope(w.root,'.bugate/drafts/scope.json')
+
+
+def revise_scope(w, mutation, message='Explicitly refine the agreed acceptance contract while preserving the user goal.'):
+    from copy import deepcopy
+    from bugate.scope import active_scope,record_request,record_scope,scope_ref
+    old=active_scope(w);value=deepcopy(old);value.pop('digest');value.pop('request_digests');value['revision']+=1
+    rid='user-change-'+str(value['revision']);request={'id':rid,'message':message,'origin':'user','session_id':'fixture-human-session','source_event_id':rid}
+    write_json(w.root,'.bugate/drafts/change-request.json',request);record_request(w.root,'.bugate/drafts/change-request.json')
+    citation={'request_id':rid,'quote':message};value['change']={'previous_digest':old['digest'],'request_refs':[citation],'impact':message};mutation(value)
+    write_json(w.root,'.bugate/drafts/scope-change.json',value);new=record_scope(w.root,'.bugate/drafts/scope-change.json',expected_digest=old['digest'])
+    for a in w.objects('artifacts','Artifact'):
+        if a['artifact_type']=='inventory':a['content']['scope_ref']=scope_ref(new);a['digest']=object_digest(a);write_json(w.root,'artifacts/'+a['id']+'.json',a)
+    review(w.root);return new

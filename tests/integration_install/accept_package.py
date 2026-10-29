@@ -19,20 +19,27 @@ import time
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--package',type=Path,required=True);parser.add_argument('--dsh',required=True);parser.add_argument('--out-dir',type=Path,required=True)
+    parser=argparse.ArgumentParser();parser.add_argument('--package',type=Path,required=True);parser.add_argument('--dsh',required=True);parser.add_argument('--out-dir',type=Path,required=True);parser.add_argument('--deny-source-root',type=Path)
     args=parser.parse_args();out=args.out_dir.resolve();out.mkdir(parents=True,exist_ok=True)
     project=out/'project';project.mkdir();home=out/'dsh-home';bootstrap=out/'bootstrap';profile='bugate-package-acceptance'
     package=args.package.resolve();install=package.parent/'install_dsh.py'
     env=os.environ.copy();env.pop('PYTHONPATH',None);env.pop('PYTHONHOME',None);env['DSH_HOME']=str(home)
     records=[]
+    denied = args.deny_source_root.resolve() if args.deny_source_root else None
+    if denied and sys.platform != 'darwin':
+        parser.error('--deny-source-root requires the macOS sandbox; no simulated denial is accepted')
+    prefix = ['/usr/bin/sandbox-exec', '-p', f'(version 1) (allow default) (deny file-read* (subpath {json.dumps(str(denied))}))'] if denied else []
     def run(name,command,expected=0):
-        start=time.monotonic();p=subprocess.run(command,cwd=out,env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=600)
+        start=time.monotonic();p=subprocess.run(prefix+command,cwd=out,env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=600)
         (out/f'{name}.stdout').write_text(p.stdout);(out/f'{name}.stderr').write_text(p.stderr)
-        item={'name':name,'command':command,'returncode':p.returncode,'seconds':round(time.monotonic()-start,2),'stdout':f'{name}.stdout','stderr':f'{name}.stderr'};records.append(item)
+        item={'name':name,'command':prefix+command,'returncode':p.returncode,'seconds':round(time.monotonic()-start,2),'stdout':f'{name}.stdout','stderr':f'{name}.stderr'};records.append(item)
         (out/'commands.json').write_text(json.dumps(records,indent=2))
         assert p.returncode==expected,(name,p.returncode,p.stdout[-3000:],p.stderr[-3000:])
         print(name,'PASS',flush=True)
         return json.loads(p.stdout) if p.stdout.strip().startswith('{') else p.stdout
+    if denied:
+        probe = run('00-source-denial-probe', [sys.executable, '-c', "from pathlib import Path; import sys; p=Path(sys.argv[1])/'pyproject.toml';\ntry: p.read_text()\nexcept PermissionError: print('source access denied'); sys.exit(0)\nraise SystemExit('source denial was not enforced')", str(denied)])
+        assert probe.strip() == 'source access denied'
     bootstrap_command=[sys.executable,str(install),'--package',str(package),'--project',str(project),'--dsh-profile',profile,'--dsh',args.dsh,'--dsh-home',str(home),'--venv',str(bootstrap)]
     first=run('01-clean-bootstrap',bootstrap_command)
     assert first['data']['status']=='installed'
@@ -109,7 +116,7 @@ except OSError as e: print(str(e));sys.exit(72)
     assert json.loads((state/'installed.json').read_text())['package_version']==original_version
     run('19-post-record-doctor',cli+['doctor','integrations',*common])
     result={'status':'PASS','level':'real DSH CLI + standalone wheel/bundle; runtime hydration not asserted','package_sha256':hashlib.sha256(package.read_bytes()).hexdigest(),
-            'dsh_version':'0.2.2-alpha.2','tests':len(records),'mapping':{'HC-01':['02-repeat'],'HC-02':['03-doctor'],'HC-11':['05-stale-projection'],'HC-14':['07-rollback','09-remove','13-explicit-pending-rollback','18-post-record-recovery'],'AC-19':['01-clean-bootstrap'],'AC-20':['01-clean-bootstrap','03-doctor'],'AC-31':['02-repeat','06-upgrade','07-rollback','09-remove','14-reinstall-after-recovery']}}
+            'dsh_version':'0.2.2-alpha.2','source_denied':str(denied) if denied else None,'tests':len(records),'mapping':{'HC-01':['02-repeat'],'HC-02':['03-doctor'],'HC-11':['05-stale-projection'],'HC-14':['07-rollback','09-remove','13-explicit-pending-rollback','18-post-record-recovery'],'AC-19':['01-clean-bootstrap'],'AC-20':['01-clean-bootstrap','03-doctor'],'AC-31':['02-repeat','06-upgrade','07-rollback','09-remove','14-reinstall-after-recovery']}}
     (out/'result.json').write_text(json.dumps(result,indent=2));print(json.dumps(result,indent=2))
 
 

@@ -20,7 +20,7 @@ capabilities:
     surface: Configured filesystem provider and session workingDirectory; ambiguity fails closed.
   protocol_binding:
     status: supported
-    surface: Task protocol.lock.json and atomically persisted session identity pin.
+    surface: Task protocol.lock.json, atomically persisted session identity pin, and current ScopeContract/inventory references.
   prepared_protocol_context:
     status: supported
     surface: Canonical schema validation and unchanged core render.content.
@@ -42,7 +42,7 @@ capabilities:
     surface: Generated MethodSpec projection with protocol and content digests.
   explicit_assessment:
     status: supported
-    surface: bugate_assess delegates to the shared core; turn-stopping rework is bounded.
+    surface: Scope authoring and execution admission delegate to the shared core; exact digests are rechecked before capture; suggestions never trigger completion rework.
   diagnostics:
     status: supported
     surface: bugate doctor and structured runtime errors.

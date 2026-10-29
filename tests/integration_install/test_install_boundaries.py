@@ -116,13 +116,20 @@ class InstallBoundaries(unittest.TestCase):
     def test_v2_bundle_core_pin_and_legacy_version_rejection(self):
         resources = self.root / 'resources'
         resources.mkdir()
-        compatibility = {'core_version': '2.0.0a2', 'protocol_version': '2.0.0',
+        compatibility = {'core_version': '2.1.0a1', 'protocol_version': '2.1.0-dev.1',
                          'dsh_version': integration.HOST_VERSION}
         target = resources / 'compatibility.json'
         target.write_text(json.dumps(compatibility))
-        self.assertEqual(integration._bundle_core_version(self.root), '2.0.0a2')
-        for key, value in [('core_version', '0.4.3'), ('core_version', '2.0.0;echo bad'),
-                           ('protocol_version', '1.3'), ('dsh_version', '0.0.0')]:
+        self.assertEqual(integration._bundle_core_version(self.root), '2.1.0a1')
+        # Installation archives remain restorable; this does not migrate tasks.
+        for version in ('2.0.0a1', '2.0.0a2'):
+            target.write_text(json.dumps({**compatibility, 'core_version': version,
+                                         'protocol_version': '2.0.0'}))
+            self.assertEqual(integration._bundle_core_version(self.root), version)
+        for key, value in [('core_version', '0.4.3'), ('core_version', '2.1.0;echo bad'),
+                           ('core_version', '2.0.0a2'), ('protocol_version', '1.3'),
+                           ('protocol_version', '2.0.0'), ('protocol_version', '2.2.0'),
+                           ('dsh_version', '0.0.0')]:
             with self.subTest(key=key, value=value):
                 target.write_text(json.dumps({**compatibility, key: value}))
                 with self.assertRaises(integration.IntegrationError) as caught:

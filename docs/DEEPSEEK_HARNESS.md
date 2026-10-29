@@ -10,9 +10,9 @@ Task artifacts stay in an external test repository. This is the only product rou
 
 | Component | Compatibility target |
 |---|---|
-| Python distribution | `bugate-core==2.0.0a2`, Python 3.11+ |
-| Protocol | Exact `2.0.0` bundle digest; no automatic migration |
-| Native package | `@bugate/deepseek-harness@2.0.0-dev.2` |
+| Python distribution | `bugate-core==2.1.0a1`, Python 3.11+ |
+| Protocol | Exact `2.1.0-dev.1` bundle digest; no automatic migration |
+| Native package | `@bugate/deepseek-harness@2.1.0-dev.1` |
 | DSH | `0.2.2-alpha.2`, source `f3803c96974ad4a94195fb97e5c637e9c2a3afe3` |
 | Node | DSH requires 24.9.0+ |
 
@@ -34,7 +34,7 @@ target version. Replace the example paths below with your chosen directories.
 ```sh
 shasum -a 256 -c SHA256SUMS
 python3 install_dsh.py \
-  --package ./bugate-deepseek-harness-2.0.0-dev.2.tgz \
+  --package ./bugate-deepseek-harness-2.1.0-dev.1.tgz \
   --venv /absolute/path/bugate-bootstrap \
   --project /absolute/path/test-repo \
   --dsh-profile bugate \
@@ -75,7 +75,8 @@ BUGATE=/absolute/path/bugate-bootstrap/bin/bugate
 ```
 
 Each task owns `task.json`, `profile.json`, `.bugate/protocol.lock.json`,
-`artifacts/`, `evidence/`, `claims/`, `assessments/` and `logs/`. Identity includes
+`scope/`, `suggestions/`, `artifacts/`, `evidence/`, `claims/`, `assessments/` and
+`logs/`. Immutable request receipts and scope history are kept under `.bugate/`. Identity includes
 the canonical project/task locations and exact Protocol/Profile bindings. The
 same task ID in two projects has distinct identity. Multiple tasks require an
 explicit selection (`setup --task-path`); the adapter does not guess the latest.
@@ -93,9 +94,60 @@ content integrity metadata, not semantic approval.
 
 `bugate_run_test` accepts a host-configured command ID, not model-supplied argv.
 Configure `executionCommands` in the owned plugin configuration with argv,
-case IDs, report path and `purpose: test` or `exploration`. Test runs require
+case IDs, report path and the required/auxiliary classification below. Test runs require
 current accepted design; exploration can collect missing facts. The explicit CLI
 collector `bugate execution run --help` exposes the same capture primitive.
+
+## Scope creation, inspection and change
+
+DSH captures eligible direct user messages as immutable `ScopeRequest` receipts.
+The model uses `bugate_scope` to read them and `bugate_record_scope` to register a
+contract draft; it cannot manufacture receipts through a model-facing tool. For
+an explicit human-operated CLI workflow, the same intake is `scope request` with
+a task-local JSON input following `scope_request.schema.json`. That CLI boundary
+is trusted local operator input, not hostile same-user authentication.
+
+```sh
+"$BUGATE" scope show --task /absolute/path/test-repo/test-task/REQ-001 --json
+"$BUGATE" scope record --task /absolute/path/test-repo/test-task/REQ-001 \
+  --input .bugate/drafts/scope.json --json
+"$BUGATE" scope check --task /absolute/path/test-repo/test-task/REQ-001 --json
+"$BUGATE" suggestion record --task /absolute/path/test-repo/test-task/REQ-001 \
+  --input .bugate/drafts/suggestion.json --json
+"$BUGATE" suggestion list --task /absolute/path/test-repo/test-task/REQ-001 --json
+"$BUGATE" execution authorize --task /absolute/path/test-repo/test-task/REQ-001 \
+  --case CASE-1 --environment-id local-fixture --json
+```
+
+Inputs live inside the selected task. `scope record` fills identity and digest
+metadata; the draft supplies the goal, source quotations, requirements, flows,
+scenario necessity, auxiliary bounds, assumptions, completion policy and change
+impact. The exact fields are canonical in `scope_contract.schema.json`.
+`scope show` exposes the active contract, request receipts and suggestions; prior
+contracts remain in the immutable `.bugate/scope-history/` records. A revision requires a new
+actual user request, incremented revision, previous digest, impact explanation
+and `--expected-digest` with the current contract digest. Every revision must
+preserve the locked Profile requirement/risk denominator. A denominator change
+returns `SCOPE_PROFILE_CHANGE_REQUIRED`: create an explicit new Profile version
+and a new task with `init`, optionally declaring the prior contract snapshot as a
+Profile source for traceability. Preserve the old task, evidence and failures.
+There is no same-task Profile rebind. User receipts establish choice, not new
+domain evidence outside Profile sources. Reassess the inventory
+and claims after recording it; old assessments cannot authorize the new scope.
+
+`bugate_check_scope` performs the same core check. `bugate_record_suggestion`
+stores optional ideas without creating a required case or execution plan.
+In `executionCommands`, required cases use `purpose: test` and declared `caseIds`.
+Auxiliary commands use an `activityId` declared by the contract and no acceptance
+case IDs; `purpose` can be `auxiliary`, `diagnostic` or `exploration`. The chosen
+`environmentId` must be allowed by the contract. Diagnosis also requires a
+current related failure and remaining declared run budget. Reads and analysis
+remain available when design prerequisites are missing. Every command remains
+subject to the host's permissions and configured providers.
+
+See [the four scope examples](ACCEPTANCE_SCOPE.md). The default does not create a
+full risk matrix. Explicit normal, boundary, rejection or permission requirements
+remain required; out-of-scope suggestions do not trigger completion rework.
 
 ## Quality and evidence semantics
 
@@ -176,19 +228,26 @@ missing unselected host is nonfatal; a broken selected integration fails.
 
 Install the Python project in a dedicated environment; build the adapter with
 `npm run build` in `adapters/deepseek-harness/plugin`, then run
-`python packaging/build_dsh.py --out-dir dist/v2-dsh-only`. Development
+`python packaging/build_dsh.py --out-dir dist/scope-convergence`. Development
 dependencies are not shipped. CI executes only current v2 core, distribution and native DSH acceptance.
 
 Acceptance distinguishes Python contracts, real DSH plus a deterministic model
 fixture, and optional live-model testing. A deterministic fixture driving the
 real DSH Agent loop is not a measurement of DeepSeek model effectiveness. Exact
-commands, artifact hashes, 49-item HC/AC mapping and remaining gaps belong in the
+commands, artifact hashes, adopted requirement/Oracle checks and applicable
+regression results belong in the
 delivery report, not in capability claims inferred from tool registration.
 
-The [current delivery contract](reports/v2-dsh-only/CONTRACT.md) and
-[acceptance matrix](reports/v2-dsh-only/acceptance.json) record applicability and actual evidence.
-AC-33 is retired by the explicit v2-only scope decision, not reported as PASS.
+The [current implementation contract](reports/scope-convergence/CONTRACT.md) and
+[adopted verification mapping](reports/scope-convergence/ACCEPTANCE_MATRIX.md) define
+this delivery. Historical v2-only reports remain historical records. No live-model
+effectiveness or unexecuted platform result is implied by the CI configuration.
 
 Supported v2 bundle upgrade/rollback preserves prior installation archives.
 A changed core or protocol digest never silently migrates an existing task.
 Create a new task using current v2 inputs; old-format conversion is unsupported.
+
+After a scope revision, this release requires new executions for the new contract;
+old evidence and failures remain preserved history. Selective reuse is not
+implemented. This conservative invalidation also applies when some requirement
+fields happen to be unchanged.

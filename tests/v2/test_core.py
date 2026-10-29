@@ -18,7 +18,7 @@ from bugate.assessment import assess,evaluate,status,validation
 from bugate.context import prepare
 from bugate.evidence import execute,record
 from bugate.errors import BugateError
-from helpers import fixture,claim,run,put_artifact,review,delivery_artifacts
+from helpers import fixture,claim,run,put_artifact,review,delivery_artifacts,create_scope
 
 class CoreAcceptance(unittest.TestCase):
     def setUp(self):
@@ -119,20 +119,20 @@ class CoreAcceptance(unittest.TestCase):
         with self.assertRaises(BugateError) as cm:prepare(self.w.root,10)
         self.assertEqual(cm.exception.code,'CONTEXT_BUDGET_TOO_SMALL')
     def test_AC15_missing_process(self):
-        with self.assertRaises(BugateError) as cm:execute(self.w.root,['/nonexistent/python'],run_id='missing')
+        with self.assertRaises(BugateError) as cm:execute(self.w.root,['/nonexistent/python'],run_id='missing',activity_id='probe')
         self.assertEqual(cm.exception.code,'DEPENDENCY_MISSING')
     def test_AC15_invalid_json_cli(self):
         p=self.w.root/'claims/bad.json';p.write_text('{bad');proc=subprocess.run([sys.executable,'-m','bugate','assess','--task',str(self.w.root),'--claim',str(p),'--json'],capture_output=True,text=True)
         self.assertEqual(proc.returncode,2);v=json.loads(proc.stdout);self.assertEqual(v['errors'][0]['code'],'STRUCTURE_INVALID')
     def test_AC15_output_limit(self):
-        with self.assertRaises(BugateError) as cm:execute(self.w.root,[sys.executable,'-c','print("x"*100000)'],run_id='large',max_output=100)
+        with self.assertRaises(BugateError) as cm:execute(self.w.root,[sys.executable,'-c','print("x"*100000)'],run_id='large',activity_id='probe',max_output=100)
         self.assertEqual(cm.exception.code,'OUTPUT_LIMIT');self.assertEqual(self.w.read('evidence/run-large.json')['execution']['status'],'blocked')
     def test_AC16_timeout_terminates_process(self):
-        with self.assertRaises(BugateError) as cm:execute(self.w.root,[sys.executable,'-c','import os,time;open("pid","w").write(str(os.getpid()));time.sleep(30)'],run_id='timeout',timeout=.2)
+        with self.assertRaises(BugateError) as cm:execute(self.w.root,[sys.executable,'-c','import os,time;open("pid","w").write(str(os.getpid()));time.sleep(30)'],run_id='timeout',activity_id='probe',timeout=.2)
         self.assertEqual(cm.exception.exit_code,124);pid=int((self.w.root/'pid').read_text())
         with self.assertRaises(ProcessLookupError):os.kill(pid,0)
     def test_AC16_cancel_cli_terminates_process(self):
-        proc=subprocess.Popen([sys.executable,'-m','bugate','execution','run','--task',str(self.w.root),'--run-id','cancel','--json','--',sys.executable,'-c','import os,time;open("cancelpid","w").write(str(os.getpid()));time.sleep(30)'],stdout=subprocess.PIPE,text=True)
+        proc=subprocess.Popen([sys.executable,'-m','bugate','execution','run','--task',str(self.w.root),'--run-id','cancel','--activity-id','probe','--json','--',sys.executable,'-c','import os,time;open("cancelpid","w").write(str(os.getpid()));time.sleep(30)'],stdout=subprocess.PIPE,text=True)
         deadline=time.monotonic()+10
         while not (self.w.root/'cancelpid').exists() and time.monotonic()<deadline:time.sleep(.03)
         self.assertTrue((self.w.root/'cancelpid').exists());pid=int((self.w.root/'cancelpid').read_text());proc.send_signal(signal.SIGTERM);out,_=proc.communicate(timeout=5);self.assertEqual(proc.returncode,130);self.assertEqual(json.loads(out)['invocation'],'cancelled')
@@ -140,8 +140,8 @@ class CoreAcceptance(unittest.TestCase):
     def test_AC17_run_idempotency(self):
         a=run(self.w);b=run(self.w);self.assertEqual(a,b);self.assertEqual(len(self.w.objects('evidence','Evidence')),1)
     def test_AC17_unknown_execution_is_not_replayed(self):
-        with self.assertRaises(BugateError):execute(self.w.root,['/nonexistent/python'],run_id='unknown')
-        with self.assertRaises(BugateError) as cm:execute(self.w.root,['/nonexistent/python'],run_id='unknown')
+        with self.assertRaises(BugateError):execute(self.w.root,['/nonexistent/python'],run_id='unknown',activity_id='probe')
+        with self.assertRaises(BugateError) as cm:execute(self.w.root,['/nonexistent/python'],run_id='unknown',activity_id='probe')
         self.assertEqual(cm.exception.code,'EXECUTION_FAILED_NO_EFFECT')
     def test_AC17_atomic_failure_keeps_previous(self):
         atomic_write(self.w.root,'atomic.txt',b'old')
@@ -192,7 +192,7 @@ class CoreAcceptance(unittest.TestCase):
     def test_knowledge_only_delivery_does_not_require_execution_report(self):
         other=self.project/'knowledge-only';other.mkdir();fixture(other)
         profile=json.loads((other/'profile-input.json').read_text());profile['delivery_criteria']=['knowledge'];(other/'profile-input.json').write_bytes(canonical(profile))
-        initialized=initialize(other,'knowledge-task',other/'profile-input.json');w=Workspace(initialized['task_root'])
+        initialized=initialize(other,'knowledge-task',other/'profile-input.json');w=Workspace(initialized['task_root']);create_scope(w)
         put_artifact(w.root,'learning','knowledge',{'entries':[{'statement':'Source defines a zero boundary','source_refs':['SRC1'],'scope':'Synthetic contract','status':'draft'}]})
         claim(w,'task_delivery_complete');self.assertEqual(assess(w.root,'claims/claim1.json')['verdict'],'satisfied')
     def test_retired_artifact_format_is_explicitly_rejected(self):
@@ -267,7 +267,7 @@ class CoreAcceptance(unittest.TestCase):
         self.assertEqual(cm.exception.code,'EXECUTION_OUTCOME_UNKNOWN');self.assertEqual((self.w.root/'logs/effect-count').read_text(),'1');self.assertEqual(list((self.w.root/'evidence').glob('.pending-*')),[])
     def test_AC16_cancel_terminates_process_group_child(self):
         code='import subprocess,sys,os,time,signal;child=subprocess.Popen([sys.executable,"-c","import time;time.sleep(30)"]);open("childpid","w").write(str(child.pid));open("parentpid","w").write(str(os.getpid()));signal.signal(signal.SIGTERM,lambda *args:(child.wait(),sys.exit(0)));time.sleep(30)'
-        proc=subprocess.Popen([sys.executable,'-m','bugate','execution','run','--task',str(self.w.root),'--run-id','cancel-group','--json','--',sys.executable,'-c',code],stdout=subprocess.PIPE,text=True)
+        proc=subprocess.Popen([sys.executable,'-m','bugate','execution','run','--task',str(self.w.root),'--run-id','cancel-group','--activity-id','probe','--json','--',sys.executable,'-c',code],stdout=subprocess.PIPE,text=True)
         deadline=time.monotonic()+10
         while not (self.w.root/'parentpid').exists() and time.monotonic()<deadline:time.sleep(.03)
         self.assertTrue((self.w.root/'parentpid').exists());pids=[int((self.w.root/name).read_text()) for name in ('parentpid','childpid')]
@@ -332,7 +332,9 @@ class CoreAcceptance(unittest.TestCase):
         evidence=run(self.w);c=claim(self.w);request,result=evaluate(self.w,c)
         objects=[self.w.binding,self.w.task,self.w.profile,self.w.objects('artifacts','Artifact')[0],evidence,c,request,result,prepare(self.w.root),methods()[0],{'apiVersion':API_VERSION,'kind':'ExecutionRecord','task_id':self.w.task['id'],'workspace_id':self.w.id,'execution':evidence['execution']},{'apiVersion':API_VERSION,'kind':'CommandResult','operation':'version','request_id':'request','invocation':'completed','data':{},'errors':[]}]
         for p in (resource_root()/'schemas').glob('*.json'):Draft202012Validator.check_schema(json.loads(p.read_text()))
-        self.assertEqual(len(objects),12)
+        from bugate.scope import active_scope,record_suggestion
+        objects.extend([active_scope(self.w),self.w.read('.bugate/scope-requests/user-request-1.json'),record_suggestion(self.w.root,value={'id':'schema-example','description':'Optional future exploration','rationale':'Outside this scope','source_refs':['SRC1']})])
+        self.assertEqual(len(objects),15)
         for value in objects:
             kind=value['kind'];validate_schema(value)
             for required in schema(kind)['required']:
@@ -370,7 +372,7 @@ class CoreAcceptance(unittest.TestCase):
             for code in values:
                 with self.subTest(file=path.name,code=code):self.assertIn(code,codes)
     def test_repeated_argv_is_valid(self):
-        e=execute(self.w.root,[sys.executable,'-c','import sys;print(sys.argv)','same','same'],run_id='argv');self.assertEqual(e['execution']['argv'][-2:],['same','same']);validate_schema(e)
+        e=execute(self.w.root,[sys.executable,'-c','import sys;print(sys.argv)','same','same'],run_id='argv',activity_id='probe');self.assertEqual(e['execution']['argv'][-2:],['same','same']);validate_schema(e)
     def test_business_claim_does_not_require_future_execution(self):self.assertEqual(self.result('business_understanding_complete')['verdict'],'satisfied')
     def test_CLI_envelope_operations_and_quality_exit(self):
         p=subprocess.run([sys.executable,'-m','bugate','protocol','prepare','--task',str(self.w.root),'--json'],capture_output=True,text=True);self.assertEqual(p.returncode,0);self.assertEqual(json.loads(p.stdout)['operation'],'protocol.prepare')

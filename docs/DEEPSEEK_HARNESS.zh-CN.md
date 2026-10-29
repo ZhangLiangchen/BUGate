@@ -9,9 +9,9 @@ Agent 循环、工具执行和有界返工。任务工件保存在外部测试�
 
 | 组件 | 兼容目标 |
 |---|---|
-| Python 分发 | `bugate-core==2.0.0a2`，Python 3.11+ |
-| Protocol | 精确 `2.0.0` bundle 摘要，不自动迁移 |
-| 原生包 | `@bugate/deepseek-harness@2.0.0-dev.2` |
+| Python 分发 | `bugate-core==2.1.0a1`，Python 3.11+ |
+| Protocol | 精确 `2.1.0-dev.1` bundle 摘要，不自动迁移 |
+| 原生包 | `@bugate/deepseek-harness@2.1.0-dev.1` |
 | DSH | `0.2.2-alpha.2`，源码 `f3803c96974ad4a94195fb97e5c637e9c2a3afe3` |
 | Node | DSH 要求 24.9.0+ |
 
@@ -31,7 +31,7 @@ DSH 本身须已安装为精确目标版本。以下示例路径需替换为选�
 ```sh
 shasum -a 256 -c SHA256SUMS
 python3 install_dsh.py \
-  --package ./bugate-deepseek-harness-2.0.0-dev.2.tgz \
+  --package ./bugate-deepseek-harness-2.1.0-dev.1.tgz \
   --venv /absolute/path/bugate-bootstrap \
   --project /absolute/path/test-repo \
   --dsh-profile bugate \
@@ -67,8 +67,9 @@ BUGATE=/absolute/path/bugate-bootstrap/bin/bugate
   --input evidence-input/import.json --json
 ```
 
-任务拥有 `task.json`、`profile.json`、`.bugate/protocol.lock.json`、`artifacts/`、
-`evidence/`、`claims/`、`assessments/` 和 `logs/`。身份包含规范化项目/任务路径及
+任务拥有 `task.json`、`profile.json`、`.bugate/protocol.lock.json`、`scope/`、
+`suggestions/`、`artifacts/`、`evidence/`、`claims/`、`assessments/` 和 `logs/`，
+不可变请求收据与范围历史保存在 `.bugate/` 下。身份包含规范化项目/任务路径及
 精确 Protocol/Profile 绑定；不同项目中相同 task id 不共享身份。多任务须明确选择
 （`setup --task-path`），适配器不会猜测“最近任务”。
 
@@ -81,9 +82,30 @@ canonical digest；更新已有工件使用 `--expected-digest` 防止误覆盖�
 完整性元数据，不代表语义已接受。
 
 `bugate_run_test` 接受宿主配置的 command id，不接受模型任意 argv。宿主插件配置的
-`executionCommands` 指定 argv、case IDs、report 路径及 `purpose: test` 或
-`exploration`。测试执行要求当前设计已满足；探索命令可以收集缺失事实。显式 CLI
+`executionCommands` 指定 argv、case IDs、report 路径及下文的必需/辅助活动分类。测试执行要求当前设计已满足；探索命令可以收集缺失事实。显式 CLI
 采集入口见 `bugate execution run --help`。
+
+## 范围创建、查看与变更
+
+DSH 将允许的用户直接消息登记为不可变 `ScopeRequest` 收据。模型通过 `bugate_scope` 读取，再用 `bugate_record_scope` 登记契约草稿；模型工具不提供伪造收据入口。人工直接操作 CLI 时可用 `scope request` 登记符合 `scope_request.schema.json` 的任务内 JSON。此 CLI 是可信本地操作者输入边界，不防御控制同用户全部文件的恶意操作者。
+
+```sh
+"$BUGATE" scope show --task /absolute/path/test-repo/test-task/REQ-001 --json
+"$BUGATE" scope record --task /absolute/path/test-repo/test-task/REQ-001 \
+  --input .bugate/drafts/scope.json --json
+"$BUGATE" scope check --task /absolute/path/test-repo/test-task/REQ-001 --json
+"$BUGATE" suggestion record --task /absolute/path/test-repo/test-task/REQ-001 \
+  --input .bugate/drafts/suggestion.json --json
+"$BUGATE" suggestion list --task /absolute/path/test-repo/test-task/REQ-001 --json
+"$BUGATE" execution authorize --task /absolute/path/test-repo/test-task/REQ-001 \
+  --case CASE-1 --environment-id local-fixture --json
+```
+
+输入文件位于选定任务内。`scope record` 补身份和摘要元数据；草稿提供目标、来源原文引用、要求、流程、场景必要性、辅助边界、假设、完成规则和变更影响，精确字段以 `scope_contract.schema.json` 为准。`scope show` 展示当前契约、请求收据和建议；历史契约保存在不可变 `.bugate/scope-history/` 记录中。变更需要新的真实用户请求、递增版本、前序摘要、影响说明，以及带当前契约摘要的 `--expected-digest`。每个版本须保持锁定 Profile 需求/风险分母；分母变化返回 `SCOPE_PROFILE_CHANGE_REQUIRED`，需显式新 Profile 版本及 `init` 新任务，可将旧契约快照列为新 Profile source 保留追溯。原任务、证据和失败保留，不提供同任务 Profile rebind。用户收据证明选择，不能替代 Profile 领域证据。登记后重新评估 inventory 和声明，旧评估不能授权新范围。
+
+`bugate_check_scope` 使用同一核心检查；`bugate_record_suggestion` 保存可选想法，不创建必需用例或执行计划。`executionCommands` 中，必需用例使用 `purpose: test` 和声明的 `caseIds`；辅助命令使用契约中已有 `activityId`，不填写验收用例 ID，`purpose` 可为 `auxiliary`、`diagnostic` 或 `exploration`。`environmentId` 必须在允许环境内。诊断还需要当前关联失败及剩余运行预算。缺少设计前提时，读取和分析仍可进行。所有命令继续服从宿主权限与 provider。
+
+参见[四类范围示例](ACCEPTANCE_SCOPE.zh-CN.md)。默认不生成完整风险矩阵；明确要求的正常、边界、拒绝或权限场景仍为必需项，范围外建议不触发完成返工。
 
 ## 质量与证据语义
 
@@ -150,15 +172,17 @@ DSH session pin 及其原子临时文件位于该目录，受管模型写入不�
 ## 开发与验证证据
 
 在独立 Python 环境安装本项目；进入 `adapters/deepseek-harness/plugin` 运行
-`npm run build`，随后运行 `python packaging/build_dsh.py --out-dir dist/v2-dsh-only`。
+`npm run build`，随后运行 `python packaging/build_dsh.py --out-dir dist/scope-convergence`。
 
 验收区分 Python 契约、真实 DSH 加确定性模型 fixture，以及可选 live-model 测试。
 确定性 fixture 驱动真实 DSH Agent loop 不等于 DeepSeek 模型效果评测。精确命令、
-产物摘要、49 项 HC/AC 映射和真实缺口以交付报告为准，不能由工具注册成功推断。
+产物摘要、已采纳需求/Oracle 验证和适用回归结果及真实缺口以交付报告为准，不能由工具注册成功推断。
 
 
 ## 本次范围与升级边界
 
 当前仅交付 v2 + DSH；旧宿主自动入口、安装器与格式已退役，不支持 v0.x 自动迁移。
-当前验收以[合同](reports/v2-dsh-only/CONTRACT.md)与[逐项矩阵](reports/v2-dsh-only/acceptance.json)为准。AC-33 因本次范围变更退役，不标 PASS。
+当前验收以[实现合同](reports/scope-convergence/CONTRACT.zh-CN.md)与[采纳验证映射](reports/scope-convergence/ACCEPTANCE_MATRIX.zh-CN.md)为准。此前 v2-only 报告作为历史记录保留；CI 配置不证明未执行平台通过，也不证明 live-model 效果。
 支持 v2 bundle 安装升级和按留存安装归档 rollback；core 或协议摘要变化不会静默迁移现有任务，应按当前 v2 输入建立新任务。
+
+范围变更后，本版本要求针对新契约重新执行；旧证据和失败继续作为历史保留。不实现选择性复用，即使部分要求字段未变也不恢复旧授权。

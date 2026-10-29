@@ -1,0 +1,27 @@
+{
+  "apiVersion": "bugate.io/v2",
+  "kind": "MethodSpec",
+  "id": "acceptance_scope",
+  "version": "2.1.0-dev.1",
+  "objective": "Establish the smallest sufficient evidence closure for the finite user goal without adding objectives or weakening business assertions.",
+  "quality_dimensions": [
+    "source_authority",
+    "scenario_necessity",
+    "scope_freshness",
+    "completion_convergence"
+  ],
+  "required_outputs": [
+    "ScopeContract",
+    "semantic_review"
+  ],
+  "recommended_considerations": [
+    "Keep direct user intent, necessary deductions, unresolved blocking assumptions and out-of-scope suggestions distinct.",
+    "Record only actual user messages as ScopeRequest; model claims of consent are not authority.",
+    "Review every required scenario against an in-scope requirement, flow, Oracle and expected evidence.",
+    "A completed execution may reveal a functional failure. Suggestions remain nonblocking.",
+    "Reassess changes; preserve prior contracts and failures. Reuse evidence only after exact applicability checks."
+  ],
+  "hard_constraint_refs": [
+    "core-quality-invariants"
+  ]
+}

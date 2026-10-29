@@ -76,12 +76,20 @@ def quality_models(facts, phase):
                     facts.add('MODEL_REFERENCE_INVALID', dimension['id'], 'Included case does not implement the modeled dimension', phase, basis=[cid])
         for artifact in facts.by_type.get('adversarial_review', []):
             facts.unique(adversarial, artifact['content']['findings'], artifact['id'])
-            if artifact['content']['residual_risks']:
-                facts.add('ADVERSARIAL_UNRESOLVED', artifact['id'], 'Unresolved adversarial residual risks remain', phase, basis=artifact['content']['residual_risks'])
+            from .scope import suggestions
+            advisory_ids={a['id'] for a in suggestions(facts.w) if a['status']=='suggested'}
+            for residual in artifact['content']['residual_risks']:
+                if residual['classification']=='in_scope':
+                    if not (residual['risk_ids'] or residual['requirement_ids']) or not set(residual['risk_ids'])<=set(facts.risks) or not set(residual['requirement_ids'])<=set(facts.requirements):
+                        facts.add('SCOPE_AMBIGUITY',artifact['id'],'Residual risk has no resolved in-scope reference',phase)
+                    facts.add('ADVERSARIAL_UNRESOLVED',artifact['id'],'Unresolved in-scope adversarial risk remains',phase,basis=residual['risk_ids']+residual['requirement_ids'])
+                elif residual['suggestion_id'] not in advisory_ids or residual['risk_ids'] or residual['requirement_ids']:
+                    facts.add('SCOPE_AMBIGUITY',artifact['id'],'Out-of-scope residual must reference a real non-executable suggestion and no in-scope requirement',phase)
         for item in adversarial.values():
-            for field, index in [('proposition_ids', facts.props), ('oracle_ids', facts.oracles), ('risk_ids', facts.w.task['risks']), ('case_ids', facts.cases)]:
+            for field, index in [('proposition_ids', facts.props), ('oracle_ids', facts.oracles), ('risk_ids', facts.risks), ('case_ids', facts.cases)]:
                 for name in item[field]:ref(item['id'], name, index)
-            if item['disposition'] == 'unresolved':
+            in_scope=bool(set(item['risk_ids'])&set(facts.risks) or set(item['case_ids'])&set(facts.cases))
+            if item['disposition'] == 'unresolved' and in_scope:
                 facts.add('ADVERSARIAL_UNRESOLVED', item['id'], 'Adversarial finding requires an evidenced disposition', phase)
             if item['disposition'] == 'included':
                 cases = [facts.cases[cid] for cid in item['case_ids'] if cid in facts.cases]

@@ -8,7 +8,7 @@ from referencing import Registry, Resource
 from . import API_VERSION, PROTOCOL_VERSION, __version__
 from .errors import BugateError
 
-SCHEMAS = {name: ''.join('_'+c.lower() if c.isupper() else c for c in name).lstrip('_') for name in ('ProtocolBinding','TestTask','Artifact','Evidence','Claim','AssessmentRequest','AssessmentResult','Profile','PreparedProtocolContext','MethodSpec','CommandResult','ExecutionRecord')}
+SCHEMAS = {name: ''.join('_'+c.lower() if c.isupper() else c for c in name).lstrip('_') for name in ('ProtocolBinding','TestTask','Artifact','Evidence','Claim','AssessmentRequest','AssessmentResult','Profile','PreparedProtocolContext','MethodSpec','CommandResult','ExecutionRecord','ScopeContract','ScopeRequest','Suggestion')}
 
 def resource_root() -> Path:
     installed = Path(__file__).parent / 'resources' / 'protocol' / 'v2'

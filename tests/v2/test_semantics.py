@@ -9,7 +9,7 @@ from bugate.protocol import object_digest, validate_schema, quality_rules, metho
 from bugate.workspace import Workspace, write_json, initialize
 from bugate.assessment import evaluate
 from bugate.context import prepare
-from helpers import fixture, claim, put_artifact, review
+from helpers import fixture, claim, put_artifact, review, create_scope, revise_scope
 
 
 class NativeSemantics(unittest.TestCase):
@@ -35,6 +35,10 @@ class NativeSemantics(unittest.TestCase):
         for a in self.w.objects('artifacts','Artifact'):write_json(Path(target),'artifacts/'+a['id']+'.json',a)
         (Path(target)/'tests.py').write_bytes((self.w.root/'tests.py').read_bytes())
         self.w=Workspace(target)
+        scope=create_scope(self.w)
+        from bugate.scope import scope_ref
+        self.mutate('inventory',lambda c:c.update(scope_ref=scope_ref(scope)))
+        review(self.w.root)
     def test_old_artifact_and_old_profile_are_rejected(self):
         old={'gate_status':'passed','cases':[]}
         for kind in ('Artifact','Profile'):
@@ -69,7 +73,8 @@ class NativeSemantics(unittest.TestCase):
         def decision(c):
             d=deepcopy(c['decisions'][0]);d['oracle_id']='O2';c['decisions'].append(d)
         self.mutate('testability',decision)
-        self.mutate('inventory',lambda c:c['cases'][0]['oracle_ids'].append('O2'));review(self.w.root)
+        self.mutate('inventory',lambda c:c['cases'][0]['oracle_ids'].append('O2'))
+        revise_scope(self.w,lambda s:(s['requirements'][0]['oracle_ids'].append('O2'),s['scenarios'][0]['oracle_ids'].append('O2')),'Also verify the second observable result O2 for the normal branch.');review(self.w.root)
         self.assertEqual(self.result()['verdict'],'satisfied',self.result()['findings'])
     def test_oracle_specific_layer_cannot_borrow_another_oracle_layer(self):
         def extra(c):
@@ -101,7 +106,15 @@ class NativeSemantics(unittest.TestCase):
     def test_included_adversarial_finding_requires_actual_case(self):
         self.adversarial();self.mutate('adversarial_review',lambda c:c['findings'][0].update(case_ids=[]));self.reviewed_models();self.assertIn('ADVERSARIAL_CASE_UNMAPPED',self.codes())
     def test_unresolved_adversarial_risk_is_not_hidden_by_review(self):
-        self.adversarial();self.mutate('adversarial_review',lambda c:c.update(residual_risks=['Unmeasured boundary']));self.reviewed_models();self.assertIn('ADVERSARIAL_UNRESOLVED',self.codes())
+        self.adversarial();self.mutate('adversarial_review',lambda c:c.update(residual_risks=[{'classification':'in_scope','risk_ids':['K1'],'requirement_ids':['R1'],'suggestion_id':None,'rationale':'The requested negative boundary is not resolved'}]));self.reviewed_models();self.assertIn('ADVERSARIAL_UNRESOLVED',self.codes())
+    def test_out_of_scope_typed_residual_is_nonblocking_advice(self):
+        from bugate.scope import record_suggestion
+        record_suggestion(self.w.root,value={'id':'optional-load','description':'Possible load exploration','rationale':'No load acceptance was requested','source_refs':['SRC1']})
+        self.adversarial();self.mutate('adversarial_review',lambda c:c.update(residual_risks=[{'classification':'suggestion','risk_ids':[],'requirement_ids':[],'suggestion_id':'optional-load','rationale':'Outside the finite integer function branches'}]));self.reviewed_models()
+        self.assertNotIn('ADVERSARIAL_UNRESOLVED',self.codes());self.assertEqual(self.result()['verdict'],'satisfied')
+    def test_ambiguous_residual_cannot_be_silently_reclassified(self):
+        self.adversarial();self.mutate('adversarial_review',lambda c:c.update(residual_risks=[{'classification':'suggestion','risk_ids':['K1'],'requirement_ids':[],'suggestion_id':'missing','rationale':'Unclear scope relationship'}]));self.reviewed_models()
+        self.assertIn('SCOPE_AMBIGUITY',self.codes())
     def test_excluded_adversarial_finding_requires_rationale(self):
         a=self.adversarial();a['content']['findings'][0].update(disposition='excluded',case_ids=[],rationale=' ');a['digest']=object_digest(a)
         with self.assertRaises(BugateError):validate_schema(a,'Artifact')

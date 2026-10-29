@@ -4,6 +4,7 @@
     "protocol/v2/README.md",
     "protocol/v2/README.zh-CN.md",
     "protocol/v2/manifest.yaml",
+    "protocol/v2/methods/acceptance_scope.json",
     "protocol/v2/methods/business_understanding.json",
     "protocol/v2/methods/diagnosis.json",
     "protocol/v2/methods/execution.json",
@@ -24,6 +25,9 @@
     "protocol/v2/schemas/prepared_protocol_context.schema.json",
     "protocol/v2/schemas/profile.schema.json",
     "protocol/v2/schemas/protocol_binding.schema.json",
+    "protocol/v2/schemas/scope_contract.schema.json",
+    "protocol/v2/schemas/scope_request.schema.json",
+    "protocol/v2/schemas/suggestion.schema.json",
     "protocol/v2/schemas/test_task.schema.json"
   ]
 }

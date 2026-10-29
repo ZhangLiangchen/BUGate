@@ -4,7 +4,9 @@
 
 BUGate 是证据优先的测试质量协议与 Python 评估核心。**DeepSeek Harness 是唯一产品宿主。** BUGate 评估业务理解、可测性、Oracle/用例追踪及限定范围的完成声明；DSH 执行工具并管理 Agent 生命周期。
 
-当前源码交付 `bugate-core 2.0.0a2` 和 `@bugate/deepseek-harness 2.0.0-dev.2`，绑定 Protocol `2.0.0` 的精确摘要。本次是破坏性预发布：旧 hooks、安装器、适配器和产物格式已退役。不支持从 v0.x 或重构前任务自动迁移。已有 release/tag 保留，本次构建不覆盖它们。
+当前源码交付 `bugate-core 2.1.0a1` 和 `@bugate/deepseek-harness 2.1.0-dev.1`，绑定 Protocol `2.1.0-dev.1` 的精确摘要。本次是破坏性预发布：旧 hooks、安装器、适配器和产物格式已退役。不支持从 v0.x 或重构前任务自动迁移。已有 release/tag 保留，本次构建不覆盖它们。
+
+验收范围契约固定用户的有限目标和必需分支，范围内必须提供充分业务证据。额外想法保持为不阻塞完成的建议，只有真实用户请求改变契约后才能纳入。验收执行完成与功能验收通过分别报告，见[范围说明与示例](docs/ACCEPTANCE_SCOPE.zh-CN.md)。
 
 ## 安装与使用
 
@@ -27,8 +29,9 @@ bugate assess --task /absolute/test-repo/test-task/TASK-1 --claim claims/design.
 - [方法](docs/qa-methodology/METHOD.zh-CN.md)与[执行流程](docs/qa-methodology/SOP.zh-CN.md)
 - [协议架构](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md)
 - [贡献者设置](CONTRIBUTING.zh-CN.md)与[开发 Prompt](INIT.zh-CN.md)
-- [交付报告](docs/reports/v2-dsh-only/DELIVERY.zh-CN.md)与[版本说明](docs/releases/dsh-v2.0.0-dev.2.zh-CN.md)
-- [本次重构合同与验收](docs/reports/v2-dsh-only/CONTRACT.md)
+- [本次实现合同](docs/reports/scope-convergence/CONTRACT.zh-CN.md)与[验收矩阵](docs/reports/scope-convergence/ACCEPTANCE_MATRIX.zh-CN.md)
+- [范围架构决策](docs/reports/scope-convergence/ARCHITECTURE.zh-CN.md)
+- [此前 v2-only 交付](docs/reports/v2-dsh-only/DELIVERY.zh-CN.md)
 
 `protocol/v2/` 是唯一规范来源，`src/bugate/` 负责评估，`adapters/deepseek-harness/` 提供原生插件，`packaging/` 构建有限清单的安装包。真实 SUT 数据与秘密留在仓库外。
 

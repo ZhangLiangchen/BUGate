@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bugate-core"
-version = "2.0.0a2"
+version = "2.1.0a1"
 description = "Host-neutral BUGate protocol, evidence and claim assessment core"
 requires-python = ">=3.11"
 dependencies = ["jsonschema==4.23.0"]
@@ -43,6 +43,11 @@ packages = ["src/bugate"]
 "protocol/v2/schemas/profile.schema.json" = "bugate/resources/protocol/v2/schemas/profile.schema.json"
 "protocol/v2/schemas/protocol_binding.schema.json" = "bugate/resources/protocol/v2/schemas/protocol_binding.schema.json"
 "protocol/v2/schemas/test_task.schema.json" = "bugate/resources/protocol/v2/schemas/test_task.schema.json"
+
+"protocol/v2/methods/acceptance_scope.json" = "bugate/resources/protocol/v2/methods/acceptance_scope.json"
+"protocol/v2/schemas/scope_contract.schema.json" = "bugate/resources/protocol/v2/schemas/scope_contract.schema.json"
+"protocol/v2/schemas/scope_request.schema.json" = "bugate/resources/protocol/v2/schemas/scope_request.schema.json"
+"protocol/v2/schemas/suggestion.schema.json" = "bugate/resources/protocol/v2/schemas/suggestion.schema.json"
 
 [tool.hatch.build.targets.sdist]
 include = ["src/bugate", "protocol/v2", "packaging/resources.json", "pyproject.toml", "LICENSE"]

@@ -59,6 +59,11 @@ def main():
                 if hashlib.sha256(payload).hexdigest() != expected:
                     parser.error('wheel checksum mismatch')
                 (stage / name).write_bytes(payload)
+            compatibility = entries.get('package/resources/compatibility.json')
+            if compatibility is None or not compatibility.isfile() or compatibility.size > 65536:
+                parser.error('missing or invalid bundle compatibility record')
+            (stage / 'resources').mkdir()
+            (stage / 'resources/compatibility.json').write_bytes(archive.extractfile(compatibility).read())
         core = list(stage.glob('bugate_core-*.whl'))
         if len(core) != 1:
             parser.error('expected one core wheel')
@@ -70,6 +75,7 @@ def main():
         spec = importlib.util.spec_from_file_location('bugate_bootstrap_integrations', integration_path)
         integration = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(integration)
+        core_version = integration._bundle_core_version(stage)
         env = os.environ.copy()
         env.pop('PYTHONPATH', None)
         env.pop('PYTHONHOME', None)
@@ -101,8 +107,8 @@ def main():
             if found.get('status') != 'installed' or found.get('package_sha256') != package_digest:
                 integration._write(marker, {**identity, 'status': 'pending', 'package_sha256': package_digest})
                 integration._run([str(python), '-m', 'pip', 'install', '--no-index', '--find-links', str(stage),
-                                  '--force-reinstall', 'bugate-core==2.0.0a2'], cwd=stage, env=env, timeout=180)
-            integration._python_health(python, stage, env)
+                                  '--force-reinstall', f'bugate-core=={core_version}'], cwd=stage, env=env, timeout=180)
+            integration._python_health(python, stage, env, core_version)
             integration._write(marker, {**identity, 'status': 'installed', 'package_sha256': package_digest})
             command = [str(python), '-m', 'bugate', 'setup', 'deepseek-harness', '--project', str(project),
                        '--dsh-profile', args.dsh_profile, '--package', str(package), '--dsh', args.dsh, '--json']

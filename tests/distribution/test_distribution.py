@@ -6,7 +6,7 @@ import unittest
 import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'packaging'))
-from distribution import check_source, check_wheel, check_python, safe_name, resource_files, CORE_MODULES
+from distribution import check_source, check_wheel, check_python, safe_name, resource_files, CORE_MODULES, CORE_VERSION
 
 class DistributionTests(unittest.TestCase):
     def test_current_source_has_only_v2_entries_and_explicit_resources(self):
@@ -27,17 +27,20 @@ class DistributionTests(unittest.TestCase):
 
     def test_wheel_checks_actual_members_not_filename(self):
         resources = resource_files(ROOT)
-        def wheel(extra=None, entries="[console_scripts]\nbugate = bugate.cli:main\n"):
+        def wheel(extra=None, metadata=None, entries="[console_scripts]\nbugate = bugate.cli:main\n"):
             output = io.BytesIO()
             with zipfile.ZipFile(output, 'w') as z:
                 for name in CORE_MODULES: z.writestr('bugate/' + name, '')
                 for name in resources: z.writestr('bugate/resources/' + name, '{}')
-                for name in ('METADATA', 'WHEEL', 'licenses/LICENSE', 'RECORD'):
-                    z.writestr('bugate_core-2.0.0a2.dist-info/' + name, '')
-                z.writestr('bugate_core-2.0.0a2.dist-info/entry_points.txt', entries)
+                for name in ('WHEEL', 'licenses/LICENSE', 'RECORD'):
+                    z.writestr(f'bugate_core-{CORE_VERSION}.dist-info/' + name, '')
+                z.writestr(f'bugate_core-{CORE_VERSION}.dist-info/METADATA', metadata if metadata is not None else f'Name: bugate-core\nVersion: {CORE_VERSION}\n')
+                z.writestr(f'bugate_core-{CORE_VERSION}.dist-info/entry_points.txt', entries)
                 if extra: z.writestr(extra, '')
             return output.getvalue()
         self.assertEqual(check_wheel(wheel(), resources)['status'], 'PASS')
+        with self.assertRaisesRegex(ValueError, 'metadata identity'):
+            check_wheel(wheel(metadata='Name: bugate-core\nVersion: 0.1.0\n'), resources)
         for name in ('bugate/legacy.py', 'bugate/resources/scripts/check_bugate.py',
                      'bugate/resources/.claude/settings.json', 'bugate/unowned.json'):
             with self.assertRaises(ValueError): check_wheel(wheel(name), resources)

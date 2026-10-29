@@ -26,8 +26,13 @@ digests exclude their own digest fields. Content changes or concurrent commit
 conflicts invalidate authorization. The core does not own an Agent loop, current
 stage, scheduler or required long-term memory service.
 
+The versioned scope contract references user-request evidence, finite goals and
+existing requirement/Oracle facts. Inventory cases bind its current version and
+digest. Suggestions are isolated from required coverage and completion blockers;
+auxiliary activities have explicit boundaries. See [scope semantics](../ACCEPTANCE_SCOPE.md).
+
 Native v2 semantics include source-backed business propositions, observable
-Oracles, testability, fixed-denominator coverage, negative cases, implementation
+Oracles, testability, fixed-denominator scope coverage, explicitly required negative cases, implementation
 references, semantic-review freshness and optional Profile-required modeling.
 Legacy artifact formats are rejected; no converter or fallback checker runs.
 
@@ -47,4 +52,4 @@ Machine authority is not duplicated in documentation or projections. The native
 build appends canonical MethodSpec resources to the Skill entry and records
 protocol/content digests; packaging verifies Python/native resource equality.
 See [installation](../DEEPSEEK_HARNESS.md), [method](METHOD.md) and
-[acceptance](../reports/v2-dsh-only/acceptance.json).
+[acceptance](../reports/scope-convergence/ACCEPTANCE_MATRIX.md).

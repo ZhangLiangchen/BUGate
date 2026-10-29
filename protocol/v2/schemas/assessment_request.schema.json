@@ -87,6 +87,11 @@
     "request_digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "advisory_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Digest of the nonblocking advisory view rendered in this assessment. Changes create a new assessment record, never a new execution authorization snapshot."
     }
   },
   "required": [
@@ -101,6 +106,7 @@
     "workspace_snapshot",
     "evaluator_version",
     "rules_digest",
-    "request_digest"
+    "request_digest",
+    "advisory_digest"
   ]
 }

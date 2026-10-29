@@ -1,8 +1,12 @@
 {
   "apiVersion": "bugate.io/v2",
   "kind": "ReasonCodeCatalog",
-  "version": "2.0.0",
+  "version": "2.1.0-dev.1",
   "codes": {
+    "ACTIVITY_CLASSIFICATION_INVALID": {
+      "meaning": "An execution cannot be both required and auxiliary",
+      "stable": true
+    },
     "ADVERSARIAL_CASE_UNMAPPED": {
       "meaning": "An included adversarial finding lacks matching inventory coverage.",
       "stable": true
@@ -17,6 +21,10 @@
     },
     "ASSESSMENT_STALE": {
       "meaning": "assessment stale",
+      "stable": true
+    },
+    "AUXILIARY_NOT_DECLARED": {
+      "meaning": "Select a declared auxiliary activity; suggestions cannot execute",
       "stable": true
     },
     "BINDING_DIGEST_MISMATCH": {
@@ -121,6 +129,18 @@
       "meaning": "No current satisfied design claim exists for the managed implementation operation.",
       "stable": true,
       "scope": "deepseek-harness adapter"
+    },
+    "DIAGNOSTIC_BOUNDARY_INVALID": {
+      "meaning": "Diagnostic policy must name current scenarios and a finite run bound",
+      "stable": true
+    },
+    "DIAGNOSTIC_FAILURE_MISSING": {
+      "meaning": "Diagnosis must relate to a recorded failure of a current required scenario",
+      "stable": true
+    },
+    "DIAGNOSTIC_LIMIT_REACHED": {
+      "meaning": "Activity budget was consumed concurrently",
+      "stable": true
     },
     "DSH_HOME": {
       "meaning": "dsh home",
@@ -283,6 +303,14 @@
       "meaning": "pending recovery required",
       "stable": true
     },
+    "PLAN_AMBIGUOUS": {
+      "meaning": "Exactly one current inventory is the acceptance plan",
+      "stable": true
+    },
+    "PLAN_STALE": {
+      "meaning": "Claim does not bind the current inventory",
+      "stable": true
+    },
     "PROFILE_MISMATCH": {
       "meaning": "profile mismatch",
       "stable": true
@@ -345,6 +373,14 @@
       "meaning": "report coverage incomplete",
       "stable": true
     },
+    "REPORT_RESULT_INCONSISTENT": {
+      "meaning": "Report completion and functional result differ from managed observations",
+      "stable": true
+    },
+    "REPORT_SCOPE_INVALID": {
+      "meaning": "Report must list exactly the current acceptance requirements",
+      "stable": true
+    },
     "REQUIREMENT_NOT_VERIFIED": {
       "meaning": "requirement not verified",
       "stable": true
@@ -391,6 +427,18 @@
       "meaning": "runtime unsupported",
       "stable": true
     },
+    "SCENARIO_OUT_OF_SCOPE": {
+      "meaning": "Only current inventory cases can execute as required acceptance",
+      "stable": true
+    },
+    "SCENARIO_REDUNDANT": {
+      "meaning": "A required scenario already has a case; add another only after scope necessity review",
+      "stable": true
+    },
+    "SCENARIO_UNRELATED": {
+      "meaning": "Required scenario must prove declared requirements and a flow",
+      "stable": true
+    },
     "SCHEMA_INVALID": {
       "meaning": "Adapter-facing JSON value violates the declared tool or value schema.",
       "stable": true,
@@ -400,8 +448,79 @@
       "meaning": "schema unknown",
       "stable": true
     },
+    "SCOPE_ACTIVITY_DENIED": {
+      "meaning": "scope activity denied",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "SCOPE_AMBIGUITY": {
+      "meaning": "Unconfirmed assumption affects acceptance direction; ask the smallest clarification",
+      "stable": true
+    },
+    "SCOPE_AUTHORITY_INVALID": {
+      "meaning": "Scope request digest set differs from its citations",
+      "stable": true
+    },
+    "SCOPE_AUTHORITY_MISSING": {
+      "meaning": "No direct user request receipt exists",
+      "stable": true
+    },
+    "SCOPE_CHANGE_INVALID": {
+      "meaning": "Scope change must preserve id, increment revision and reference its predecessor",
+      "stable": true
+    },
+    "SCOPE_CHANGE_UNAUTHORIZED": {
+      "meaning": "Changing agreed scope requires a new direct user request; failure or time pressure is not authority",
+      "stable": true
+    },
     "SCOPE_DENOMINATOR_CHANGED": {
       "meaning": "scope denominator changed",
+      "stable": true
+    },
+    "SCOPE_ENVIRONMENT_INVALID": {
+      "meaning": "Select an environment explicitly permitted by the current scope",
+      "stable": true
+    },
+    "SCOPE_EXCLUSION_CONFLICT": {
+      "meaning": "An exclusion conflicts with an in-scope requirement",
+      "stable": true
+    },
+    "SCOPE_MISSING": {
+      "meaning": "A ScopeContract is required",
+      "stable": true
+    },
+    "SCOPE_ORACLE_WEAKENED": {
+      "meaning": "Case must retain every agreed business Oracle",
+      "stable": true
+    },
+    "SCOPE_PROFILE_CHANGE_REQUIRED": {
+      "meaning": "Scope cannot alter the locked Profile denominator; use a new explicit Profile version and task",
+      "stable": true
+    },
+    "SCOPE_REFERENCE_INVALID": {
+      "meaning": "Flow has no matching scope objective or parent branch",
+      "stable": true
+    },
+    "SCOPE_REQUEST_CAPTURE_FAILED": {
+      "meaning": "scope request capture failed",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "SCOPE_REQUEST_CONFLICT": {
+      "meaning": "scope request conflict",
+      "stable": true,
+      "scope": "deepseek-harness adapter"
+    },
+    "SCOPE_SCENARIO_MISSING": {
+      "meaning": "In-scope requirement has no necessary scenario",
+      "stable": true
+    },
+    "SCOPE_SEMANTIC_REVIEW_MISSING": {
+      "meaning": "Current source-backed review must establish necessity and user authorization; populated fields are not sufficient",
+      "stable": true
+    },
+    "SCOPE_STALE": {
+      "meaning": "Claim does not bind the current scope revision",
       "stable": true
     },
     "SEMANTIC_PLACEHOLDER": {
@@ -422,6 +541,10 @@
     },
     "STRUCTURE_INVALID": {
       "meaning": "structure invalid",
+      "stable": true
+    },
+    "SUGGESTION_INVALID": {
+      "meaning": "Suggestion identity or digest is invalid",
       "stable": true
     },
     "TASK_AMBIGUOUS": {
@@ -459,6 +582,10 @@
     },
     "TEST_REPORT_MISSING": {
       "meaning": "test report missing",
+      "stable": true
+    },
+    "TEST_REPORT_UNPLANNED": {
+      "meaning": "Report contains a selector outside the authorized requested cases",
       "stable": true
     },
     "UNCLASSIFIED_MANAGED_WRITE": {

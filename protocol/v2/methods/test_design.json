@@ -2,26 +2,21 @@
   "apiVersion": "bugate.io/v2",
   "kind": "MethodSpec",
   "id": "test_design",
-  "version": "2.0.0",
-  "objective": "Trace every frozen requirement and risk through an oracle to concrete positive and negative cases.",
+  "version": "2.1.0-dev.1",
+  "objective": "Trace exactly the active ScopeContract requirements and necessary branches through business Oracles to required cases.",
   "quality_dimensions": [
-    "risk_coverage",
-    "reverse_proposition_coverage",
-    "oracle_coverage",
-    "negative_coverage"
+    "scope_necessity",
+    "fixed_requirement_coverage",
+    "oracle_coverage"
   ],
   "required_outputs": [
     "inventory",
     "semantic_review"
   ],
   "recommended_considerations": [
-    "equivalence partitions",
-    "boundaries",
-    "negative states",
-    "independent review",
-    "source-bound readable cases",
-    "adversarial findings need explicit disposition and matching inventory coverage",
-    "optional typed test-dimension matrix; Profile may require it"
+    "Use negative, boundary, permission, performance or other dimensions only when the user scope requires them.",
+    "Review necessity against source evidence; field completeness is not semantic proof.",
+    "Record unaccepted extensions as non-executable suggestions."
   ],
   "hard_constraint_refs": [
     "core-quality-invariants"

@@ -31,7 +31,7 @@
       ]
     },
     "schema_version": {
-      "const": "2.0.0"
+      "const": "2.1.0-dev.1"
     },
     "revision": {
       "type": "string",
@@ -232,7 +232,7 @@
                   "minLength": 1,
                   "pattern": "\\S"
                 },
-                "minItems": 1,
+                "minItems": 0,
                 "uniqueItems": true
               },
               "unknowns": {
@@ -514,6 +514,13 @@
                       "type": "string",
                       "minLength": 1,
                       "pattern": "\\S"
+                    },
+                    "scenario_id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                    },
+                    "classification": {
+                      "const": "required"
                     }
                   },
                   "required": [
@@ -527,7 +534,9 @@
                     "layer_reason",
                     "implementation",
                     "test_selector",
-                    "negative"
+                    "negative",
+                    "scenario_id",
+                    "classification"
                   ]
                 },
                 "minItems": 1,
@@ -550,12 +559,36 @@
                 },
                 "minItems": 0,
                 "uniqueItems": true
+              },
+              "scope_ref": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "digest"
+                ]
               }
             },
             "required": [
               "cases",
               "requirement_scope",
-              "risk_scope"
+              "risk_scope",
+              "scope_ref"
             ]
           }
         }
@@ -618,6 +651,67 @@
                 "type": "string",
                 "minLength": 1,
                 "pattern": "\\S"
+              },
+              "scope_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "scope_decisions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "scenario_id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                    },
+                    "necessity": {
+                      "enum": [
+                        "accepted",
+                        "unsupported",
+                        "uncertain"
+                      ]
+                    },
+                    "reasoning": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "source_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "scenario_id",
+                    "necessity",
+                    "reasoning",
+                    "source_refs"
+                  ]
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "change_authorization": {
+                "enum": [
+                  "not_applicable",
+                  "accepted",
+                  "unsupported",
+                  "uncertain"
+                ]
               }
             },
             "required": [
@@ -626,7 +720,10 @@
               "artifact_digests",
               "conclusion",
               "limitations",
-              "reasoning"
+              "reasoning",
+              "scope_digest",
+              "scope_decisions",
+              "change_authorization"
             ]
           }
         }
@@ -698,6 +795,60 @@
                 "type": "string",
                 "minLength": 1,
                 "pattern": "\\S"
+              },
+              "scope_ref": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "digest"
+                ]
+              },
+              "coverage_statement": {
+                "const": "This conclusion covers only the agreed acceptance scope."
+              },
+              "requirement_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "suggestion_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "execution_complete": {
+                "type": "boolean"
+              },
+              "functional_result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "undetermined"
+                ]
               }
             },
             "required": [
@@ -706,7 +857,13 @@
               "outcome",
               "findings",
               "limitations",
-              "analysis"
+              "analysis",
+              "scope_ref",
+              "coverage_statement",
+              "requirement_ids",
+              "suggestion_ids",
+              "execution_complete",
+              "functional_result"
             ]
           }
         }
@@ -952,9 +1109,50 @@
               "residual_risks": {
                 "type": "array",
                 "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "pattern": "\\S"
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "classification": {
+                      "enum": [
+                        "in_scope",
+                        "suggestion"
+                      ]
+                    },
+                    "risk_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "requirement_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "suggestion_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "required": [
+                    "classification",
+                    "risk_ids",
+                    "requirement_ids",
+                    "suggestion_id",
+                    "rationale"
+                  ]
                 },
                 "minItems": 0,
                 "uniqueItems": true

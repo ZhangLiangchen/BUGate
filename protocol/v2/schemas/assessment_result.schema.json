@@ -294,6 +294,66 @@
         "incomplete",
         "uncertain"
       ]
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "execution_complete": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "functional_result": {
+          "enum": [
+            "passed",
+            "failed",
+            "undetermined",
+            "not_assessed"
+          ]
+        },
+        "requirement_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "blocking_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "suggestion_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "historical_failure_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "coverage_statement": {
+          "const": "This conclusion covers only the agreed acceptance scope."
+        }
+      },
+      "required": [
+        "execution_complete",
+        "functional_result",
+        "requirement_ids",
+        "blocking_codes",
+        "suggestion_ids",
+        "historical_failure_ids",
+        "coverage_statement"
+      ]
     }
   },
   "required": [
@@ -314,6 +374,7 @@
     "evidence_ids",
     "unknowns",
     "scope",
-    "quality_posture"
+    "quality_posture",
+    "acceptance"
   ]
 }

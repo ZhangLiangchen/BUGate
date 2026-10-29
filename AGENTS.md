@@ -31,7 +31,13 @@ neutral temporary fixtures. Bind domain facts to Profile-declared evidence.
 Build source-backed propositions and observable Oracles before governed test
 implementation. Check business semantics as well as structure. Placeholders,
 unresolved blocking gaps and deferred probes cannot authorize implementation.
-Keep requirement/risk coverage denominators fixed by the Profile.
+The locked Profile fixes requirement/risk coverage denominators for every scope
+revision in the task. User-authorized branch or Oracle changes within those
+denominators create a new ScopeContract revision. A denominator change requires
+an explicit new Profile version and a new task through init; preserve the prior
+task, failures and history. ScopeRequest proves user choice, not domain evidence,
+which remains Profile-declared. Keep suggestions outside required coverage and
+completion blockers.
 
 Model-reported pass flags and hashes are not execution proof. A previous
 assessment cannot authorize a changed claim or snapshot. Preserve actual product

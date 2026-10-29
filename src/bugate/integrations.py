@@ -278,8 +278,12 @@ def _bundle_core_version(bundle):
     """Each v2 archive pins its own core; upgrade/rollback never reinterpret facts."""
     compatibility = _json(bundle / "resources" / "compatibility.json")
     version = compatibility.get("core_version")
+    protocol_version = compatibility.get("protocol_version")
+    supported = {"2.0.0": {"2.0.0a1", "2.0.0a2"},
+                 "2.1.0-dev.1": {"2.1.0a1"}}
     if (not isinstance(version, str) or not re.fullmatch(r"2\.\d+\.\d+(?:(?:a|b|rc)\d+)?", version)
-            or compatibility.get("protocol_version") != "2.0.0"
+            or not isinstance(protocol_version, str)
+            or version not in supported.get(protocol_version, set())
             or compatibility.get("dsh_version") != HOST_VERSION):
         raise IntegrationError("VERSION_MISMATCH", "Bundle must pin a supported v2 core/protocol and exact DSH version", 2)
     return version
@@ -336,7 +340,7 @@ def _check_wheel_target(python, inventory, root, env):
     return target
 
 
-def _python_health(python, root, env, expected_version="2.0.0a2"):
+def _python_health(python, root, env, expected_version):
     code = "import importlib.metadata,json; from importlib.resources import files; p=files('bugate').joinpath('resources/protocol/v2'); print(json.dumps({'version':importlib.metadata.version('bugate-core'),'protocol':str(p),'resources':p.joinpath('schemas/prepared_protocol_context.schema.json').is_file()}))"
     stdout, _ = _run([str(python), "-c", code], cwd=root, env=env, timeout=20)
     try:

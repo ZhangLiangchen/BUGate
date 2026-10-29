@@ -23,6 +23,18 @@ def parser():
     ar=common('artifact',False);ars=ar.add_subparsers(dest='artifact_command',required=True);record=ars.add_parser('record');record.add_argument('--task',required=True);record.add_argument('--input',required=True);record.add_argument('--expected-digest');record.add_argument('--json',action='store_true')
     e=common('evidence',False);es=e.add_subparsers(dest='evidence_command',required=True);er=es.add_parser('record');er.add_argument('--task',required=True);er.add_argument('--input',required=True);er.add_argument('--json',action='store_true')
     x=common('execution',False);xs=x.add_subparsers(dest='execution_command',required=True);run=xs.add_parser('run');run.add_argument('--task',required=True);run.add_argument('--run-id',required=True);run.add_argument('--case',dest='case_ids',action='append',default=[]);run.add_argument('--report');run.add_argument('--agent-id',default='cli');run.add_argument('--session-id',default='cli');run.add_argument('--call-id');run.add_argument('--parent-call-id');run.add_argument('--root-call-id');run.add_argument('--timeout',type=float,default=60);run.add_argument('--max-output',type=int,default=1048576);run.add_argument('--json',action='store_true');run.add_argument('argv',nargs=argparse.REMAINDER)
+    sc=common('scope',False);scs=sc.add_subparsers(dest='scope_command',required=True)
+    for name in ('show','check','request','record'):
+        c=scs.add_parser(name);c.add_argument('--task',required=True);c.add_argument('--json',action='store_true')
+        if name in ('request','record'):c.add_argument('--input',required=True)
+        if name=='record':c.add_argument('--expected-digest')
+    sg=common('suggestion',False);sgs=sg.add_subparsers(dest='suggestion_command',required=True)
+    for name in ('record','list'):
+        c=sgs.add_parser(name);c.add_argument('--task',required=True);c.add_argument('--json',action='store_true')
+        if name=='record':c.add_argument('--input',required=True)
+    auth=xs.add_parser('authorize');auth.add_argument('--task',required=True);auth.add_argument('--case',dest='case_ids',action='append',default=[]);auth.add_argument('--json',action='store_true')
+    for c in (run,auth):
+        c.add_argument('--activity-id');c.add_argument('--environment-id');c.add_argument('--expected-scope-digest');c.add_argument('--expected-plan-digest')
     for command in ('setup','remove'):
         c=common(command,False);c.add_argument('host',choices=['deepseek-harness']);c.add_argument('--project',required=True);c.add_argument('--dsh-profile',required=True);c.add_argument('--dsh',default='dsh');c.add_argument('--dsh-home')
         if command=='setup':c.add_argument('--package');c.add_argument('--python');c.add_argument('--task-path')
@@ -48,7 +60,21 @@ def dispatch(a):
         from .authoring import record_artifact
         return record_artifact(a.task,a.input,expected_digest=a.expected_digest),0
     if a.command=='evidence':return record(a.task,a.input),0
-    if a.command=='execution':return execute(a.task,a.argv[1:] if a.argv and a.argv[0]=='--' else a.argv,run_id=a.run_id,case_ids=a.case_ids,report=a.report,agent_id=a.agent_id,session_id=a.session_id,call_id=a.call_id,parent_call_id=a.parent_call_id,root_call_id=a.root_call_id,timeout=a.timeout,max_output=a.max_output),0
+    if a.command=='scope':
+        from .scope import active_scope,check,record_request,record_scope,show
+        from .workspace import Workspace
+        if a.scope_command=='show':return show(a.task),0
+        if a.scope_command=='request':return record_request(a.task,a.input),0
+        if a.scope_command=='record':return record_scope(a.task,a.input,expected_digest=a.expected_digest),0
+        data=check(a.task);return data,0 if data['valid'] else 3
+    if a.command=='suggestion':
+        from .scope import record_suggestion,suggestions
+        from .workspace import Workspace
+        return (record_suggestion(a.task,a.input) if a.suggestion_command=='record' else suggestions(Workspace(a.task))),0
+    if a.command=='execution' and a.execution_command=='authorize':
+        from .scope import authorize
+        data=authorize(a.task,case_ids=a.case_ids,activity_id=a.activity_id,environment_id=a.environment_id,expected_scope_digest=a.expected_scope_digest,expected_plan_digest=a.expected_plan_digest);return data,0 if data['allowed'] else 3
+    if a.command=='execution':return execute(a.task,a.argv[1:] if a.argv and a.argv[0]=='--' else a.argv,run_id=a.run_id,case_ids=a.case_ids,report=a.report,agent_id=a.agent_id,session_id=a.session_id,call_id=a.call_id,parent_call_id=a.parent_call_id,root_call_id=a.root_call_id,timeout=a.timeout,max_output=a.max_output,activity_id=a.activity_id,environment_id=a.environment_id,expected_scope_digest=a.expected_scope_digest,expected_plan_digest=a.expected_plan_digest),0
     from . import integrations
     if a.command=='setup':return integrations.setup(a.project,a.dsh_profile,package=a.package,dsh=a.dsh,dsh_home=a.dsh_home,python=a.python,task_path=a.task_path),0
     if a.command=='remove':return integrations.remove(a.project,a.dsh_profile,dsh=a.dsh,dsh_home=a.dsh_home,rollback=a.rollback),0
@@ -59,7 +85,7 @@ def main(argv=None):
     args=list(sys.argv[1:] if argv is None else argv);operation=' '.join(args[:2]) if args else 'unknown';request_id=str(uuid.uuid4());data=None;errors=[];invocation='completed';rc=0
     try:
         parsed=parser().parse_args(args);operation=parsed.command
-        for key in ('protocol_command','artifact_command','evidence_command','execution_command'):
+        for key in ('protocol_command','artifact_command','evidence_command','execution_command','scope_command','suggestion_command'):
             if getattr(parsed,key,None):operation+='.'+getattr(parsed,key)
         data,rc=dispatch(parsed)
     except KeyboardInterrupt:

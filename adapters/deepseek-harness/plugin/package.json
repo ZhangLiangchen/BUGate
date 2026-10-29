@@ -1,6 +1,6 @@
 {
   "name": "@bugate/deepseek-harness",
-  "version": "2.0.0-dev.2",
+  "version": "2.1.0-dev.1",
   "description": "BUGate quality protocol and evidence adapter for DeepSeek Harness",
   "type": "module",
   "main": "lib/index.js",

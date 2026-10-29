@@ -18,5 +18,7 @@ test('AC-19/20/21 installed tarball and isolated Python run real DSH authoring a
  const child=spawn(executable,args,{cwd:directory,env,stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>output+=x);
  const code=await new Promise(resolve=>child.on('exit',resolve));await writeFile(join(directory,'runtime.log'),output);assert.equal(code,0,output+`\nRetained evidence: ${directory}`);
  const result=JSON.parse(await readFile(join(directory,'result.json')));assert.equal(result.evidence.source_type,'host_observed');assert.equal(result.evidence.execution.status,'passed');
+ assert.equal(result.completion_assessment.verdict,'satisfied');assert.equal(result.suggestions.length,4);
+ assert.equal(result.failure_result.evidence.execution.status,'failed');assert.equal(result.failure_result.requirement_assessment.verdict,'unsatisfied');assert.equal(result.failure_result.completion_assessment.verdict,'satisfied');
  console.log(JSON.stringify({evidence:join(directory,'result.json'),log:join(directory,'runtime.log'),requests:result.requests,installed:result.installed,python:result.python}));
 });

@@ -36,13 +36,13 @@ jobs:
       - name: Build finite native bundle and offline wheelhouse
         run: |
           python3 packaging/build_dsh.py --out-dir "$RUNNER_TEMP/bugate-dsh-package"
-          python3 scripts/check_distribution.py --bundle "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.0.0-dev.2.tgz"
+          python3 scripts/check_distribution.py --bundle "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.1.0-dev.1.tgz"
           cd "$RUNNER_TEMP/bugate-dsh-package"
           sha256sum -c SHA256SUMS
       - name: Standalone clean installation and v2 lifecycle
         run: |
           python3 tests/integration_install/accept_package.py \
-            --package "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.0.0-dev.2.tgz" \
+            --package "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.1.0-dev.1.tgz" \
             --dsh "$RUNNER_TEMP/dsh-runtime/node_modules/.bin/dsh" \
             --out-dir "$RUNNER_TEMP/bugate-dsh-acceptance"
       - name: Real DSH runtime from installed package

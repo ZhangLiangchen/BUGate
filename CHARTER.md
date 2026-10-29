@@ -17,3 +17,9 @@ Quality invariants continue: source-backed business understanding, testability,
 Oracle/case traceability, snapshot freshness, evidence provenance, honest failure
 classification and scoped completion. DSH owns scheduling and lifecycle. No
 mutable current-stage authority or mandatory memory service is introduced.
+
+Acceptance breadth follows the user’s goals and accepted requirements. Evidence
+depth must be sufficient within that scope. A first-class contract pins those
+goals; suggestions cannot become execution or completion obligations without
+a source-backed user change. Execution completion and functional acceptance
+remain separate conclusions.

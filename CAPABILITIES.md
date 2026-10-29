@@ -4,8 +4,9 @@ English | [简体中文](CAPABILITIES.zh-CN.md)
 
 | Capability | Current implementation |
 |---|---|
+| Acceptance scope | Versioned source-backed goals, finite flows/branches, required cases, auxiliary activities, bounded diagnosis and non-blocking suggestions. |
 | Business understanding | Source-backed propositions, Oracles, states, boundaries, gaps and digest-bound semantic review. |
-| Testability and design | Observation, preconditions, layer selection, requirement/risk coverage and positive/negative case traceability. |
+| Testability and design | Observation, preconditions, layer selection, requirement/risk coverage and scope-required case traceability. |
 | Optional richer modeling | Profile-required domain/state/dimension/adversarial artifacts are evaluated natively. |
 | References and freshness | Exact Protocol/Profile binding, content references, snapshots, evaluator digest and concurrent-write checks. |
 | Evidence | Bounded managed execution, JUnit interpretation, provenance separation and atomic persistence. |
@@ -25,4 +26,10 @@ test delivery while requirement verification remains unsatisfied.
 
 No legacy format migration, alternative host adapter, role process manager,
 self-healing loop, automatic memory lifecycle or global user configuration cleanup
-is included. Actual conformance results belong in the [acceptance matrix](docs/reports/v2-dsh-only/acceptance.json).
+is included. Current acceptance requirements are in the [scope matrix](docs/reports/scope-convergence/ACCEPTANCE_MATRIX.md); recorded results must be read separately from that frozen contract.
+
+The guard uses declared case/activity IDs and current protocol, scope, plan and
+snapshot bindings. It cannot determine every business meaning in arbitrary shell
+commands. Semantic review of necessity is distinct from structural checks;
+recording “approved” or a necessity sentence is not trusted user authorization.
+See [scope and result examples](docs/ACCEPTANCE_SCOPE.md).

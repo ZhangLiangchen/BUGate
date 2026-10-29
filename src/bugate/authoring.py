@@ -31,6 +31,18 @@ def record_artifact(task,input_file,*,expected_digest=None):
     actual=object_digest(value)
     if 'digest' in value and value['digest']!=actual:raise BugateError('OBJECT_DIGEST_MISMATCH','Artifact digest differs from actual content')
     value['digest']=actual;validate_schema(value,'Artifact')
+    if value['artifact_type']=='inventory':
+        from .scope import active_scope,scope_ref,record_suggestion
+        scope=active_scope(w)
+        if content['scope_ref']!=scope_ref(scope):raise BugateError('SCOPE_STALE','Inventory draft does not bind the current scope')
+        allowed={c['id'] for c in scope['scenarios']}
+        extras=[c for c in content['cases'] if c['scenario_id'] not in allowed]
+        if extras:
+            ids=[]
+            for case in extras:
+                sid='extension-'+object_digest({'case':case['id'],'scope':scope['digest']}).split(':')[1][:32]
+                record_suggestion(task,value={'id':sid,'description':'Proposed additional scenario '+case['scenario_id'],'rationale':'No required scenario in the current scope. Proposed executable details were not admitted.','source_refs':value['source_refs']});ids.append(sid)
+            raise BugateError('SCENARIO_OUT_OF_SCOPE','Unaccepted extensions were recorded as suggestions; the active inventory was not changed',details={'suggestion_ids':ids})
     sources={s['id'] for s in w.profile['sources']}
     for ref in value['source_refs']:
         if ref not in sources:raise BugateError('REFERENCE_MISSING','Artifact source is absent from Profile',details=ref)

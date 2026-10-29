@@ -66,8 +66,23 @@ it asserts an actual permission error before loading the installed plugin.
 This proves independent runtime operation even when the source cannot be read.
 
 `tests/integration_install/accept_published_upgrade.py` takes explicit previous
-and candidate archives plus the published previous SHA256. It installs dev.1,
-upgrades to dev.2, rejects the old task binding without modifying it, prepares a
-new v2 task, and rolls back to the exact retained dev.1 archive. This is distinct
+and candidate archives plus the published previous SHA256. It installs the selected prior archive,
+upgrades to the current candidate, rejects the old task binding without modifying it, prepares a
+new current-protocol task, and rolls back to the exact retained prior archive. This is distinct
 from the metadata-only upgrade fixture in `accept_package.py`, which tests
 transaction/crash recovery. No v0.x import or automatic task migration is supported.
+
+Scope-convergence invariant checks run real model tool
+calls against current core admission. The deterministic model attempts an
+unrelated configured test, observes its denial before process start, records a
+non-executable suggestion, executes the required cases and submits completion.
+The same workflow runs with an intentional product defect: functional verification
+fails while execution completion succeeds. Additional suggestions are recorded
+after completion; the identical claim remains satisfied with no rework.
+
+The installed runner executes both passing and failing workflows under source
+read denial when configured. It verifies durable evidence before tool results,
+exact scope/plan references, required scenario counts and independent functional
+versus execution verdicts. A separate real subagent test proves that DSH's
+user-tagged delegation prompt cannot create a human authorization receipt.
+Uncited continuation messages do not alter the authorization snapshot.

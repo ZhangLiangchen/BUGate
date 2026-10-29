@@ -245,6 +245,69 @@
             "pattern": "^sha256:[0-9a-f]{64}$"
           },
           "minProperties": 1
+        },
+        "scope_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ]
+        },
+        "plan_ref": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "id",
+                "digest"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activity_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment_id": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -269,7 +332,11 @@
         "implementation_digests",
         "collector",
         "requested_case_ids",
-        "input_manifest"
+        "input_manifest",
+        "scope_ref",
+        "plan_ref",
+        "activity_id",
+        "environment_id"
       ]
     }
   },

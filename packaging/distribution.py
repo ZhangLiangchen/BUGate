@@ -2,6 +2,7 @@
 from __future__ import annotations
 import ast
 import configparser
+from email.parser import BytesParser
 import io
 import json
 from pathlib import Path, PurePosixPath
@@ -12,8 +13,9 @@ import zipfile
 CORE_MODULES = {
     '__init__.py', '__main__.py', 'assessment.py', 'authoring.py', 'cli.py',
     'context.py', 'errors.py', 'evidence.py', 'integrations.py', 'protocol.py',
-    'workspace.py', 'semantics.py',
+    'workspace.py', 'semantics.py', 'scope.py',
 }
+CORE_VERSION = tomllib.loads((Path(__file__).resolve().parents[1] / 'pyproject.toml').read_text())['project']['version']
 RETIRED_MODULES = {'legacy', 'bugate_core', 'check_bugate_v13_semantics',
                    'memory_bus', 'role_governance', 'role_lineage',
                    'sdtd_orchestrator', 'bugate_update', 'bugate_init'}
@@ -66,6 +68,13 @@ def check_source(root: Path) -> dict:
     wanted = {f: 'bugate/resources/' + f for f in expected}
     if mapping != wanted:
         raise ValueError('wheel resource mapping must equal finite canonical inventory')
+    version_tree = ast.parse((root / 'src/bugate/__init__.py').read_text())
+    versions = {node.targets[0].id: node.value.value for node in version_tree.body
+                if isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) and isinstance(node.value, ast.Constant)}
+    protocol = json.loads((root / 'protocol/v2/manifest.yaml').read_text())
+    if versions.get('__version__') != configuration['project']['version'] or versions.get('PROTOCOL_VERSION') != protocol['metadata']['version']:
+        raise ValueError('Python package/core/protocol version declarations disagree')
     modules = {p.name for p in (root / 'src/bugate').glob('*.py')}
     if modules != CORE_MODULES:
         raise ValueError(f'core module inventory differs: {sorted(modules ^ CORE_MODULES)}')
@@ -88,11 +97,14 @@ def check_wheel(data: bytes, resources: set[str]) -> dict:
             raise ValueError('duplicate wheel member')
         expected = {'bugate/' + n for n in CORE_MODULES} | {'bugate/resources/' + r for r in resources}
         actual = set()
-        metadata_root = 'bugate_core-2.0.0a2.dist-info/'
+        metadata_root = f'bugate_core-{CORE_VERSION}.dist-info/'
         metadata_names = {metadata_root + n for n in ('METADATA', 'WHEEL', 'entry_points.txt', 'licenses/LICENSE', 'RECORD')}
         observed_metadata = {n for n in names if '.dist-info/' in n}
         if observed_metadata != metadata_names:
             raise ValueError('unexpected wheel metadata inventory')
+        metadata = BytesParser().parsebytes(archive.read(metadata_root + 'METADATA'))
+        if metadata.get('Name') != 'bugate-core' or metadata.get('Version') != CORE_VERSION:
+            raise ValueError('wheel metadata identity differs from current package version')
         entries = configparser.ConfigParser(interpolation=None, strict=True)
         entries.read_string(archive.read(metadata_root + 'entry_points.txt').decode('utf-8'))
         if entries.sections() != ['console_scripts'] or dict(entries['console_scripts']) != {'bugate': 'bugate.cli:main'}:
