@@ -2,21 +2,21 @@
 
 [English](TYPESCRIPT_CORDIS.md) | 简体中文
 
-**架构决策：** Accepted（已接受），2026-10-29。  
-**实施状态：** Planned（计划中），尚未开始。迁移检查全部为 **NOT_RUN**。  
+**架构决策：** Accepted（已接受），2026-10-29。
+**实施状态：** IN_PROGRESS。2026-10-30 已授权从 `eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654` 实施阶段 0～5；尚不宣称最终已安装 Team 验收或切换完成。
 **权威来源：** 用户在本任务中的明确决策：DSH 保持唯一宿主，将 BUGate 全面转向 TypeScript 并纳入 Cordis 架构，写入下一步开发计划。它替代此前暂保留 Python 作为目标核心架构的建议，不削弱已有质量与证据不变量。
 
-本次仅修改说明文档，不迁移代码、不修改版本或机器规则、不改已发布资产，也不禁止切换前维护现有 Python 实现。[Protocol v2](../../protocol/v2/manifest.yaml)仍是唯一机器权威；本计划不是第二套规范，也不是其他开发任务或 SUT 的默认验收矩阵。
+2026-10-30 执行请求已授权阶段 0～5。此前“仅文档/NOT_RUN”描述上一轮规划状态，本计划现记录实施。[Protocol v2](../../protocol/v2/manifest.yaml)继续是唯一机器权威；`2.2.0-dev.1` 对本轮明确授权的 Team 来源增强进行版本化，本计划不创建其他 SUT 的默认矩阵。
 
 ## 背景与基线
 
-现场核验基线为 `3a5fcc7ae2b35f8eb361896c932d688939364bae`。[当前发布](../releases/DSH_2_1_0_DEV_1.zh-CN.md)使用 Python core `2.1.0a1` 和 Protocol/原生包 `2.1.0-dev.1`，已有证据仅适用于其记录的源码及产物摘要，不证明计划中的迁移。
+本轮实施基线为 main `eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654`。`3a5fcc7ae2b35f8eb361896c932d688939364bae` 标识历史已发布 Python 基线。[历史 Python 发布](../releases/DSH_2_1_0_DEV_1.zh-CN.md)使用 Python core `2.1.0a1` 和 Protocol/原生包 `2.1.0-dev.1`，已有证据仅适用于其记录的源码及产物摘要，不证明计划中的迁移。
 
-BUGate 已有原生 Cordis 插件：[`cordis.patch.yml`](../../adapters/deepseek-harness/plugin/cordis.patch.yml)注册 `@bugate/deepseek-harness`，配置包含 `pythonExecutable: python3`。[`index.ts`](../../adapters/deepseek-harness/plugin/src/index.ts)负责原生接入，[`bridge.ts`](../../adapters/deepseek-harness/plugin/src/bridge.ts)通过 DSH provider 调用 Python。目标是替换这条产品 Python 桥接及实现，不是首次引入 Cordis。
+历史基线已有原生 Cordis 插件：[`cordis.patch.yml`](https://github.com/ZhangLiangchen/BUGate/blob/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/adapters/deepseek-harness/plugin/cordis.patch.yml)注册 `@bugate/deepseek-harness`，当时配置包含 `pythonExecutable: python3`。基线 `index.ts` 负责原生接入，[`bridge.ts`](https://github.com/ZhangLiangchen/BUGate/blob/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/adapters/deepseek-harness/plugin/src/bridge.ts)通过 DSH provider 调用 Python。目标是替换这条产品 Python 桥接及实现，不是首次引入 Cordis。
 
-实施起点：
+历史实施起点（新实现位于 `packages/core/`、`packages/cli/` 和 Node `packaging/`）：
 
-- [`src/bugate/`](../../src/bugate/)：`protocol.py`、`assessment.py`、`semantics.py`、`scope.py` 保存校验/评估；`workspace.py` 保存身份及持久化；`authoring.py`/`context.py` 负责创作/准备；`evidence.py`、`cli.py`、`integrations.py` 负责采集、CLI 和安装。
+- [`src/bugate/`](https://github.com/ZhangLiangchen/BUGate/tree/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/src/bugate/)：`protocol.py`、`assessment.py`、`semantics.py`、`scope.py` 保存校验/评估；`workspace.py` 保存身份及持久化；`authoring.py`/`context.py` 负责创作/准备；`evidence.py`、`cli.py`、`integrations.py` 负责采集、CLI 和安装。
 - [`adapters/deepseek-harness/`](../../adapters/deepseek-harness/)：原生插件、provider/生命周期接入及真实 runtime 测试。
 - [`packaging/`](../../packaging/)、[`scripts/`](../../scripts/)、[`tests/`](../../tests/)及 [CI](../../.github/workflows/ci.yml)：第一方构建、安装、doctor、分发和验收工具链均纳入 TypeScript/Node 目标。
 
@@ -32,13 +32,13 @@ JSON、YAML 和文档保留各自格式。外部 SUT 测试可以使用所需语
 
 ## DSH 官方 Agent Team 多视角交叉互审（用户追加决策）
 
-**来源与状态：** 用户先要求原生 subagent 评审及真实来源、独立性、工件绑定，随后明确改为优先复用 DSH 官方 Agent Team 插件。采用最新决定：由 Team 成员执行多视角交叉互审，BUGate 校验真实评审来源、独立性和工件绑定，不能仅靠 reviewer 名称不同就认定独立，不恢复 Claude/Codex 依赖。本项已接受，实施及验收仍为 **NOT_RUN**；效率提升是用户期望，尚未实测。现有 [`assessment.py`](../../src/bugate/assessment.py) 的独立性检查主要比较 producer/reviewer 名称；现有 [DSH 子 Agent 测试](../../adapters/deepseek-harness/tests/runtime.test.mjs)证明绑定和授权来源的部分行为，不证明完整互审链路。本项是有用户来源、需版本化的能力增强，不回写成旧协议已经保证的能力。
+**来源与状态：** 用户先要求原生 subagent 评审及真实来源、独立性、工件绑定，随后明确改为优先复用 DSH 官方 Agent Team 插件。采用最新决定：由 Team 成员执行多视角交叉互审，BUGate 校验真实评审来源、独立性和工件绑定，不能仅靠 reviewer 名称不同就认定独立，不恢复 Claude/Codex 依赖。本项已接受，实施及验收为 **IN_PROGRESS**；效率提升是用户期望，尚未实测。历史 [`assessment.py`](https://github.com/ZhangLiangchen/BUGate/tree/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/src/bugate/assessment.py) 的独立性检查主要比较 producer/reviewer 名称；历史 [DSH 子 Agent 测试](https://github.com/ZhangLiangchen/BUGate/blob/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/adapters/deepseek-harness/tests/runtime.test.mjs)证明绑定和授权来源的部分行为，不证明完整互审链路。本项是有用户来源、需版本化的能力增强，不回写成旧协议已经保证的能力。
 
 DSH 单宿主允许多个 Agent。优先使用官方 Agent Team 承载有限的必要视角评审；宿主拥有成员名册、任务板、消息、委派、执行、取消和生命周期。BUGate 只保存评审工件、必要宿主引用和评估，不复制 Team 状态机，不另建 Agent loop 或调度器，不依赖 Claude Code/Codex。subagent 可以作为官方 Team 的底层实现，或在明确有依据的降级设计中使用；不能自行用直接 subagent 调用替代 Team 来宣称本项验收完成。
 
 **现场接口核验（不是运行验收）：** 本地 `adapters/deepseek-harness/plugin/node_modules/@deepseek-ai/dsh-experimental-agent-team` 的 `package.json`、README 和类型声明对应官方 [`packages/experimental/agent-team`](https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/experimental/agent-team)，版本为 `0.2.2-alpha.2`，另有 `dsh-experimental-tool-agent-team` 和 `dsh-experimental-agent-team-profile`。`ctx.agentTeams` 提供以精确 live Agent 为调用身份的 membership、成员查询、spawnTeammate、sendMessage、任务查询/创建/expectedRevision CAS 更新、waitForChange 和 interrupt。TeamId 关联 Lead SessionId，成员支持 fresh/fork；官方 Team profile 挂载 Team 并禁用直接 subagent/control/fork 工具，底层仍依赖 dsh-subagent。实施前复核实际选用版本和配置，不把 experimental 能力描述成稳定接口。
 
-Team 持久化名册及任务板；消息发送成功只证明目标 inbox 接受，不证明模型处理或单独同步 flush。当前为进程内共享 cwd，不提供 worktree 隔离；writeScopes 是提示，不能替代写入保护。任务 owner 不自动释放，消息无自动重试/重发去重保证。复用这些真实语义设计恢复、取消、并发及评审发布屏障；Team task complete 不等于评审有效，更不等于业务通过。本轮未运行 Team 真实联调。
+Team 持久化名册及任务板；消息发送成功只证明目标 inbox 接受，不证明模型处理或单独同步 flush。当前为进程内共享 cwd，不提供 worktree 隔离；writeScopes 是提示，不能替代写入保护。任务 owner 不自动释放，消息无自动重试/重发去重保证。复用这些真实语义设计恢复、取消、并发及评审发布屏障；Team task complete 不等于评审有效，更不等于业务通过。此前规划轮未运行 Team；本轮实施的真实调用单独保存在验收记录。
 
 - **适用范围：** 独立评审是否必需及所需视角由有效 Profile 和本轮采纳要求决定。视角说明它验证什么命题及必要性，不默认固定角色数、模型数、轮数或全员两两互审。评审发现范围外机会仍只记建议，不扩展 SUT 目标；评审本身也有可观察的完成条件和有界返工。
 - **真实来源：** 从实际 DSH 执行接缝捕获被评审工件作者和评审者的 Agent/session 身份、Team/成员身份、委派/父子关系及实际执行结果，绑定此次评审输入与持久化输出。模型填写的名称、session ID、模型名或“已经独立审查”不能提升为宿主观察。主 Agent 代写评审文本可以保留为模型材料，不能冒充 Team 成员的实际输出；作者来源缺失时也不能判定独立性已证明。
@@ -65,13 +65,13 @@ Team 持久化名册及任务板；消息发送成功只证明目标 inbox 接�
 
 ## 有限实施阶段
 
-所有阶段均为 **NOT_RUN**。执行时各自记录实际源码/命令/产物身份与结果；本次文档更新不满足任何实施退出条件。
+各阶段按实际源码/命令/产物身份和结果记录，不继承历史测试结论。
 阶段 0 使用现有已验证工具建立有限基线，不要求尚未实现的 TS 评估器授权自身迁移。
 
 | 阶段 | 需求 / 交付 | 可观察 Oracle 与最小充分验证 | 退出条件 |
 |---|---|---|---|
 | 0. 需求、Oracle、基线 | 冻结契约/源码及已知缺陷，映射变更边界、Python 依赖和真实 DSH 接口；决定版本/绑定及历史查看策略，核验作者/评审来源和 Team 身份及成员独立性可观察边界。 | 有来源的需求/Oracle 映射、规范字节向量、针对性基线反例、真实 provider/接口核验。 | 每项变更有必要性来源和可区分的 Oracle；实质缺口解决或明确阻塞，不用占位分析放行实现；互审来源/上下文策略有可验证设计。 |
-| 1. 核心与 Node CLI | 移植校验、语义/范围/声明、创作/上下文与统一 CLI，明确 IO 边界；版本化原生互审来源、独立性及绑定规则。 | [核心测试](../../tests/v2/)中的适用类别：真实 verdict/reason 断言、无效 JSON、规范向量、旧引用和建议隔离；明确身份差异的开发期差分。 | 运行时检查及输出语义满足 Oracle，差异有证据处置；名称或自报身份不能满足宿主独立评审要求。 |
+| 1. 核心与 Node CLI | 移植校验、语义/范围/声明、创作/上下文与统一 CLI，明确 IO 边界；版本化原生互审来源、独立性及绑定规则。 | [核心测试](../../tests/typescript/)中的适用类别：真实 verdict/reason 断言、无效 JSON、规范向量、旧引用和建议隔离；明确身份差异的开发期差分。 | 运行时检查及输出语义满足 Oracle，差异有证据处置；名称或自报身份不能满足宿主独立评审要求。 |
 | 2. 执行、存储、采集 | 移植工作区身份、原子发布/CAS/锁及进程/报告采集；设计 execution world、CPU/IO 和清理边界。 | 临时真实命令覆盖成功/失败/skip/xfail、缺报告、超时/取消；必要的并发写入、路径/world 不一致、返回前持久化检查。 | 中断不制造完成，使用正确配置 world，清理有界，不支持的映射明确拒绝。 |
 | 3. Cordis 原生接入 | 在核验过的原生接缝以共享 TS 服务替代 PythonBridge，保持上下文/准入、来源和有界返工；复用 DSH 官方 Agent Team 实现多视角互审和持久化来源。 | [真实 DSH 测试类别](../../adapters/deepseek-harness/tests/README.zh-CN.md)：确定性 fixture 驱动实际工具/临时 SUT 命令，检查范围、建议、失败、辅助/诊断、恢复/子 Agent/隔离和取消，以及上节互审正反例。 | 真实宿主调用证明约束、互审来源/独立性/绑定及证据屏障；mock context 不单独完成本阶段；若运行 live model，单独报告。 |
 | 4. Node 打包与 CI | 移植第一方 build/install/doctor/distribution/test 入口，产出有限 npm 资产、规范投影及一致使用说明/CI。 | 源码禁读且 Python 不可用的干净安装；摘要/资源；适用的重复安装、doctor、升级/rollback/卸载/所有权检查；已安装包真实 DSH 流程及多视角互审链路。运行所声明的 CI 检查并报告实测平台。 | 精确产物独立运行，校验和与文档一致；不因 TS 推断 Windows 等平台支持。 |
@@ -79,7 +79,7 @@ Team 持久化名册及任务板；消息发送成功只证明目标 inbox 接�
 
 ## 版本、旧证据与安装切换
 
-实现时按实际兼容性影响决定协议/评估器/打包版本，现在不分配新版本，也不静默改变现有版本含义。旧 Python 评估/收据不能因为字段相似就授权 TS 执行。默认切换方式为明确的新任务/绑定，保留旧范围、证据、失败和任务历史。阶段 0 决定历史只读查看说明，不新增自动格式转换、跨版本授权或选择性证据复用。现有任务内的范围失效及 Profile 分母规则继续有效。
+本轮为明确授权的宿主来源和独立性增强，将协议/评估器/打包版本设为 `2.2.0-dev.1`，不静默改变已有版本含义。旧 Python 评估/收据不能因为字段相似就授权 TS 执行。默认切换方式为明确的新任务/绑定，保留旧范围、证据、失败和任务历史。阶段 0 决定历史只读查看说明，不新增自动格式转换、跨版本授权或选择性证据复用。现有任务内的范围失效及 Profile 分母规则继续有效。
 
 最终产品不依赖 Python bootstrap/wheelhouse。已有用户 Python 环境保留，只有显式的 owned-uninstall 才能处理已证实属于 BUGate 的状态；保留 SUT 依赖、任务事实及无关配置，不扫描或清理用户全局环境。Node/npm 安装必须证明所有权、中断恢复和 rollback，选用 npm 本身并不证明这些性质。
 
@@ -93,4 +93,4 @@ Team 持久化名册及任务板；消息发送成功只证明目标 inbox 接�
 
 风险包括序列化/校验器差异、本地 world 假设、事件循环阻塞、取消/drain 丢失、持久化削弱、伪造用户来源和旧绑定复用；上述阶段覆盖其直接迁移影响。不承诺实测性能/模型质量收益、新平台、新宿主或更多 SUT 风险类别。其他机会保持建议。
 
-**下一步：** 在下一次实施任务从阶段 0 开始。本次仅更新计划/导航并检查 Markdown 链接与空白，不宣称完成移植、产品测试、打包、runtime 验证、卸载或发布；迁移证据全部保持 **NOT_RUN**。
+**当前执行：** 共享核心/CLI、Node 生命周期及原生 Team 接入已实施并持续联调。候选 Node 包已在 macOS arm64 操作系统隔离下通过安装、重复、doctor、升级、rollback、卸载和中断恢复；该候选不是最终 Team 交付包。最终精确包验收与 Python 退役仍须完成。Live-model 验证为 NOT_RUN；未发布新公开 release/tag。

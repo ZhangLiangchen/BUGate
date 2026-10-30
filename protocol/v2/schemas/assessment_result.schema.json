@@ -354,6 +354,114 @@
         "historical_failure_ids",
         "coverage_statement"
       ]
+    },
+    "review_assurance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "review_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "review_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "observation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settlement_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution_independence": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "status": {
+                "enum": [
+                  "observed",
+                  "not_proven",
+                  "not_required"
+                ]
+              },
+              "context_mode": {
+                "enum": [
+                  null,
+                  "lead",
+                  "fresh",
+                  "fork"
+                ]
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "required",
+              "status",
+              "context_mode",
+              "limitations"
+            ]
+          },
+          "semantic_opinion": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "conclusion": {
+                "enum": [
+                  "accepted",
+                  "rejected",
+                  "uncertain"
+                ]
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "conclusion",
+              "limitations"
+            ]
+          }
+        },
+        "required": [
+          "review_id",
+          "review_digest",
+          "observation_id",
+          "settlement_id",
+          "execution_independence",
+          "semantic_opinion"
+        ]
+      }
     }
   },
   "required": [
@@ -375,6 +483,7 @@
     "unknowns",
     "scope",
     "quality_posture",
-    "acceptance"
+    "acceptance",
+    "review_assurance"
   ]
 }

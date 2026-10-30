@@ -1,0 +1,1 @@
+{"name":"@bugate/core","version":"2.2.0-dev.1","type":"module","main":"dist/index.js","types":"dist/index.d.ts","exports":{".":{"types":"./dist/index.d.ts","default":"./dist/index.js"}},"files":["dist","resources"],"scripts":{"build":"tsc -p tsconfig.json"},"dependencies":{"ajv":"8.17.1","fast-xml-parser":"5.3.0"},"engines":{"node":">=24.9.0"},"license":"MIT"}

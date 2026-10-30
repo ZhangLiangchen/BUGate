@@ -1,0 +1,9 @@
+{
+  "name": "@bugate/install",
+  "version": "2.2.0-dev.1",
+  "type": "module",
+  "exports": "./lifecycle.mjs",
+  "files": ["lifecycle.mjs", "archive.mjs", "install.mjs"],
+  "engines": {"node": ">=24.9.0"},
+  "license": "MIT"
+}

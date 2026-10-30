@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { cp, mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -5,7 +6,7 @@ import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
-execFileSync(process.execPath, [fileURLToPath(new URL('node_modules/typescript/bin/tsc', import.meta.url))], { cwd: fileURLToPath(new URL('.', import.meta.url)), stdio: 'inherit' });
+execFileSync(process.execPath, [createRequire(import.meta.url).resolve('typescript/bin/tsc')], { cwd: fileURLToPath(new URL('.', import.meta.url)), stdio: 'inherit' });
 await mkdir(new URL('resources', import.meta.url), { recursive: true });
 await rm(new URL('resources/protocol', import.meta.url), { recursive: true, force: true });
 await cp(resolve(root, 'protocol/v2'), new URL('resources/protocol', import.meta.url), { recursive: true });
@@ -27,8 +28,8 @@ const canonical = await Promise.all(canonicalFiles.map(async file => `\n## Canon
 const entry = await readFile(resolve(root, 'views/skills/bugate/SKILL.md'), 'utf8');
 await writeFile(new URL('resources/SKILL.md', import.meta.url), entry + '\nProtocol digest: `' + protocolDigest + '`\n' + canonical.join(''));
 await writeFile(new URL('resources/projection.json', import.meta.url), JSON.stringify({ protocol_digest: protocolDigest, method_files: methodFiles, skill_digest: sha(entry + '\nProtocol digest: `' + protocolDigest + '`\n' + canonical.join('')) }, null, 2) + '\n');
-const coreVersion = (await readFile(resolve(root, 'pyproject.toml'), 'utf8')).match(/^version = "([^"]+)"$/mu)?.[1];
-if (!coreVersion) throw new Error('Canonical Python package version is missing');
+const coreVersion = JSON.parse(await readFile(resolve(root, 'packages/core/package.json'), 'utf8')).version;
+if (!coreVersion) throw new Error('Canonical TypeScript package version is missing');
 const manifest = JSON.parse(await readFile(new URL('package.json', import.meta.url), 'utf8'));
 const protocolVersion = JSON.parse(await readFile(resolve(root, 'protocol/v2/manifest.yaml'), 'utf8')).metadata.version;
 await writeFile(new URL('resources/compatibility.json', import.meta.url), JSON.stringify({

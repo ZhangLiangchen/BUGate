@@ -2,7 +2,7 @@
   "apiVersion": "bugate.io/v2",
   "kind": "MethodSpec",
   "id": "test_design",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "objective": "Trace exactly the active ScopeContract requirements and necessary branches through business Oracles to required cases.",
   "quality_dimensions": [
     "scope_necessity",

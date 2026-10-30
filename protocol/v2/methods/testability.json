@@ -2,7 +2,7 @@
   "apiVersion": "bugate.io/v2",
   "kind": "MethodSpec",
   "id": "testability",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "objective": "Choose the cheapest sufficient observation and test layer for every proposition.",
   "quality_dimensions": [
     "observation",

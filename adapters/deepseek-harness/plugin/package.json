@@ -1,6 +1,6 @@
 {
   "name": "@bugate/deepseek-harness",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "description": "BUGate quality protocol and evidence adapter for DeepSeek Harness",
   "type": "module",
   "main": "lib/index.js",
@@ -14,14 +14,16 @@
   "files": [
     "lib",
     "resources",
-    "python",
     "cordis.patch.yml",
     "README.md",
     "README.zh-CN.md"
   ],
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": [
+        "./node_modules/@deepseek-ai/dsh-experimental-agent-team-profile/cordis.patch.yml",
+        "./cordis.patch.yml"
+      ]
     }
   },
   "engines": {
@@ -31,7 +33,7 @@
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test ../tests/bridge.test.mjs ../tests/runtime.test.mjs"
+    "test": "node --test ../tests/core-service.test.mjs ../tests/runtime-node.test.mjs ../tests/team.test.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.6-alpha.1",
@@ -43,10 +45,18 @@
     "@deepseek-ai/dsh-tools": "0.2.2-alpha.2",
     "@deepseek-ai/dsh-working-directory": "0.2.2-alpha.2",
     "@deepseek-ai/dsh-llm": "0.2.2-alpha.2",
-    "@deepseek-ai/dsh-util-values": "0.2.2-alpha.2"
+    "@deepseek-ai/dsh-util-values": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-experimental-agent-team": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-session": "0.2.2-alpha.2"
   },
   "dependencies": {
-    "ajv": "8.17.1"
+    "ajv": "8.17.1",
+    "@bugate/cli": "2.2.0-dev.1",
+    "@bugate/core": "2.2.0-dev.1",
+    "@deepseek-ai/dsh-experimental-agent-team-profile": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-experimental-agent-team": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-experimental-tool-agent-team": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-experimental-client-ui-agent-team": "0.2.2-alpha.2"
   },
   "devDependencies": {
     "@types/node": "24.10.0",

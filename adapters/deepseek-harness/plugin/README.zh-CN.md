@@ -1,62 +1,83 @@
-[English](README.md)
+# BUGate 原生 DSH 插件
 
-# 原生 bundle 配置
+[English](README.md) | 简体中文
 
-执行 `node build.mjs` 编译 TypeScript，并从仓库规范协议生成协议与 Skill 资源。
-分发使用 `packaging/build_dsh.py` 生成的预构建 bundle，内含 Python wheels。
-`dsh plugin add` 读取 `cordis.patch.yml`，配置行 id 为 `bugate`，插件名称为
-`@bugate/deepseek-harness`。
+`@bugate/deepseek-harness` 2.2.0-dev.1 是共享 TypeScript 核心及统一 Node CLI 的
+Cordis 接入。DSH 是唯一产品宿主。插件直接消费 `@bugate/core` 规范序列化，在配置的
+DSH subprocess/filesystem world 中运行已安装 `@bugate/cli`，执行校验、哈希、存储和
+进程采集；没有 Python fallback。
 
-| 配置 | 默认值 | 含义 |
-|---|---|---|
-| `pythonExecutable` | `python3` | 由 provider 解析；绝对宿主安装路径须映射。 |
-| `projectRoot` | 会话发现 | 可选的 filesystem provider 路径，限制发现范围。 |
-| `taskPath` | 唯一发现任务 | 明确的 provider 任务路径；歧义报错。 |
-| `mode` | `managed` | `advisory` 不拦截写入，评估含义不变。 |
-| `maxContextBytes` | 8000 | 核心渲染预算。 |
-| `timeoutMs` | 30000 | 每次核心调用期限。 |
-| `maxOutputBytes` | 1048576 | stdout/stderr 合计字节上限。 |
-| `graceMs` | 1000 | 终止进程宽限期。 |
-| `maxRework` | 2 | 完成声明返工次数上限。 |
-| `maxReworkMs` | 120000 | 完成声明返工总时限。 |
-| `executionCommands` | `{}` | 宿主配置的命令注册表，模型只提交命令 id。 |
+包的有序 `dsh.bundle.patch` 先消费原样的官方
+`@deepseek-ai/dsh-experimental-agent-team-profile` patch，再注册 BUGate。
+官方层挂载 Team service/tools 并禁用直接委派工具。成员、任务板、消息、执行及生命周期
+由 DSH 拥有，BUGate 不建立团队调度器。接口锁定 DSH/Team 0.2.2-alpha.2、Cordis
+4.0.6-alpha.1；Node 要求 >=24.9.0。experimental Team API 不保证稳定。
 
-命令字段为 `argv: string[]`、`caseIds: string[]`、`report`（任务内本次新 JUnit 路径，验收测试必填，辅助探测可省略）、
-`purpose: 'test' | 'auxiliary' | 'diagnostic' | 'exploration'` 和可选 `timeoutSeconds`（默认 20）。命令及其参数路径
-必须属于同一配置 execution world；适配器不猜测任意参数含义，也不跨运行环境隐式访问。
-bridge timeout 应大于命令 timeout 与证据采集开销之和。
+## 配置
 
-工具包括 `bugate_prepare`、`bugate_status`、`bugate_validate`、`bugate_assess`、
-`bugate_scope`、`bugate_check_scope`、`bugate_record_scope`、`bugate_record_suggestion`、
-`bugate_record_artifact`、`bugate_record_evidence`、`bugate_run_test`。
-`bugate_assess({claim,submit:true})` 启用有界完成声明返工。草稿写入 `.bugate/drafts/`；
-`bugate_record_artifact({input,expected_digest?})` 委托核心计算摘要、校验和原子 CAS。
-更新需传旧工件摘要。普通 evidence 登记不接受宿主观测来源升级。
+```yaml
+- id: bugate
+  config:
+    projectRoot: /absolute/external-test-project
+    mode: managed
+    nodeExecutable: node
+    maxRework: 2
+    maxReworkMs: 120000
+    executionCommands:
+      required-tests:
+        argv: [node, tests/runner.mjs, logs/results.xml]
+        caseIds: [case-from-current-inventory]
+        report: logs/results.xml
+        purpose: test
+```
 
-设计满足前允许 `artifacts/`、`claims/`、`evidence-input/`、精确 `.bugate/drafts/`
-子树的分析写入。`implementation/`、`tests/` 写入需要新鲜且满足的设计声明。
-受管模式拒绝其他 `.bugate/` 控制文件与任意 shell 写入；关联契约活动的配置 exploration 命令可做合法探测。
-读取始终可用。
+项目有多个任务时显式选择 `taskPath`。`coreEntrypoint` 可指定宿主拥有的已安装 CLI
+绝对路径，不是模型参数。Node 可执行文件及 CLI 安装都必须映射进配置的 filesystem/
+process world。opaque target key 不作路径；文件见证比较 provider 可见的实际文件和目录。
+不支持的映射明确拒绝。
 
-协议、Schema、版本或投影失配会清除旧满意状态。reload 释放工具、提示提供者及存活
-子进程。冷恢复核对会话固定的完整绑定，不接受静默替换。需全局加载适配器才能覆盖
-独立 preset 和子 Agent；不假定父 Agent 局部 guard 自动继承。没有 BUGate 自有 loop
-或强制长期记忆服务。
+`context.text` 和 `tools.guard` 同步消费已完成的 prepared 状态。准备、模型准入和评审
+最终结算使用真实可等待的 Agent 生命周期接缝。受管写入/执行 ticket 重新检查范围、计划
+和当前设计验收。普通读取及来源分析保持可用。managed 模式拒绝任意 `bash`，因为插件不
+推断任意 shell 意图；使用绑定必需用例或有界辅助活动的 `bugate_run_test` 配置命令。
+advisory 模式不实施阻断工具策略。
 
-范围契约与收敛工具：`bugate_scope` 查看当前契约、真实用户请求收据和建议；
-`bugate_check_scope` 校验范围和计划；`bugate_record_scope({input, expected_digest?})`
-登记契约草稿或有用户来源的新版本。请求捕获命令不向模型暴露为工具，Agent 自述
-“用户同意”不构成授权；子 Agent 委派和插件返工不被捕获为真人请求。若改变锁定 Profile 的要求/风险分母，
-需显式新 Profile 版本并初始化新任务；原任务及其失败保留，不自动重绑定。
+## 原生工具与评审来源
 
-命令配置支持 `purpose: test | auxiliary | diagnostic | exploration`，辅助活动
-必须提供契约中声明的 `activityId` 且 `caseIds` 为空；验收测试只能列当前计划用例。
-可设置 `environmentId`；省略时核心仅接受唯一允许环境，多环境需显式选择。
-每次执行在 await 准备接缝获取同步 guard 凭据，核心启动命令前再次核对期望
-契约/计划摘要。诊断按关联失败和有限次数受控，不无限扩展成专项。
+工具包括 prepare/status/validate、范围创作、工件/证据导入、建议、评估和配置执行。
+统一 CLI 与原生插件使用相同核心规则及 JSON envelope。
 
-建议草稿放 `.bugate/drafts/`，包含 `id`、`description`、`rationale`、
-`source_refs`，通过 `bugate_record_suggestion({input})` 登记；不接受命令或执行
-步骤。草稿目录和正式建议都不进入授权快照，因此不会使已经完整的声明失效。
-范围外建议不触发返工；返工只修复范围内证据缺失或不一致。真实功能失败时，
-`execution_complete` 可以通过，`requirement_verified` 必须保留不通过。
+`bugate_publish_artifact({artifact: ...})` 接收真实模型工具调用的内联输出，捕获精确
+live 官方 Team 成员、Agent/Session、parent、fresh/fork 及继承事件前缀、原始工具参数和
+实际收到的同伴消息。`bugate_record_artifact({input: ...})` 只是文件导入；成员导入
+Lead 代写文件不建立作者身份。标签、模型名称和 JSON 身份字段不提升为宿主身份。
+
+采用两阶段发布：工具返回前，工件及不可变 `HostObservation` 已持久化，状态为
+`published`，还不能授权评审。在可等待的准备/停止/恢复接缝，插件 flush 真实最终 DSH
+`tool/result` 并发布不可变 `HostSettlement`。仅完成且匹配的结算可参与评估；发布后
+取消、超时、失败和缺少结算保持未完成。冷恢复读取持久化 Session 与核心事实，不相信
+Lead 局部缓存。
+
+锁定的 `Profile.team_review_policy` 只选择必要且有来源的视角、上下文策略、交叉核对
+要求和有界轮数，不施加通用角色/模型/用例矩阵。评审绑定精确工件及上游依赖快照、范围/
+计划、Profile/协议和评估器字节，相关变化使评审失效。`fresh_required` 表示不继承 Lead
+事件前缀，不保证认知独立或无法看到共享工作区。同模型成员可以满足可观察执行分离；
+不同模型本身不证明独立性。
+
+交叉核对引用精确历史意见和实际收到的 Team 消息；原始发现、反证、限制及处置持久化。
+有证据的独立处置可解决发现，不要求全员同意，原始异议继续保留。多数票及 Team task
+complete 不替代业务 Oracle；消息 accepted 不代表接收者处理或评审持久化完成。
+
+Team 是进程内共享 cwd，不提供 worktree 隔离；writeScopes 仅建议、owner 不自动释放，
+消息没有重试/去重保证。发布/CAS/锁保护配合协议的写入者，不抵御同权限文件系统/进程
+篡改。不从确定性 runtime 测试推断模型质量或效率提升。
+
+另见[适配器用法](../README.zh-CN.md)、[协议权威](../../../protocol/v2/README.zh-CN.md)
+和[运行验证](../tests/README.zh-CN.md)。
+
+原生观察通道由插件进程内 Ed25519 私钥签名，配置 filesystem provider 仅持久化公钥 pin。签名绑定 task/workspace、操作及完整上下文摘要；CLI 验证已有 pin，不提供创建宿主权威的命令。普通模型 JSON 或自设环境 token 不能制造来源。历史公钥及签名保留以验证恢复记录；同权限直接改写公钥/文件仍在保证边界之外。
+
+fresh Team 会话仍接收 Lead 编写的委派 prompt，其精确字节保存在持久 DSH 会话和
+Lead 的真实 spawn 工具调用中。原生记录证明哪个真实成员输出了内容及可观察上下文
+策略，不证明文本原创。Lead 可以在 prompt 中放入文本后由成员复述，身份本身不能
+证明认知独立或通用识别所有代写形式。

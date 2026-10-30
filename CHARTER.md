@@ -3,19 +3,18 @@
 English | [简体中文](CHARTER.zh-CN.md)
 
 BUGate is a SUT-neutral testing quality protocol, not an execution orchestrator.
-The current released Python core assesses versioned facts; the only product adapter is native
+The shared TypeScript core assesses versioned facts; the only product adapter is native
 DeepSeek Harness. Task work happens in an external test repository with an
 explicit Profile and exact protocol binding. Core development never mounts a
 real SUT into this repository.
 
-The accepted next architecture is a full TypeScript implementation: a shared
-SUT-neutral evaluation core, unified Node CLI and native Cordis service/plugin
-within DSH. The existing native plugin will move off its Python bridge. This is
-an accepted user decision with implementation **planned, not started**; the
-current release and its Python installation remain unchanged. See the
-[TypeScript/Cordis development plan](docs/plans/TYPESCRIPT_CORDIS.md) for phases,
-Oracles and cutover boundaries. This target does not change DSH's execution-world
-providers, transfer Agent-loop ownership or restrict external SUT test languages.
+The accepted architecture has a shared TypeScript evaluation core, unified Node
+CLI and native Cordis service/plugin. Official DSH Agent Team owns reviewer
+membership, task boards, messages and lifecycle; BUGate binds persisted host
+observations to review outputs and evaluates their applicability. Implementation
+is in progress under the 2026-10-30 request; final cutover remains conditional on
+exact-artifact acceptance. See the [migration plan](docs/plans/TYPESCRIPT_CORDIS.md).
+This does not transfer Agent-loop ownership or restrict external SUT test languages.
 
 The 2026-10-29 scope decision retires all previous compatibility, multi-host,
 role-daemon, memory-runtime and imported-installer requirements. Git history and

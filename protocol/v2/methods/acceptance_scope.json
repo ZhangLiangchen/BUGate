@@ -2,7 +2,7 @@
   "apiVersion": "bugate.io/v2",
   "kind": "MethodSpec",
   "id": "acceptance_scope",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "objective": "Establish the smallest sufficient evidence closure for the finite user goal without adding objectives or weakening business assertions.",
   "quality_dimensions": [
     "source_authority",

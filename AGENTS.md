@@ -10,7 +10,7 @@ for that tool.
 ## Authority and layout
 
 - `protocol/v2/` is the sole machine authority: Schemas, MethodSpec, rules and reason codes.
-- `src/bugate/` is the current released host-neutral Python evaluator and unified CLI.
+- `packages/core/` owns the shared TypeScript evaluator; `packages/cli/` owns the unified Node CLI.
 - `adapters/deepseek-harness/` is the native adapter and real-runtime acceptance.
 - `views/skills/bugate/` is the small entry projection; the build appends canonical MethodSpec resources and seals their digest.
 - `packaging/` owns the explicit resource inventory and standalone installer.
@@ -26,10 +26,10 @@ as reviewable task artifacts; no memory daemon or hook is required.
 
 The user has accepted the [TypeScript/Cordis roadmap](docs/plans/TYPESCRIPT_CORDIS.md):
 shared TypeScript core, unified Node CLI and native Cordis service/plugin, with
-DSH remaining the only host. Implementation is planned, not started. The current
-Python release remains maintainable until verified cutover. Read the plan before
-migration work; it does not change current machine contracts, authorize a new
-release or make historical test counts universal gates. Preserve the invariants
+DSH remaining the only host. Implementation is in progress under the 2026-10-30 execution request. The protocol
+and evaluator are versioned `2.2.0-dev.1`; cutover requires exact-package runtime
+and independent-install evidence. Read the plan before migration work. Historical
+Python releases and test counts are not authorization or universal gates. Preserve the invariants
 below across the implementation change and use actual configured execution worlds.
 
 Keep the core SUT-neutral. Real product sources, APIs, secrets, environments,

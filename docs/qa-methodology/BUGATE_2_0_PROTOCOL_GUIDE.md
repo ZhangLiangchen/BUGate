@@ -8,10 +8,10 @@ multi-host plans are retired by the [2026-10-29 decision](../../CHARTER.md).
 | Boundary | Authority |
 |---|---|
 | `protocol/v2/` | Canonical Schemas, MethodSpec, quality rules and reason codes. |
-| `src/bugate/` | Deterministic validation, semantic-review requirements, snapshots, evidence and claim assessment. |
+| `packages/core/` | Shared TypeScript runtime validation, semantic-review requirements, snapshots, evidence and claim assessment. |
 | Unified CLI | Versioned JSON CommandResult and stable exit semantics. |
 | DSH native adapter | Host services, exact binding, unchanged prepared context, managed tools and bounded rework. |
-| `packaging/` | Finite resources, standalone wheels/bundle and owned installation lifecycle. |
+| `packaging/` | Finite resources, finite Node bundle and owned installation lifecycle. |
 
 The `ProtocolBinding` pins the exact protocol and Profile. `TestTask` identifies
 canonical project/task scope; `Artifact`, `Evidence` and `Claim` preserve content,
@@ -53,6 +53,15 @@ exploration remain available when implementation prerequisites are missing.
 
 Machine authority is not duplicated in documentation or projections. The native
 build appends canonical MethodSpec resources to the Skill entry and records
-protocol/content digests; packaging verifies Python/native resource equality.
+protocol/content digests; packaging verifies shared-core/native resource equality.
 See [installation](../DEEPSEEK_HARNESS.md), [method](METHOD.md) and
 [current and historical documentation](../README.md).
+
+Official DSH Agent Team review uses Profile-declared necessary perspectives.
+The host captures author/reviewer identity, Team membership, execution and input
+context. Fresh/fork status and execution separation are observable facts, not a
+claim of cognitive independence. A review requires a persisted host observation
+and successful final tool settlement, exact current artifact/input bindings and
+source-backed semantic content. Team task completion and message acceptance are
+not review acceptance. Disagreements and dispositions remain traceable; imported
+JSON and reviewer names cannot manufacture host provenance.

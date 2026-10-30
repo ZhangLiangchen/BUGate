@@ -1,0 +1,17 @@
+{
+  "source_commit": "eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654",
+  "evaluator": "sha256:683e55243d84e47fca1323fa6041c9f948bf114a5556173d9ebf7fa47800fb6e",
+  "classification": "baseline defect intentionally corrected in 2.2 new binding; do not preserve parity for colliding namespaces",
+  "snapshot_counterexample": {
+    "task_file": "source:SRC1",
+    "before": "sha256:de5fe1d4486ef5e632ab5be2b7c280aab803d03685555312a7e0b7770f16f140",
+    "after": "sha256:de5fe1d4486ef5e632ab5be2b7c280aab803d03685555312a7e0b7770f16f140",
+    "changed": false
+  },
+  "execution_manifest_counterexample": {
+    "task_file": "@source/SRC1",
+    "manifest_source_value": "sha256:10f1c9d9899de286cb009690f022e37ea544bf8fbbb350952aa630ae0de77c3c",
+    "actual_source_digest": "sha256:7dd10c57e793687b972bb1ce95c2c0de9a4198ff41810b151e76cbb1461ac8fd",
+    "changed_after_actual_source_change": false
+  }
+}

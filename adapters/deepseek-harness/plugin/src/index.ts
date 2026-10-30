@@ -1,3 +1,4 @@
+import { canonical, contentDigest } from '@bugate/core';
 import { createHash, randomUUID } from 'node:crypto';
 import { posix, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,11 +13,13 @@ import type {} from '@deepseek-ai/dsh-system-prompt';
 import type {} from '@deepseek-ai/dsh-working-directory';
 import type { ToolDefinition, ToolExecution, ToolExecutionToken, JsonSchemaNode } from '@deepseek-ai/dsh-tools';
 import { Ajv2020, type ValidateFunction } from 'ajv/dist/2020.js';
-import { PythonBridge } from './bridge.js';
+import { NodeCoreService } from './core-service.js';
+import type {} from '@deepseek-ai/dsh-experimental-agent-team';
+import type {} from '@deepseek-ai/dsh-session';
 import { BridgeError, failure, json, object, string, type CommandResult, type PreparedContext } from './contracts.js';
 
 export const name = 'bugate';
-export const inject = ['agents', 'tools', 'systemPrompt', 'fs', 'subprocess', 'skills', 'workingDirectory', 'llm'];
+export const inject = ['agents', 'tools', 'systemPrompt', 'fs', 'subprocess', 'skills', 'workingDirectory', 'llm', 'agentTeams', 'sessions'];
 export interface ExecutionCommand {
   argv: string[]; caseIds: string[]; report?: string;
   purpose?: 'test' | 'exploration' | 'auxiliary' | 'diagnostic'; activityId?: string; environmentId?: string; timeoutSeconds?: number;
@@ -27,7 +30,7 @@ declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap { 'bugate-rework': { kind: 'bugate-rework' } }
 }
 export interface Config {
-  pythonExecutable?: string; projectRoot?: string; taskPath?: string;
+  nodeExecutable?: string; coreEntrypoint?: string; projectRoot?: string; taskPath?: string;
   mode?: 'advisory' | 'managed'; maxContextBytes?: number; timeoutMs?: number;
   maxOutputBytes?: number; graceMs?: number; maxRework?: number; maxReworkMs?: number;
   executionCommands?: Record<string, ExecutionCommand>;
@@ -56,13 +59,13 @@ function positive(value: number | undefined, fallback: number, label: string): n
   return result;
 }
 
-/** Registers real DSH services. Quality decisions remain in the Python core. */
+/** Registers real DSH services. Quality decisions remain in the shared TypeScript core. */
 export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   const maxContextBytes = positive(config.maxContextBytes, 8000, 'maxContextBytes');
   const maxRework = positive(config.maxRework, 2, 'maxRework');
   const maxReworkMs = positive(config.maxReworkMs, 120000, 'maxReworkMs');
-  const bridge = new PythonBridge(ctx, {
-    pythonExecutable: config.pythonExecutable ?? 'python3', timeoutMs: positive(config.timeoutMs, 30000, 'timeoutMs'),
+  const bridge = new NodeCoreService(ctx, {
+    nodeExecutable: config.nodeExecutable ?? 'node', coreEntrypoint: config.coreEntrypoint, timeoutMs: positive(config.timeoutMs, 30000, 'timeoutMs'),
     maxOutputBytes: positive(config.maxOutputBytes, 1048576, 'maxOutputBytes'), graceMs: positive(config.graceMs, 1000, 'graceMs'),
   });
   const states = new Map<Agent, State>();
@@ -75,6 +78,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   const refreshQueues = new Map<string, Promise<void>>();
   const operations = new Set<Promise<unknown>>();
   const capturedRequests = new Set<string>();
+  const settledOutputs = new Set<string>();
   const ajv = new Ajv2020({ strict: false, allErrors: true });
   const validators = new Map<string, ValidateFunction>();
   const commands = config.executionCommands ?? {};
@@ -137,24 +141,24 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
 
   function checked(result: CommandResult): CommandResult {
     const envelopeValidator = validators.get('CommandResult');
-    if (envelopeValidator && !envelopeValidator(result)) throw new BridgeError('PYTHON_INVALID_RESPONSE', ajv.errorsText(envelopeValidator.errors));
+    if (envelopeValidator && !envelopeValidator(result)) throw new BridgeError('CORE_INVALID_RESPONSE', ajv.errorsText(envelopeValidator.errors));
     if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
       const kind = result.data.kind;
       if (typeof kind === 'string') {
         const validator = validators.get(kind);
-        if (validator && !validator(result.data)) throw new BridgeError('PYTHON_INVALID_RESPONSE', ajv.errorsText(validator.errors));
+        if (validator && !validator(result.data)) throw new BridgeError('CORE_INVALID_RESPONSE', ajv.errorsText(validator.errors));
       }
     }
     return result;
   }
-  async function call(argv: string[], task: string, signal?: AbortSignal): Promise<CommandResult> {
-    const pending = bridge.call([...argv, '--json'], task, signal).then(checked);
+  async function call(argv: string[], task: string, signal?: AbortSignal, hostContext?: Record<string, unknown>): Promise<CommandResult> {
+    const pending = bridge.call([...argv, '--json'], task, signal, hostContext).then(checked);
     operations.add(pending);
     try { return await pending; } finally { operations.delete(pending); }
   }
   async function verifyFilesystem(task: string, value: unknown, signal?: AbortSignal): Promise<void> {
     const validate = ajv.getSchema('https://bugate.io/v2/schemas/command_result.schema.json#/$defs/filesystem_manifest') as ValidateFunction<FilesystemManifest> | undefined;
-    if (!validate || !validate(value)) throw new BridgeError('PYTHON_INVALID_RESPONSE', 'Core filesystem witness is missing or invalid');
+    if (!validate || !validate(value)) throw new BridgeError('CORE_INVALID_RESPONSE', 'Core filesystem witness is missing or invalid');
     const witness = value;
     const root = await ctx.fs.resolve(task, { signal });
     if (ctx.fs.processPath(root) !== witness.task_root) throw new BridgeError('RUNTIME_UNSUPPORTED', 'Filesystem and subprocess providers resolve different task roots');
@@ -243,6 +247,20 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     }
     return undefined;
   }
+  async function settleOutputs(agent: Agent, task: string, signal?: AbortSignal): Promise<void> {
+    const events = agent.session.snapshotEvents();
+    const outputCalls = new Set(events.flatMap(event => event.type === 'assistant/message' && event.seq >= agent.session.inheritedEventCount ? event.data.message.content.flatMap(block => block.type === 'tool-call' && block.name === 'bugate_publish_artifact' ? [String(block.id)] : []) : []));
+    const results = events.filter(event => event.type === 'tool/result' && event.seq >= agent.session.inheritedEventCount && outputCalls.has(String(event.data.message.toolCallId)) && !settledOutputs.has(String(agent.session.id) + ':' + event.seq));
+    if (!results.length) return;
+    if (!await ctx.sessions.flush(agent.session)) throw new BridgeError('HOST_PROVENANCE_REQUIRED', 'Review settlement requires durable DSH session persistence');
+    for (const event of results) {
+      if (event.type !== 'tool/result') continue;
+      signal?.throwIfAborted();
+      const result = await call(['artifact', 'settle', '--task', task], task, signal, { host: 'deepseek-harness', host_version: '0.2.2-alpha.2', settlement: { session_id: String(agent.session.id), call_id: String(event.data.message.toolCallId), result_event: event } });
+      if (result.invocation !== 'completed') throw new BridgeError('REVIEW_NOT_COMPLETED', JSON.stringify(result.errors));
+      settledOutputs.add(String(agent.session.id) + ':' + event.seq);
+    }
+  }
   async function refresh(agent: Agent, signal?: AbortSignal): Promise<State | undefined> {
     const previous = states.get(agent);
     if (previous) { previous.prepared = undefined; previous.generation++; }
@@ -250,6 +268,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     try { task = await discover(agent, signal); }
     catch (error) { if (previous) previous.error = failure('protocol.prepare', error); throw error; }
     if (!task) { states.delete(agent); return undefined; }
+    await settleOutputs(agent, task, signal);
     // The provider may implement createIfAbsent through a temporary directory.
     // Serialize our own full task refresh/pin writes so sibling hydration never
     // mistakes that owned atomic staging directory for a different execution world.
@@ -336,7 +355,8 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
         try { await ctx.fs.writeText(await ctx.fs.resolve(input, { signal }), receipt, { kind: 'createIfAbsent' }, signal); }
         catch (error) { if (await read(input, signal) !== receipt) throw new BridgeError('CONCURRENT_CONFLICT', error instanceof Error ? error.message : String(error)); }
       } else if (await read(input, signal) !== receipt) throw new BridgeError('SCOPE_REQUEST_CONFLICT', 'Host request identity already has different content');
-      const result = await call(['scope', 'request', '--task', task, '--input', input], task, signal);
+      await ctx.sessions.flush(agent.session);
+      const result = await call(['scope', 'request', '--task', task, '--input', input], task, signal, { host: 'deepseek-harness', host_version: '0.2.2-alpha.2', user_request: { session_id: String(agent.session.id), source_event_id: String(message.id), message: text, origin: 'user' } });
       if (result.invocation !== 'completed') throw new BridgeError('SCOPE_REQUEST_CAPTURE_FAILED', JSON.stringify(result.errors));
       capturedRequests.add(key);
     }
@@ -393,7 +413,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   ctx.on('agent/disposed', ({ agent }) => { states.delete(agent); });
 
   function managed(exec: ToolExecution): boolean {
-    return ['write', 'edit', 'str_replace_editor', 'bash', 'bugate_run_test', 'bugate_assess', 'bugate_record_evidence', 'bugate_record_artifact', 'bugate_record_scope', 'bugate_record_suggestion'].includes(exec.name);
+    return ['write', 'edit', 'str_replace_editor', 'bash', 'bugate_run_test', 'bugate_assess', 'bugate_record_evidence', 'bugate_record_artifact', 'bugate_publish_artifact', 'bugate_record_scope', 'bugate_record_suggestion'].includes(exec.name);
   }
   ctx.on('tools/pre-execute', async (exec, next) => {
     callIds.set(exec.token, `${exec.agent?.id ?? 'agentless'}:${exec.callId}`);
@@ -413,7 +433,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
       let needsDesign = true;
       let authorization: { scopeDigest: string; planDigest?: string } | undefined;
       if (exec.name === 'bash') throw new BridgeError('UNCLASSIFIED_MANAGED_WRITE', 'Use a configured bugate_run_test exploration command; arbitrary shell writes are outside the managed policy');
-      if (exec.name === 'bugate_assess' || exec.name === 'bugate_record_evidence' || exec.name === 'bugate_record_artifact' || exec.name === 'bugate_record_scope' || exec.name === 'bugate_record_suggestion') {
+      if (exec.name === 'bugate_assess' || exec.name === 'bugate_record_evidence' || exec.name === 'bugate_record_artifact' || exec.name === 'bugate_publish_artifact' || exec.name === 'bugate_record_scope' || exec.name === 'bugate_record_suggestion') {
         needsDesign = false;
       } else if (exec.name === 'bugate_run_test') {
         const command = commands[string(args.command_id, 'command_id')];
@@ -501,6 +521,49 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     if (exec.agent) await refresh(exec.agent, exec.signal);
     return result;
   });
+  async function observedExecution(exec: ToolExecution): Promise<Record<string, unknown>> {
+    if (!exec.agent) throw new BridgeError('HOST_PROVENANCE_REQUIRED', 'A live Team member must execute the output tool');
+    const agent = exec.agent;
+    const membership = ctx.agentTeams.membership(agent);
+    const member = ctx.agentTeams.listMembers(agent).find(row => String(row.id) === String(agent.session.id));
+    if (!member || (member.status !== 'running' && member.status !== 'inactive')) throw new BridgeError('HOST_PROVENANCE_REQUIRED', 'The executing Agent is not an active official Team member');
+    const events = agent.session.snapshotEvents();
+    const event = events.findLast(value => value.type === 'assistant/message' && value.seq >= agent.session.inheritedEventCount && !value.data.interrupted && value.data.message.content.some(block => block.type === 'tool-call' && String(block.id) === String(exec.callId) && block.name === exec.name));
+    if (!event || event.type !== 'assistant/message') throw new BridgeError('HOST_PROVENANCE_REQUIRED', 'No actual model tool output in this member session matches the execution');
+    const block = event.data.message.content.find(value => value.type === 'tool-call' && String(value.id) === String(exec.callId));
+    if (!block || block.type !== 'tool-call' || !isDeepStrictEqual(JSON.parse(block.arguments), exec.arguments)) throw new BridgeError('HOST_PROVENANCE_REQUIRED', 'Observed model arguments differ from dispatched output');
+    const sessionEvent = { seq: event.seq, time: event.time, turn: event.data.turn, step: event.data.step, tool_call: { ...block, arguments: JSON.parse(block.arguments), arguments_json: block.arguments } };
+    const messages = events.flatMap(value => {
+      if (value.type !== 'user/message' || value.seq < agent.session.inheritedEventCount || String(value.data.source.kind) !== 'agent-message') return [];
+      const source = value.data.source as unknown as Record<string, unknown>;
+      if (typeof source.senderSessionId !== 'string') return [];
+      return [{ message_id: String(value.data.id), sender_session_id: source.senderSessionId, content_digest: contentDigest(canonical(value.data.content)), content: value.data.content, event_seq: value.seq }];
+    });
+    // Ordinary Agent inbox acceptance is not a persistence barrier. Commit the
+    // original model output and received-message observations before core receipt publication.
+    await ctx.sessions.flush(agent.session);
+    exec.signal.throwIfAborted();
+    return { host: 'deepseek-harness', host_version: '0.2.2-alpha.2', execution: {
+      agent_id: String(agent.id), session_id: String(agent.session.id), team_id: String(membership.id), member_name: membership.name, member_role: membership.role,
+      context_mode: membership.role === 'lead' ? 'lead' : member.context,
+      parent_session_id: agent.session.header.parentSession ? String(agent.session.header.parentSession) : null,
+      inherited_event_count: agent.session.inheritedEventCount, call_id: String(exec.callId), root_call_id: String(exec.rootCallId), tool_name: exec.name,
+      arguments_digest: contentDigest(canonical(exec.arguments)), arguments: exec.arguments,
+      session_event_digest: contentDigest(canonical(sessionEvent)), session_event: sessionEvent,
+    }, messages };
+  }
+  register('bugate_publish_artifact', 'Publish this actual Team member tool output as a quality artifact. Inline content and exact live Team execution are durably observed; quality authorization additionally awaits final host tool-result settlement. File imports and names cannot establish authorship or independent review.', { artifact: { type: 'object' }, expected_digest: { type: 'string' } }, ['artifact'], async (args, exec, state) => {
+    const observation = await observedExecution(exec);
+    const artifact = object(args.artifact);
+    // The core authoring operation supplies computed binding/digest fields.
+    if (artifact.kind !== 'Artifact' || artifact.apiVersion !== 'bugate.io/v2') throw new BridgeError('SCHEMA_INVALID', 'Inline output must be an Artifact draft');
+    observation.artifact = artifact;
+    const argv = ['artifact', 'publish', '--task', state.task];
+    if (args.expected_digest !== undefined) argv.push('--expected-digest', string(args.expected_digest, 'expected_digest'));
+    const result = await call(argv, state.task, exec.signal, observation);
+    if (exec.agent) await refresh(exec.agent, exec.signal);
+    return result;
+  });
   register('bugate_record_artifact', 'Validate and atomically register a task-local draft; the shared core computes content digests and enforces compare-and-swap updates.', { input: { type: 'string' }, expected_digest: { type: 'string' } }, ['input'], async (args, exec, state) => {
     const input = await contained(state.task, string(args.input, 'input'), exec.signal);
     const argv = ['artifact', 'record', '--task', state.task, '--input', input];
@@ -522,7 +585,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     const authorization = ticket?.scopeDigest ? { scopeDigest: ticket.scopeDigest, planDigest: ticket.planDigest } : await authorize(command, state.task, exec.signal);
     const report = command.report ? await contained(state.task, command.report, exec.signal) : undefined;
     const runId = `dsh-${createHash('sha256').update(`${exec.agent?.id}:${exec.rootCallId}:${exec.callId}`).digest('hex').slice(0, 32)}`;
-    const argv = ['execution', 'run', '--task', state.task, '--run-id', runId, '--agent-id', String(exec.agent?.id), '--session-id', String(exec.agent?.id), '--call-id', callIds.get(exec.token) ?? String(exec.callId), '--root-call-id', String(exec.rootCallId), '--timeout', String(command.timeoutSeconds ?? 20)];
+    const argv = ['execution', 'run', '--task', state.task, '--run-id', runId, '--agent-id', String(exec.agent?.id), '--session-id', String(exec.agent?.session.id), '--call-id', callIds.get(exec.token) ?? String(exec.callId), '--root-call-id', String(exec.rootCallId), '--timeout', String(command.timeoutSeconds ?? 20)];
     if (report) argv.push('--report', report);
     const parent = exec.parent ? callIds.get(exec.parent) : undefined;
     if (exec.parent && !parent) throw new BridgeError('CALL_LINEAGE_MISSING', 'Nested parent identity is unavailable');
@@ -537,6 +600,8 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     return result;
   });
   ctx.on('agent/turn-stopping', async ({ agent, signal }) => {
+    const task = await discover(agent, signal);
+    if (task && !signal.aborted) await settleOutputs(agent, task, signal);
     const state = states.get(agent);
     if (!state?.pendingClaim || signal.aborted) return;
     await Promise.all([...operations]);
@@ -548,5 +613,5 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     state.attempts++; state.lastGap = gap;
     agent.steer(createUserMessage({ source: { kind: 'bugate-rework' }, content: [{ type: 'text', text: `BUGate completion claim is not satisfied. Repair only missing, invalid or inconsistent evidence within the current acceptance scope, or report BLOCKED/INCOMPLETE. Out-of-scope suggestions do not require execution or user decisions. Preserve real failures; execution completion does not mean requirements passed. Rework ${state.attempts}/${maxRework}: ${JSON.stringify(result)}` }] }));
   });
-  ctx.effect(() => async () => { await bridge.dispose(); await Promise.allSettled([...operations]); states.clear(); tickets.clear(); callIds.clear(); bindingDigests.clear(); refreshQueues.clear(); epochs.clear(); leases.clear(); callTasks.clear(); capturedRequests.clear(); });
+  ctx.effect(() => async () => { await bridge.dispose(); await Promise.allSettled([...operations]); states.clear(); tickets.clear(); callIds.clear(); bindingDigests.clear(); refreshQueues.clear(); epochs.clear(); leases.clear(); callTasks.clear(); capturedRequests.clear(); settledOutputs.clear(); });
 }

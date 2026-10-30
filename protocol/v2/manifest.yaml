@@ -3,7 +3,7 @@
   "kind": "ProtocolManifest",
   "metadata": {
     "id": "bugate",
-    "version": "2.1.0-dev.1"
+    "version": "2.2.0-dev.1"
   },
   "status": "implemented",
   "schemas": {
@@ -21,7 +21,9 @@
     "test_task": "schemas/test_task.schema.json",
     "scope_contract": "schemas/scope_contract.schema.json",
     "scope_request": "schemas/scope_request.schema.json",
-    "suggestion": "schemas/suggestion.schema.json"
+    "suggestion": "schemas/suggestion.schema.json",
+    "host_observation": "schemas/host_observation.schema.json",
+    "host_settlement": "schemas/host_settlement.schema.json"
   },
   "methods": [
     "methods/acceptance_scope.json",
@@ -31,7 +33,8 @@
     "methods/implementation.json",
     "methods/knowledge.json",
     "methods/test_design.json",
-    "methods/testability.json"
+    "methods/testability.json",
+    "methods/team_review.json"
   ],
   "rules": "rules/quality.json",
   "reason_codes": "reason_codes.yaml",
@@ -40,6 +43,8 @@
     "json": "sorted object keys, UTF-8, no whitespace, no floating point; integers within JS safe range",
     "object_digest": "exclude top-level digest and request_digest",
     "workspace_snapshot": "current task facts, active scope and referenced sources; excludes suggestions, unreferenced user requests, history, assessments and transaction bookkeeping",
-    "assurance": "local managed process observation, not hostile-worker authentication"
+    "assurance": "local managed process observation, not hostile-worker authentication",
+    "review_input_snapshot": "Per-review upstream dependency closure: exact binding/evaluator, Profile sources, current scope/plan, reviewed non-review artifacts and their relevant design closure, implementation file bytes, and only explicitly referenced execution evidence and its files. Exclude reviews, host observations/settlements, claims, assessments, drafts, suggestions, historical copies and unrelated downstream execution/report/knowledge/diagnosis. No object hashes itself and later unrelated execution does not invalidate design review.",
+    "review_settlement": "Published HostObservation never authorizes. Await durable final DSH tool/result, persist immutable HostSettlement referencing observation and raw result, and recompute current inputs. Missing, failed, cancelled or timeout settlement is not complete."
   }
 }

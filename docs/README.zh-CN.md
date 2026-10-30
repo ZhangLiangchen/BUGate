@@ -2,8 +2,8 @@
 
 [English](README.md) | 简体中文
 
-当前已发布的 BUGate 是宿主无关的 Python 质量评估核心与 v2 协议，唯一原生产品宿主为
-DeepSeek Harness。请从下列现行指南开始；唯一机器权威是
+BUGate 使用共享 TypeScript 质量评估核心与版本化协议，DeepSeek Harness 是唯一产品宿主。
+实施与精确产物验证进行中。请从下列现行指南开始；唯一机器权威是
 [Protocol v2](../protocol/v2/manifest.yaml)，交付报告或历史验收矩阵不建立额外规则。
 
 ## 当前指南
@@ -20,9 +20,9 @@ DeepSeek Harness。请从下列现行指南开始；唯一机器权威是
 架构指南保留 `BUGATE_2_0_PROTOCOL_GUIDE` 文件名以维持已有链接，正文描述当前
 v2 架构；精确组件版本以协议 manifest 和分发元数据为准。
 
-## 已接受的下一步架构
+## 实施与证据
 
-[TypeScript/Cordis 计划](plans/TYPESCRIPT_CORDIS.zh-CN.md)记录用户已接受的路线：全面 TypeScript 产品/工具链、统一 Node CLI 与 DSH 内的 Cordis 原生服务/插件。**实施计划中、尚未开始。** 未来目标与现行指南、发布观察分开；计划不修改机器契约或已发布资产，不宣称迁移测试已执行。
+[TypeScript/Cordis 计划](plans/TYPESCRIPT_CORDIS.zh-CN.md)记录已授权实施和切换条件。Node 实现版本为 `2.2.0-dev.1`；候选包安装通过不能证明最终 Team runtime 验收。
 
 ## 验证记录
 

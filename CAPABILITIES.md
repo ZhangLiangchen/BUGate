@@ -12,7 +12,8 @@ English | [简体中文](CAPABILITIES.zh-CN.md)
 | Evidence | Bounded managed execution, JUnit interpretation, provenance separation and atomic persistence. |
 | Claims | Business understanding, design, implementation, execution, requirement verification and scoped task delivery. |
 | DSH | Native apply(ctx), canonical context, tools, Skill projection, managed policy, child isolation, resume and bounded rework. |
-| Installation | Offline Python wheelhouse, real DSH plugin installation, idempotence, upgrade, rollback, doctor and removal. |
+| Installation | Finite Node bundle; real DSH plugin installation, ownership, idempotence, upgrade, explicit interrupted-operation recovery, rollback, doctor and removal. |
+| Official Team review | Host-observed authors/reviewers, exact artifact/input binding, fresh/fork policy and preserved discussion; completion requires durable output and successful host settlement. |
 
 The CLI is `bugate`; see the [guide](docs/DEEPSEEK_HARNESS.md) for exact commands
 and exit semantics. Machine contracts are under `protocol/v2/`; they outrank this

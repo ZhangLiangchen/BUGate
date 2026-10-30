@@ -1,7 +1,7 @@
 {
   "apiVersion": "bugate.io/v2",
   "kind": "QualityRules",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "claim_dimensions": {
     "business_understanding_complete": [
       "business_understanding"
@@ -51,7 +51,13 @@
     "Auxiliary reads, preparation, cleanup and bounded failure diagnosis do not add acceptance objectives.",
     "Out-of-scope suggestions are non-executable and never block completion or require rework.",
     "Do not reduce scope, assertions or failure cases to obtain a pass; scope changes require traceable direct user input.",
-    "Scope contracts never override host permissions, approvals or tool safety boundaries."
+    "Scope contracts never override host permissions, approvals or tool safety boundaries.",
+    "Host review provenance comes only from actual DSH Team tool execution; imported JSON, reviewer names, Team task completion and message acceptance do not establish a completed review.",
+    "Persist review output and host observation before authorization. Current authors and reviewers must be separate actual Team member executions; fresh-required policies reject fork context.",
+    "Preserve raw review findings, counterevidence and cross-check dispositions. Unresolved blocking opinions remain blockers; consensus and majority do not replace business Oracles.",
+    "Review input changes, cross-task receipts and replayed execution identities invalidate review authorization. A changed denominator requires a new Profile and task.",
+    "A published HostObservation alone never authorizes. Only an immutable HostSettlement from the durably flushed final DSH tool/result establishes completed output. Cancellation, timeout, missing settlement and non-success result do not complete review.",
+    "Changing target digests cannot erase an unresolved in-scope blocking Team opinion. Preserve genuine historical findings for the same scope and related target IDs until an exact evidenced disposition; a historical opinion used for disposition never authorizes changed current inputs."
   ],
   "hard_constraint_set": "core-quality-invariants",
   "quality_models": {
@@ -66,5 +72,6 @@
     "source_plan": "Per-case sources narrow the inventory artifact source plan; all declared source bytes are digest checked",
     "testability": "Every proposition and every oracle has a resolved observation strategy",
     "placeholders": "Exact unresolved markers cannot satisfy required quality fields"
-  }
+  },
+  "team_review": "When Profile.team_review_policy or quality_requirements.independent_review applies, author and review host receipts must bind exact current artifacts and acyclic inputs. Team membership, distinct execution identity and declared context policy establish observed execution separation only, not cognitive independence. Required perspectives and necessity come from the locked Profile; no default role/model matrix. Preserve authenticated independent opinions within the same scope and related target IDs across target digest revisions. Historical completed independent peer opinions may supply exact finding-specific dispositions with real received messages and counterevidence; they cannot authorize current review inputs. Previously evidenced dispositions remain closed after later revisions."
 }

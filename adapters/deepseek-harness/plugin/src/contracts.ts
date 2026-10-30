@@ -23,7 +23,7 @@ export class BridgeError extends Error {
 export function failure(operation: string, error: unknown): CommandResult {
   const code = error instanceof BridgeError ? error.code : 'RUNTIME_ERROR';
   return { apiVersion: 'bugate.io/v2', kind: 'CommandResult', operation, request_id: randomUUID(),
-    invocation: code === 'PYTHON_CANCELLED' ? 'cancelled' : code === 'PYTHON_TIMEOUT' ? 'timeout' : 'runtime_error',
+    invocation: code === 'CORE_CANCELLED' ? 'cancelled' : code === 'CORE_TIMEOUT' ? 'timeout' : 'runtime_error',
     data: null, errors: [{ code, message: error instanceof Error ? error.message : String(error), details: {} }] };
 }
 export function object(value: unknown): Record<string, unknown> {
@@ -39,5 +39,5 @@ export function json(value: unknown): JsonValue {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (Array.isArray(value)) return value.map(json);
   if (typeof value === 'object') return Object.fromEntries(Object.entries(object(value)).map(([k, v]) => [k, json(v)]));
-  throw new BridgeError('PYTHON_INVALID_RESPONSE', 'Response is not lossless JSON');
+  throw new BridgeError('CORE_INVALID_RESPONSE', 'Response is not lossless JSON');
 }

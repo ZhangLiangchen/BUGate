@@ -2,187 +2,100 @@
 
 [English](DEEPSEEK_HARNESS.md) | 简体中文
 
-原生适配器调用 BUGate Python 核心评估任务当前事实。DeepSeek Harness（DSH）负责
-Agent 循环、工具执行和有界返工。任务工件保存在外部测试仓库。此路线是唯一当前产品入口。
+共享 TypeScript 核心评估有限、有来源的任务事实，统一 Node CLI 与 Cordis 插件消费同一实现。DSH 负责 Agent loop、Team 成员、消息、任务板、调度和生命周期。任务事实及 SUT 依赖保留在明确选择的外部项目。
 
-## 版本与分发
+`2.2.0-dev.1` 实现正在验证。候选安装结果不等于最终 Team 验收。公开 Python release 保留历史身份，本次不发布或覆盖 release。
 
-| 组件 | 兼容目标 |
+| 组件 | 目标 |
 |---|---|
-| Python 分发 | `bugate-core==2.1.0a1`，Python 3.11+ |
-| Protocol | 精确 `2.1.0-dev.1` bundle 摘要，不自动迁移 |
-| 原生包 | `@bugate/deepseek-harness@2.1.0-dev.1` |
-| DSH | `0.2.2-alpha.2`，源码 `f3803c96974ad4a94195fb97e5c637e9c2a3afe3` |
-| Node | DSH 要求 24.9.0+ |
+| Core / CLI / 安装器 / 原生包 | `2.2.0-dev.1` |
+| Protocol | 精确 `2.2.0-dev.1` 资源摘要 |
+| DSH / 官方 experimental Agent Team 包 | `0.2.2-alpha.2` |
+| Cordis | `4.0.6-alpha.1` |
+| Node | `24.9.0+`，另记录实际测试版本 |
 
-预构建 tarball 包含编译后 JavaScript、原生 bundle patch、canonical Schema/方法、
-生成的 Skill、Python wheel 和带校验和清单的 wheelhouse。平台 wheel 的 Python ABI
-与平台记录在 `python/inventory.json`；其他 ABI 应在目标平台重新构建。运行不需要
-全局 editable install，也不依赖 BUGate 源码 checkout。
+tarball 包含第一方编译后 JavaScript、运行依赖、canonical Schema/MethodSpec、生成的 Skill 投影和官方 Team profile 原始层，不包含 Python bootstrap、wheel 或产品 fallback。宿主依赖可能需要 registry，不声称内置完整离线 DSH。使用 POSIX 进程组；仅报告实测平台，不推导 Windows 支持。
 
-当前采集器和安装锁使用 POSIX 进程组及文件锁。本次在 macOS arm64 实测，新增 CI
-面向 Linux；本包不支持 Windows 执行环境。
+## 安装和检查
 
-## 安装到明确项目与 profile
-
-使用同一构建的 tarball、`install_dsh.py` 和 `SHA256SUMS`，先校验再安装。
-DSH 本身须已安装为精确目标版本。以下示例路径需替换为选定的实际目录。
+使用同一次构建的全部资产，先验证 `SHA256SUMS` 再执行独立 Node 安装器。须已安装 DSH 与 pnpm，外部项目目录须存在。明确选择项目、DSH home 和 profile。
 
 ```sh
 shasum -a 256 -c SHA256SUMS
-python3 install_dsh.py \
-  --package ./bugate-deepseek-harness-2.1.0-dev.1.tgz \
-  --venv /absolute/path/bugate-bootstrap \
+node install.mjs \
+  --package ./bugate-deepseek-harness-2.2.0-dev.1.tgz \
   --project /absolute/path/test-repo \
   --dsh-profile bugate \
-  --dsh /absolute/path/to/dsh \
+  --dsh /absolute/path/dsh \
   --dsh-home /absolute/path/dsh-home
-```
-
-Python 依赖从 bundle 离线安装；DSH 原生插件管理器可能需要访问包注册表解析宿主
-peer dependencies。Setup 调用真实 `dsh plugin --profile ... add ...` 并验证
-`--dump-config`，保留无关配置，拒绝接管无本插件所有权记录的已有包。相同字节重复
-安装幂等；升级保留旧包用于显式 rollback。Pending 操作须核对恢复，不能静默覆盖。
-安装成功证明包与配置就绪；上下文注入仍须真实 Agent 会话证明。
-
-## 初始化与使用任务
-
-按 `protocol/v2/schemas/profile.schema.json` 编写 JSON Profile，绑定来源路径与
-SHA-256、需求/风险 ID、交付标准及资源边界。来源路径相对外部项目；Profile 不保存
-秘密，也不从聊天推断。
-
-```sh
-BUGATE=/absolute/path/bugate-bootstrap/bin/bugate
-"$BUGATE" init --project /absolute/path/test-repo --task REQ-001 \
-  --sut-profile /absolute/path/profile.json --json
-"$BUGATE" protocol prepare --task /absolute/path/test-repo/test-task/REQ-001 \
-  --max-bytes 8000 --json
-"$BUGATE" status --task /absolute/path/test-repo/test-task/REQ-001 --json
-"$BUGATE" validate --task /absolute/path/test-repo/test-task/REQ-001 --json
-"$BUGATE" artifact record --task /absolute/path/test-repo/test-task/REQ-001 \
-  --input .bugate/drafts/brief.json --json
-"$BUGATE" assess --task /absolute/path/test-repo/test-task/REQ-001 \
-  --claim claims/design.json --json
-"$BUGATE" evidence record --task /absolute/path/test-repo/test-task/REQ-001 \
-  --input evidence-input/import.json --json
-```
-
-任务拥有 `task.json`、`profile.json`、`.bugate/protocol.lock.json`、`scope/`、
-`suggestions/`、`artifacts/`、`evidence/`、`claims/`、`assessments/` 和 `logs/`，
-不可变请求收据与范围历史保存在 `.bugate/` 下。身份包含规范化项目/任务路径及
-精确 Protocol/Profile 绑定；不同项目中相同 task id 不共享身份。多任务须明确选择
-（`setup --task-path`），适配器不会猜测“最近任务”。
-
-先建立有来源的业务命题和 Oracle、可测性、用例清单及绑定版本的语义评审，再声明设计
-完成。工件 payload 与 Claim 类型以 canonical Schema 为准。`protocol prepare`
-给出当前硬约束与可补足缺口。DSH 工具包括 `bugate_prepare`、`bugate_status`、
-`bugate_validate`、`bugate_assess`、`bugate_record_artifact`、`bugate_record_evidence`
-和 `bugate_run_test`。未计算摘要的草稿写入 `.bugate/drafts/`，由登记入口计算
-canonical digest；更新已有工件使用 `--expected-digest` 防止误覆盖。摘要只是内容
-完整性元数据，不代表语义已接受。
-
-`bugate_run_test` 接受宿主配置的 command id，不接受模型任意 argv。宿主插件配置的
-`executionCommands` 指定 argv、case IDs、report 路径及下文的必需/辅助活动分类。测试执行要求当前设计已满足；探索命令可以收集缺失事实。显式 CLI
-采集入口见 `bugate execution run --help`。
-
-## 范围创建、查看与变更
-
-DSH 将允许的用户直接消息登记为不可变 `ScopeRequest` 收据。模型通过 `bugate_scope` 读取，再用 `bugate_record_scope` 登记契约草稿；模型工具不提供伪造收据入口。人工直接操作 CLI 时可用 `scope request` 登记符合 `scope_request.schema.json` 的任务内 JSON。此 CLI 是可信本地操作者输入边界，不防御控制同用户全部文件的恶意操作者。
-
-```sh
-"$BUGATE" scope show --task /absolute/path/test-repo/test-task/REQ-001 --json
-"$BUGATE" scope record --task /absolute/path/test-repo/test-task/REQ-001 \
-  --input .bugate/drafts/scope.json --json
-"$BUGATE" scope check --task /absolute/path/test-repo/test-task/REQ-001 --json
-"$BUGATE" suggestion record --task /absolute/path/test-repo/test-task/REQ-001 \
-  --input .bugate/drafts/suggestion.json --json
-"$BUGATE" suggestion list --task /absolute/path/test-repo/test-task/REQ-001 --json
-"$BUGATE" execution authorize --task /absolute/path/test-repo/test-task/REQ-001 \
-  --case CASE-1 --environment-id local-fixture --json
-```
-
-输入文件位于选定任务内。`scope record` 补身份和摘要元数据；草稿提供目标、来源原文引用、要求、流程、场景必要性、辅助边界、假设、完成规则和变更影响，精确字段以 `scope_contract.schema.json` 为准。`scope show` 展示当前契约、请求收据和建议；历史契约保存在不可变 `.bugate/scope-history/` 记录中。变更需要新的真实用户请求、递增版本、前序摘要、影响说明，以及带当前契约摘要的 `--expected-digest`。每个版本须保持锁定 Profile 需求/风险分母；分母变化返回 `SCOPE_PROFILE_CHANGE_REQUIRED`，需显式新 Profile 版本及 `init` 新任务，可将旧契约快照列为新 Profile source 保留追溯。原任务、证据和失败保留，不提供同任务 Profile rebind。用户收据证明选择，不能替代 Profile 领域证据。登记后重新评估 inventory 和声明，旧评估不能授权新范围。
-
-`bugate_check_scope` 使用同一核心检查；`bugate_record_suggestion` 保存可选想法，不创建必需用例或执行计划。`executionCommands` 中，必需用例使用 `purpose: test` 和声明的 `caseIds`；辅助命令使用契约中已有 `activityId`，不填写验收用例 ID，`purpose` 可为 `auxiliary`、`diagnostic` 或 `exploration`。`environmentId` 必须在允许环境内。诊断还需要当前关联失败及剩余运行预算。缺少设计前提时，读取和分析仍可进行。所有命令继续服从宿主权限与 provider。
-
-参见[四类范围示例](ACCEPTANCE_SCOPE.zh-CN.md)。默认不生成完整风险矩阵；明确要求的正常、边界、拒绝或权限场景仍为必需项，范围外建议不触发完成返工。
-
-## 质量与证据语义
-
-命令成功、结构有效、执行结果、声明结论与质量状态分别表达。Stdout 仅输出一个版本化
-`CommandResult`，诊断走 stderr。`status` 和 `protocol prepare` 可成功返回质量缺口。
-
-| 退出码 | 含义 |
-|---|---|
-| 0 | 调用完成，满足该命令成功条件 |
-| 3 | `validate`/`assess` 已完成，质量 invalid/unsatisfied/inconclusive |
-| 2 | 输入、绑定或范围不合法 |
-| 1 | 运行、依赖或存储故障 |
-| 124 | 超时，已尝试并报告受管进程终止 |
-| 130 | 取消 |
-
-导入、人工提交和模型自报材料不能靠填写字段升级为 `host_observed`。受管采集记录真实
-argv、身份、时间、结果、有界日志、JUnit 用例及相关输入摘要，并在工具返回前完成证据
-持久化。哈希检测字节变化，不能证明已有日志属实，也不能防御控制全部同权限本地文件
-的操作者。
-
-声明具有范围：业务理解不要求未来执行；需求验证需要当前 Oracle 关联的实际用例观察。
-零用例、全 skip/xfail、没有执行均不能证明需求通过。真实产品失败在证据、诊断与约定
-报告完整时可以完成测试交付。评估只适用于固定声明与输入快照，事实变化使其失效。
-普通评估不依赖 Memory 服务。
-
-## 受管范围与恢复
-
-默认受管工具为 DSH `write`、`edit`、`str_replace_editor`、`bash` 和
-`bugate_run_test`。读取、任务内分析和声明材料允许继续；implementation/tests 路径
-要求当前设计已接受。任意 shell 写入被拒绝，探索通过显式配置命令进行。其他外部工具
-或 backend 不属于通用文件系统沙箱保证；访问权限仍由 DSH 权限系统及 runtime
-provider 负责。
-
-异步准备发生在可等待生命周期；动态 context 和最终 guard 为同步接口。适配器原样
-注入 canonical `render.content`，关闭插值，失败时清除旧上下文。可等待的
-`agent/request` hook 在请求组装后刷新，`llm/stream` 检查在模型执行前拒绝已失效的
-上下文。子 Agent 独立解析
-任务绑定；持久 session 绑定检查拒绝冷恢复时摘要漂移。只有显式提交完成声明后才发生
-返工，并受次数、时间、无进展和取消约束。
-
-文件目标为 opaque。适配器使用配置的 fs/subprocess provider 和 `processPath`；
-安装的 Python/资源必须有 execution-world 映射。缺失映射返回 capability error，
-不会在浏览器调用 Python，也不会退回另一台机器的磁盘。
-核心提供有大小上限的文件系统清单，适配器通过 filesystem provider 核对任务文件、
-目录成员和 Profile 来源字节，再接受 subprocess 结果。仅锁文件相同，不能证明两个
-执行环境中的工件相同。
-清单上限为 2,048 个文件、2,048 个目录和 32 MiB 文件内容，超限明确失败。排除
-写入锁和无事实权威的 `.bugate/runtime/` 记账目录，草稿、声明与证据仍在核对范围内。
-DSH session pin 及其原子临时文件位于该目录，受管模型写入不能修改它。
-
-```sh
+BUGATE=/absolute/path/dsh-home/profiles/bugate/node_modules/.bin/bugate
 "$BUGATE" doctor integrations --project /absolute/path/test-repo \
-  --dsh-profile bugate --dsh /absolute/path/to/dsh \
+  --dsh-profile bugate --dsh /absolute/path/dsh \
   --dsh-home /absolute/path/dsh-home --json
+```
+
+setup 调用真实 DSH 插件管理器，记录包身份及自有配置块，并核验合成配置。同字节重复安装幂等；拒绝接管无所有权包、覆盖已修改配置块或使用含糊目标。doctor 验证留存/已安装字节；配置健康不证明 Agent hydration 或 Team 评审通过。实际 DSH 会话须加载该 profile 的官方 Team 层与 BUGate。
+
+原生包在 BUGate 前组合官方 Team profile 原始 patch，由其提供 Team service/tools，并按 DSH 规则禁用直接 subagent/control/fork 工具。不要在同一 profile 再重复添加 Team profile 层。experimental API 固定版本，不称为稳定接口。
+
+## 绑定有限任务
+
+依据包内 `profile.schema.json` 编写 Profile，提供真实领域来源路径/摘要、固定需求/风险 ID 和适用评审策略，然后：
+
+```sh
+"$BUGATE" init --project /absolute/path/test-repo --task TASK-1 \
+  --sut-profile /absolute/path/profile.json --json
+"$BUGATE" protocol prepare --task /absolute/path/test-repo/test-task/TASK-1 --json
+"$BUGATE" status --task /absolute/path/test-repo/test-task/TASK-1 --json
+"$BUGATE" artifact record --task /absolute/path/test-repo/test-task/TASK-1 \
+  --input .bugate/drafts/brief.json --json
+"$BUGATE" assess --task /absolute/path/test-repo/test-task/TASK-1 \
+  --claim claims/design.json --json
+```
+
+任务选择含糊时，使用 `setup deepseek-harness ... --task-path /absolute/path/.../TASK-1`。已有安装重新绑定须先明确移除；不推断最新任务、不自动初始化。用户收据证明选择，领域事实仍来自 Profile 声明证据。覆盖分母内的授权分支/Oracle 变更新建范围版本；分母变更须新 Profile 版本与新任务，保留旧事实和失败。建议不可执行、不阻塞。
+
+任务保留 artifacts、evidence、claims、assessments、scope 历史以及不可变宿主观察/结算。核心拒绝不匹配的协议、评估器或 Profile 绑定。旧 Python 任务仅作只读历史：检查留存 JSON/日志及其身份，或在独立历史环境中使用匹配 release。不提供转换器或跨版本授权桥；Node 新任务需要明确当前绑定。
+
+## 原生工具与评审来源
+
+使用 `bugate_prepare`、`bugate_status`、`bugate_validate`、`bugate_scope`、`bugate_check_scope`、`bugate_record_scope`、`bugate_record_suggestion`、`bugate_record_artifact`、`bugate_record_evidence`、`bugate_assess` 和 `bugate_run_test` 执行相应质量操作。导入材料保留 model/import 来源。
+
+`bugate_publish_artifact` 捕获真实 live Team 成员的内联输出及宿主身份，绑定作者/评审执行、Team 成员、fresh/fork 上下文、工具输入、任务/协议/评估器/Profile、工件摘要及无循环输入快照。输出/HostObservation 已持久化仍不足以授权：最终宿主 tool-result 接缝须持久化成功的 HostSettlement。取消、超时、失败或缺失结算仍未完成。CLI JSON 导入不能产生这些宿主收据。
+
+必要视角由有效 Profile 决定，具备来源、必要性和有界完成条件。Team 成员通过官方消息交换异议及反证，原始意见、讨论关联、修订意见和采纳/拒绝/未解决处置均可追踪。工件或相关输入变更使旧评审失效；跨任务、重放、改名自审以及作者/评审来源缺失不能授权当前声明。Team task complete 与 inbox 接受不等于评审有效。
+
+分别报告执行独立性与语义质量。fresh/fork 和角色分离不保证认知独立或正确性；fork 不是盲审。策略允许时，同模型不同成员不自动无效。Team 当前共用进程/cwd，writeScopes 仅为提示，不能隔离工作树；BUGate 不承诺任务 owner 自动释放或消息自动重试/去重。
+
+发送给 Node subprocess 的原生上下文由插件进程内持有的 Ed25519 私钥签名，配置 filesystem provider 持久化公钥 pin；公共 CLI 不提供 authority 注册。签名绑定操作、任务、工作区和精确上下文字节，恢复后重新验证持久化收据。同权限者替换 pin 或全部本地状态不在该信任边界内。
+
+## Provider、受管工具与完成
+
+在真实 filesystem/subprocess execution world 配置 `nodeExecutable`，必要时配置 `coreEntrypoint`；`projectRoot` 和 `taskPath` 绑定外部任务。opaque fs target key 不是宿主路径。Node 服务 IO 与采集走配置 subprocess provider；插件核验 provider 可见的 manifest，不支持的映射明确拒绝，不静默读取另一执行世界。持久化完成后工具才返回成功。
+
+`executionCommands` 将稳定 `command_id` 映射到 argv、case IDs、report、可选 activity/environment 和 timeout。必需用例须通过当前范围/计划准入；辅助和诊断使用显式契约边界，建议不能成为可执行计划。`bugate_run_test` 接受配置命令 ID，不接受任意模型 argv。保留真实产品失败、基础设施错误、缺报告/零测试、skip、xfail、超时和取消。
+
+异步 lifecycle 接缝完成准备后，同步 `context.text` 和 `tools.guard` 才消费状态。插件原样注入 canonical render，在模型调用前复核准入；恢复、子 Agent、Team 成员分别校验绑定。managed 模式约束声明的写入工具/命令触发，不能理解所有 shell 语义，也不替代 DSH 权限。advisory 省略受管写入准入，但核心评估及受管测试范围检查仍生效。
+
+仅 `bugate_assess` 的 `submit: true` 启动完成返工；次数、时间和重复缺口有界，不无限循环追求一致。回合停止不等于声明满足。分别报告执行闭环、功能验收、阻塞和范围外建议。
+
+CLI 输出单个 `bugate.io/v2` `CommandResult`。退出 0 表示调用完成，仍须查看 data：采集到真实产品失败也可以是已完成调用。退出 3 表示评估不满足或质量校验未通过，2 为输入无效，1 为运行时/基础设施错误，124 为超时，130 为取消。verdict、结构、语义评审和执行维度分别表达。
+
+## 升级、中断恢复与卸载
+
+```sh
+"$BUGATE" setup deepseek-harness --package /absolute/path/new-bundle.tgz \
+  --project /absolute/path/test-repo --dsh-profile bugate \
+  --dsh /absolute/path/dsh --dsh-home /absolute/path/dsh-home --json
 "$BUGATE" remove deepseek-harness --project /absolute/path/test-repo \
-  --dsh-profile bugate --dsh /absolute/path/to/dsh \
+  --dsh-profile bugate --dsh /absolute/path/dsh \
   --dsh-home /absolute/path/dsh-home --rollback --json
 ```
 
-移除 `--rollback` 即为卸载。保留任务事实、无关插件/配置与恢复包。Doctor 分别报告
-宿主存在、插件/资源完整性、投影新鲜度、任务绑定及 hydration 观察；未选择且缺失的
-宿主非致命，已选择且损坏的集成失败。
+`--rollback` 协调中断的自有操作或恢复留存的前一 Node 包。仅该显式路径恢复 dead-owner 锁，不抢占活跃进程。不加 `--rollback` 则只卸载自有配置/包状态，保留无关设置/插件、任务事实、失败历史、收据和恢复归档。不删除全局 Python、SUT 依赖或无关环境。失败时保留精确错误与 journal，不删除状态或盲目重试。
 
-## 开发与验证证据
+## 验证
 
-在独立 Python 环境安装本项目；进入 `adapters/deepseek-harness/plugin` 运行
-`npm run build`，随后运行 `python packaging/build_dsh.py --out-dir dist/local-build`。
+参见[贡献指南](../CONTRIBUTING.zh-CN.md)与 [CI](../.github/workflows/ci.yml)。独立验收先将产物和 runner 复制出 checkout，再用操作系统策略禁止源码读取，并仅允许明确的 Node/宿主/必要工具执行。源码读取及绝对解释器执行拒绝探针，与安装、生命周期、已安装真实 DSH/Team 测试位于同一受限进程树。仅修改 PATH 不构成隔离。
 
-验收区分 Python 契约、真实 DSH 加确定性模型 fixture，以及可选 live-model 测试。
-确定性 fixture 驱动真实 DSH Agent loop 不等于 DeepSeek 模型效果评测。精确命令、
-产物摘要、已采纳需求/Oracle 验证和适用回归结果及真实缺口以交付报告为准，不能由工具注册成功推断。
-
-
-## 本次范围与升级边界
-
-当前仅交付 v2 + DSH；旧宿主自动入口、安装器与格式已退役，不支持 v0.x 自动迁移。
-[文档索引](README.zh-CN.md)区分当前说明、发布验证与冻结实现记录。历史验收矩阵仅适用于其记录的变更与产物摘要，不是未来任务的默认场景清单；CI 配置不证明未执行平台通过，也不证明 live-model 效果。
-支持 v2 bundle 安装升级和按留存安装归档 rollback；core 或协议摘要变化不会静默迁移现有任务，应按当前 v2 输入建立新任务。
-
-范围变更后，本版本要求针对新契约重新执行；旧证据和失败继续作为历史保留。不实现选择性复用，即使部分要求字段未变也不恢复旧授权。
+记录精确包摘要、源码清单、Node/DSH/Cordis/Team/provider/平台版本、命令输出和实际结果。确定性 fixture 驱动真实成员、工具与临时命令，不证明 live-model 质量或效率；live-model 结果单独说明。本地宿主观察与摘要不抵抗同权限文件系统篡改。历史报告只适用于原始身份。

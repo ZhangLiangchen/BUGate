@@ -2,7 +2,7 @@
   "apiVersion": "bugate.io/v2",
   "kind": "MethodSpec",
   "id": "implementation",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "objective": "Bind implementation bytes and selectors to reviewed cases and oracles.",
   "quality_dimensions": [
     "implementation_binding",

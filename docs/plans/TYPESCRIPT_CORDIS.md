@@ -2,37 +2,37 @@
 
 English | [简体中文](TYPESCRIPT_CORDIS.zh-CN.md)
 
-**Decision:** Accepted, 2026-10-29.  
-**Implementation:** Planned; not started. All migration checks: **NOT_RUN**.  
+**Decision:** Accepted, 2026-10-29.
+**Implementation:** IN_PROGRESS, authorized 2026-10-30 from `eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654`. Final installed Team acceptance and cutover are not yet claimed.
 **Authority:** The user's explicit decision in this task: DSH remains the only
 host; move BUGate fully to TypeScript within Cordis and record the next development
 plan. This supersedes the earlier suggestion to retain Python as the target
 architecture, without weakening existing quality or evidence invariants.
 
-This task changes explanatory documents only. It does not migrate code, change
-versions or machine rules, alter published assets, or prohibit maintenance of the
-current Python implementation. [Protocol v2](../../protocol/v2/manifest.yaml)
-remains the sole machine authority; this plan is not a second specification or a
-default acceptance matrix for other development tasks or SUTs.
+The 2026-10-30 execution request authorizes phases 0–5. This working plan now
+records implementation; earlier documentation-only/NOT_RUN wording described
+the prior planning task. [Protocol v2](../../protocol/v2/manifest.yaml) remains
+the sole machine authority. The new `2.2.0-dev.1` protocol versions the explicitly
+authorized Team provenance enhancement; this plan is not a default SUT matrix.
 
-## Context and baseline
+## Context and historical baseline
 
-The inspected baseline is `3a5fcc7ae2b35f8eb361896c932d688939364bae`.
-The [current release](../releases/DSH_2_1_0_DEV_1.md) uses Python core `2.1.0a1`
+The implementation baseline is main `eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654`.
+`3a5fcc7ae2b35f8eb361896c932d688939364bae` identifies the historical published Python baseline.
+The [historical Python release](../releases/DSH_2_1_0_DEV_1.md) uses Python core `2.1.0a1`
 and Protocol/native package `2.1.0-dev.1`. Its evidence applies to its recorded
 source and artifact digests, not to the planned migration.
 
-BUGate already has a native Cordis plugin:
-[`cordis.patch.yml`](../../adapters/deepseek-harness/plugin/cordis.patch.yml)
-registers `@bugate/deepseek-harness` with `pythonExecutable: python3`.
-[`index.ts`](../../adapters/deepseek-harness/plugin/src/index.ts) handles native
-integration; [`bridge.ts`](../../adapters/deepseek-harness/plugin/src/bridge.ts)
+The historical baseline already had a native Cordis plugin:
+[`cordis.patch.yml`](https://github.com/ZhangLiangchen/BUGate/blob/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/adapters/deepseek-harness/plugin/cordis.patch.yml)
+registered `@bugate/deepseek-harness` with `pythonExecutable: python3`.
+The baseline `index.ts` handled native integration; [`bridge.ts`](https://github.com/ZhangLiangchen/BUGate/blob/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/adapters/deepseek-harness/plugin/src/bridge.ts)
 invokes Python through DSH providers. The target replaces that product bridge
 and Python implementation; it does not introduce Cordis integration from scratch.
 
-Implementation starting points:
+Historical starting points (implementation now lives in `packages/core/`, `packages/cli/` and Node `packaging/`):
 
-- [`src/bugate/`](../../src/bugate/): `protocol.py`, `assessment.py`, `semantics.py`
+- [`src/bugate/`](https://github.com/ZhangLiangchen/BUGate/tree/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/src/bugate/): `protocol.py`, `assessment.py`, `semantics.py`
   and `scope.py` hold validation/evaluation; `workspace.py` holds identity and
   persistence; `authoring.py`/`context.py` handle authoring/preparation;
   `evidence.py`, `cli.py`, `integrations.py` handle collection, CLI and installation.
@@ -78,11 +78,10 @@ actual provenance, independence and artifact binding, then explicitly selected
 reuse of DSH's official Agent Team plugin. The latest decision takes precedence:
 Team members perform cross-review; BUGate validates actual provenance,
 independence and artifact binding rather than different reviewer names, without
-restoring Claude/Codex dependencies. Accepted; implementation and verification
-remain **NOT_RUN**. Improved efficiency is the user's expectation, not a measured
+restoring Claude/Codex dependencies. Accepted; implementation and verification are **IN_PROGRESS**. Improved efficiency is the user's expectation, not a measured
 result. The
-current independence check in [`assessment.py`](../../src/bugate/assessment.py)
-primarily compares producer/reviewer names. Existing [DSH subagent tests](../../adapters/deepseek-harness/tests/runtime.test.mjs)
+current independence check in [`assessment.py`](https://github.com/ZhangLiangchen/BUGate/tree/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/src/bugate/assessment.py)
+primarily compares producer/reviewer names. Existing [DSH subagent tests](https://github.com/ZhangLiangchen/BUGate/blob/eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654/adapters/deepseek-harness/tests/runtime.test.mjs)
 prove some binding and authorization-provenance behavior, not a complete
 cross-review workflow. This is a user-sourced, versioned enhancement, not a claim
 that the previous protocol already guaranteed it.
@@ -218,15 +217,14 @@ historical 123/24 totals are observations, not fixed migration gates.
 
 ## Finite implementation phases
 
-Every row is **NOT_RUN**. Each phase records its actual source/command/artifact
-identity and results; this documentation update satisfies none of these exits.
-Phase 0 uses existing verified tools to establish a finite baseline; it does not
+Phase progress is recorded against actual evidence below; historical counts are
+not gates. Phase 0 uses existing verified tools to establish a finite baseline; it does not
 require the not-yet-built TS evaluator to authorize its own migration.
 
 | Phase | Requirement / deliverable | Observable Oracle and minimum sufficient checks | Exit condition |
 |---|---|---|---|
 | 0. Requirements, Oracles, baseline | Freeze selected contracts/source and known defects; map changed boundaries, Python dependencies and actual DSH interfaces. Decide version/binding and historical inspection policy; verify observable author/reviewer provenance and Team identity and member independence boundaries. | Source-backed requirement/Oracle map; canonical vectors; targeted baseline counterexamples; actual provider/interface probes. | Every planned change has a necessity source and discriminating Oracle; material gaps resolved or explicitly blocked, no placeholder implementation approval; review provenance/context policy has a verifiable design. |
-| 1. Core and Node CLI | Port validation, semantics/scope/claims, authoring/context and unified CLI with explicit IO boundaries; version native review provenance, independence and binding rules. | Relevant categories from [core tests](../../tests/v2/): real verdict/reason expectations, malformed JSON, canonical vectors, stale refs and advisory isolation; development differential comparison with documented identity differences. | Runtime checks and output semantics meet their Oracles; disagreements have evidence-backed dispositions; names or self-reported identities cannot satisfy host independent-review requirements. |
+| 1. Core and Node CLI | Port validation, semantics/scope/claims, authoring/context and unified CLI with explicit IO boundaries; version native review provenance, independence and binding rules. | Relevant categories from [core tests](../../tests/typescript/): real verdict/reason expectations, malformed JSON, canonical vectors, stale refs and advisory isolation; development differential comparison with documented identity differences. | Runtime checks and output semantics meet their Oracles; disagreements have evidence-backed dispositions; names or self-reported identities cannot satisfy host independent-review requirements. |
 | 2. Execution, storage, collector | Port workspace identity, atomic publication/CAS/locks and process/report capture; design execution-world, CPU/IO and cleanup boundaries. | Neutral real commands for success/failure/skip/xfail, missing report, timeout/cancel; necessary concurrent-writer/path/world mismatch and durable-return checks. | No false completion on interruption; correct configured world and bounded cleanup, unsupported mappings explicitly rejected. |
 | 3. Cordis native integration | Replace PythonBridge with shared TS services at verified native seams; preserve context/admission, provenance and bounded rework; reuse DSH official Agent Team for multi-perspective review with persisted provenance. | [Real DSH test categories](../../adapters/deepseek-harness/tests/README.md): deterministic fixtures drive actual tools/temporary SUT commands for scope, suggestions, failures, aux/diagnosis, recovery/children/isolation and cancellation, plus the review success/counterexamples above. | Actual host calls demonstrate enforcement, review provenance/independence/binding and evidence barriers. Mock contexts alone do not close the phase; live-model checks, if run, are separate. |
 | 4. Node packaging and CI | Port first-party build/install/doctor/distribution/test entry points; produce finite npm assets, canonical projections and matching usage/CI. | Clean installation with source reads denied and Python unavailable; digest/resources; applicable repeat/doctor/upgrade/rollback/remove/ownership checks; installed real DSH workflows including multi-perspective cross-review. Run declared CI checks and report actual platforms. | Exact assets work independently; checksums/docs agree. No platform claim from TS alone, including Windows. |
@@ -234,9 +232,9 @@ require the not-yet-built TS evaluator to authorize its own migration.
 
 ## Version, evidence and installation cutover
 
-Choose protocol/evaluator/package versions during implementation from the actual
-compatibility impact; assign no new version now and do not silently change an
-existing version's meaning. Old Python assessments/receipts cannot authorize TS
+The protocol/evaluator/package version is `2.2.0-dev.1` for the explicitly
+authorized host provenance and independence enhancement. Existing versions are
+not silently reinterpreted. Old Python assessments/receipts cannot authorize TS
 execution because fields happen to match. The default cutover uses explicit new
 tasks/bindings while preserving old scopes, evidence, failures and task history.
 Phase 0 defines read-only historical inspection without adding automatic format
@@ -264,7 +262,9 @@ and stale binding reuse. The phases above address their direct migration impact.
 No measured speed/model-quality benefit, new platform, additional host or extra
 SUT risk category is promised. Other opportunities remain suggestions.
 
-**Next action:** begin phase 0 in the next implementation task. This task performs
-only plan/navigation edits and Markdown link/whitespace checks. No port, product
-test, package build, runtime validation, uninstall or release is claimed; all
-migration evidence remains **NOT_RUN**.
+**Current execution:** shared core/CLI, Node lifecycle and native Team integration
+are implemented and undergoing integration. The candidate Node lifecycle passed
+OS-isolated install/repeat/doctor/upgrade/rollback/remove/interruption recovery on
+macOS arm64, but that candidate is not the final Team-enabled delivery. Final
+exact-package acceptance and Python retirement remain required. Live-model
+validation is NOT_RUN. No public release/tag has been published.

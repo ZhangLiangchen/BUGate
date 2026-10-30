@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugate.io/v2/schemas/host_settlement.schema.json",
+  "title": "BUGate final DSH tool result settlement",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "bugate.io/v2"
+    },
+    "kind": {
+      "const": "HostSettlement"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "observation_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ]
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "call_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "cancelled",
+        "failed",
+        "timeout"
+      ]
+    },
+    "result_event": {
+      "type": "object"
+    },
+    "result_event_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authority_id": {
+          "type": "string",
+          "pattern": "^authority-[0-9a-f]{64}$"
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "context_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "authority_id",
+        "operation",
+        "task_root",
+        "workspace_id",
+        "context_digest",
+        "signature"
+      ]
+    },
+    "host_context": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "id",
+    "task_id",
+    "workspace_id",
+    "observation_ref",
+    "session_id",
+    "call_id",
+    "status",
+    "result_event",
+    "result_event_digest",
+    "digest",
+    "authentication",
+    "host_context"
+  ]
+}

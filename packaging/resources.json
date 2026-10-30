@@ -10,6 +10,7 @@
     "protocol/v2/methods/execution.json",
     "protocol/v2/methods/implementation.json",
     "protocol/v2/methods/knowledge.json",
+    "protocol/v2/methods/team_review.json",
     "protocol/v2/methods/test_design.json",
     "protocol/v2/methods/testability.json",
     "protocol/v2/reason_codes.yaml",
@@ -21,6 +22,8 @@
     "protocol/v2/schemas/command_result.schema.json",
     "protocol/v2/schemas/evidence.schema.json",
     "protocol/v2/schemas/execution_record.schema.json",
+    "protocol/v2/schemas/host_observation.schema.json",
+    "protocol/v2/schemas/host_settlement.schema.json",
     "protocol/v2/schemas/method_spec.schema.json",
     "protocol/v2/schemas/prepared_protocol_context.schema.json",
     "protocol/v2/schemas/profile.schema.json",
@@ -29,5 +32,64 @@
     "protocol/v2/schemas/scope_request.schema.json",
     "protocol/v2/schemas/suggestion.schema.json",
     "protocol/v2/schemas/test_task.schema.json"
-  ]
+  ],
+  "node_package_files": {
+    "ajv": [
+      "package.json",
+      "dist",
+      "LICENSE"
+    ],
+    "fast-xml-parser": [
+      "package.json",
+      "lib",
+      "src",
+      "LICENSE"
+    ],
+    "fast-deep-equal": [
+      "package.json",
+      "index.js",
+      "index.d.ts",
+      "react.js",
+      "react.d.ts",
+      "es6",
+      "LICENSE"
+    ],
+    "fast-uri": [
+      "package.json",
+      "index.js",
+      "lib",
+      "types",
+      "LICENSE"
+    ],
+    "json-schema-traverse": [
+      "package.json",
+      "index.js",
+      "index.d.ts",
+      "LICENSE"
+    ],
+    "require-from-string": [
+      "package.json",
+      "index.js",
+      "license"
+    ],
+    "strnum": [
+      "package.json",
+      "strnum.js",
+      "LICENSE"
+    ],
+    "anynum": [
+      "package.json",
+      "anynum.js",
+      "digitTable.js",
+      "LICENSE"
+    ],
+    "@deepseek-ai/dsh-experimental-agent-team-profile": [
+      "package.json",
+      "cordis.patch.yml",
+      "lib",
+      "icon.svg",
+      "locale",
+      "LICENSE"
+    ]
+  }
 }

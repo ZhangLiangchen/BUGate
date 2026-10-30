@@ -14,7 +14,7 @@ projections:
 capabilities:
   protocol_discovery:
     status: supported
-    surface: Bundled canonical protocol resources and Python version handshake.
+    surface: Bundled canonical protocol resources and shared TypeScript/Node version handshake.
   workspace_discovery:
     status: supported
     surface: Configured filesystem provider and session workingDirectory; ambiguity fails closed.

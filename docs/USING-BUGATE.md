@@ -6,7 +6,11 @@ Use the [native DSH guide](DEEPSEEK_HARNESS.md) for installation, commands,
 configuration, diagnostics, upgrade/rollback and removal. Follow the
 [task workflow](qa-methodology/SOP.md) for evidence-first testing.
 The current product accepts v2 inputs only. Historical import instructions are
-not an installation path for this version.
+not an installation path for this version. The shared TypeScript core and
+unified Node CLI are the product runtime; DSH and its official Agent Team own
+Agent execution and collaboration. Use a new current task binding for this
+version; `bugate history inspect --task PATH` reads prior identities without
+conversion or authorization.
 
 Define the finite [acceptance scope](ACCEPTANCE_SCOPE.md) from the user request.
 Required scenarios and auxiliary activity boundaries are explicit; suggestions

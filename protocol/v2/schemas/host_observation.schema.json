@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bugate.io/v2/schemas/host_observation.schema.json",
+  "title": "BUGate DSH host observation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "bugate.io/v2"
+    },
+    "kind": {
+      "const": "HostObservation"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "protocol_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "profile_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "binding_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "evaluator_version": {
+      "const": "2.2.0-dev.1"
+    },
+    "host": {
+      "const": "deepseek-harness"
+    },
+    "host_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "operation": {
+      "enum": [
+        "artifact_author",
+        "review",
+        "discussion"
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "team_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "member_name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "member_role": {
+          "enum": [
+            "lead",
+            "teammate"
+          ]
+        },
+        "context_mode": {
+          "enum": [
+            "lead",
+            "fresh",
+            "fork"
+          ]
+        },
+        "parent_session_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inherited_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "call_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "root_call_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "arguments_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "session_event_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "session_event": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "agent_id",
+        "session_id",
+        "team_id",
+        "member_name",
+        "member_role",
+        "context_mode",
+        "parent_session_id",
+        "inherited_event_count",
+        "call_id",
+        "root_call_id",
+        "tool_name",
+        "arguments_digest",
+        "session_event_digest",
+        "arguments",
+        "session_event"
+      ]
+    },
+    "subject_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ]
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "id",
+          "digest"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "input_snapshot": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "scope_ref": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "digest"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "plan_ref": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "id",
+            "digest"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "enum": [
+        "published",
+        "completed",
+        "cancelled",
+        "failed",
+        "timeout"
+      ]
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "sender_session_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "content_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "event_seq": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "message_id",
+          "sender_session_id",
+          "content_digest",
+          "content",
+          "event_seq"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "evaluator_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authority_id": {
+          "type": "string",
+          "pattern": "^authority-[0-9a-f]{64}$"
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "context_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "authority_id",
+        "operation",
+        "task_root",
+        "workspace_id",
+        "context_digest",
+        "signature"
+      ]
+    },
+    "host_context": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "id",
+    "task_id",
+    "workspace_id",
+    "protocol_digest",
+    "profile_digest",
+    "binding_digest",
+    "evaluator_version",
+    "host",
+    "host_version",
+    "operation",
+    "execution",
+    "subject_ref",
+    "artifact_refs",
+    "input_snapshot",
+    "scope_ref",
+    "plan_ref",
+    "status",
+    "messages",
+    "digest",
+    "evaluator_digest",
+    "authentication",
+    "host_context"
+  ]
+}

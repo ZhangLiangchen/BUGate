@@ -7,10 +7,10 @@
 | 边界 | 权威职责 |
 |---|---|
 | `protocol/v2/` | canonical Schema、MethodSpec、质量规则和 reason codes。 |
-| `src/bugate/` | 确定性校验、语义评审要求、快照、证据与声明评估。 |
+| `packages/core/` | 确定性校验、语义评审要求、快照、证据与声明评估。 |
 | 统一 CLI | 版本化 JSON CommandResult 与稳定退出语义。 |
 | DSH 原生适配器 | 宿主服务、精确绑定、原样上下文、受管工具和有界返工。 |
-| `packaging/` | 有限资源清单、独立 wheel/bundle 和有所有权的安装生命周期。 |
+| `packaging/` | 有限资源清单、有限 Node bundle 和有所有权的安装生命周期。 |
 
 `ProtocolBinding` 锁定精确协议与 Profile；`TestTask` 标识规范化项目/任务范围；`Artifact`、`Evidence`、`Claim` 保存内容、来源与适用性。`AssessmentRequest` 绑定固定声明和输入快照；`AssessmentResult` 保存确定性/语义/执行维度与 findings；`PreparedProtocolContext` 为宿主渲染当前约束和缺口。字段与类型以 canonical Schema 为准。
 
@@ -24,4 +24,6 @@
 
 DSH `context.text` 与 `tools.guard` 保持同步；准备和证据持久化使用可等待生命周期/工具接缝。适配器校验并原样注入核心 `render.content`；子 Agent 和恢复会话独立验证精确绑定。文件与执行使用配置的 provider/execution-world 映射，opaque key 不当路径。实现前提缺失时仍允许读取、分析和合法探索。
 
-文档和投影不复制机器权威。原生构建向 Skill 入口追加 canonical MethodSpec 并记录协议/内容摘要；打包校验 Python 与原生资源一致。参见[安装](../DEEPSEEK_HARNESS.zh-CN.md)、[方法](METHOD.zh-CN.md)及[当前文档与历史记录](../README.zh-CN.md)。
+文档和投影不复制机器权威。原生构建向 Skill 入口追加 canonical MethodSpec 并记录协议/内容摘要；打包校验共享核心与原生资源一致。参见[安装](../DEEPSEEK_HARNESS.zh-CN.md)、[方法](METHOD.zh-CN.md)及[当前文档与历史记录](../README.zh-CN.md)。
+
+官方 DSH Agent Team 按 Profile 声明的必要视角执行互审。宿主捕获作者、评审者、Team 成员、执行及输入上下文；fresh/fork 和执行分离是可观察事实，不保证认知独立。评审须具备持久化宿主观察、成功的最终工具结算、当前精确工件/输入绑定和有来源的语义内容。Team 任务完成和消息接受不等于评审有效。异议及处置保留可追溯关系；导入 JSON 和 reviewer 名称不能制造宿主来源。

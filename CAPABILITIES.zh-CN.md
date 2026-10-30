@@ -12,7 +12,8 @@
 | 证据 | 有界受管执行、JUnit 解析、来源区分与原子持久化。 |
 | 声明 | 业务理解、设计、实现、执行、需求验证和限定范围的任务交付。 |
 | DSH | 原生 apply(ctx)、canonical context、工具、Skill 投影、受管门禁、子 Agent 隔离、恢复与有界返工。 |
-| 安装 | 离线 Python wheelhouse、真实 DSH 插件安装、幂等、升级、rollback、doctor 与卸载。 |
+| 安装 | 有限 Node 安装包；真实 DSH 插件安装、所有权、重复安装、升级、中断恢复、rollback、doctor 和卸载。 |
+| 官方 Team 互审 | 宿主观察的作者/评审者、工件及输入绑定、fresh/fork 策略、原始讨论；完成需持久化输出和成功的宿主结算。 |
 
 统一 CLI 为 `bugate`，精确命令和退出语义见[指南](docs/DEEPSEEK_HARNESS.zh-CN.md)。机器契约位于 `protocol/v2/`，优先于本摘要。适配器能力 manifest 声明验证目标和限制。
 

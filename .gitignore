@@ -10,6 +10,7 @@ node_modules/
 node_modules
 /adapters/deepseek-harness/plugin/lib/
 /adapters/deepseek-harness/plugin/resources/
+/packages/core/resources/
 /adapters/deepseek-harness/plugin/python/
 *.tgz
 

@@ -1,7 +1,7 @@
 {
   "apiVersion": "bugate.io/v2",
   "kind": "ReasonCodeCatalog",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "codes": {
     "ACTIVITY_CLASSIFICATION_INVALID": {
       "meaning": "An execution cannot be both required and auxiliary",
@@ -327,36 +327,6 @@
       "meaning": "protocol mismatch",
       "stable": true
     },
-    "PYTHON_ABI_UNSUPPORTED": {
-      "meaning": "python abi unsupported",
-      "stable": true
-    },
-    "PYTHON_CANCELLED": {
-      "meaning": "python cancelled",
-      "stable": true
-    },
-    "PYTHON_EXIT_ERROR": {
-      "meaning": "Core process exited outside the declared exit-code contract.",
-      "stable": true,
-      "scope": "deepseek-harness adapter"
-    },
-    "PYTHON_INVALID_RESPONSE": {
-      "meaning": "python invalid response",
-      "stable": true
-    },
-    "PYTHON_MISSING": {
-      "meaning": "python missing",
-      "stable": true
-    },
-    "PYTHON_OUTPUT_LIMIT": {
-      "meaning": "Core stdout or stderr exceeded the managed bridge output bound.",
-      "stable": true,
-      "scope": "deepseek-harness adapter"
-    },
-    "PYTHON_TIMEOUT": {
-      "meaning": "python timeout",
-      "stable": true
-    },
     "QUALITY_MODEL_MISSING": {
       "meaning": "Profile requires a quality model that is absent.",
       "stable": true
@@ -407,7 +377,7 @@
       "stable": true
     },
     "REVIEW_INDEPENDENCE_MISSING": {
-      "meaning": "Profile-required reviewer independence is not evidenced.",
+      "meaning": "Author and reviewer execution separation or declared input-context policy cannot be established.",
       "stable": true
     },
     "RISK_UNCOVERED": {
@@ -605,6 +575,96 @@
     "ZERO_TESTS": {
       "meaning": "zero tests",
       "stable": true
+    },
+    "HOST_PROVENANCE_REQUIRED": {
+      "meaning": "Only actual managed DSH execution may publish host observations.",
+      "stable": true
+    },
+    "REVIEW_PROVENANCE_MISSING": {
+      "meaning": "The current artifact or review has no matching durable host observation.",
+      "stable": true
+    },
+    "REVIEW_INPUT_STALE": {
+      "meaning": "Review input snapshot no longer matches current binding, artifacts, scope, plan or execution facts.",
+      "stable": true
+    },
+    "REVIEW_REPLAY": {
+      "meaning": "Host execution identity was reused for a different output or task.",
+      "stable": true
+    },
+    "REVIEW_PERSPECTIVE_MISSING": {
+      "meaning": "A Profile-required perspective has no valid current review.",
+      "stable": true
+    },
+    "REVIEW_CONTEXT_POLICY": {
+      "meaning": "Observed fresh/fork context does not satisfy the locked review policy.",
+      "stable": true
+    },
+    "REVIEW_CROSS_CHECK_MISSING": {
+      "meaning": "A required cross-check lacks a referenced opinion and an actually received Team message.",
+      "stable": true
+    },
+    "REVIEW_DISAGREEMENT_UNRESOLVED": {
+      "meaning": "An in-scope blocking review finding or cross-check disposition remains unresolved.",
+      "stable": true
+    },
+    "REVIEW_NOT_COMPLETED": {
+      "meaning": "Cancelled, failed, timed-out or unpublished review output is not completion.",
+      "stable": true
+    },
+    "CORE_INVALID_RESPONSE": {
+      "meaning": "Installed Node core returned an invalid envelope or mismatched operation.",
+      "stable": true
+    },
+    "CORE_OUTPUT_LIMIT": {
+      "meaning": "Managed Node core response exceeded the configured output bound.",
+      "stable": true
+    },
+    "CORE_TIMEOUT": {
+      "meaning": "Managed Node core invocation exceeded its deadline.",
+      "stable": true
+    },
+    "CORE_CANCELLED": {
+      "meaning": "Managed Node core invocation was cancelled.",
+      "stable": true
+    },
+    "REVIEW_AUTHOR_MISSING": {
+      "meaning": "Current reviewed artifact lacks completed host-observed inline authorship.",
+      "stable": true
+    },
+    "REVIEW_BINDING_STALE": {
+      "meaning": "Review dependency snapshot, scope, plan or exact binding differs.",
+      "stable": true
+    },
+    "REVIEW_CONTEXT_INVALID": {
+      "meaning": "Observed member context does not satisfy the locked context policy.",
+      "stable": true
+    },
+    "REVIEW_DISSENT_UNRESOLVED": {
+      "meaning": "An in-scope original blocking opinion lacks an evidenced independent disposition.",
+      "stable": true
+    },
+    "REVIEW_ROUND_LIMIT": {
+      "meaning": "The locked Profile review publication bound has been reached.",
+      "stable": true
+    },
+    "CORE_EXIT_ERROR": {
+      "meaning": "Installed Node core exited with an unsupported process status.",
+      "stable": true
+    },
+    "HOST_AUTHORITY_INVALID": {
+      "meaning": "The native host context signature or its pinned authority/task/operation binding is invalid.",
+      "stable": true
+    },
+    "COMMAND_TIMEOUT": {
+      "meaning": "A first-party installation or verification subprocess exceeded its configured deadline; its process group is terminated and the command reports timeout rather than success.",
+      "stable": true,
+      "scope": "Node packaging lifecycle"
+    },
+    "OUTPUT_DRAIN_FAILED": {
+      "meaning": "A first-party installation or verification subprocess exited but descendants kept its output pipes open beyond the drain bound; process cleanup is attempted and the command reports failure.",
+      "stable": true,
+      "scope": "Node packaging lifecycle"
     }
   }
 }

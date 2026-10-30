@@ -1,24 +1,25 @@
-# 贡献指南
+# 参与开发
 
 [English](CONTRIBUTING.md) | 简体中文
 
-阅读 [AGENTS](AGENTS.zh-CN.md)、[方法与 SOP](docs/qa-methodology/README.zh-CN.md)及[当前文档索引](docs/README.zh-CN.md)。为本次变更记录合同与证据映射，历史交付合同不自动成为其他变更的要求。使用动态通用临时 fixture，不提交真实 SUT 源码或秘密。Protocol 是唯一规范；Schema、MethodSpec、reason codes 或快照变更必须增加正例、负例、过期输入测试并重新生成 DSH 投影。
+先读 [AGENTS](AGENTS.zh-CN.md)、[METHOD](docs/qa-methodology/METHOD.zh-CN.md)、
+[SOP](docs/qa-methodology/SOP.zh-CN.md)、[协议指导](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.zh-CN.md)
+和 [TypeScript 计划](docs/plans/TYPESCRIPT_CORDIS.zh-CN.md)。实施前保存实际需求、必要不变量、可观察 Oracle 和有限验收映射；历史测试数量不是通用门槛。
+
+需要 Node 24.9.0 或更高版本。按仓库 lockfile 安装并编译：
 
 ```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -e .
-.venv/bin/python -m unittest discover -s tests/v2 -v
-.venv/bin/python -m unittest discover -s tests/distribution -v
-.venv/bin/python tests/integration_install/test_install_boundaries.py
+npm ci --ignore-scripts --no-audit --no-fund
+npm run build
+npm test
+node scripts/check_distribution.mjs
+node --test adapters/deepseek-harness/tests/core-service.test.mjs adapters/deepseek-harness/tests/runtime-node.test.mjs adapters/deepseek-harness/tests/team.test.mjs
+node packaging/build.mjs --out-dir /absolute/path/bugate-package
+node scripts/check_distribution.mjs --bundle /absolute/path/bugate-package/bugate-deepseek-harness-2.2.0-dev.1.tgz
 ```
 
-原生适配器依赖精确版本 `@deepseek-ai/dsh@0.2.2-alpha.2`、`typescript@5.9.3`、`ajv@8.17.1`、`@types/node@24.10.0`，安装到隔离 npm prefix，再将其 `node_modules` 链接到 `adapters/deepseek-harness/plugin/`。使用 Node 24.9.0+ 和 pnpm 11.28.5；CI 保存可复现命令。
+workspace 包含共享核心、CLI、安装器和原生插件。核心和插件消费相同的规范字节。构建只清理自有输出目录，生成有限资源/依赖清单和 SHA256SUMS。lockfile 锁定 DSH/Cordis/官方 Team 依赖；安装器调用真实 DSH 插件管理器，不取代宿主调度。
 
-```sh
-npm run build --prefix adapters/deepseek-harness/plugin
-node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs
-.venv/bin/python packaging/build_dsh.py --out-dir dist/local-build
-.venv/bin/python scripts/check_distribution.py --bundle dist/local-build/bugate-deepseek-harness-2.1.0-dev.1.tgz
-```
+仓库测试使用临时通用 fixture。真实 SUT 源码、环境、秘密及任务证据放在外部工作区。保留真实失败、skip、xfail、未观察结果和其他写者的改动。验证 subprocess/world 映射与可等待持久化；mock context 不能单独证明宿主支持。
 
-按目标 Python/平台 ABI 构建。使用实际 bundle 执行独立安装和真实 DSH runtime 验收；源码树单测不等于独立运行证据。保留无关用户配置，记录真实命令与结果（含失败），同步中英文文档。普通构建测试不发布 release。
+独立验收以操作系统限制源码读取和可执行文件，运行已安装的精确产物。参见[安装说明](docs/DEEPSEEK_HARNESS.zh-CN.md)与 [CI](.github/workflows/ci.yml)。记录实际平台、包摘要、命令与结果，区分确定性 runtime 与 live-model 结果。框架文档保持中英文对应；未经授权不发布 release。

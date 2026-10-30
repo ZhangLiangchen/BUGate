@@ -1,3 +1,6 @@
+import {mkdtemp} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import { createRequire } from 'node:module';
 const require = createRequire(process.env.BUGATE_DSH_MODULES ? process.env.BUGATE_DSH_MODULES + '/__bugate_runtime__.js' : new URL('../plugin/package.json', import.meta.url));
 export const load = name => import(require.resolve(name));
@@ -27,14 +30,26 @@ export class FixtureModel extends LlmAdapter {
  async resolveModel(provider,model){return {provider,id:model,name:model,context:{contextWindow:100000}};}
  async *stream(options){this.requests.push(options);const response=this.script.shift() ?? textResponse();for(const frame of typeof response==='function'?response(options):response)yield frame;}
 }
-export async function host({model=new FixtureModel(),persistence,ptc=false,fs=FsLocal}={}) {
+export async function host({model=new FixtureModel(),persistence,ptc=false,fs=FsLocal,team=false}={}) {
  const ctx=new Context();
  for(const plugin of [LlmRuntime,SessionStore,Projections,SystemPrompt,Tools,Agents,fs,SubprocessLocal,Skills])await ctx.plugin(plugin);
  const executor=ptc?undefined:await ctx.plugin(Native);
  await ctx.plugin((await load('@deepseek-ai/dsh-working-directory')).default);
+ if(team&&!persistence)persistence=await mkdtemp(join(tmpdir(),'bugate-team-sessions-'));
  if(persistence)await ctx.plugin(await load('@deepseek-ai/dsh-session-persistence-jsonl'),{root:persistence,compression:'none'});
  await ctx.plugin(AgentLoop,{agents:[]});
  ctx.llm.registerAdapter(['fixture'],model);
+ if(team){
+ await ctx.plugin((await load('@deepseek-ai/dsh-session-query')).default);
+ await ctx.plugin((await load('@deepseek-ai/cordis-plugin-loader')).default);
+ await ctx.plugin((await load('@deepseek-ai/dsh-agent-preset-registry')).default,{default:'main'});
+ await ctx.agentPresets.register({id:'main',plugins:[]});
+ await ctx.plugin((await load('@deepseek-ai/dsh-subagent')).default);
+ await ctx.plugin(await load('@deepseek-ai/dsh-subagent-spawn-in-process'),{providerName:'spawn'});
+ await ctx.plugin(await load('@deepseek-ai/dsh-subagent-fork-in-process'),{providerName:'fork'});
+ if(team!== 'infrastructure'){await ctx.plugin((await load('@deepseek-ai/dsh-experimental-agent-team')).default);
+ await ctx.plugin(await load('@deepseek-ai/dsh-experimental-tool-agent-team'));}
+ }
  return {ctx,model,executor};
 }
 export async function send(agent,text='continue') {

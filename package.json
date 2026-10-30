@@ -1,0 +1,30 @@
+{
+  "name": "bugate-workspace",
+  "version": "2.2.0-dev.1",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "packaging",
+    "adapters/deepseek-harness/plugin"
+  ],
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "scripts": {
+    "build": "node packaging/build.mjs --compile-only",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "node --test tests/typescript/*.test.mjs tests/distribution/*.test.mjs tests/integration_install/*.test.mjs",
+    "test:runtime": "node --test adapters/deepseek-harness/tests/core-service.test.mjs adapters/deepseek-harness/tests/runtime-node.test.mjs adapters/deepseek-harness/tests/team.test.mjs",
+    "check:distribution": "node scripts/check_distribution.mjs",
+    "package": "node packaging/build.mjs --out-dir dist"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "typescript": "5.9.3",
+    "ajv": "8.17.1",
+    "fast-xml-parser": "5.3.0",
+    "@deepseek-ai/dsh": "0.2.2-alpha.2",
+    "pnpm": "11.28.5"
+  }
+}

@@ -1,63 +1,57 @@
-name: v2 + DeepSeek Harness
+name: TypeScript + native DSH Agent Team
 
 on:
   push:
   pull_request:
 
 jobs:
-  protocol-dsh:
-    runs-on: ubuntu-latest
+  node-dsh:
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
       - uses: actions/setup-node@v4
         with:
           node-version: "24.9.0"
-      - name: Install exact host and isolated build dependencies
+          cache: npm
+      - name: Install locked Node and official DSH dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile the shared core, unified CLI and native plugin
+        run: npm run build
+      - name: Core, source distribution and owned installation boundaries
         run: |
-          runtime="$RUNNER_TEMP/dsh-runtime"
-          mkdir -p "$runtime"
-          npm install --prefix "$runtime" --save-exact @deepseek-ai/dsh@0.2.2-alpha.2 typescript@5.9.3 ajv@8.17.1 @types/node@24.10.0
-          npm install --global pnpm@11.28.5
-          ln -s "$runtime/node_modules" adapters/deepseek-harness/plugin/node_modules
-          python3 -m pip install .
-      - name: Core, source distribution and installation boundaries
+          npm test
+          node scripts/check_distribution.mjs
+      - name: Real official DSH runtime and Agent Team
+        run: node --test adapters/deepseek-harness/tests/core-service.test.mjs adapters/deepseek-harness/tests/runtime-node.test.mjs adapters/deepseek-harness/tests/team.test.mjs
+      - name: Build finite Node artifact
         run: |
-          python3 -m unittest discover -s tests/v2 -v
-          python3 -m unittest discover -s tests/distribution -v
-          python3 tests/integration_install/test_install_boundaries.py
-          python3 scripts/check_distribution.py
-      - name: Compile against locked DSH types and execute actual runtime
+          node packaging/build.mjs --out-dir "$RUNNER_TEMP/bugate-node-package"
+          node scripts/check_distribution.mjs --bundle "$RUNNER_TEMP/bugate-node-package/bugate-deepseek-harness-2.2.0-dev.1.tgz"
+          cd "$RUNNER_TEMP/bugate-node-package"
+          shasum -a 256 -c SHA256SUMS
+      - name: Copy official host runtime outside the denied checkout
         run: |
-          npm run build --prefix adapters/deepseek-harness/plugin
-          node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs
-      - name: Build finite native bundle and offline wheelhouse
+          mkdir -p "$RUNNER_TEMP/dsh-runtime"
+          npm install --prefix "$RUNNER_TEMP/dsh-runtime" --ignore-scripts --save-exact @deepseek-ai/dsh@0.2.2-alpha.2 pnpm@11.28.5
+      - name: Installed lifecycle and runtime with OS source and Python denial
         run: |
-          python3 packaging/build_dsh.py --out-dir "$RUNNER_TEMP/bugate-dsh-package"
-          python3 scripts/check_distribution.py --bundle "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.1.0-dev.1.tgz"
-          cd "$RUNNER_TEMP/bugate-dsh-package"
-          sha256sum -c SHA256SUMS
-      - name: Standalone clean installation and v2 lifecycle
-        run: |
-          python3 tests/integration_install/accept_package.py \
-            --package "$RUNNER_TEMP/bugate-dsh-package/bugate-deepseek-harness-2.1.0-dev.1.tgz" \
+          node tests/integration_install/accept_package.mjs \
+            --package "$RUNNER_TEMP/bugate-node-package/bugate-deepseek-harness-2.2.0-dev.1.tgz" \
             --dsh "$RUNNER_TEMP/dsh-runtime/node_modules/.bin/dsh" \
-            --out-dir "$RUNNER_TEMP/bugate-dsh-acceptance"
-      - name: Real DSH runtime from installed package
-        env:
-          BUGATE_INSTALLED_PLUGIN: ${{ runner.temp }}/bugate-dsh-acceptance/dsh-home/profiles/bugate-package-acceptance/node_modules/@bugate/deepseek-harness
-          BUGATE_INSTALLED_PYTHON: ${{ runner.temp }}/bugate-dsh-acceptance/bootstrap/bin/python
-          BUGATE_DSH_MODULES: ${{ runner.temp }}/dsh-runtime/node_modules
-        run: node --test adapters/deepseek-harness/tests/standalone-package.test.mjs
+            --dsh-modules "$RUNNER_TEMP/dsh-runtime/node_modules" \
+            --pnpm-module "$RUNNER_TEMP/dsh-runtime/node_modules/pnpm/bin/pnpm.mjs" \
+            --out-dir "$RUNNER_TEMP/bugate-node-acceptance" \
+            --deny-source-root "$GITHUB_WORKSPACE" \
+            --runtime-runner adapters/deepseek-harness/tests/standalone-node-runner.mjs \
+            --runtime-files standalone-node-runner.mjs,host.mjs,workflow-node.mjs,installed-profile.mjs,team-fixture.mjs,team-negative.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bugate-v2-dsh-package-and-acceptance
+          name: bugate-node-package-and-acceptance
           path: |
-            ${{ runner.temp }}/bugate-dsh-package
-            ${{ runner.temp }}/bugate-dsh-acceptance/*.json
-            ${{ runner.temp }}/bugate-dsh-acceptance/*.stdout
-            ${{ runner.temp }}/bugate-dsh-acceptance/*.stderr
+            ${{ runner.temp }}/bugate-node-package
+            ${{ runner.temp }}/bugate-node-acceptance/*.json
+            ${{ runner.temp }}/bugate-node-acceptance/*.stdout
+            ${{ runner.temp }}/bugate-node-acceptance/*.stderr
+            ${{ runner.temp }}/bugate-node-acceptance/*.sb
           retention-days: 14

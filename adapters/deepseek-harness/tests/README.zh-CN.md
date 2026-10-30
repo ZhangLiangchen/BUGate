@@ -1,64 +1,35 @@
-[English](README.md)
+# 原生 runtime 验证
 
-# DSH 自动化验收
+[English](README.md) | 简体中文
 
-先构建 `../plugin`。在临时 Node 环境安装官方 DSH 0.2.2-alpha.2、TypeScript 5.9.3
-和 Ajv 8.17.1，通过 `plugin/node_modules` 解析；测试宿主也支持
-`BUGATE_DSH_MODULES` 指向模块目录。`BUGATE_TEST_PYTHON` 指定已安装核心依赖的 Python。
-
-```sh
-node adapters/deepseek-harness/plugin/build.mjs
-BUGATE_TEST_PYTHON=/absolute/venv/bin/python node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs
-```
-
-`host.mjs` 加载官方 Cordis/AgentLoop、filesystem、subprocess、提示、工具流水线、
-会话、Skill 和 LLM 服务，只有模型适配器使用确定性 fixture。其他用例加载真实 JSONL
-持久化、compaction-basic/token-meter、preset/loader、spawn/fork 和 Node PTC 服务。
-
-覆盖 50 次真实模型请求的规范上下文、真实 compactNow 及压缩后恢复、事实变化后的
-旧满意状态失效、preset 变更后的冷恢复精确绑定、多子 Agent 与多工作区、PTC 嵌套
-执行谱系、完成返工边界、reload、非 BUGate 工作区、失配资源和丢失绑定。确定性 race
-暂停真实模型准备阶段，在兄弟 Agent 写入后验证模型请求数为零；下一轮重新准备当前事实。
-
-authoring 工作流从无工件、无实现开始，通过真实模型工具调用读取需求、写草稿、登记
-由核心计算的摘要、建立有来源的业务 Oracle 和评审，再评估设计、生成实现。更新引用与
-评审并重新评估后执行真实通用 Python 测试。工具结果返回前必须已有持久化执行证据。
-
-Bridge 测试执行真实 local-provider 子进程，覆盖错误响应、退出码/operation 失配、
-缺少 Python、输出上限、超时、取消，以及具有 opaque key 的映射 provider。同绑定但不同工件/源字节以及新增/缺失路径的真实
-provider 子类必须在模型请求前被拒绝。
-仓库不提交秘密或真实公司 SUT fixture。
-
-干净包安装完成后，单独运行必需的安装闭环：
+测试使用真实锁定版本的 DSH/Cordis 服务、官方 Agent Team、实际工具、filesystem/
+subprocess provider、持久化会话和临时中性命令；只有模型边界使用确定性 fixture。
+代码树中存在测试不证明已经执行；迁移报告记录实际命令、版本、精确源码/包身份和输出。
 
 ```sh
-BUGATE_INSTALLED_PLUGIN=/absolute/profile/node_modules/@bugate/deepseek-harness \
-BUGATE_INSTALLED_PYTHON=/absolute/installed/runtime/venv/bin/python \
-BUGATE_DSH_MODULES=/absolute/runtime/node_modules \
-node --test adapters/deepseek-harness/tests/standalone-package.test.mjs
+npm run build
+node --test adapters/deepseek-harness/tests/core-service.test.mjs \
+  adapters/deepseek-harness/tests/runtime-node.test.mjs \
+  adapters/deepseek-harness/tests/team.test.mjs
 ```
 
-runner 使用官方 profile runtime resolution，断言插件与宿主共享同一个 DSH LLM 模块。
-该测试只复制通用测试驱动到新临时目录，清除 PYTHONPATH/NODE_PATH，加载实际安装包
-lib/resources 与独立核心，并执行真实 authoring 和命令采集。缺失安装参数明确失败，
-不会跳过。输出保留的 result JSON 和日志路径，包含安装路径、兼容元数据、请求次数和
-执行证据。这里证明确定性运行时集成，不冒充 live-model 分析质量。
+- `core-service.test.mjs`：实际 Node provider 调用、输出/envelope/退出错误、专用宿主
+  观察通道、超时/取消/drain、opaque 文件系统 key 和不可用安装映射。
+- `runtime-node.test.mjs`：保留适用基线断言，覆盖精确 context、压缩、恢复、任务隔离、
+  guard、配置执行、PTC/子成员/preset 生命周期、并发、准入竞态和 provider 边界。
+- `team.test.mjs`、`team-fixture.mjs`、`team-negative.mjs`：官方 Team 成员、任务 CAS、
+  同伴消息及冷恢复、真实内联作者/评审来源、有来源必要视角、原始异议及有证据处置、
+  当前工件绑定和两阶段发布/最终结算。反例包含 Lead 代写导入、换名自审、fork 策略、
+  过时工件、跨任务重放和发布后取消。
+- `workflow-node.mjs`：共用中性创作/执行 fixture。来源明确要求正数、零和负数结果，
+  三者均有真实断言；范围外建议不可执行/不阻塞，真实产品失败与有界诊断保留。
+- `standalone-node-runner.mjs` 和 `installed-profile.mjs`：精确独立安装包、官方 profile
+  组合/包解析、实际后端 Team 和 BUGate 激活、成功/失败流程及 Team 控制。安装验收
+  对完整 runner 子树施加 OS 源码禁读和进程 allowlist，并实际探测 Python 执行被拒。
+  只改 PATH 不是隔离证据。
 
-macOS 的独立包测试可设置 `BUGATE_DENY_SOURCE_ROOT=/absolute/BUGate`。
-测试子进程在操作系统 sandbox 内运行，禁止读取源码仓库；加载安装插件前，
-先断言读取源码确实返回权限错误，再验证真实 runtime 可独立运行。
+历史固定测试数量和角色矩阵不是发布门槛。fixture 证明 runtime 机制与确定性断言，
+不证明 live-model 推理质量、缺陷发现率或效率。Live model 单独报告；未运行则明确
+**NOT_RUN**。平台支持只根据实际测试报告。
 
-`tests/integration_install/accept_published_upgrade.py` 显式接收旧版与候选归档，
-并核对旧版公开 SHA256。它实际安装指定旧归档、升级本次候选包、拒绝旧任务绑定且保持字节不变、
-准备新当前协议任务，再回滚到保留的旧版原始归档。该测试与 `accept_package.py` 中
-只修改版本元数据的事务/崩溃恢复 fixture 分开报告。不支持 v0.x 导入或自动任务迁移。
-
-范围收敛不变量验证使用真实模型工具调用链。确定性
-模型主动执行无目标关联的已配置命令，验证进程启动前拒绝；随后记录不可执行建议，
-执行范围内用例并提交完成声明。相同流程加入故意生成的产品缺陷时，业务验证失败，
-验收执行完整仍通过。在完成后继续记录建议，原声明保持满足且不触发返工。
-
-独立安装 runner 在启用源码读取拒绝时执行通过/失败两条流程，验证工具返回前
-证据已持久化、精确范围/计划绑定、必需场景数和功能/执行两种结论。真实子 Agent
-反例证明 DSH 标作 user 的委派 prompt 不能成为用户授权收据；未被契约引用的
-普通继续消息不改变授权快照。
+历史 Python/runtime 测试及发布产物保留在 Git 历史；其原始源码/协议身份不是 TS/Team 证据。

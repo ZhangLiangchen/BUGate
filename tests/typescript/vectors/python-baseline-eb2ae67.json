@@ -1,0 +1,188 @@
+{
+  "source_commit": "eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654",
+  "python_version": "3.13.3 (main, Apr  8 2025, 13:54:08) [Clang 17.0.0 (clang-1700.0.13.3)]",
+  "canonical": [
+    {
+      "input": null,
+      "hex": "6e756c6c",
+      "digest": "sha256:da8413bbd64a8367d9c9db0f097982f7da4d69614f1085b2715a362d3742958b"
+    },
+    {
+      "input": true,
+      "hex": "74727565",
+      "digest": "sha256:796b917d0c3d2a3a0295d83bfd73fe1b6e15cb37c4da1cd60f1e14be16d9e1ee"
+    },
+    {
+      "input": false,
+      "hex": "66616c7365",
+      "digest": "sha256:44c635a836e0462fb4ad43f62510f979e60c3eeb77b0c7fb96f4790ba67825fa"
+    },
+    {
+      "input": 0,
+      "hex": "30",
+      "digest": "sha256:bfe88fab5bdf5fb49873911873bfb57d943a094ab5de3e9dbf3adcbd1d1d5714"
+    },
+    {
+      "input": -1,
+      "hex": "2d31",
+      "digest": "sha256:af776148e465984aadf75150326df36ab736ae76ebf31528d7e2557fc0ac2072"
+    },
+    {
+      "input": 9007199254740991,
+      "hex": "39303037313939323534373430393931",
+      "digest": "sha256:905808bec1bd3b1637a3ed6803863be700c75afa7a7e2539e76c66c8a190baec"
+    },
+    {
+      "input": {
+        "z": 0,
+        "a": "中文\n\t\"\\",
+        "": 2,
+        "𐀀": 1
+      },
+      "hex": "7b2261223a22e4b8ade696875c6e5c745c225c5c222c227a223a302c22ee8080223a322c22f0908080223a317d",
+      "digest": "sha256:29642cda2fb0f293a2b6db8f271fd5c75a3cfd7e8fbc8004523bbc5c30e9347e"
+    },
+    {
+      "input": [
+        1,
+        "x",
+        null,
+        {
+          "b": 2,
+          "a": 1
+        }
+      ],
+      "hex": "5b312c2278222c6e756c6c2c7b2261223a312c2262223a327d5d",
+      "digest": "sha256:341c1e45f5413dde567630607f724eaf5a4968c93d8c4608deb91547a65636d3"
+    }
+  ],
+  "business": [
+    {
+      "name": "baseline",
+      "verdict": "satisfied",
+      "codes": []
+    },
+    {
+      "name": "no_oracle",
+      "verdict": "unsatisfied",
+      "codes": [
+        "ORACLE_BINDING_INVALID",
+        "ORACLE_MISSING",
+        "REFERENCE_MISSING"
+      ]
+    },
+    {
+      "name": "unknown_proposition",
+      "verdict": "inconclusive",
+      "codes": [
+        "BUSINESS_SEMANTICS_UNRESOLVED"
+      ]
+    },
+    {
+      "name": "placeholder",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SEMANTIC_PLACEHOLDER"
+      ]
+    },
+    {
+      "name": "uncovered_requirement",
+      "verdict": "unsatisfied",
+      "codes": [
+        "REFERENCE_MISSING",
+        "REQUIREMENT_UNCOVERED",
+        "SCENARIO_UNRELATED"
+      ]
+    },
+    {
+      "name": "testability_gap",
+      "verdict": "unsatisfied",
+      "codes": [
+        "TESTABILITY_GAP"
+      ]
+    },
+    {
+      "name": "unmapped_oracle",
+      "verdict": "unsatisfied",
+      "codes": [
+        "ORACLE_UNCOVERED",
+        "TESTABILITY_ORACLE_UNMAPPED"
+      ]
+    },
+    {
+      "name": "wrong_layer",
+      "verdict": "unsatisfied",
+      "codes": [
+        "LAYER_DECISION_MISMATCH"
+      ]
+    },
+    {
+      "name": "missing_risk",
+      "verdict": "unsatisfied",
+      "codes": [
+        "RISK_UNCOVERED"
+      ]
+    },
+    {
+      "name": "unknown_source",
+      "verdict": "unsatisfied",
+      "codes": [
+        "REFERENCE_MISSING"
+      ]
+    },
+    {
+      "name": "changed_denominator",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SCOPE_DENOMINATOR_CHANGED"
+      ]
+    },
+    {
+      "name": "wrong_scope_binding",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SCOPE_STALE"
+      ]
+    },
+    {
+      "name": "unaccepted_scenario",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SCENARIO_OUT_OF_SCOPE",
+        "SCOPE_SCENARIO_MISSING"
+      ]
+    },
+    {
+      "name": "redundant_scenario",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SCENARIO_REDUNDANT"
+      ]
+    },
+    {
+      "name": "weak_observation",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SCOPE_ORACLE_WEAKENED"
+      ]
+    },
+    {
+      "name": "review_missing",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SCOPE_SEMANTIC_REVIEW_MISSING",
+        "SEMANTIC_REVIEW_MISSING"
+      ]
+    },
+    {
+      "name": "stale_review",
+      "verdict": "unsatisfied",
+      "codes": [
+        "SCOPE_SEMANTIC_REVIEW_MISSING",
+        "SEMANTIC_REVIEW_MISSING",
+        "SEMANTIC_REVIEW_STALE"
+      ]
+    }
+  ],
+  "identity_difference": "Protocol 2.1.0-dev.1/Python evaluator versus 2.2.0-dev.1/TypeScript evaluator intentionally differ; no snapshot or authorization is reused."
+}

@@ -4,9 +4,9 @@
 
 BUGate 定义有限验收任务的质量要求，并评估已记录的事实能否支持验收声明。它将用户目标、业务要求、可观测 Oracle、必需用例与真实执行证据关联起来，让 Agent 能够说明：**本轮覆盖了什么、实际发生了什么、可以得出什么结论。**
 
-**DeepSeek Harness（DSH）是唯一产品宿主。** BUGate 提供宿主无关的 Python 核心、版本化协议和统一 CLI；原生 DSH 插件消费这些评估结果，约束受治理执行和完成声明。DSH 负责 Agent loop、工具、调度、会话生命周期和有界返工。
+**DeepSeek Harness（DSH）是唯一产品宿主。** BUGate 提供宿主无关的 TypeScript 核心、版本化协议和统一 Node CLI；原生 DSH 插件消费这些评估结果，约束受治理执行和完成声明。DSH 负责 Agent loop、工具、调度、会话生命周期和有界返工。
 
-**当前发布：** 下文描述 Python 核心与原生 TypeScript DSH 插件。**已接受的下一步架构：** 全面 TypeScript 核心/工具链、统一 Node CLI 与 Cordis 原生服务/插件。迁移处于**计划中、尚未开始**；当前安装说明和已发布资产保持不变。详见 [TypeScript/Cordis 计划](docs/plans/TYPESCRIPT_CORDIS.zh-CN.md)。
+**实施状态：** 2026-10-30 请求已授权 `2.2.0-dev.1` TypeScript 核心/工具链与官方 DSH Agent Team 互审，当前实施及验证进行中。精确安装包通过 runtime 和独立安装验收后才切换；历史 Python 发布保持不变。详见 [TypeScript/Cordis 计划](docs/plans/TYPESCRIPT_CORDIS.zh-CN.md)。
 
 ## 围绕用户目标确定验收范围
 
@@ -34,7 +34,7 @@ Oracle 描述证明某项要求所需的可观测业务结果。结构校验、�
 
 `execution_complete` 与 `requirement_verified` 分别评估。验证一个指定要求，不会将其他必需工作标记为完成。报告分别说明实际覆盖、功能结果、执行阻塞和建议，并声明：**“本结论仅覆盖本次约定范围。”**
 
-## 当前已发布架构与权威边界
+## 架构与权威边界
 
 ### 插件如何在 DSH 中生效
 
@@ -45,14 +45,14 @@ flowchart TD
     A["将已校验安装包装入选定 DSH profile"] --> B["Cordis 加载插件并校验包内资源"]
     B --> S["注册 Skill 与原生工具"]
     B --> T["Agent 生命周期：定位任务、捕获合格用户请求"]
-    T --> P["等待 Python 核心准备完成，核验精确绑定"]
+    T --> P["等待 共享 TypeScript 核心准备完成，核验精确绑定"]
     P --> C["同步上下文原样返回已准备内容"]
     S -. "可供 Agent 使用" .-> M["DSH 模型与工具调用链"]
     C --> M
     M --> Q["bugate_run_test(command_id)：等待当前准入评估"]
     Q --> G{"同步 guard：准入票据仍有效？"}
     G -->|"否"| N["拒绝并返回缺口或冲突"]
-    G -->|"票据有效且宿主允许"| X["DSH provider 启动 Python 采集器<br/>核心复核范围/计划后执行配置命令"]
+    G -->|"票据有效且宿主允许"| X["DSH provider 启动 Node 采集器<br/>核心复核范围/计划后执行配置命令"]
     X --> E["采集器完成证据持久化后才返回工具结果"]
     E -. "Agent 显式提交 submit: true" .-> F["bugate_assess：当前声明"]
     F --> H["停止回合时重新评估已提交声明"]
@@ -96,30 +96,27 @@ flowchart TD
 | 执行 | 当前绑定、受管采集与证据持久化屏障。 | 约束已声明工具/provider，不是通用 shell 或操作系统沙箱。 |
 | 结论 | 执行完整性、功能结果、阻塞和建议分别表达。 | 真实失败保持失败，缺少观察不能转为已验证。 |
 
-这些是已实现机制，不是已实证的模型效率或缺陷发现率提升。细节见[执行流程](docs/qa-methodology/SOP.zh-CN.md)、[配置与边界](adapters/deepseek-harness/plugin/README.zh-CN.md)、[原生生命周期代码](adapters/deepseek-harness/plugin/src/index.ts)和[执行采集器](src/bugate/evidence.py)。
+这些是已实现机制，不是已实证的模型效率或缺陷发现率提升。细节见[执行流程](docs/qa-methodology/SOP.zh-CN.md)、[配置与边界](adapters/deepseek-harness/plugin/README.zh-CN.md)、[原生生命周期代码](adapters/deepseek-harness/plugin/src/index.ts)和[执行采集器](packages/core/src/evidence.ts)。
 
 ### 规则与实现的位置
 
 | 位置 | 职责 |
 |---|---|
 | [`protocol/v2/`](protocol/v2/) | 唯一机器规范：Schema、MethodSpec、质量规则和 reason codes。 |
-| [`src/bugate/`](src/bugate/) | 宿主无关的校验、快照、证据与声明评估，以及统一 JSON CLI。 |
+| [`packages/core/`](packages/core/) | 宿主无关的校验、快照、证据与声明评估，以及统一 JSON CLI。 |
 | [`adapters/deepseek-harness/`](adapters/deepseek-harness/) | 原生工具、执行准入、上下文/生命周期接入和真实 DSH 验收。 |
 | [`views/skills/bugate/`](views/skills/bugate/) | 精简入口投影；构建时附加规范 MethodSpec 资源并封存摘要。 |
-| [`packaging/`](packaging/) | 明确的资源清单、独立 wheel/原生安装包和有所有权边界的安装生命周期。 |
+| [`packaging/`](packaging/) | 明确的资源清单、有限 Node 安装包和有所有权边界的安装生命周期。 |
 | [`docs/qa-methodology/`](docs/qa-methodology/) | 解释协议及其使用流程。 |
 
 ## 安装并开始任务
 
-安装入口固定到
-[`dsh-v2.1.0-dev.1`](https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.1.0-dev.1)：Python `bugate-core 2.1.0a1`、原生包 `2.1.0-dev.1`，以及精确绑定的 Protocol `2.1.0-dev.1`。使用[一键安装 Prompt](INSTALL_DSH_PROMPT.zh-CN.md)或[安装恢复指南](docs/DEEPSEEK_HARNESS.zh-CN.md)。bundle、安装器和校验和必须来自同一次构建；明确选择外部测试项目、DSH profile 和 bootstrap 环境。运行时安装不需要 BUGate 源码 checkout。
-
-适配器面向 DSH `0.2.2-alpha.2` 和 Node `24.9.0+`。Python 核心要求 `3.11+`；随包依赖 wheel 必须匹配 `python/inventory.json` 记录的 Python/平台 ABI。[发布说明](docs/releases/DSH_2_1_0_DEV_1.zh-CN.md)列出打包平台和验证结果。不支持 Windows。Python 依赖离线安装，DSH peer dependencies 的解析可能需要访问 registry。
+使用同一次已验证构建的 `2.2.0-dev.1` Node 安装包、独立安装器及校验和。本次实现不是新公开 release。通过[安装 Prompt](INSTALL_DSH_PROMPT.zh-CN.md)或[安装恢复指南](docs/DEEPSEEK_HARNESS.zh-CN.md)，明确选择外部项目、DSH profile 和 home。运行时不依赖源码 checkout 或 Python。DSH/官方 Team 为 `0.2.2-alpha.2`、Cordis 为 `4.0.6-alpha.1`、Node 为 `24.9.0+`；宿主依赖可能需 registry。只报告实测平台，不推导 Windows 支持。
 
 安装后，依据 [Profile Schema](protocol/v2/schemas/profile.schema.json)编写有来源的 Profile，再初始化任务：
 
 ```sh
-BUGATE=/absolute/path/bugate-bootstrap/bin/bugate
+BUGATE=/absolute/path/dsh-home/profiles/PROFILE/node_modules/.bin/bugate
 "$BUGATE" init --project /absolute/path/test-repo --task TASK-1 \
   --sut-profile /absolute/path/profile.json --json
 "$BUGATE" protocol prepare \
@@ -136,7 +133,7 @@ CLI 输出单个版本化 `CommandResult` JSON。调用完成仍可能报告缺�
 
 [范围治理交付记录](docs/reports/scope-convergence/DELIVERY.zh-CN.md)将实施阶段的正式要求关联到所记录快照的实际核心、DSH 和安装证据。发布打包的资源字节可能不同；[发布说明](docs/releases/DSH_2_1_0_DEV_1.zh-CN.md)标识精确发布产物及其验证，不继承旧包的通过结论。
 
-已记录的集成验证使用确定性模型 fixture 驱动真实 DSH runtime，包括禁止读取源码 checkout 的已安装包流程。**未运行 live-model 验证。** 这些观察不能证明模型质量或效率提升。本地证据哈希也无法对抗拥有同一文件系统控制权的行为者。
+runtime 验证使用确定性模型 fixture 驱动真实 DSH 与官方 Team 成员/工具；最终已安装包验证须关联精确产物摘要，并由操作系统禁止读取源码及执行 Python。**未运行 live-model 验证。** 这些观察不能证明模型质量或效率提升。本地证据哈希也无法对抗拥有同一文件系统控制权的行为者。
 
 | 后续阅读 | 用途 |
 |---|---|
@@ -148,3 +145,9 @@ CLI 输出单个版本化 `CommandResult` JSON。调用完成仍可能报告缺�
 | [验收矩阵](docs/reports/scope-convergence/ACCEPTANCE_MATRIX.zh-CN.md) | 需求来源、Oracle 和已运行证据。 |
 
 [MIT 许可](LICENSE)。
+
+## 官方 Agent Team 交叉互审
+
+必要视角由有效 Profile 和采纳要求决定，没有固定角色数或全员两两互审矩阵。Team 的名册、live Agent/session、fresh/fork 上下文、工具调用及最终结果提供可观察来源；模型填写的名称或“已独立评审”不构成证明。输出与 HostObservation 持久化后，还须成功的 HostSettlement 才可评估。工件、范围、计划或输入快照变化会使旧评审失效。
+
+原始意见、反证、限制、交叉讨论和异议处置保留关联。消息接受与 Team task complete 均不等于评审通过；一致 pass 不替代 Oracle。fork 不是盲审，执行分离不保证认知独立，writeScopes 不提供工作树隔离。同权限文件系统篡改不在本地宿主观察保证范围。

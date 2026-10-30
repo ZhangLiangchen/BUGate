@@ -31,7 +31,7 @@
       ]
     },
     "schema_version": {
-      "const": "2.1.0-dev.1"
+      "const": "2.2.0-dev.1"
     },
     "revision": {
       "type": "string",
@@ -712,6 +712,138 @@
                   "unsupported",
                   "uncertain"
                 ]
+              },
+              "perspective_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                    },
+                    "proposition_id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                    },
+                    "statement": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "blocking": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "enum": [
+                        "open",
+                        "resolved"
+                      ]
+                    },
+                    "evidence_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      },
+                      "uniqueItems": true
+                    },
+                    "counterevidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      },
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "proposition_id",
+                    "statement",
+                    "blocking",
+                    "status",
+                    "evidence_refs",
+                    "counterevidence"
+                  ]
+                },
+                "uniqueItems": true
+              },
+              "cross_checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "review_ref": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "digest"
+                      ]
+                    },
+                    "disposition": {
+                      "enum": [
+                        "accepted",
+                        "rejected",
+                        "unresolved"
+                      ]
+                    },
+                    "reasoning": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "evidence_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      },
+                      "uniqueItems": true
+                    },
+                    "message_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "finding_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "review_ref",
+                    "disposition",
+                    "reasoning",
+                    "evidence_refs",
+                    "message_id"
+                  ]
+                },
+                "uniqueItems": true
               }
             },
             "required": [

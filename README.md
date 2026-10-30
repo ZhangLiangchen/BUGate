@@ -9,15 +9,14 @@ evidence, so an Agent can explain **what was covered, what happened and what can
 be concluded**.
 
 **DeepSeek Harness (DSH) is the only product host.** BUGate supplies a host-neutral
-Python core, a versioned protocol and a unified CLI. Its native DSH plugin uses
+TypeScript core, a versioned protocol and a unified Node CLI. Its native DSH plugin uses
 those evaluations to constrain managed execution and completion. DSH owns the
 Agent loop, tools, scheduling, session lifecycle and bounded rework.
 
-**Current release:** Python core and native TypeScript DSH plugin, as described
-below. **Accepted next architecture:** full TypeScript core/toolchain, unified
-Node CLI and Cordis native service/plugin. That migration is **planned, not
-started**; current installation instructions and released assets remain unchanged.
-See the [TypeScript/Cordis plan](docs/plans/TYPESCRIPT_CORDIS.md).
+**Implementation:** `2.2.0-dev.1` TypeScript core/toolchain and official DSH Agent
+Team review are in progress under the 2026-10-30 request. Final cutover depends
+on exact-package runtime and independent-install evidence. Historical Python
+releases remain unchanged. See the [TypeScript/Cordis plan](docs/plans/TYPESCRIPT_CORDIS.md).
 
 ## Acceptance follows the user's goal
 
@@ -71,7 +70,7 @@ Verifying one named requirement does not mark other required work complete.
 Reports identify actual coverage, functional results, execution blockers and
 suggestions, and state: **“This conclusion covers only the agreed scope.”**
 
-## Current released architecture and authority
+## Architecture and authority
 
 ### How the plugin takes effect in DSH
 
@@ -89,14 +88,14 @@ flowchart TD
     A["Install verified bundle into selected DSH profile"] --> B["Cordis loads plugin and validates bundled resources"]
     B --> S["Register Skill and native tools"]
     B --> T["Agent lifecycle: resolve task and capture eligible user requests"]
-    T --> P["Await Python-core preparation; verify exact binding"]
+    T --> P["Await shared TypeScript-core preparation; verify exact binding"]
     P --> C["Synchronous context returns unchanged prepared content"]
     S -. "Available to the Agent" .-> M["DSH model and tool pipeline"]
     C --> M
     M --> Q["bugate_run_test(command_id): await current admission"]
     Q --> G{"Synchronous guard: ticket still valid?"}
     G -->|"No"| N["Deny with gap or conflict"]
-    G -->|"Valid ticket; host also permits"| X["DSH provider starts Python collector<br/>Core rechecks scope/plan, then runs configured command"]
+    G -->|"Valid ticket; host also permits"| X["DSH provider starts Node collector<br/>Core rechecks scope/plan, then runs configured command"]
     X --> E["Collector durably publishes evidence before tool return"]
     E -. "Agent explicitly submits with submit: true" .-> F["bugate_assess: current claim"]
     F --> H["At turn stopping: reassess submitted claim"]
@@ -166,42 +165,35 @@ These are implemented mechanisms, not measured claims of better model efficiency
 or defect yield. Details: [workflow](docs/qa-methodology/SOP.md),
 [configuration and limits](adapters/deepseek-harness/plugin/README.md),
 [native lifecycle code](adapters/deepseek-harness/plugin/src/index.ts) and
-[execution collector](src/bugate/evidence.py).
+[execution collector](packages/core/src/evidence.ts).
 
 ### Where the rules and implementation live
 
 | Location | Responsibility |
 |---|---|
 | [`protocol/v2/`](protocol/v2/) | The sole machine specification: Schemas, MethodSpec, quality rules and reason codes. |
-| [`src/bugate/`](src/bugate/) | Host-neutral validation, snapshots, evidence and claim assessment; one JSON CLI. |
+| [`packages/core/`](packages/core/) | Host-neutral validation, snapshots, evidence and claim assessment; one JSON CLI. |
 | [`adapters/deepseek-harness/`](adapters/deepseek-harness/) | Native tools, execution admission, context/lifecycle integration and actual DSH acceptance tests. |
 | [`views/skills/bugate/`](views/skills/bugate/) | Small entry projection; the build appends canonical MethodSpec resources and seals their digest. |
-| [`packaging/`](packaging/) | Explicit resource inventory, standalone wheel/native bundle and owned installation lifecycle. |
+| [`packaging/`](packaging/) | Explicit resource inventory, finite Node bundle and owned installation lifecycle. |
 | [`docs/qa-methodology/`](docs/qa-methodology/) | Explanations of the protocol and workflow. |
 
 ## Install and start a task
 
-Installation is pinned to
-[`dsh-v2.1.0-dev.1`](https://github.com/ZhangLiangchen/BUGate/releases/tag/dsh-v2.1.0-dev.1):
-Python `bugate-core 2.1.0a1`, native package `2.1.0-dev.1` and exact Protocol
-`2.1.0-dev.1`. Follow the [one-step installation Prompt](INSTALL_DSH_PROMPT.md)
-or the [installation and recovery guide](docs/DEEPSEEK_HARNESS.md). Use the bundle,
-installer and checksum files from the same build, and choose an explicit external
-test project, DSH profile and bootstrap environment. Runtime installation does
-not need the BUGate source checkout.
-
-The adapter targets DSH `0.2.2-alpha.2` and Node `24.9.0+`. The Python core requires
-Python `3.11+`; bundled dependency wheels must match the Python/platform ABI
-recorded in `python/inventory.json`. See the
-[release notes](docs/releases/DSH_2_1_0_DEV_1.md) for the packaged platform and
-verification results. Windows is unsupported. Python dependencies install
-offline; DSH peer dependency resolution may require registry access.
+Use the `2.2.0-dev.1` Node bundle, standalone installer and checksums from the
+same verified build. This implementation is not a newly published public release.
+Follow the [installation Prompt](INSTALL_DSH_PROMPT.md) or [installation and
+recovery guide](docs/DEEPSEEK_HARNESS.md); choose an explicit external project, DSH
+profile and DSH home. Runtime needs no BUGate checkout or Python. DSH and official
+Team packages target `0.2.2-alpha.2`, Cordis `4.0.6-alpha.1`, Node `24.9.0+`.
+Host dependency installation may need registry access. Only actually tested
+platforms are reported; TypeScript does not imply Windows support.
 
 After installation, author a source-backed Profile using the
 [Profile Schema](protocol/v2/schemas/profile.schema.json) and initialize a task:
 
 ```sh
-BUGATE=/absolute/path/bugate-bootstrap/bin/bugate
+BUGATE=/absolute/path/dsh-home/profiles/PROFILE/node_modules/.bin/bugate
 "$BUGATE" init --project /absolute/path/test-repo --task TASK-1 \
   --sut-profile /absolute/path/profile.json --json
 "$BUGATE" protocol prepare \
@@ -237,9 +229,10 @@ bytes; the [release notes](docs/releases/DSH_2_1_0_DEV_1.md) identify the exact
 release artifacts and their verification instead of inheriting an older package's
 result.
 
-Recorded integration verification uses deterministic model fixtures driving the
-real DSH runtime, including an installed-package run with source-checkout reads
-denied. **Live-model validation was not run.** These observations do not establish
+Runtime verification uses deterministic model fixtures driving actual DSH and
+official Team members/tools. Final installed-package verification is reported
+against its exact artifact digest, with OS-enforced source/Python denial.
+**Live-model validation was not run.** These observations do not establish
 improved model quality or productivity. Local evidence hashes also do not
 authenticate against an actor controlling the same filesystem.
 
@@ -253,3 +246,19 @@ authenticate against an actor controlling the same filesystem.
 | [Acceptance matrix](docs/reports/scope-convergence/ACCEPTANCE_MATRIX.md) | Requirement sources, Oracles and executed evidence. |
 
 [MIT license](LICENSE).
+
+## Official Agent Team cross-review
+
+Required perspectives follow the effective Profile and adopted requirements; no
+fixed reviewer count or all-pairs matrix is imposed. Team membership, live
+Agent/session identity, fresh/fork context, tool calls and final results provide
+observable provenance. Model-filled names or independence claims are not proof.
+Persisted output and HostObservation need a successful HostSettlement before
+evaluation. Artifact, scope, plan or input changes invalidate prior review.
+
+Raw opinions, counterevidence, limitations, cross-discussion and dispositions
+remain linked. Message acceptance and Team task complete do not mean review
+acceptance; unanimous pass cannot replace an Oracle. Fork is not blind review,
+execution separation does not prove cognitive independence, and writeScopes
+is not worktree isolation. Local host observations do not protect against an
+actor with the same filesystem permissions.

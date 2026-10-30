@@ -2,7 +2,7 @@
   "apiVersion": "bugate.io/v2",
   "kind": "MethodSpec",
   "id": "business_understanding",
-  "version": "2.1.0-dev.1",
+  "version": "2.2.0-dev.1",
   "objective": "Build a source-backed business model with explicit unresolved boundaries.",
   "quality_dimensions": [
     "proposition_coverage",

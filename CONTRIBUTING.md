@@ -2,36 +2,37 @@
 
 English | [简体中文](CONTRIBUTING.zh-CN.md)
 
-Read [AGENTS.md](AGENTS.md), the [method and SOP](docs/qa-methodology/README.md),
-and the [current documentation index](docs/README.md). Record a change-specific
-contract and evidence mapping; a historical delivery contract is not a standing
-requirement for unrelated changes.
-Use temporary generic fixtures; do not commit SUT sources or secrets. The Protocol
-is canonical. Changes to Schema, MethodSpec, reasons or snapshots require positive,
-negative and stale-input tests plus regenerated DSH projections.
+Read [AGENTS](AGENTS.md), [METHOD](docs/qa-methodology/METHOD.md),
+[SOP](docs/qa-methodology/SOP.md), the [protocol guide](docs/qa-methodology/BUGATE_2_0_PROTOCOL_GUIDE.md)
+and the [TypeScript plan](docs/plans/TYPESCRIPT_CORDIS.md). Save the actual
+requirements, necessary invariants, observable Oracles and finite acceptance map
+before implementation. Historical test counts are not universal gates.
+
+Node 24.9.0 or later is required. Install the checked-in lockfile, then compile:
 
 ```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -e .
-.venv/bin/python -m unittest discover -s tests/v2 -v
-.venv/bin/python -m unittest discover -s tests/distribution -v
-.venv/bin/python tests/integration_install/test_install_boundaries.py
+npm ci --ignore-scripts --no-audit --no-fund
+npm run build
+npm test
+node scripts/check_distribution.mjs
+node --test adapters/deepseek-harness/tests/core-service.test.mjs adapters/deepseek-harness/tests/runtime-node.test.mjs adapters/deepseek-harness/tests/team.test.mjs
+node packaging/build.mjs --out-dir /absolute/path/bugate-package
+node scripts/check_distribution.mjs --bundle /absolute/path/bugate-package/bugate-deepseek-harness-2.2.0-dev.1.tgz
 ```
 
-For the native adapter, install exactly `@deepseek-ai/dsh@0.2.2-alpha.2`,
-`typescript@5.9.3`, `ajv@8.17.1` and `@types/node@24.10.0` into an isolated npm
-prefix, then link its `node_modules` into `adapters/deepseek-harness/plugin/`.
-Use Node 24.9.0+ and pnpm 11.28.5. The CI file records the reproducible commands.
+The workspaces are shared core, CLI, installer and native plugin. The core and
+plugin consume the same canonical protocol bytes. Build cleans only owned output
+directories and emits a finite resource/dependency inventory and SHA256SUMS.
+DSH/Cordis/official Team dependencies are pinned in the lockfile. The installation
+manager calls DSH's actual plugin manager; it does not replace the host scheduler.
 
-```sh
-npm run build --prefix adapters/deepseek-harness/plugin
-node --test adapters/deepseek-harness/tests/bridge.test.mjs adapters/deepseek-harness/tests/runtime.test.mjs
-.venv/bin/python packaging/build_dsh.py --out-dir dist/local-build
-.venv/bin/python scripts/check_distribution.py --bundle dist/local-build/bugate-deepseek-harness-2.1.0-dev.1.tgz
-```
+Repository tests use neutral temporary fixtures. Real SUT code, environments,
+secrets and task evidence stay in external workspaces. Preserve real failures,
+skips, xfails, unobserved outcomes and concurrent writers. Test subprocess/world
+mapping and awaited persistence; mock contexts alone cannot establish host support.
 
-Build on the target Python/platform ABI. Run standalone package installation and
-real DSH runtime acceptance with the resulting bundle; a source-tree unit test is
-not standalone evidence. Preserve unrelated user configuration. Record actual
-commands and their results, including failures. Keep documentation bilingual.
-No release publication occurs during normal build/test work.
+Independent acceptance runs the installed artifact under OS-enforced source-read
+and executable restrictions. See [installation](docs/DEEPSEEK_HARNESS.md) and
+[CI](.github/workflows/ci.yml). Record actual platform, package digest, commands
+and results. Deterministic runtime and live-model results are distinct. Keep
+framework documentation bilingual. Do not publish a release without authorization.

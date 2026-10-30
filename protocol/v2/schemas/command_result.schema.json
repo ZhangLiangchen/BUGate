@@ -163,7 +163,8 @@
         },
         "excluded_runtime_directories": {
           "const": [
-            ".bugate/runtime"
+            ".bugate/runtime",
+            ".bugate/write.lock"
           ]
         }
       },

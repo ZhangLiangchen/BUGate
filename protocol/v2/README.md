@@ -2,15 +2,15 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Protocol `2.1.0-dev.1`, Python `bugate-core 2.1.0a1`, and DSH bundle `2.1.0-dev.1`
+Protocol `2.2.0-dev.1`, TypeScript `@bugate/core 2.2.0-dev.1`, and DSH bundle `2.2.0-dev.1`
 have separate version identities. Every task locks the exact protocol digest. This directory is the canonical package resource;
-wheel construction includes these exact bytes. `manifest.yaml` and
+Node package construction includes these exact bytes. `manifest.yaml` and
 `reason_codes.yaml` use JSON syntax, which is valid YAML 1.2.
 
 The Schemas listed in `manifest.yaml` use Draft 2020-12, validated by pinned
-`jsonschema==4.23.0`. Artifact content is
+`ajv@8.17.1`. Artifact content is
 strictly typed by `artifact_type`. MethodSpec defines quality, not a workflow.
-The Python evaluator returns deterministic, semantic-review and runtime
+The shared TypeScript evaluator returns deterministic, semantic-review and runtime
 dimensions separately. The adapter must inject `render.content` unchanged.
 
 Task initialization accepts a JSON Profile. Paths in Profile sources are relative
@@ -68,11 +68,30 @@ cross-references and current semantic-review requirements whenever supplied.
 Included adversarial findings must map to actual cases. Unresolved in-scope
 findings and residual risks prevent design completion. An out-of-scope residual
 references a recorded non-executable suggestion and carries no in-scope
-requirement/risk references; it does not block completion. Independent review requires named artifact
-`producer` values distinct from `reviewer`; this is provenance, not authenticated identity.
+requirement/risk references; it does not block completion. Independent review requires durable DSH Team host observations for the actual author and reviewer executions, distinct execution roles and an observable context policy. Names and imported model fields do not prove independence.
 Optional models are not implicit default requirements. Their schema and negative
 controls live alongside the ordinary v2 tests.
 
-Examples are generated and schema-checked by `tests/v2/test_core.py`; fixtures and
-execution logs live in temporary external SUT directories. Ordinary operations
-have no Memory Bus dependency.
+Node tests generate neutral temporary fixtures and execution logs. Ordinary operations have no Memory Bus dependency.
+
+`Profile.team_review_policy` fixes finite source-backed perspectives, fresh/declared context, a bounded round limit and whether cross-checking is required. The native inline `bugate_publish_artifact` tool binds actual model tool output and exact live Team membership; path imports do not acquire authorship. `HostObservation` references the final output digest, precise binding and evaluator identity. It retains raw call and received-message facts plus canonical digests. Observed execution separation is distinct from semantic review quality and is not a guarantee of cognitive independence.
+
+Review input snapshots use each review target’s upstream dependency closure: exact binding/evaluator, Profile sources, scope/plan, relevant design artifacts, implementation bytes and only explicitly referenced execution evidence/files. They exclude reviews, observations/settlements, claims, assessments, drafts, suggestions, history and unrelated downstream execution/report/knowledge/diagnosis. This prevents a review hashing itself. Changing relevant inputs invalidates old reviews. Cross-checks reference immutable prior opinions and actual received Team messages; unresolved blocking findings remain visible. A Team task marked complete or a message accepted never constitutes valid review. Ordinary CLI imports cannot mint host observations. Local managed observation does not protect against same-permission filesystem/process tampering.
+
+Host provenance uses two-stage publication: `HostObservation.status=published` records durable output and observations but cannot authorize. At an awaited lifecycle seam, the adapter reads and flushes the final DSH `tool/result`, then publishes an immutable `HostSettlement`. Missing final output, cancellation, timeout and failure remain incomplete. Recovery settles from durable session facts, never Lead-local state.
+
+The native observation channel is signed by an Ed25519 private key held only in the plugin process. The configured filesystem provider persists only its public-key pin. Signatures bind task/workspace, operation and the complete context digest; the CLI verifies an existing pin and exposes no authority-creation command. Ordinary model JSON and a self-supplied environment token cannot mint provenance. Historical public keys/signatures remain for recovery verification; same-permission direct key/file rewriting remains outside the assurance.
+
+Native semantic-review tool arguments must carry explicit, current target digests;
+the publisher cannot silently replace null or stale references with the latest
+artifact. `AssessmentResult.review_assurance` separately exposes each opinion’s
+host observation/settlement references, observed execution independence and
+semantic conclusion with their respective limits. An accepted opinion is not a
+claim of proven cognitive independence or correctness.
+
+Target revisions do not erase genuine unresolved blocking findings. Within the
+same scope and related target IDs, preserve historical independent opinions until
+an exact original-review/finding disposition has actual peer-message provenance
+and source-backed counterevidence. Historical opinions can support that disposition
+but cannot authorize changed current inputs. Previously evidenced dispositions
+remain closed without requiring consensus.

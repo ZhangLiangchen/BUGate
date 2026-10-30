@@ -1,73 +1,50 @@
-[简体中文](README.zh-CN.md)
+# DeepSeek Harness integration
 
-# DeepSeek Harness adapter
+English | [简体中文](README.zh-CN.md)
 
-The native `@bugate/deepseek-harness` bundle targets DSH **0.2.2-alpha.2**, verified
-against official source commit `f3803c96974ad4a94195fb97e5c637e9c2a3afe3`.
-It uses the shared Python core **2.1.0a1** and canonical protocol **2.1.0-dev.1**.
-This is the sole current product adapter. Release assets and verification
-records are indexed in the [documentation guide](../../docs/README.md); local
-builds do not publish or replace releases.
+DSH is BUGate's only product host. The Cordis plugin and unified Node CLI consume
+the same TypeScript core. Protocol v2 remains the sole machine authority; DSH
+owns Agent execution, official Team collaboration and bounded lifecycle work.
 
-See [installation and usage](../../docs/DEEPSEEK_HARNESS.md),
-[plugin configuration](plugin/README.md), and [runtime tests](tests/README.md).
+Install the finite standalone Node package into an explicit external project and
+isolated DSH profile using the [installation guide](../../docs/DEEPSEEK_HARNESS.md).
+The bundle consumes the official Team profile patch before registering BUGate.
+Do not combine a second independently enabled copy of the Team profile; an
+installation must resolve exactly one Team service and tool set. Package ownership,
+interrupted recovery, rollback and removal are handled by the Node installer.
+Existing task facts and unrelated profiles are preserved.
 
-`plugin/src/index.ts` implements real Cordis `apply(ctx, config)`. Awaited
-`agent/created` and `agent/pre-step` prepare core context; synchronous
-`systemPrompt.context.text` returns the validated core render verbatim.
-`tools/pre-execute` obtains a current assessment and task lease; synchronous
-`tools.guard` can only add a denial. Task-wide epochs invalidate old tickets and
-contexts after managed operations. `agent/turn-stopping` re-assesses explicitly
-submitted claims with retry, elapsed-time and unchanged-gap limits.
+Create a source-backed Profile and a new task with the installed `bugate init`.
+The Profile fixes requirement/risk denominators and, where needed, finite review
+perspectives and their source-backed necessity. Use actual user request receipts
+to establish finite scope, source-backed propositions and observable Oracles,
+then publish design artifacts before governed implementation. Scope revisions
+within the locked denominator require current user choice; changing denominators
+requires an explicit new Profile version and a new task.
 
-All Python calls use configured filesystem and subprocess providers. Opaque
-filesystem target keys are never paths. Bundle resources and absolute installed
-Python executables require an explicit host-to-execution-world mapping; unmapped
-browser or remote worlds fail with an actionable capability error. Workspace
-paths are resolved and contained before mapping to subprocess paths. The adapter
-validates the core's finite filesystem witness against provider-read raw bytes,
-source files and the complete task file/directory set; a matching lock alone is
-not enough to establish a shared world. Only the write lock and the core-declared `.bugate/runtime/` control
-subtree are excluded. Session pins live in its `deepseek-harness/` directory. The tested
-execution provider is the official local provider on macOS; a mapped opaque
-provider also verifies that no target key is interpreted as a path. Unconfigured
-remote/browser execution is not claimed.
+Use native `bugate_publish_artifact` for actual inline author/reviewer output.
+Ordinary path imports preserve unknown/imported authorship. Have the official
+Team create required members, coordinate tasks, read the exact artifacts, exchange
+opinions and evidence, and publish their own cross-check dispositions. BUGate
+validates real host provenance, context policy, author/reviewer separation,
+current input/output bindings and final execution settlement. Team task complete
+and accepted messages do not constitute quality acceptance.
 
-The supported guard scope is registered write/edit/str_replace_editor/bash and
-BUGate mutation/execution tools. Other host tools require host policy/classification.
-External processes or a principal controlling the same filesystem can change
-facts outside a managed lease; hashes and session pins do not create a security
-boundary against that principal. Ordinary imported evidence cannot become
-host-observed execution. `bugate_run_test` invokes the core's one-shot execution
-capture and awaits durable evidence before returning its result.
+The native plugin handles exact binding, prepared context, model admission,
+managed tool tickets, actual configured process execution and evidence publication.
+It never interprets arbitrary shell commands as safe test intent or assumes a
+parent's local guard is inherited. Each member, fork, preset and resumed Agent
+checks its binding independently. Auxiliary work and bounded diagnosis remain
+separate from required scenarios and non-executable suggestions.
 
-Real-runtime tests use official DSH services and a deterministic LLM fixture.
-They prove runtime integration, lifecycle behavior and real local command
-execution. They do not claim live-model business analysis quality.
+Node validation/collection runs through the actual configured subprocess world;
+provider filesystem witnesses must agree. Stop/cancel/dispose drain managed work;
+unsettled or failed review outputs do not authorize. Team's shared cwd and advisory
+write scopes are not filesystem isolation. The assurance is local managed-host
+observation, not same-permission tamper resistance or cognitive independence.
 
-An awaited `agent/request` refresh runs again before admission. If a sibling
-changes task facts during subsequent model preparation, the official
-`llm/stream` seam rejects the request before the model receives missing or stale
-protocol context. It does not rewrite the immutable DSH request.
-
-Acceptance scope is a first-class `ScopeContract`, consumed unchanged through
-core context and one-shot execution admission. `bugate_scope` exposes the current
-contract and host-captured user request receipts; `bugate_record_scope` records
-source-backed drafts with compare-and-swap revisions. Each configured execution
-is checked against the current scope, inventory plan, allowed environment and
-activity. Expected scope/plan digests are rechecked by the collector before
-starting the process. Auxiliary commands require a declared activity id; a
-diagnostic activity also requires a current related failure and finite budget.
-
-`bugate_record_suggestion` stores advisory descriptions only. Suggestions do not
-change the authorization snapshot, become executable plans or trigger completion
-rework. Completion of acceptance execution and functional requirement verification
-are separate claims; an observed product failure remains a failure. Reports list
-the actual finite scope and cannot claim overall product safety.
-
-User request capture is awaited at primary-session input seams. DSH tags initial
-subagent prompts as user messages, so the adapter checks persisted subagent origin
-and does not promote model-authored delegation into user authority. Fork-inherited
-events are not recaptured; BUGate rework has its own message source. Children and
-cold sessions independently read the current scope and plan. Host permissions
-and existing tool denials remain authoritative.
+See [plugin configuration and boundaries](plugin/README.md),
+[actual verification categories](tests/README.md), and
+[canonical protocol](../../protocol/v2/README.md). Deterministic-model real-runtime
+results and any live-model results are reported separately; inspect the current
+migration report for actual commands and exact artifact identities.

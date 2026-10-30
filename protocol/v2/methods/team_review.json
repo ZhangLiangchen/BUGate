@@ -1,0 +1,28 @@
+{
+  "apiVersion": "bugate.io/v2",
+  "kind": "MethodSpec",
+  "id": "team_review",
+  "version": "2.2.0-dev.1",
+  "objective": "Validate finite Profile-required review perspectives with actual DSH official Team authorship, context and durable output bound to exact artifacts and acyclic inputs.",
+  "quality_dimensions": [
+    "observed_execution_independence",
+    "semantic_review_quality",
+    "artifact_binding",
+    "cross_check_disposition"
+  ],
+  "required_outputs": [
+    "semantic_review",
+    "HostObservation",
+    "HostSettlement"
+  ],
+  "recommended_considerations": [
+    "Derive perspectives and propositions from the Profile, never a fixed role or model matrix.",
+    "Use official Team members, task CAS and messages; record fresh/fork context and observed limitations.",
+    "Record original opinions and evidence, cross-check disagreements through Team messages, and preserve unresolved findings; bounded rework does not require consensus.",
+    "Observe the local host trust boundary: messages accepted and Team tasks complete are not review validity; same-permission tampering is outside the assurance.",
+    "Carry unresolved source-bound findings across related target revisions. Link each disposition to the exact original review digest and finding ID; keep historical disposition distinct from current-input authorization."
+  ],
+  "hard_constraint_refs": [
+    "core-quality-invariants"
+  ]
+}

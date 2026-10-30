@@ -57,3 +57,12 @@ create immutable revisions, preserve failures and require fresh plan/claim
 assessment. A changed claim never inherits old authorization. Reports state the
 actual agreed scope and separate execution closure, functional results, blockers
 and suggestions. See [scope examples](../ACCEPTANCE_SCOPE.md).
+
+Official DSH Agent Team review uses Profile-declared necessary perspectives.
+The host captures author/reviewer identity, Team membership, execution and input
+context. Fresh/fork status and execution separation are observable facts, not a
+claim of cognitive independence. A review requires a persisted host observation
+and successful final tool settlement, exact current artifact/input bindings and
+source-backed semantic content. Team task completion and message acceptance are
+not review acceptance. Disagreements and dispositions remain traceable; imported
+JSON and reviewer names cannot manufacture host provenance.

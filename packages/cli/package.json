@@ -1,0 +1,27 @@
+{
+  "name": "@bugate/cli",
+  "version": "2.2.0-dev.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "bin": {
+    "bugate": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bugate/core": "2.2.0-dev.1",
+    "@bugate/install": "2.2.0-dev.1"
+  },
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "license": "MIT"
+}
