@@ -52,12 +52,12 @@
     "Out-of-scope suggestions are non-executable and never block completion or require rework.",
     "Do not reduce scope, assertions or failure cases to obtain a pass; scope changes require traceable direct user input.",
     "Scope contracts never override host permissions, approvals or tool safety boundaries.",
-    "Host review provenance comes only from actual DSH Team tool execution; imported JSON, reviewer names, Team task completion and message acceptance do not establish a completed review.",
-    "Persist review output and host observation before authorization. Current authors and reviewers must be separate actual Team member executions; fresh-required policies reject fork context.",
-    "Preserve raw review findings, counterevidence and cross-check dispositions. Unresolved blocking opinions remain blockers; consensus and majority do not replace business Oracles.",
+    "When Profile.team_review_policy or Profile.quality_requirements.independent_review requires Team/independent review, quality authorization requires actual DSH Team provenance; imported JSON, reviewer names, Team task completion and message acceptance do not prove completed review.",
+    "When the Profile requires Team/independent review, persist output and host observation before review authorization; authors and reviewers must be separate actual Team executions, and fresh-required policies reject fork context.",
+    "For Profile-required Team review, preserve raw findings, counterevidence and dispositions. Unresolved in-scope blocking opinions remain blockers; consensus and majority never replace business Oracles.",
     "Review input changes, cross-task receipts and replayed execution identities invalidate review authorization. A changed denominator requires a new Profile and task.",
-    "A published HostObservation alone never authorizes. Only an immutable HostSettlement from the durably flushed final DSH tool/result establishes completed output. Cancellation, timeout, missing settlement and non-success result do not complete review.",
-    "Changing target digests cannot erase an unresolved in-scope blocking Team opinion. Preserve genuine historical findings for the same scope and related target IDs until an exact evidenced disposition; a historical opinion used for disposition never authorizes changed current inputs."
+    "A published HostObservation alone cannot authorize Profile-required Team/independent review. Await an immutable HostSettlement from the durably flushed final DSH tool/result; cancellation, timeout, missing settlement and non-success result do not complete that review.",
+    "For Profile-required Team review, target digest changes cannot erase unresolved in-scope blocking opinions. Preserve genuine historical findings for the same scope and related target IDs until exact evidenced disposition; historical opinions do not authorize changed current inputs."
   ],
   "hard_constraint_set": "core-quality-invariants",
   "quality_models": {

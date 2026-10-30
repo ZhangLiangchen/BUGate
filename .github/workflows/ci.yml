@@ -32,7 +32,9 @@ jobs:
       - name: Copy official host runtime outside the denied checkout
         run: |
           mkdir -p "$RUNNER_TEMP/dsh-runtime"
-          npm install --prefix "$RUNNER_TEMP/dsh-runtime" --ignore-scripts --save-exact @deepseek-ai/dsh@0.2.2-alpha.2 pnpm@11.28.5
+          cd "$RUNNER_TEMP/dsh-runtime"
+          npm install --ignore-scripts --save-exact @deepseek-ai/dsh@0.2.2-alpha.2 pnpm@11.28.5
+          npm ci --ignore-scripts --no-audit --no-fund
       - name: Installed lifecycle and runtime with OS source and Python denial
         run: |
           node tests/integration_install/accept_package.mjs \
