@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
+import {readFile,writeFile,readdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {host,FixtureModel,SessionId,toolResponse,textResponse,requestText,createUserMessage} from './host.mjs';
@@ -44,7 +44,7 @@ export class TeamModel extends FixtureModel {
  route(options){return requestText(options).match(/You are teammate "([^"]+)"/)?.[1]??'lead';}
  enqueue(member,...steps){const q=this.queues.get(member)??[];q.push(...steps);this.queues.set(member,q);}
  async *stream(options){
-  this.requests.push(options);const member=this.route(options),phase=this.phases.find(p=>p.member===member&&!p.finished&&!p.emittedDone);
+  this.requests.push(options);const member=this.route(options),phase=this.phases.find(p=>p.member===member&&!p.finished&&!p.failed&&!p.emittedDone);
   let response;
   if(phase&&requestText(options).includes(phase.token)){
    phase.request_indexes.push(this.requests.length-1);const next=phase.steps.shift();response=await next(options);
@@ -59,13 +59,38 @@ export class TeamModel extends FixtureModel {
  * or review completion; actual call/result/turn and durable signed facts do. */
 export function createTeamPhaseDriver(h,lead,{task,budgetMs=300000}={}){
  const phases=[],waits=[],driverId=randomUUID();let sequence=0;
- const pending=name=>phases.find(p=>p.member===name&&!p.finished&&!p.emittedDone);
+ const pending=name=>phases.find(p=>p.member===name&&!p.finished&&!p.failed&&!p.emittedDone);
  const activate=(name,text)=>{const p=pending(name);return p?text+'\n'+p.token:text;};
  const step=(name,args)=>()=>{const value=structuredClone(typeof args==='function'?args():args);if(name==='spawn_teammate')value.prompt=activate(value.name,value.prompt);if(name==='send_message')value.message=activate(value.target,value.message);return toolResponse(name,value,'team-call-'+driverId+'-'+(++sequence));};
- function queue(member,...steps){const token='BUGATE_FIXTURE_PHASE_'+randomUUID(),phase={id:phases.length+1,member,token,marker:token+' FINISHED',steps:[],calls:[],request_indexes:[],emittedDone:false,finished:false,allowInterrupted:false};phase.steps=[...steps,()=>textResponse(phase.marker+'; quality remains subject to persisted BUGate facts.')];phases.push(phase);h.model.phases.push(phase);return phase;}
+ function queue(member,...steps){const token='BUGATE_FIXTURE_PHASE_'+randomUUID(),phase={id:phases.length+1,member,token,marker:token+' FINISHED',steps:[],calls:[],request_indexes:[],emittedDone:false,finished:false,failed:false,allowInterrupted:false};phase.steps=[...steps,()=>textResponse(phase.marker+'; quality remains subject to persisted BUGate facts.')];phases.push(phase);h.model.phases.push(phase);return phase;}
  const row=name=>h.ctx.agentTeams.listMembers(lead).find(m=>m.name===name);
  async function log(name,durable=false){const member=row(name);if(!member)return;const id=SessionId(String(member.id)),session=h.ctx.sessions.get(id);if(session){if(durable)assert.equal(await h.ctx.sessions.flush(session),true,'The exact phase session must flush before advancing');return{member,events:session.snapshotEvents(),source:durable?'live_flushed':'live'};}const value=await h.ctx.sessionQuery.readSession(id);return{member,events:value.events,source:'persisted_read'};}
  const textOf=message=>(message?.content??[]).filter(c=>c.type==='text').map(c=>c.text).join('\n');
+ // Reconstruct the actual official inbox. A canceled splice without this exact
+ // message is unrelated; a disposal cancellation is never substituted for the
+ // earlier turn error which left this phase pending and unable to advance.
+ function activation(phase,events){
+  const inbox={'next-turn':[],'next-step':[]};let state;
+  for(const event of events){
+   if(event.type!=='agent/inbox/spliced')continue;
+   const splice=event.data,removed=inbox[splice.target].splice(splice.start,splice.removedCount??0,...splice.inserted);
+   for(const message of splice.inserted)if(textOf(message).includes(phase.token)&&(!phase.activationMessageId||String(message.id)===phase.activationMessageId))state={message_id:String(message.id),insert_seq:event.seq,insert_time:event.time,status:'pending'};
+   if(state&&removed.some(message=>String(message.id)===state.message_id))Object.assign(state,{status:splice.outcome==='canceled'?'canceled':'claimed',remove_seq:event.seq,remove_time:event.time});
+  }
+  if(state){const admitted=events.find(e=>e.type==='user/message'&&String(e.data.id)===state.message_id);if(admitted)state.admitted_seq=admitted.seq;}
+  return state;
+ }
+ async function rejectStoppedPhase(phase,current,audit){
+  const input=activation(phase,current.events);if(!input)return;
+  audit.activation=input;
+  const terminal=current.events.findLast(e=>e.type==='turn/end'&&e.seq>input.insert_seq&&['error','aborted'].includes(e.data.reason.kind));
+  // A running member may still be draining an expected cancellation. Evaluate
+  // its real completed/interrupted boundary first; do not replace it with idle.
+  if(input.status!=='canceled'&&(!terminal||current.member.status!=='inactive'))return;
+  const durable=await log(phase.member,true);audit.activation=activation(phase,durable.events);audit.persistence=durable.source;
+  audit.terminal_event=terminal??null;audit.calls=phase.calls;audit.unexecuted=phase.calls.length===0;
+  throw Error('Actual phase '+phase.id+' for '+phase.member+' cannot advance: '+JSON.stringify({activation:audit.activation,terminal_event:audit.terminal_event}));
+ }
  function phaseBoundary(phase,events){
   const outputs=phase.calls.map(call=>({call,invocation:events.find(e=>e.type==='tool/call'&&String(e.data.callId)===call.id),result:events.find(e=>e.type==='tool/result'&&String(e.data.message.toolCallId)===call.id)}));
   if(outputs.some(x=>!x.invocation||!x.result))return;
@@ -89,12 +114,12 @@ export function createTeamPhaseDriver(h,lead,{task,budgetMs=300000}={}){
   }return verified;
  }
  async function waitPhase(phase){
-  if(phase.finished)return;const started=Date.now(),audit={kind:'phase',phase_id:phase.id,member:phase.member,token:phase.token,started_at:new Date(started).toISOString(),budget_ms:budgetMs,status:'waiting'};waits.push(audit);
-  try{while(Date.now()-started<budgetMs){const current=await log(phase.member),boundary=current&&phaseBoundary(phase,current.events);if(boundary){const durable=await log(phase.member,true),confirmed=phaseBoundary(phase,durable.events);assert.ok(confirmed,'Flushed session must retain the exact phase boundary');audit.calls=confirmed.outputs.map(x=>({id:x.call.id,name:x.call.name,call_seq:x.invocation.seq,result_seq:x.result.seq}));audit.turn_end={seq:confirmed.end.seq,time:confirmed.end.time,turn:confirmed.end.data.turn};audit.publications=await publications(confirmed,String(durable.member.id));audit.persistence=durable.source;audit.other_members=h.ctx.agentTeams.listMembers(lead).filter(m=>m.name!==phase.member);audit.status=confirmed.interrupted?'interrupted_not_authorized':'observed';phase.finished=true;phase.steps=[];return audit;}await new Promise(r=>setTimeout(r,100));}throw Error('Actual phase '+phase.id+' for '+phase.member+' did not complete within '+budgetMs+'ms');}
-  catch(error){audit.status='failed';audit.error=String(error);throw error;}finally{audit.finished_at=new Date().toISOString();audit.elapsed_ms=Date.now()-started;}
+  if(phase.finished)return;assert.equal(phase.failed,false,'A failed phase cannot be retried or replayed');const started=Date.now(),audit={kind:'phase',phase_id:phase.id,member:phase.member,token:phase.token,started_at:new Date(started).toISOString(),budget_ms:budgetMs,status:'waiting'};waits.push(audit);
+  try{while(Date.now()-started<budgetMs){const current=await log(phase.member),boundary=current&&phaseBoundary(phase,current.events);if(boundary){const durable=await log(phase.member,true),confirmed=phaseBoundary(phase,durable.events);assert.ok(confirmed,'Flushed session must retain the exact phase boundary');audit.calls=confirmed.outputs.map(x=>({id:x.call.id,name:x.call.name,call_seq:x.invocation.seq,result_seq:x.result.seq}));audit.activation=activation(phase,durable.events);audit.turn_end={seq:confirmed.end.seq,time:confirmed.end.time,turn:confirmed.end.data.turn};audit.publications=await publications(confirmed,String(durable.member.id));audit.persistence=durable.source;audit.other_members=h.ctx.agentTeams.listMembers(lead).filter(m=>m.name!==phase.member);audit.status=confirmed.interrupted?'interrupted_not_authorized':'observed';phase.finished=true;phase.steps=[];return audit;}if(current)await rejectStoppedPhase(phase,current,audit);await new Promise(r=>setTimeout(r,100));}throw Error('Actual phase '+phase.id+' for '+phase.member+' did not complete within '+budgetMs+'ms');}
+  catch(error){phase.failed=true;phase.steps=[];audit.status='failed';audit.error=String(error);throw error;}finally{audit.finished_at=new Date().toISOString();audit.elapsed_ms=Date.now()-started;}
  }
- async function send(agent,text){assert.equal(String(agent.session.id),String(lead.session.id),'Only the real Lead receives direct fixture input');const phase=pending('lead');assert.ok(phase,'Lead actions require an explicitly queued phase');agent.followup(createUserMessage({content:[{type:'text',text:activate('lead',text)}],source:{kind:'user'}}));await waitPhase(phase);}
- async function settle(){for(const phase of phases.filter(p=>!p.finished))await waitPhase(phase);}
+ async function send(agent,text){assert.equal(String(agent.session.id),String(lead.session.id),'Only the real Lead receives direct fixture input');const phase=pending('lead');assert.ok(phase,'Lead actions require an explicitly queued phase');const message=createUserMessage({content:[{type:'text',text:activate('lead',text)}],source:{kind:'user'}});phase.activationMessageId=String(message.id);agent.followup(message);await waitPhase(phase);}
+ async function settle(){for(const phase of phases.filter(p=>!p.finished&&!p.failed))await waitPhase(phase);}
  const runMember=async(name,message)=>{if(!pending(name))queue(name);queue('lead',step('send_message',{target:name,message}));await send(lead,'Resume the named member through the official Team inbox.');await settle();};
  async function sendPeer(sender,target,message){
   const previous=await log(target),watermark=previous?.events.at(-1)?.seq??-1,requestWatermark=h.model.requests.length;queue(sender,step('send_message',{target,message}));const senderPhase=pending(sender);if(sender==='lead')await send(lead,'Send the bounded Team evidence exchange.');else await runMember(sender,'Send the prepared peer evidence exchange.');
@@ -128,8 +153,19 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
  function publish(value,update=false){return step('bugate_publish_artifact',()=>({artifact:typeof value==='function'?value():value,...(update?{expected_digest:records.get((typeof value==='function'?value():value).id).digest}:{})}));}
  function received(member,reviewId){const agent=memberAgent(member),ref=records.get(reviewId);assert.ok(agent);const event=agent.session.snapshotEvents().findLast(e=>e.type==='user/message'&&e.data.source.kind==='agent-message'&&JSON.stringify(e.data.content).includes(ref.digest));assert.ok(event,'The official Team message must have entered the actual target session');return event.data.id;}
  function cross(member,peer){return[{review_ref:{id:peer,digest:records.get(peer).digest},disposition:'accepted',finding_ids:['zero-boundary'],reasoning:'Compared the peer opinion with SRC1 and exact O1. The inventory includes an explicit test_zero case with input zero and expected zero, alongside positive and negative cases; the apparent omission is refuted by current evidence.',evidence_refs:['SRC1','O1','inventory'],message_id:String(received(member,peer))}];}
+ async function assessCurrent(id,type,evidenceIds=[]){
+  // Each is a distinct actual model/tool step. The host owns write ordering and
+  // re-prepares after the write; no out-of-band task mutation races a notice.
+  const phase=queue('lead',step('bugate_status',{}),step('write',()=>{
+   const statusCall=phase.calls.find(c=>c.name==='bugate_status'),result=observations.find(o=>o.call===statusCall.id&&o.agent===String(lead.session.id)).result,current=observed(result);
+   const claim={apiVersion:'bugate.io/v2',kind:'Claim',id,claim_type:type,task_id:current.task_id,workspace_id:current.workspace_id,statement:'Current exact source, Team review and actual observations support only this scoped claim.',requirement_ids:['R1'],artifact_ids:[...records.keys()],evidence_ids:evidenceIds,workspace_snapshot:current.workspace_snapshot,scope_ref:current.scope_ref,plan_ref:current.plan_ref,known_gaps:[],open_questions:[]};
+   return{file_path:join(task,'claims',id+'.json'),content:JSON.stringify(claim)};
+  }),step('bugate_assess',{claim:'claims/'+id+'.json'}));
+  await send(lead,'Observe current facts, write the exact claim and assess '+id+' in distinct sequential native steps.');
+  const writeCall=phase.calls.find(c=>c.name==='write'),writeResult=observations.find(o=>o.call===writeCall.id&&o.agent===String(lead.session.id)).result;assert.equal(writeResult.isError,false,JSON.stringify(writeResult));assert.equal(writeResult.value,true);
+  const assessCall=phase.calls.find(c=>c.name==='bugate_assess'),result=observations.find(o=>o.call===assessCall.id&&o.agent===String(lead.session.id)).result;const data=observed(result);assert.equal(data.verdict,'satisfied',JSON.stringify(result));return data;
+ }
  try{
-  await mkdir(join(task,'.bugate/drafts'),{recursive:true});
   queue('lead',step('inspect_contract',{}),step('bugate_scope',{}),step('write',()=>({file_path:join(task,'.bugate/drafts/scope.json'),content:JSON.stringify(scopeTemplate(scopeState.requests.find(r=>r.message.includes(requirement.trim()))))})),step('bugate_record_scope',{input:'.bugate/drafts/scope.json'}));
   await send(lead,requirement+'Review only the accepted finite branches using the Profile-required oracle and coverage perspectives.');
   assert.ok(scopeRef?.digest,JSON.stringify(observations));
@@ -152,14 +188,10 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
   await runMember('oracle-reviewer','Recheck the evidence and record your own disposition, preserving the original dissent in history.');
   // Each member marks only its official Team task complete. Assessment remains separate.
   for(const [name,id]of[['oracle-reviewer','task-1'],['coverage-reviewer','task-2']]){queue(name,step('team_task_update',{task_id:id,expected_revision:1,action:'claim'}),step('team_task_update',{task_id:id,expected_revision:2,action:'complete'}));await runMember(name,'Close your actual Team task after publishing evidence; this does not authorize BUGate quality.');}
-  const status=cli('status','--task',task);assert.equal(status.invocation,'completed',JSON.stringify(status));
-  const claim={apiVersion:'bugate.io/v2',kind:'Claim',id:'team-design',claim_type:'test_design_complete',task_id:status.data.task_id,workspace_id:status.data.workspace_id,statement:'The exact source-backed design has both required real Team perspectives and evidenced disagreement disposition.',requirement_ids:['R1'],artifact_ids:[...records.keys()],evidence_ids:[],workspace_snapshot:status.data.workspace_snapshot,scope_ref:status.data.scope_ref,plan_ref:status.data.plan_ref,known_gaps:[],open_questions:[]};
-  await writeFile(join(task,'claims/team-design.json'),JSON.stringify(claim));queue('lead',step('bugate_assess',{claim:'claims/team-design.json'}));await send(lead,'Assess the current exact design after durable cross-review; do not infer pass from Team completion.');
-  const assessment=observations.filter(x=>x.tool==='bugate_assess').at(-1)?.result.value;assert.equal(assessment?.data?.verdict,'satisfied',JSON.stringify(assessment??observations));
+  const assessment=await assessCurrent('team-design','test_design_complete');
   // Only after the pre-code design is accepted may the Lead implement the
   // requested exact assertions. This changes upstream bytes and requires fresh
   // review of the revised inventory; old opinions remain historical.
-  await mkdir(join(task,'tests'),{recursive:true});
   const inventory=templates(scopeRef)[2];inventory.revision='2';
   queue('lead',step('write',{file_path:join(task,'tests/runner.mjs'),content:runner}),publish(inventory,true));
   await send(lead,'Implement the accepted positive, zero and negative assertions and publish the revised inventory with actual implementation bytes.');await settle();
@@ -174,7 +206,6 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
   await sendPeer('coverage-reviewer','oracle-reviewer',JSON.stringify({review_ref:{id:'review-coverage',digest:records.get('review-coverage').digest},finding_id:'zero-boundary',counterevidence:['SRC1','O1','inventory'],position:'All three required branches have exact assertion code; preserve this finite scope.'}));
   queue('oracle-reviewer',step('inspect_contract',{}),publish(()=>review('review-oracle','oracle',{resolved:true,cross:cross('oracle-reviewer','review-coverage')}),true));
   await runMember('oracle-reviewer','Record the bounded final cross-check for the actual revised implementation.');
-  async function assessCurrent(id,type,evidenceIds=[]){const current=cli('status','--task',task);assert.equal(current.invocation,'completed',JSON.stringify(current));const claim={apiVersion:'bugate.io/v2',kind:'Claim',id,claim_type:type,task_id:current.data.task_id,workspace_id:current.data.workspace_id,statement:'Current exact source, Team review and actual observations support only this scoped claim.',requirement_ids:['R1'],artifact_ids:[...records.keys()],evidence_ids:evidenceIds,workspace_snapshot:current.data.workspace_snapshot,scope_ref:current.data.scope_ref,plan_ref:current.data.plan_ref,known_gaps:[],open_questions:[]};await writeFile(join(task,'claims',id+'.json'),JSON.stringify(claim));queue('lead',step('bugate_assess',{claim:'claims/'+id+'.json'}));await send(lead,'Assess '+id+' against the exact current observed facts.');const result=observations.filter(o=>o.tool==='bugate_assess').at(-1)?.result.value;assert.equal(result?.data?.verdict,'satisfied',JSON.stringify(result));return result.data;}
   const implementedDesign=await assessCurrent('team-implemented-design','test_design_complete');
   queue('lead',step('bugate_run_test',{command_id:'normal'}));await send(lead,'Execute the configured three exact assertions only after current implemented design and Team reviews are accepted.');await settle();
   const execution=observations.filter(o=>o.tool==='bugate_run_test').at(-1)?.result.value;assert.equal(execution?.invocation,'completed',JSON.stringify(execution));assert.equal(execution.data.execution.status,'passed');assert.equal(execution.data.execution.cases.length,3);assert.deepEqual(JSON.parse(await readFile(join(task,'evidence',execution.data.id+'.json'),'utf8')),execution.data,'Actual execution evidence is durable before tool success');
@@ -184,7 +215,7 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
   assert.ok(receipts.some(r=>r.execution.member_name==='oracle-reviewer'&&r.execution.context_mode==='fresh'&&r.execution.parent_session_id===String(lead.session.id)));
   assert.ok(receipts.some(r=>r.messages.length>0));assert.ok(receipts.some(r=>r.subject_ref.digest===firstOpinion.digest),'Original dissent observation retained');
   assert.deepEqual(JSON.parse(await readFile(join(task,'artifacts/review-oracle.json'),'utf8')),records.get('review-oracle'),'Completed tool output has already been published');
-  const report={status:'PASS',fixture_runtime_config:{maxContextBytes:16000,memberSettleDeadlineMs:300000,timeoutRelay},mode:'deterministic-model-real-runtime',live_model:'NOT_RUN',task,policy,versions:{node:process.version,dsh:'0.2.2-alpha.2',team:'0.2.2-alpha.2',cordis:'4.0.6-alpha.1'},members:h.ctx.agentTeams.listMembers(lead),tasks:h.ctx.agentTeams.listTasks(lead),original_opinion:firstOpinion,current_opinions:[records.get('review-oracle'),records.get('review-coverage')],assessment:assessment.data,implemented_design:implementedDesign,execution:execution.data,requirement_verification:verified,receipts,model_requests:model.requests.length,observations,waits:waitObservations};
+  const report={status:'PASS',fixture_runtime_config:{maxContextBytes:16000,memberSettleDeadlineMs:300000,timeoutRelay},mode:'deterministic-model-real-runtime',live_model:'NOT_RUN',task,policy,versions:{node:process.version,dsh:'0.2.2-alpha.2',team:'0.2.2-alpha.2',cordis:'4.0.6-alpha.1'},members:h.ctx.agentTeams.listMembers(lead),tasks:h.ctx.agentTeams.listTasks(lead),original_opinion:firstOpinion,current_opinions:[records.get('review-oracle'),records.get('review-coverage')],assessment,implemented_design:implementedDesign,execution:execution.data,requirement_verification:verified,receipts,model_requests:model.requests.length,observations,waits:waitObservations};
   if(negativeChecks)report.negative_controls=await negativeChecks({h,lead,task,project,records,observations,queue,step,publish,review,send,runMember,sendPeer,received,settle,policy,timeoutRelay});
   // Restart the entire Cordis host, not only a Team member. Historical signed
   // outputs are recomputed from persisted session results under a new host key.

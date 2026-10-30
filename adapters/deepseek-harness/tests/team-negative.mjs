@@ -1,6 +1,6 @@
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
-import {readFile,readdir,writeFile,mkdir,cp} from 'node:fs/promises';
+import {readFile,readdir,mkdir,cp} from 'node:fs/promises';
 import {join} from 'node:path';
 import {cli,initializeProject,cliEntrypoint} from './workflow-node.mjs';
 
@@ -53,12 +53,15 @@ export async function negativeTeamChecks(api){
  // The Lead authors a file claiming the reviewer's label, then a real teammate
  // imports it. Import/publication is not authorship; Team tasks remain completed.
  const imported=review('review-oracle','oracle',{resolved:true});
- await writeFile(join(task,'.bugate/drafts/lead-written-review.json'),JSON.stringify(imported));
+ const leadDraftPhase=queue('lead',step('write',{file_path:join(task,'.bugate/drafts/lead-written-review.json'),content:JSON.stringify(imported)}));
+ await send(lead,'Write the prepared review draft through the configured filesystem tool as the Lead; do not attribute its authorship to a teammate.');
+ const leadDraftWrite=observations.find(o=>o.tool==='write'&&o.call===leadDraftPhase.calls.find(c=>c.name==='write')?.id);assert.equal(leadDraftWrite?.agent,String(lead.session.id));assert.equal(leadDraftWrite?.result.isError,false,JSON.stringify(leadDraftWrite));assert.equal(leadDraftWrite.result.value,true);
  const old=records.get('review-oracle');
  queue('oracle-reviewer',step('bugate_record_artifact',{input:'.bugate/drafts/lead-written-review.json',expected_digest:old.digest}));
  await runMember('oracle-reviewer','Import the prepared material as imported material. Do not claim host authorship for this file.');
  checkpoint('Lead-written path import cannot impersonate a completed Team review despite matching reviewer label and completed Team task',['REVIEW_PROVENANCE_MISSING']);
  const importObservation=observations.filter(o=>o.tool==='bugate_record_artifact').at(-1);assert.equal(importObservation.result.value.invocation,'completed',JSON.stringify(importObservation));
+ checks.at(-1).lead_write=leadDraftWrite;checks.at(-1).member_import=importObservation;
  // Different reviewer string on the same actual author cannot satisfy independence.
  queue('lead',publish(()=>review('review-renamed-self','oracle',{resolved:true})));await send(lead,'Publish a same-agent review with a different label as a negative control.');await settle();
  checkpoint('Renamed self-review is not an independent actual Team execution',['REVIEW_INDEPENDENCE_MISSING']);
@@ -91,12 +94,15 @@ export async function negativeTeamChecks(api){
  // A changed upstream artifact invalidates all old reviews, even if task state
  // or a model still reports completion.
  const revised=structuredClone(records.get('brief'));delete revised.digest;revised.revision='2';revised.content.boundaries.push('Zero is asserted as its own explicitly required branch.');
- await writeFile(join(task,'.bugate/drafts/imported-brief.json'),JSON.stringify(revised));queue('lead',step('bugate_record_artifact',{input:'.bugate/drafts/imported-brief.json',expected_digest:records.get('brief').digest}));await send(lead,'Import changed upstream material with unknown authorship for the stale-review and missing-author negative controls.');await settle();const importedBrief=observations.filter(o=>o.tool==='bugate_record_artifact'&&o.result.value?.data?.id==='brief').at(-1);assert.equal(importedBrief.result.value.invocation,'completed');records.set('brief',importedBrief.result.value.data);
+ const importedBriefPhase=queue('lead',step('write',{file_path:join(task,'.bugate/drafts/imported-brief.json'),content:JSON.stringify(revised)}),step('bugate_record_artifact',{input:'.bugate/drafts/imported-brief.json',expected_digest:records.get('brief').digest}));await send(lead,'Write and then import changed upstream material through the configured tools for the stale-review and missing-author negative controls; an ordinary file import does not establish original authorship.');await settle();const importedBriefWrite=observations.find(o=>o.tool==='write'&&o.call===importedBriefPhase.calls.find(c=>c.name==='write')?.id);assert.equal(importedBriefWrite?.agent,String(lead.session.id));assert.equal(importedBriefWrite?.result.isError,false,JSON.stringify(importedBriefWrite));assert.equal(importedBriefWrite.result.value,true);const importedBrief=observations.find(o=>o.tool==='bugate_record_artifact'&&o.call===importedBriefPhase.calls.find(c=>c.name==='bugate_record_artifact')?.id);assert.equal(importedBrief?.result.value?.data?.id,'brief');assert.equal(importedBrief.result.value.invocation,'completed');records.set('brief',importedBrief.result.value.data);
  checkpoint('Changed artifact and dependency snapshot invalidate prior completed reviews',['REVIEW_BINDING_STALE','SEMANTIC_REVIEW_STALE']);
+ checks.at(-1).lead_write=importedBriefWrite;checks.at(-1).ordinary_import=importedBrief;
  queue('oracle-reviewer',step('inspect_contract',{}),publish(()=>review('review-missing-author','oracle',{resolved:true})));await runMember('oracle-reviewer','Review the exact newly imported artifact without inventing an author identity; report that publication/import is not authorship.');checkpoint('A genuine independent member cannot prove independence when the reviewed artifact author is unknown',['REVIEW_AUTHOR_MISSING']);const afterFurtherRevision=cli('status','--task',task);assert.ok(!afterFurtherRevision.data.findings.some(f=>f.code==='REVIEW_DISSENT_UNRESOLVED'&&f.basis?.includes(originalDissent.id)),'An already evidenced historical disposition must not reopen just because another target changed');
  // Ordinary CLI cannot turn arbitrary model JSON into a host-published receipt.
  const denied=cli('artifact','publish','--task',task);assert.equal(denied.invocation,'invalid_input');assert.ok(denied.errors.some(e=>['HOST_PROVENANCE_REQUIRED','REVIEW_PROVENANCE_MISSING'].includes(e.code)),JSON.stringify(denied));checks.push({name:'Ordinary CLI cannot mint host provenance',result:denied});
  // Cross-task replay has a different workspace identity and cannot be admitted.
+ // This separate workspace has no mounted Agent or in-flight preparation. The
+ // original active task is read only while copying deliberate invalid replay input.
  const replayProject=join(project,'replay-project'),replayTask=await initializeProject(replayProject,{teamPolicy:policy});
  for(const directory of ['artifacts','.bugate/host-observations','.bugate/host-settlements','.bugate/host-authorities']){await mkdir(join(replayTask,directory),{recursive:true});await cp(join(task,directory),join(replayTask,directory),{recursive:true});}
  const replay=cli('status','--task',replayTask);assert.equal(replay.invocation,'completed',JSON.stringify(replay));assert.ok(replay.data.findings.some(f=>f.code==='REVIEW_PROVENANCE_MISSING'),JSON.stringify(replay));assert.equal(replay.data.implementation_ready,false);checks.push({name:'Copied real host receipts from another task cannot authorize a new workspace',workspace_id:replay.data.workspace_id,findings:replay.data.findings});
