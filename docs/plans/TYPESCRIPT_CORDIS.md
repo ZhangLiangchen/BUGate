@@ -6,14 +6,22 @@ English | [简体中文](TYPESCRIPT_CORDIS.zh-CN.md)
 **Implementation:** IN_PROGRESS, authorized 2026-10-30 from `eb2ae6769f16a4c0b7d542795bcc95cbbcbfd654`. Final installed Team acceptance and cutover are not yet claimed.
 **Authority:** The user's explicit decision in this task: DSH remains the only
 host; move BUGate fully to TypeScript within Cordis and record the next development
-plan. This supersedes the earlier suggestion to retain Python as the target
-architecture, without weakening existing quality or evidence invariants.
+plan. That earlier single-target decision is now scoped by the 2026-10-30
+[dual-branch decision](PYTHON_FIELD_TRIAL.md): improve Python on its own branch
+for the first field trial, while this full TypeScript track continues independently.
+Neither track is cancelled or rolled back; quality and evidence invariants remain.
 
 The 2026-10-30 execution request authorizes phases 0–5. This working plan now
 records implementation; earlier documentation-only/NOT_RUN wording described
 the prior planning task. [Protocol v2](../../protocol/v2/manifest.yaml) remains
 the sole machine authority. The new `2.2.0-dev.1` protocol versions the explicitly
 authorized Team provenance enhancement; this plan is not a default SUT matrix.
+
+**Track boundary:** this plan governs `codex/typescript-cordis-team`. Python
+retirement, no-Python packaging and cutover below apply only to the TS package
+and branch, not to the independent Python improvement. TS acceptance does not
+automatically replace the Python field-trial installation. The Python trial
+does not wait for completion of these migration phases.
 
 ## Context and historical baseline
 
@@ -228,7 +236,7 @@ require the not-yet-built TS evaluator to authorize its own migration.
 | 2. Execution, storage, collector | Port workspace identity, atomic publication/CAS/locks and process/report capture; design execution-world, CPU/IO and cleanup boundaries. | Neutral real commands for success/failure/skip/xfail, missing report, timeout/cancel; necessary concurrent-writer/path/world mismatch and durable-return checks. | No false completion on interruption; correct configured world and bounded cleanup, unsupported mappings explicitly rejected. |
 | 3. Cordis native integration | Replace PythonBridge with shared TS services at verified native seams; preserve context/admission, provenance and bounded rework; reuse DSH official Agent Team for multi-perspective review with persisted provenance. | [Real DSH test categories](../../adapters/deepseek-harness/tests/README.md): deterministic fixtures drive actual tools/temporary SUT commands for scope, suggestions, failures, aux/diagnosis, recovery/children/isolation and cancellation, plus the review success/counterexamples above. | Actual host calls demonstrate enforcement, review provenance/independence/binding and evidence barriers. Mock contexts alone do not close the phase; live-model checks, if run, are separate. |
 | 4. Node packaging and CI | Port first-party build/install/doctor/distribution/test entry points; produce finite npm assets, canonical projections and matching usage/CI. | Clean installation with source reads denied and Python unavailable; digest/resources; applicable repeat/doctor/upgrade/rollback/remove/ownership checks; installed real DSH workflows including multi-perspective cross-review. Run declared CI checks and report actual platforms. | Exact assets work independently; checksums/docs agree. No platform claim from TS alone, including Windows. |
-| 5. Python retirement and cutover | Retire product bridge/bootstrap/wheelhouse, first-party Python tooling and production fallback after replacements are verified. | Finite package/dependency inspection; product install/runtime/verification without Python; explicit old-binding rejection, retained history and owned uninstall/rollback checks. | One supported TS product path, no implicit Python requirement. Historical releases remain intact; later publication has its own authorized delivery. |
+| 5. TS-branch Python retirement and cutover | Retire this branch's bridge/bootstrap/wheelhouse, first-party Python tooling and production fallback after replacements are verified; retain the independent Python track. | Finite package/dependency inspection; product install/runtime/verification without Python; explicit old-binding rejection, retained history and owned uninstall/rollback checks. | One supported TS product path, no implicit Python requirement. Historical releases remain intact; later publication has its own authorized delivery. |
 
 ## Version, evidence and installation cutover
 
@@ -241,7 +249,7 @@ Phase 0 defines read-only historical inspection without adding automatic format
 conversion, cross-version authorization or selective evidence reuse. Existing
 within-task scope invalidation and Profile-denominator rules remain effective.
 
-The final product has no Python bootstrap/wheelhouse requirement. Existing user
+The final TS product has no Python bootstrap/wheelhouse requirement. Existing user
 Python environments remain until an explicit owned-uninstall action, limited to
 proven BUGate-owned state. Preserve SUT dependencies, task facts and unrelated
 configuration; do not scan or clean global environments. Node/npm installation
@@ -252,9 +260,9 @@ alone establishes none of these properties.
 
 | Option | Decision / tradeoff |
 |---|---|
-| Keep Python core plus TS bridge as target | Delivered baseline, superseded as the target by the user; remains maintainable until cutover. |
+| Python core plus TS native plugin | Accepted as an independent improvement track under the 2026-10-30 decision; its verified delivery serves the first field trial. |
 | Shared TS core + Node CLI + native Cordis | **Accepted.** One first-party language/toolchain and eventual removal of Python bootstrap/bridge; requires preserving runtime/persistence semantics and effect boundaries. |
-| Permanent dual runtime or generic multi-host layer | Not adopted; outside this decision. Temporary development comparison is sufficient. |
+| Permanent dual runtime in one package or generic multi-host layer | Not adopted. Independent source branches and separately verified packages are not a dual-evaluator runtime. |
 
 Risks are serialization/validator drift, local-world assumptions, event-loop
 blocking, cancellation/drain loss, weaker persistence, synthetic user authority

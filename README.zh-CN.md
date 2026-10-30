@@ -4,9 +4,11 @@
 
 BUGate 定义有限验收任务的质量要求，并评估已记录的事实能否支持验收声明。它将用户目标、业务要求、可观测 Oracle、必需用例与真实执行证据关联起来，让 Agent 能够说明：**本轮覆盖了什么、实际发生了什么、可以得出什么结论。**
 
-**DeepSeek Harness（DSH）是唯一产品宿主。** BUGate 提供宿主无关的 TypeScript 核心、版本化协议和统一 Node CLI；原生 DSH 插件消费这些评估结果，约束受治理执行和完成声明。DSH 负责 Agent loop、工具、调度、会话生命周期和有界返工。
+**DeepSeek Harness（DSH）是唯一产品宿主。** 本 TypeScript 分支提供宿主无关的 TypeScript 核心、版本化协议和统一 Node CLI；原生 DSH 插件消费这些评估结果，约束受治理执行和完成声明。DSH 负责 Agent loop、工具、调度、会话生命周期和有界返工。
 
 **实施状态：** 2026-10-30 请求已授权 `2.2.0-dev.1` TypeScript 核心/工具链与官方 DSH Agent Team 互审，当前实施及验证进行中。精确安装包通过 runtime 和独立安装验收后才切换；历史 Python 发布保持不变。详见 [TypeScript/Cordis 计划](docs/plans/TYPESCRIPT_CORDIS.zh-CN.md)。
+
+**开发分支（2026-10-30）：** Python 改进版与全面 TypeScript 版在独立分支/worktree 开发。首轮实战优先使用通过自身 runtime 与安装验收的 Python 改进版；TS 独立继续，不自动替换实战安装。详见[分支边界与 Python 实战计划](docs/plans/PYTHON_FIELD_TRIAL.zh-CN.md)。本 checkout 的实现与安装说明描述 TS 路线，不代表 Python 改进版已交付或实战已完成。
 
 ## 围绕用户目标确定验收范围
 

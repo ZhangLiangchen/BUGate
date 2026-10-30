@@ -8,7 +8,7 @@ business requirements, observable Oracles, required cases and actual execution
 evidence, so an Agent can explain **what was covered, what happened and what can
 be concluded**.
 
-**DeepSeek Harness (DSH) is the only product host.** BUGate supplies a host-neutral
+**DeepSeek Harness (DSH) is the only product host.** This TypeScript branch supplies a host-neutral
 TypeScript core, a versioned protocol and a unified Node CLI. Its native DSH plugin uses
 those evaluations to constrain managed execution and completion. DSH owns the
 Agent loop, tools, scheduling, session lifecycle and bounded rework.
@@ -17,6 +17,14 @@ Agent loop, tools, scheduling, session lifecycle and bounded rework.
 Team review are in progress under the 2026-10-30 request. Final cutover depends
 on exact-package runtime and independent-install evidence. Historical Python
 releases remain unchanged. See the [TypeScript/Cordis plan](docs/plans/TYPESCRIPT_CORDIS.md).
+
+**Development tracks (2026-10-30):** the improved Python edition and full TypeScript
+edition develop on separate branches/worktrees. The first field trial will use
+the improved Python edition after its own runtime and installation acceptance;
+TS development continues independently and does not automatically replace that
+installation. See [branch boundaries and Python field trial](docs/plans/PYTHON_FIELD_TRIAL.md).
+This checkout's implementation and installation instructions describe the TS track,
+not a delivered Python improvement or a completed field trial.
 
 ## Acceptance follows the user's goal
 

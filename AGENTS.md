@@ -10,7 +10,7 @@ for that tool.
 ## Authority and layout
 
 - `protocol/v2/` is the sole machine authority: Schemas, MethodSpec, rules and reason codes.
-- `packages/core/` owns the shared TypeScript evaluator; `packages/cli/` owns the unified Node CLI.
+- On this TypeScript branch, `packages/core/` owns the shared evaluator; `packages/cli/` owns the unified Node CLI. The separate Python track retains its Python core/CLI layout.
 - `adapters/deepseek-harness/` is the native adapter and real-runtime acceptance.
 - `views/skills/bugate/` is the small entry projection; the build appends canonical MethodSpec resources and seals their digest.
 - `packaging/` owns the explicit resource inventory and standalone installer.
@@ -24,7 +24,14 @@ as reviewable task artifacts; no memory daemon or hook is required.
 
 ## Engineering invariants
 
-The user has accepted the [TypeScript/Cordis roadmap](docs/plans/TYPESCRIPT_CORDIS.md):
+The 2026-10-30 [branch decision](docs/plans/PYTHON_FIELD_TRIAL.md) keeps the improved
+Python edition and full TypeScript edition on independent branches/worktrees.
+Prioritize one field trial with the verified Python improvement; TS work continues
+independently. Preserve both histories and uncommitted work. Keep packages,
+installation targets, tasks and evidence distinct; TS acceptance does not authorize
+replacing the Python trial installation.
+
+This branch follows the accepted [TypeScript/Cordis roadmap](docs/plans/TYPESCRIPT_CORDIS.md):
 shared TypeScript core, unified Node CLI and native Cordis service/plugin, with
 DSH remaining the only host. Implementation is in progress under the 2026-10-30 execution request. The protocol
 and evaluator are versioned `2.2.0-dev.1`; cutover requires exact-package runtime
