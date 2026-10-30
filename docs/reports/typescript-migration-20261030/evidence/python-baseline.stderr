@@ -1,0 +1,53 @@
+test_core (unittest.loader._FailedTest.test_core) ... ERROR
+test_scope (unittest.loader._FailedTest.test_scope) ... ERROR
+test_semantics (unittest.loader._FailedTest.test_semantics) ... ERROR
+
+======================================================================
+ERROR: test_core (unittest.loader._FailedTest.test_core)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_core
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/Users/zhangliangchen/PycharmProjects/BUGate/tests/v2/test_core.py", line 14, in <module>
+    from bugate import API_VERSION
+ModuleNotFoundError: No module named 'bugate'
+
+
+======================================================================
+ERROR: test_scope (unittest.loader._FailedTest.test_scope)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_scope
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/Users/zhangliangchen/PycharmProjects/BUGate/tests/v2/test_scope.py", line 10, in <module>
+    from bugate import API_VERSION
+ModuleNotFoundError: No module named 'bugate'
+
+
+======================================================================
+ERROR: test_semantics (unittest.loader._FailedTest.test_semantics)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_semantics
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/Users/zhangliangchen/PycharmProjects/BUGate/tests/v2/test_semantics.py", line 7, in <module>
+    from bugate.errors import BugateError
+ModuleNotFoundError: No module named 'bugate'
+
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+FAILED (errors=3)
