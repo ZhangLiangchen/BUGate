@@ -8,7 +8,7 @@ import {cli,initializeProject,cliEntrypoint} from './workflow-node.mjs';
 /** Counterexamples use real official Team executions; invalid imported material
  * and deliberate mutations remain in their temporary task as negative evidence. */
 export async function negativeTeamChecks(api){
- const {h,lead,task,project,records,observations,queue,step,publish,review,runMember,sendPeer,received,settle,policy}=api,checks=[];
+ const {h,lead,task,project,records,observations,queue,step,publish,review,runMember,sendPeer,received,settle,policy,timeoutRelay}=api,checks=[];
  const codes=()=>{const value=cli('status','--task',task);assert.equal(value.invocation,'completed',JSON.stringify(value));return value.data.findings.map(x=>x.code);};
  const checkpoint=(name,expected)=>{const actual=codes();for(const code of expected)assert.ok(actual.includes(code),JSON.stringify({name,expected,actual}));checks.push({name,expected,observed_codes:[...new Set(actual)]});};
  // A failed publish with no durable output must not poison subsequent
@@ -24,6 +24,19 @@ export async function negativeTeamChecks(api){
  const forged=structuredClone(realReceipt.host_context);forged.artifact.id='forged-cli-author';forged.execution.arguments.artifact.id='forged-cli-author';
  const attempt=spawnSync(process.execPath,[cliEntrypoint,'artifact','publish','--task',task,'--host-observation-stdin','--json'],{encoding:'utf8',env:{...process.env,BUGATE_HOST_TOKEN:'self-selected-token'},input:JSON.stringify({token:'self-selected-token',context:forged})});
  const forgedResult=JSON.parse(attempt.stdout);assert.equal(attempt.status,2);assert.ok(forgedResult.errors.some(e=>e.code==='REVIEW_PROVENANCE_MISSING'),JSON.stringify(forgedResult));checks.push({name:'Self-supplied CLI token and actual-shaped model JSON cannot mint a host signature',result:forgedResult});
+ // Delay only the exact successful real CLI publication's output. The genuine
+ // product collector, not the model or fixture, creates the timeout outcome.
+ assert.ok(timeoutRelay);
+ queue('timeout-reviewer',step('inspect_contract',{}),publish(()=>review(timeoutRelay.target,'coverage')));
+ queue('lead',step('spawn_teammate',{name:'timeout-reviewer',description:'Actual collector timeout after durable publication',prompt:'Inspect the current contract and publish your own exact coverage opinion. The fixture delays only the real CLI response after durable publication; do not claim timeout output completed.',context:'fresh'}));
+ await send(lead,'Create the real Team publication timeout control.');await settle();
+ const timedResult=observations.find(o=>o.tool==='bugate_publish_artifact'&&o.result.value?.invocation==='timeout'&&o.result.value.errors?.some(e=>e.code==='CORE_TIMEOUT'));assert.ok(timedResult,'The unchanged real Node collector must produce CORE_TIMEOUT');
+ await runMember('timeout-reviewer','Resume through the official Team inbox, read persisted timeout facts, and do not publish a replacement opinion.');
+ const fault=JSON.parse(await readFile(timeoutRelay.marker,'utf8')),actualOutput=JSON.parse(await readFile(timeoutRelay.output,'utf8'));assert.equal(fault.child_exit.code,0);assert.equal(fault.child_exit.signal,null);assert.equal(actualOutput.invocation,'completed');assert.equal(actualOutput.data.id,timeoutRelay.target);
+ const timedReceipts=await Promise.all((await readdir(join(task,'.bugate/host-observations'))).map(async file=>JSON.parse(await readFile(join(task,'.bugate/host-observations',file),'utf8')))),timedObservation=timedReceipts.find(r=>r.subject_ref.id===timeoutRelay.target);assert.ok(timedObservation,'The real CLI published an observation before its response timed out');assert.deepEqual(timedObservation.subject_ref,fault.subject_ref);assert.equal(timedObservation.status,'published');
+ const timedSettlement=JSON.parse(await readFile(join(task,'.bugate/host-settlements','settlement-'+timedObservation.id+'.json'),'utf8'));assert.equal(timedSettlement.status,'timeout');assert.equal(timedSettlement.result_event.data.message.toolCallId,timedResult.call);assert.ok(JSON.stringify(timedSettlement.result_event).includes('CORE_TIMEOUT'));
+ for(const pid of [fault.relay_pid,fault.child_pid])assert.throws(()=>process.kill(pid,0),{code:'ESRCH'},'Actual collector and child must have exited after drain');
+ const timedStatus=cli('status','--task',task);assert.ok(timedStatus.data.findings.some(f=>f.code==='REVIEW_PROVENANCE_MISSING'&&f.subject===timeoutRelay.target),'A timed-out review publication must never authorize current review');checks.push({name:'Actual Team publication timeout after durable output cannot complete review; real collector drains and settlement preserves timeout',fault,relay:timeoutRelay,result:timedResult,observation:timedObservation,settlement:timedSettlement,findings:timedStatus.data.findings,observed_relay_to_result_ms:timedSettlement.result_event.time-Date.parse(fault.started_at),processes_exited:[fault.relay_pid,fault.child_pid]});
  // A changed digest must not make an earlier genuine unresolved objection
  // vanish. The original member need not agree with the evidenced peer disposition.
  queue('oracle-reviewer',step('inspect_contract',{}),publish(()=>{const a=review('review-revision-dissent','oracle',{open:true});a.content.findings[0].id='revision-zero-boundary';return a;}));

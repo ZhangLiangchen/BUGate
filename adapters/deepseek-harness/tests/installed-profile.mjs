@@ -16,9 +16,9 @@ export async function installedProfileMount(profileDir,modules){
  for(const id of ['tool-subagent','tool-subagent-control','tool-subagent-fork']){const rows=flat.filter(e=>e.id===id);assert.ok(rows.length>0&&rows.every(e=>e.disabled===true),`Official Team profile disables direct ${id}`);}
  const resolution=await createRuntimeResolution({installAnchor,profile,home:dirname(dirname(profileDir))});
  const identities=[];
- return {profile,entries:selected,identities,async mount(h,{executionCommands,maxContextBytes}={}){
+ return {profile,entries:selected,identities,async mount(h,{executionCommands,maxContextBytes,coreEntrypoint}={}){
   await h.ctx.plugin(PluginPackages,{resolution});
-  for(const entry of selected){const req=createRequire(join(profileDir,'package.json'));const resolved=req.resolve(entry.name);const imported=await import(pathToFileURL(resolved).href);const config={...entry.config,...(entry.id==='bugate'&&executionCommands?{executionCommands}:{}),...(entry.id==='bugate'&&maxContextBytes?{maxContextBytes}:{})};identities.push({id:entry.id,name:entry.name,module:resolved,config});await h.ctx.plugin(imported.default??imported,config);}
+  for(const entry of selected){const req=createRequire(join(profileDir,'package.json'));const resolved=req.resolve(entry.name);const imported=await import(pathToFileURL(resolved).href);const config={...entry.config,...(entry.id==='bugate'&&executionCommands?{executionCommands}:{}),...(entry.id==='bugate'&&maxContextBytes?{maxContextBytes}:{}),...(entry.id==='bugate'&&coreEntrypoint?{coreEntrypoint}:{})};identities.push({id:entry.id,name:entry.name,module:resolved,config});await h.ctx.plugin(imported.default??imported,config);}
   assert.ok(h.ctx.agentTeams,'Composed profile actually activated official Team service');
  }};
 }

@@ -3,7 +3,38 @@ import {mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {host,FixtureModel,SessionId,toolResponse,textResponse,send,requestText} from './host.mjs';
-import {initializeProject,cli,requirement,scopeTemplate,templates,runner} from './workflow-node.mjs';
+import {initializeProject,cli,cliEntrypoint,requirement,scopeTemplate,templates,runner} from './workflow-node.mjs';
+
+/** Transparent test relay: the actual CLI produces every byte and exit status.
+ * Only one exact successful review publication has its real output withheld so
+ * the unchanged product collector reaches its real default 30-second timeout. */
+export async function createTimeoutRelay(project){
+ const entry=join(project,'team-timeout-relay.mjs'),marker=join(project,'team-timeout-publication.json'),output=join(project,'team-timeout-publication.stdout'),target='review-timeout-after-publish';
+ const source=`import {spawn} from 'node:child_process';
+import {readFile,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+const actual=${JSON.stringify(cliEntrypoint)},target=${JSON.stringify(target)},marker=${JSON.stringify(marker)},output=${JSON.stringify(output)};
+const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);const input=Buffer.concat(chunks),argv=process.argv.slice(2);
+let fault=false;try{fault=argv[0]==='artifact'&&argv[1]==='publish'&&JSON.parse(input.toString()).context.artifact.id===target;}catch{}
+const started=Date.now(),child=spawn(process.execPath,[actual,...argv],{stdio:['pipe','pipe','pipe']}),stdout=[],stderr=[];
+child.stdin.on('error',()=>{});child.stdin.end(input);
+child.stdout.on('data',bytes=>{if(fault)stdout.push(bytes);else process.stdout.write(bytes);});
+child.stderr.on('data',bytes=>{if(fault)stderr.push(bytes);else process.stderr.write(bytes);});
+const outcome=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',(code,signal)=>resolve({code,signal}));});
+if(fault&&outcome.code===0){
+ const bytes=Buffer.concat(stdout),value=JSON.parse(bytes.toString()),task=argv[argv.indexOf('--task')+1];
+ if(value.invocation!=='completed'||value.data?.id!==target)throw Error('Fault injection requires actual successful target publication');
+ const artifact=JSON.parse(await readFile(task+'/artifacts/'+target+'.json','utf8'));
+ if(artifact.digest!==value.data.digest)throw Error('Actual target publication was not durable');
+ await writeFile(output,bytes);
+ await writeFile(marker,JSON.stringify({target,actual_cli:actual,relay_pid:process.pid,child_pid:child.pid,child_exit:outcome,started_at:new Date(started).toISOString(),published_at:new Date().toISOString(),stdout_sha256:'sha256:'+createHash('sha256').update(bytes).digest('hex'),subject_ref:{id:artifact.id,digest:artifact.digest},withhold_ms:45000,product_default_timeout_ms:30000},null,2)+'\\n');
+ await new Promise(resolve=>setTimeout(resolve,45000));
+}
+if(fault){process.stdout.write(Buffer.concat(stdout));process.stderr.write(Buffer.concat(stderr));}
+if(outcome.signal)process.kill(process.pid,outcome.signal);else process.exitCode=outcome.code;
+`;
+ await writeFile(entry,source);return{entry,marker,output,target,actual_cli:cliEntrypoint,source_digest:'sha256:'+createHash('sha256').update(source).digest('hex'),withhold_ms:45000,product_default_timeout_ms:30000};
+}
 
 /** Only model bytes are deterministic. Team membership, tool execution, peer inbox,
  * persistence, provider IO, CAS and subprocesses are the installed official runtime. */
@@ -16,18 +47,30 @@ export class TeamModel extends FixtureModel {
 const observed=(value)=>{assert.equal(value.isError,false,JSON.stringify(value));if(value.value?.invocation)assert.equal(value.value.invocation,'completed',JSON.stringify(value));return value.value?.data??value.value;};
 export async function teamAcceptance(project,plugin,{evidencePath,mount,negativeChecks}={}){
  const model=new TeamModel(),policy={perspectives:[{id:'oracle',proposition_ids:['P1'],necessity:'Check the source-defined exact result and the disputed zero boundary.',source_refs:['SRC1']},{id:'coverage',proposition_ids:['P1'],necessity:'Check that required positive, zero and negative branches exercise the declared Oracle.',source_refs:['SRC1']}],context:'fresh_required',max_rounds:6,cross_check_required:true};
- const task=await initializeProject(project,{teamPolicy:policy}),persistence=join(project,'sessions'),h=await host({model,persistence,team:mount?'infrastructure':true});
- let lead;const observations=[],records=new Map();let scopeState,scopeRef,sequence=0;
+ const task=await initializeProject(project,{teamPolicy:policy}),persistence=join(project,'sessions'),timeoutRelay=negativeChecks?await createTimeoutRelay(project):undefined,h=await host({model,persistence,team:mount?'infrastructure':true});
+ let lead;const observations=[],waitObservations=[],records=new Map();let scopeState,scopeRef,sequence=0;
  h.ctx.on('tools/result',(exec,result)=>{observations.push({agent:String(exec.agent?.session.id),tool:exec.name,call:String(exec.callId),result});if(result.isError||result.value?.invocation!=='completed')return;const data=result.value.data;if(exec.name==='bugate_scope')scopeState=data;if(exec.name==='bugate_record_scope')scopeRef={id:data.id,revision:data.revision,digest:data.digest};if(exec.name==='bugate_publish_artifact')records.set(data.id,data);});
  h.ctx.tools.register({name:'inspect_contract',description:'Read the generated Profile-declared source and exact current review artifacts through the configured filesystem provider.',parameters:{type:'object',properties:{},additionalProperties:false},output:{schema:{type:'object'},render:(_a,v)=>[{type:'text',text:JSON.stringify(v)}]},execute:async()=>{const source=new TextDecoder().decode(await h.ctx.fs.readBytes(await h.ctx.fs.resolve(join(project,'requirements.md'))));const artifacts={};for(const name of ['brief','testability','inventory']){try{artifacts[name]=JSON.parse(new TextDecoder().decode(await h.ctx.fs.readBytes(await h.ctx.fs.resolve(join(task,'artifacts',name+'.json')))));}catch{}}const implementations={};for(const c of artifacts.inventory?.content?.cases??[]){const path=c.implementation?.path;if(!path||implementations[path])continue;try{const bytes=await h.ctx.fs.readBytes(await h.ctx.fs.resolve(join(task,path)));implementations[path]={content:new TextDecoder('utf-8',{fatal:true}).decode(bytes),digest:'sha256:'+createHash('sha256').update(bytes).digest('hex')};}catch(error){if(!['ENOENT','FS_NOT_FOUND'].includes(error?.code))throw error;}}return{source,artifacts,implementations};}});
  h.ctx.tools.register({name:'write',description:'Write a generated draft through configured filesystem provider.',parameters:{type:'object',properties:{file_path:{type:'string'},content:{type:'string'}},required:['file_path','content'],additionalProperties:false},output:{schema:{type:'boolean'},render:()=>[]},execute:async args=>{await h.ctx.fs.writeText(await h.ctx.fs.resolve(args.file_path),args.content);return true;}});
  const executionCommands={normal:{argv:[process.execPath,'tests/runner.mjs','logs/team.xml'],caseIds:['C1','C2','C3'],report:'logs/team.xml',purpose:'test',environmentId:'local-fixture'}};
- if(mount)await mount(h,{project,task,executionCommands,maxContextBytes:16000});else await h.ctx.plugin(plugin,{projectRoot:project,nodeExecutable:process.execPath,executionCommands,maxContextBytes:16000});
+ const runtimeConfig={executionCommands,maxContextBytes:16000,...(timeoutRelay?{coreEntrypoint:timeoutRelay.entry}:{})};
+ if(mount)await mount(h,{project,task,...runtimeConfig});else await h.ctx.plugin(plugin,{projectRoot:project,nodeExecutable:process.execPath,...runtimeConfig});
  lead=await h.ctx.agentLoop.create(SessionId('team-lead'),{provider:'fixture',model:'deterministic-team-fixture'},{cwd:task});
  const step=(name,args)=>()=>toolResponse(name,typeof args==='function'?args():args,'team-call-'+(++sequence));
  const queue=(member,...steps)=>model.enqueue(member,...steps,()=>textResponse('The bounded fixture step is complete; quality remains subject to BUGate assessment.'));
  const flush=async()=>{await h.ctx.sessions.flush(lead.session);};
- async function settle(){for(let i=0;i<4800;i++){const members=h.ctx.agentTeams.listMembers(lead);const running=members.filter(m=>m.status==='running'||m.status==='provisioning');if(!running.length){await flush();return;}await new Promise(r=>setTimeout(r,25));}throw Error('Actual Team failed to settle within fixture bound');}
+ async function settle(){
+  const started=Date.now(),budget=300000,deadline=started+budget;
+  const audit={id:waitObservations.length+1,started_at:new Date(started).toISOString(),budget_ms:budget,status:'waiting',initial_members:structuredClone(h.ctx.agentTeams.listMembers(lead)),unfinished_members:[]};waitObservations.push(audit);
+  try{
+   while(Date.now()<deadline){const members=h.ctx.agentTeams.listMembers(lead),running=members.filter(m=>m.status==='running'||m.status==='provisioning');audit.unfinished_members=running;
+    if(!running.length){audit.members_idle_at=new Date().toISOString();await flush();audit.status='settled';audit.final_members=members;return;}
+    await new Promise(r=>setTimeout(r,Math.min(25,Math.max(1,deadline-Date.now()))));
+   }
+   audit.status='timeout';throw Error('Actual Team failed to settle within the 300000ms fixture deadline');
+  }catch(error){if(audit.status==='waiting')audit.status='error';audit.error=String(error);throw error;}
+  finally{audit.finished_at=new Date().toISOString();audit.elapsed_ms=Date.now()-started;}
+ }
  const memberAgent=name=>{const row=h.ctx.agentTeams.listMembers(lead).find(m=>m.name===name);return row?h.ctx.agents.get(row.id):undefined;};
  const runMember=async(name,message)=>{queue('lead',step('send_message',{target:name,message}));await send(lead,'Resume the named member through the official Team inbox.');await settle();};
  const sendPeer=async(sender,target,message)=>{queue(sender,step('send_message',{target,message}));if(sender==='lead'){await send(lead,'Send the bounded Team evidence exchange.');await settle();}else await runMember(sender,'Send the prepared peer evidence exchange.');};
@@ -91,15 +134,15 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
   assert.ok(receipts.some(r=>r.execution.member_name==='oracle-reviewer'&&r.execution.context_mode==='fresh'&&r.execution.parent_session_id===String(lead.session.id)));
   assert.ok(receipts.some(r=>r.messages.length>0));assert.ok(receipts.some(r=>r.subject_ref.digest===firstOpinion.digest),'Original dissent observation retained');
   assert.deepEqual(JSON.parse(await readFile(join(task,'artifacts/review-oracle.json'),'utf8')),records.get('review-oracle'),'Completed tool output has already been published');
-  const report={status:'PASS',fixture_runtime_config:{maxContextBytes:16000},mode:'deterministic-model-real-runtime',live_model:'NOT_RUN',task,policy,versions:{node:process.version,dsh:'0.2.2-alpha.2',team:'0.2.2-alpha.2',cordis:'4.0.6-alpha.1'},members:h.ctx.agentTeams.listMembers(lead),tasks:h.ctx.agentTeams.listTasks(lead),original_opinion:firstOpinion,current_opinions:[records.get('review-oracle'),records.get('review-coverage')],assessment:assessment.data,implemented_design:implementedDesign,execution:execution.data,requirement_verification:verified,receipts,model_requests:model.requests.length,observations};
-  if(negativeChecks)report.negative_controls=await negativeChecks({h,lead,task,project,records,observations,queue,step,publish,review,runMember,sendPeer,received,settle,policy});
+  const report={status:'PASS',fixture_runtime_config:{maxContextBytes:16000,memberSettleDeadlineMs:300000,timeoutRelay},mode:'deterministic-model-real-runtime',live_model:'NOT_RUN',task,policy,versions:{node:process.version,dsh:'0.2.2-alpha.2',team:'0.2.2-alpha.2',cordis:'4.0.6-alpha.1'},members:h.ctx.agentTeams.listMembers(lead),tasks:h.ctx.agentTeams.listTasks(lead),original_opinion:firstOpinion,current_opinions:[records.get('review-oracle'),records.get('review-coverage')],assessment:assessment.data,implemented_design:implementedDesign,execution:execution.data,requirement_verification:verified,receipts,model_requests:model.requests.length,observations,waits:waitObservations};
+  if(negativeChecks)report.negative_controls=await negativeChecks({h,lead,task,project,records,observations,queue,step,publish,review,runMember,sendPeer,received,settle,policy,timeoutRelay});
   // Restart the entire Cordis host, not only a Team member. Historical signed
   // outputs are recomputed from persisted session results under a new host key.
   const beforeRestart=cli('status','--task',task);assert.equal(beforeRestart.invocation,'completed');
   await h.ctx.fiber.dispose();
   const recoveredModel=new TeamModel(),recovered=await host({model:recoveredModel,persistence,team:mount?'infrastructure':true}),recoveredResults=[];
   try{
-   if(mount)await mount(recovered,{project,task,executionCommands,maxContextBytes:16000});else await recovered.ctx.plugin(plugin,{projectRoot:project,nodeExecutable:process.execPath,executionCommands,maxContextBytes:16000});
+   if(mount)await mount(recovered,{project,task,...runtimeConfig});else await recovered.ctx.plugin(plugin,{projectRoot:project,nodeExecutable:process.execPath,...runtimeConfig});
    recovered.ctx.on('tools/result',(exec,result)=>recoveredResults.push({tool:exec.name,result}));
    const resumed=(await recovered.ctx.agents.resume({resumeSessionId:SessionId('team-lead'),agentOptions:{provider:'fixture',model:'deterministic-team-fixture'}})).agent;
    recoveredModel.enqueue('lead',()=>toolResponse('bugate_prepare',{},'cold-host-prepare'),()=>toolResponse('bugate_status',{},'cold-host-status'),()=>textResponse('Recomputed persisted facts without replacing historical provenance.'));
@@ -109,5 +152,5 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
    report.host_restart={before_snapshot:beforeRestart.data.workspace_snapshot,after_snapshot:afterRestart.data.workspace_snapshot,observations:recoveredResults,members:recovered.ctx.agentTeams.listMembers(resumed)};
   }finally{await recovered.ctx.fiber.dispose();}
   if(evidencePath)await writeFile(evidencePath,JSON.stringify(report,null,2)+'\n');return{report,task,persistence,records,cli,project};
- }catch(error){await writeFile(join(project,'team-failure.json'),JSON.stringify({message:String(error),observations,requests:model.requests.map(r=>({sessionId:r.sessionId,route:model.route(r)})),members:lead?h.ctx.agentTeams.listMembers(lead):[]},null,2));console.error('TEAM_FAILURE_ARTIFACT',join(project,'team-failure.json'));throw error;}finally{await h.ctx.fiber.dispose();}
+ }catch(error){await writeFile(join(project,'team-failure.json'),JSON.stringify({message:String(error),observations,waits:waitObservations,requests:model.requests.map(r=>({sessionId:r.sessionId,route:model.route(r)})),members:lead?h.ctx.agentTeams.listMembers(lead):[]},null,2));console.error('TEAM_FAILURE_ARTIFACT',join(project,'team-failure.json'));throw error;}finally{await h.ctx.fiber.dispose();}
 }
