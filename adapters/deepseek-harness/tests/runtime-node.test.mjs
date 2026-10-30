@@ -190,7 +190,7 @@ test('HC-10/11 AC-08/09 stale projections and deleted bindings invalidate prior 
  const f=await fixture();const copy=join(f.temporary,'installed-plugin');await mkdir(copy);
  for(const name of ['lib','resources','package.json'])await cp(fileURLToPath(new URL('../plugin/'+name,import.meta.url)),join(copy,name),{recursive:true});
  const {createRequire}=await import('node:module');const {dirname}=await import('node:path');const require=createRequire(new URL('../plugin/package.json',import.meta.url));
- for(const name of ['@deepseek-ai/dsh-llm','@bugate/core','@bugate/cli','ajv']){let root=dirname(require.resolve(name));for(;;){try{if(JSON.parse(await readFile(join(root,'package.json'),'utf8')).name===name)break;}catch{}const parent=dirname(root);assert.notEqual(parent,root,'package root for '+name);root=parent;}const target=join(copy,'node_modules',name);await mkdir(dirname(target),{recursive:true});await symlink(await realpath(root),target);}
+ for(const name of ['@deepseek-ai/cordis','@deepseek-ai/dsh-llm','@bugate/core','@bugate/cli','ajv']){let root=dirname(require.resolve(name));for(;;){try{if(JSON.parse(await readFile(join(root,'package.json'),'utf8')).name===name)break;}catch{}const parent=dirname(root);assert.notEqual(parent,root,'package root for '+name);root=parent;}const target=join(copy,'node_modules',name);await mkdir(dirname(target),{recursive:true});await symlink(await realpath(root),target);}
  await writeFile(join(copy,'resources/SKILL.md'),'tampered stale projection');
  const h=await host();t.after(()=>h.ctx.fiber.dispose());
  const imported=await import(pathToFileURL(join(copy,'lib/index.js')).href);

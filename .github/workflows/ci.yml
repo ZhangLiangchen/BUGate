@@ -22,7 +22,7 @@ jobs:
           npm test
           node scripts/check_distribution.mjs
       - name: Real official DSH runtime and Agent Team
-        run: node --test adapters/deepseek-harness/tests/core-service.test.mjs adapters/deepseek-harness/tests/runtime-node.test.mjs adapters/deepseek-harness/tests/team.test.mjs
+        run: npm run test:runtime
       - name: Build finite Node artifact
         run: |
           node packaging/build.mjs --out-dir "$RUNNER_TEMP/bugate-node-package"

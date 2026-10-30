@@ -14,6 +14,8 @@ import type {} from '@deepseek-ai/dsh-working-directory';
 import type { ToolDefinition, ToolExecution, ToolExecutionToken, JsonSchemaNode } from '@deepseek-ai/dsh-tools';
 import { Ajv2020, type ValidateFunction } from 'ajv/dist/2020.js';
 import { NodeCoreService } from './core-service.js';
+import { BugateService } from './service.js';
+export { BugateService } from './service.js';
 import type {} from '@deepseek-ai/dsh-experimental-agent-team';
 import type {} from '@deepseek-ai/dsh-session';
 import { BridgeError, failure, json, object, string, type CommandResult, type PreparedContext } from './contracts.js';
@@ -156,6 +158,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     operations.add(pending);
     try { return await pending; } finally { operations.delete(pending); }
   }
+  const service = new BugateService(ctx, (argv, task, signal) => call(argv, task, signal), maxContextBytes);
   async function verifyFilesystem(task: string, value: unknown, signal?: AbortSignal): Promise<void> {
     const validate = ajv.getSchema('https://bugate.io/v2/schemas/command_result.schema.json#/$defs/filesystem_manifest') as ValidateFunction<FilesystemManifest> | undefined;
     if (!validate || !validate(value)) throw new BridgeError('CORE_INVALID_RESPONSE', 'Core filesystem witness is missing or invalid');
@@ -305,10 +308,10 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
       if (await exists(sessionBindingPath, signal)) {
         if (await read(sessionBindingPath, signal) !== sessionBinding) throw new BridgeError('BINDING_DIGEST_MISMATCH', 'Persisted session binding differs; cold resume cannot silently change protocol or Profile');
       }
-      const result = await call(['protocol', 'prepare', '--task', task, '--max-bytes', String(maxContextBytes)], task, signal);
+      const result = await service.prepare(task, signal);
       if (result.invocation !== 'completed' || !preparedValidator(result.data)) throw new BridgeError('CONTEXT_UNAVAILABLE', JSON.stringify(result.errors));
       const value = result.data;
-      const current = await call(['status', '--task', task], task, signal);
+      const current = await service.status(task, signal);
       if (current.invocation !== 'completed') throw new BridgeError('CONTEXT_UNAVAILABLE', JSON.stringify(current.errors));
       const coreStatus = object(current.data);
       if (!isDeepStrictEqual(coreStatus.binding, filesystemBinding) || coreStatus.task_id !== value.workspace.task_id || coreStatus.workspace_id !== value.workspace.workspace_digest) throw new BridgeError('RUNTIME_UNSUPPORTED', 'Filesystem and subprocess providers disagree about the exact task binding; configure one execution world');
@@ -448,7 +451,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
         else if (!/^(implementation|tests)\//u.test(relative) && needsDesign) throw new BridgeError('PATH_NOT_MANAGED', 'Writes must target task artifacts, claims, evidence-input, .bugate/drafts, implementation or tests');
       }
       if (needsDesign) {
-        const status = await call(['status', '--task', task], task, exec.signal);
+        const status = await service.status(task, exec.signal);
         if (status.invocation !== 'completed' || object(status.data).implementation_ready !== true) throw new BridgeError('DESIGN_NOT_ACCEPTED', 'A current satisfied test_design_complete claim is required before implementation or governed tests');
       }
       tickets.set(exec.token, { task, epoch, generation: state.generation, allowed: true, ...authorization });
@@ -496,7 +499,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     ctx.tools.register(definition);
   }
   register('bugate_prepare', 'Prepare the current exact-bound quality protocol context.', {}, [], async (_args, _exec, state) => ({ apiVersion: 'bugate.io/v2', kind: 'CommandResult', operation: 'protocol.prepare', request_id: randomUUID(), invocation: 'completed', data: json(state.prepared), errors: [] }));
-  register('bugate_status', 'Read derived quality facts and assessment freshness.', {}, [], async (_args, exec, state) => call(['status', '--task', state.task], state.task, exec.signal));
+  register('bugate_status', 'Read derived quality facts and assessment freshness.', {}, [], async (_args, exec, state) => service.status(state.task, exec.signal));
   register('bugate_validate', 'Validate current task structure, references and deterministic rules.', {}, [], async (_args, exec, state) => call(['validate', '--task', state.task], state.task, exec.signal));
   register('bugate_scope', 'Read the active acceptance scope, its source receipts and history. Scope is the finite user objective, not a default test matrix.', {}, [], async (_args, exec, state) => call(['scope', 'show', '--task', state.task], state.task, exec.signal));
   register('bugate_check_scope', 'Check the current scope and plan references, conflicts and source gaps; structural validity does not establish semantic necessity.', {}, [], async (_args, exec, state) => call(['scope', 'check', '--task', state.task], state.task, exec.signal));
@@ -516,7 +519,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   });
   register('bugate_assess', 'Assess a persisted task-local claim; submit=true asks for bounded completion rework.', { claim: { type: 'string' }, submit: { type: 'boolean' } }, ['claim'], async (args, exec, state) => {
     const claim = await contained(state.task, string(args.claim, 'claim'), exec.signal);
-    const result = await call(['assess', '--task', state.task, '--claim', claim], state.task, exec.signal);
+    const result = await service.assess(state.task, claim, exec.signal);
     if (args.submit === true) { state.pendingClaim = claim; state.attempts = 0; state.reworkStart = Date.now(); state.lastGap = undefined; }
     if (exec.agent) await refresh(exec.agent, exec.signal);
     return result;
@@ -605,7 +608,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     const state = states.get(agent);
     if (!state?.pendingClaim || signal.aborted) return;
     await Promise.all([...operations]);
-    const result = await call(['assess', '--task', state.task, '--claim', state.pendingClaim], state.task, signal);
+    const result = await service.assess(state.task, state.pendingClaim, signal);
     const data = result.data && typeof result.data === 'object' ? object(result.data) : {};
     if (data.verdict === 'satisfied') { state.pendingClaim = undefined; return; }
     const gap = digest(JSON.stringify([result.errors, data.findings ?? []]));

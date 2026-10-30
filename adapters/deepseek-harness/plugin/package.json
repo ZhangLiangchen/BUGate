@@ -33,7 +33,7 @@
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test ../tests/core-service.test.mjs ../tests/runtime-node.test.mjs ../tests/team.test.mjs"
+    "test": "node --test ../tests/core-service.test.mjs ../tests/cordis-service.test.mjs ../tests/runtime-node.test.mjs ../tests/team.test.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.6-alpha.1",

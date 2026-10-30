@@ -81,3 +81,12 @@ fresh Team 会话仍接收 Lead 编写的委派 prompt，其精确字节保存�
 Lead 的真实 spawn 工具调用中。原生记录证明哪个真实成员输出了内容及可观察上下文
 策略，不证明文本原创。Lead 可以在 prompt 中放入文本后由成员复述，身份本身不能
 证明认知独立或通用识别所有代写形式。
+
+插件通过真正 Cordis 服务注册接缝提供已导出、带类型的 `BugateService`，即
+`ctx.bugate`。消费插件声明 `inject: ['bugate']`，可 await
+`status(task, signal?)`、`prepare(task, signal?)` 和
+`assess(task, claimPath, signal?)`。任务及声明路径属于配置的执行 world。
+这些方法与原生质量工具消费同一核心和传输，不开放任意命令或宿主来源签名入口。
+Cordis 随拥有者插件 fiber 卸载服务及其依赖消费者；拥有者 dispose 会取消并排空
+自身传输，旧引用以 `CORE_CANCELLED` 拒绝，重载提供新实例。质量结果本身不替代
+宿主权限和工具准入控制。

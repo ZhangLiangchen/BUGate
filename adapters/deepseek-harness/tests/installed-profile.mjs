@@ -22,3 +22,19 @@ export async function installedProfileMount(profileDir,modules){
   assert.ok(h.ctx.agentTeams,'Composed profile actually activated official Team service');
  }};
 }
+
+/** A real dependent Cordis plugin consumes the installed named service. */
+export async function observeBugateService(h,task){
+ let result,active=false;
+ const fiber=await h.ctx.plugin({name:'bugate-service-acceptance-consumer',inject:['bugate'],async apply(ctx){
+  const service=ctx.bugate;
+  assert.equal(service.name,'bugate');
+  for(const name of ['status','prepare','assess'])assert.equal(typeof service[name],'function');
+  for(const name of ['call','publish','sign','hostContext'])assert.equal(service[name],undefined,'Native signing and arbitrary execution must not be exposed on the quality service');
+  const status=await service.status(task),prepared=await service.prepare(task);
+  assert.equal(status.invocation,'completed',JSON.stringify(status));assert.equal(status.operation,'status');
+  assert.equal(prepared.invocation,'completed',JSON.stringify(prepared));assert.equal(prepared.operation,'protocol.prepare');assert.equal(prepared.data.workspace.workspace_digest,status.data.workspace_id);
+  result={service,status,prepared};active=true;ctx.effect(()=>()=>{active=false;});
+ }});
+ assert.ok(result,'The real injected consumer must activate');return{fiber,...result,active:()=>active};
+}

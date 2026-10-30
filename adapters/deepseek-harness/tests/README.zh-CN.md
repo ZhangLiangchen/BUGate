@@ -33,3 +33,9 @@ node --test adapters/deepseek-harness/tests/core-service.test.mjs \
 **NOT_RUN**。平台支持只根据实际测试报告。
 
 历史 Python/runtime 测试及发布产物保留在 Git 历史；其原始源码/协议身份不是 TS/Team 证据。
+
+`cordis-service.test.mjs` 加载实际注册的 `ctx.bugate` 和真实
+`inject: ['bugate']` 消费者，调用共享 status/prepare/assess API，并观察原生工具
+使用同一实例，验证依赖卸载、旧引用拒绝和重载。候选构建后先运行这项聚焦验证，
+再运行较长的 Team 和独立安装套件；独立 runner 也通过真正组合的已安装 profile
+注入消费者。

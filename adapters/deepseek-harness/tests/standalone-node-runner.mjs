@@ -5,7 +5,7 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {host,SessionId,requestText} from './host.mjs';
 import {initializeProject,authorAndExecute,cli} from './workflow-node.mjs';
-import {installedProfileMount} from './installed-profile.mjs';
+import {installedProfileMount,observeBugateService} from './installed-profile.mjs';
 import {teamAcceptance} from './team-fixture.mjs';
 import {negativeTeamChecks} from './team-negative.mjs';
 
@@ -24,9 +24,10 @@ for(const productFailure of [false,true]){
  try{
   const commands={...Object.fromEntries([1,2,3].map(i=>['diagnose'+i,{argv:[process.execPath,'-e',`const f=require('node:fs');console.log(f.readFileSync('logs/installed.xml','utf8'));f.writeFileSync('logs/diagnose${i}.xml','<testsuite/>');f.writeFileSync('logs/diagnose${i}-executed','observed')`],caseIds:[],report:`logs/diagnose${i}.xml`,purpose:'diagnostic',activityId:'diagnose',environmentId:'local-fixture'}])),normal:{argv:[process.execPath,'tests/runner.mjs','logs/installed.xml',productFailure?'broken':'normal'],caseIds:['C1','C2','C3'],report:'logs/installed.xml',purpose:'test',environmentId:'local-fixture'},outside:{argv:[process.execPath,'-e',"require('node:fs').writeFileSync('outside-executed','must never run')"],caseIds:['C-security'],report:'logs/outside.xml',purpose:'test',environmentId:'local-fixture'}};
   await composition.mount(h,{executionCommands:commands});
+  const injectedService=await observeBugateService(h,task);
   const agent=await h.ctx.agentLoop.create(SessionId(productFailure?'installed-failure':'installed-success'),{provider:'fixture',model:'deterministic'},{cwd:task});
   const result=await authorAndExecute(h,agent,task,{execute:true,exerciseScope:true,productFailure});
-  assert.ok(h.model.requests.every(r=>requestText(r).includes('BUGate')));assert.equal(result.completion_assessment.verdict,'satisfied');assert.equal(result.requirement_assessment.verdict,productFailure?'unsatisfied':'satisfied');results.push(result);
+  assert.ok(h.model.requests.every(r=>requestText(r).includes('BUGate')));assert.equal(result.completion_assessment.verdict,'satisfied');assert.equal(result.requirement_assessment.verdict,productFailure?'unsatisfied':'satisfied');results.push({...result,cordis_service:{name:injectedService.service.name,status:injectedService.status,prepared:injectedService.prepared}});
  }finally{await h.ctx.fiber.dispose();}
 }
 const team=await teamAcceptance(join(projectRoot,'runtime-team'),null,{mount:composition.mount,negativeChecks:negativeTeamChecks});

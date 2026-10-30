@@ -15,7 +15,7 @@
     "build": "node packaging/build.mjs --compile-only",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "node --test tests/typescript/*.test.mjs tests/distribution/*.test.mjs tests/integration_install/*.test.mjs",
-    "test:runtime": "node --test adapters/deepseek-harness/tests/core-service.test.mjs adapters/deepseek-harness/tests/runtime-node.test.mjs adapters/deepseek-harness/tests/team.test.mjs",
+    "test:runtime": "node --test adapters/deepseek-harness/tests/core-service.test.mjs adapters/deepseek-harness/tests/cordis-service.test.mjs adapters/deepseek-harness/tests/runtime-node.test.mjs adapters/deepseek-harness/tests/team.test.mjs",
     "check:distribution": "node scripts/check_distribution.mjs",
     "package": "node packaging/build.mjs --out-dir dist"
   },

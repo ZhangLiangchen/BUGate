@@ -45,3 +45,10 @@ such a run it is **NOT_RUN**. Only actual tested platforms may be claimed.
 
 Historical Python/runtime tests and released artifacts remain available in Git
 history. Their original source and protocol identities are not TS/Team evidence.
+
+`cordis-service.test.mjs` loads the actual registered `ctx.bugate` service and a
+real `inject: ['bugate']` consumer. It calls the shared status/prepare/assessment
+API, observes native tools using that same instance, and checks dependent unload,
+old-reference rejection and reload. This focused test runs before the longer
+Team and installed-package suites after a candidate build. The installed runner
+also injects a consumer through the actually composed installed profile.

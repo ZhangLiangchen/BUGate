@@ -101,3 +101,14 @@ The native record proves which live member emitted an output and its observable
 context policy; it does not prove textual originality. A Lead can place text in
 a prompt that a member repeats, so identity alone cannot establish cognitive
 independence or detect every form of ghostwriting.
+
+The plugin registers the exported, typed `BugateService` as the native Cordis
+`ctx.bugate` service. Dependent plugins declare `inject: ['bugate']` and may await
+`status(task, signal?)`, `prepare(task, signal?)` or
+`assess(task, claimPath, signal?)`. Task and claim paths belong to the configured
+execution world. These methods use the same core and transport as the native
+quality tools; they expose no arbitrary command or host-provenance signer.
+Cordis unregisters the service and unloads its dependents with the owning plugin
+fiber. Owner disposal cancels and drains its transport; retained old references
+reject with `CORE_CANCELLED`. Reload provides a new instance. Quality results do
+not themselves replace the host's permission and tool-admission controls.
