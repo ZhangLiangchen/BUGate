@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
 import {join} from 'node:path';
-import {createHash} from 'node:crypto';
-import {host,FixtureModel,SessionId,toolResponse,textResponse,send,requestText} from './host.mjs';
+import {createHash,randomUUID} from 'node:crypto';
+import {host,FixtureModel,SessionId,toolResponse,textResponse,requestText,createUserMessage} from './host.mjs';
 import {initializeProject,cli,cliEntrypoint,requirement,scopeTemplate,templates,runner} from './workflow-node.mjs';
 
 /** Transparent test relay: the actual CLI produces every byte and exit status.
@@ -40,15 +40,81 @@ if(outcome.signal)process.kill(process.pid,outcome.signal);else process.exitCode
  * persistence, provider IO, CAS and subprocesses are the installed official runtime. */
 export class TeamModel extends FixtureModel {
  queues=new Map();
+ phases=[];
  route(options){return requestText(options).match(/You are teammate "([^"]+)"/)?.[1]??'lead';}
  enqueue(member,...steps){const q=this.queues.get(member)??[];q.push(...steps);this.queues.set(member,q);}
- async *stream(options){this.requests.push(options);const next=this.queues.get(this.route(options))?.shift();const response=next?await next(options):textResponse('This member has no pending fixture action. No completion claim.');for(const frame of response)yield frame;}
+ async *stream(options){
+  this.requests.push(options);const member=this.route(options),phase=this.phases.find(p=>p.member===member&&!p.finished&&!p.emittedDone);
+  let response;
+  if(phase&&requestText(options).includes(phase.token)){
+   phase.request_indexes.push(this.requests.length-1);const next=phase.steps.shift();response=await next(options);
+   for(const frame of response)if(frame.type==='block-end'&&frame.block.type==='tool-call')phase.calls.push({id:String(frame.block.id),name:frame.block.name,arguments:frame.block.arguments});
+   if(!phase.steps.length)phase.emittedDone=true;
+  }else{const next=this.queues.get(member)?.shift();response=next?await next(options):textResponse('This member has no activated fixture phase. No completion claim.');}
+  for(const frame of response)yield frame;
+ }
+}
+
+/** Test-only correlation over real host events. Tokens never establish authorship
+ * or review completion; actual call/result/turn and durable signed facts do. */
+export function createTeamPhaseDriver(h,lead,{task,budgetMs=300000}={}){
+ const phases=[],waits=[],driverId=randomUUID();let sequence=0;
+ const pending=name=>phases.find(p=>p.member===name&&!p.finished&&!p.emittedDone);
+ const activate=(name,text)=>{const p=pending(name);return p?text+'\n'+p.token:text;};
+ const step=(name,args)=>()=>{const value=structuredClone(typeof args==='function'?args():args);if(name==='spawn_teammate')value.prompt=activate(value.name,value.prompt);if(name==='send_message')value.message=activate(value.target,value.message);return toolResponse(name,value,'team-call-'+driverId+'-'+(++sequence));};
+ function queue(member,...steps){const token='BUGATE_FIXTURE_PHASE_'+randomUUID(),phase={id:phases.length+1,member,token,marker:token+' FINISHED',steps:[],calls:[],request_indexes:[],emittedDone:false,finished:false,allowInterrupted:false};phase.steps=[...steps,()=>textResponse(phase.marker+'; quality remains subject to persisted BUGate facts.')];phases.push(phase);h.model.phases.push(phase);return phase;}
+ const row=name=>h.ctx.agentTeams.listMembers(lead).find(m=>m.name===name);
+ async function log(name,durable=false){const member=row(name);if(!member)return;const id=SessionId(String(member.id)),session=h.ctx.sessions.get(id);if(session){if(durable)assert.equal(await h.ctx.sessions.flush(session),true,'The exact phase session must flush before advancing');return{member,events:session.snapshotEvents(),source:durable?'live_flushed':'live'};}const value=await h.ctx.sessionQuery.readSession(id);return{member,events:value.events,source:'persisted_read'};}
+ const textOf=message=>(message?.content??[]).filter(c=>c.type==='text').map(c=>c.text).join('\n');
+ function phaseBoundary(phase,events){
+  const outputs=phase.calls.map(call=>({call,invocation:events.find(e=>e.type==='tool/call'&&String(e.data.callId)===call.id),result:events.find(e=>e.type==='tool/result'&&String(e.data.message.toolCallId)===call.id)}));
+  if(outputs.some(x=>!x.invocation||!x.result))return;
+  for(const output of outputs){assert.equal(output.invocation.data.name,output.call.name);assert.equal(output.invocation.data.arguments,output.call.arguments);}
+  const marker=events.find(e=>e.type==='assistant/message'&&textOf(e.data.message).includes(phase.marker));
+  if(marker){const end=events.find(e=>e.type==='turn/end'&&e.seq>marker.seq&&e.data.turn===marker.data.turn);if(end){assert.equal(end.data.reason.kind,'completed','Normal phases require the actual completed turn, not crash balancing');return{outputs,end,marker};}}
+  if(phase.allowInterrupted&&phase.steps.length===1&&outputs.length){const last=outputs.at(-1),end=events.find(e=>e.type==='turn/end'&&e.seq>last.result.seq&&e.data.turn===last.result.data.turn);if(end&&last.result.data.message.isError){assert.equal(end.data.reason.kind,'aborted');return{outputs,end,interrupted:true};}}
+ }
+ async function publications(boundary,sessionId){
+  const verified=[];for(const output of boundary.outputs.filter(x=>x.call.name==='bugate_publish_artifact')){
+   const directory=join(task,'.bugate/host-observations');let observations=[];try{observations=await Promise.all((await readdir(directory)).map(async file=>JSON.parse(await readFile(join(directory,file),'utf8'))));}catch(error){if(error.code!=='ENOENT')throw error;}
+   const observation=observations.find(r=>r.execution.session_id===sessionId&&r.execution.call_id===output.call.id);
+   if(boundary.interrupted){assert.ok(observation,'Interrupted-after-publication phase must retain its actual output');verified.push({call_id:output.call.id,observation_ref:observation.subject_ref,status:'interrupted_not_authorized'});continue;}
+   const actual=JSON.parse(textOf(output.result.data.message));
+   if(actual.invocation==='invalid_input'&&!observation){verified.push({call_id:output.call.id,status:'rejected_without_publication'});continue;}
+   assert.ok(observation,'Every successful/timed-out publication phase must have an actual host observation');
+   const artifact=JSON.parse(await readFile(join(task,'artifacts',observation.subject_ref.id+'.json'),'utf8'));assert.equal(artifact.digest,observation.subject_ref.digest);
+   const settlement=JSON.parse(await readFile(join(task,'.bugate/host-settlements','settlement-'+observation.id+'.json'),'utf8'));assert.deepEqual(settlement.observation_ref,{id:observation.id,digest:observation.digest});assert.equal(settlement.call_id,output.call.id);assert.equal(settlement.result_event.seq,output.result.seq);assert.deepEqual(settlement.result_event.data,output.result.data);
+   if(actual.invocation==='completed'){assert.deepEqual(artifact,actual.data,'Completed output is exactly the durably published artifact');assert.equal(settlement.status,'completed');}else if(actual.invocation==='timeout')assert.equal(settlement.status,'timeout');else assert.notEqual(settlement.status,'completed');
+   verified.push({call_id:output.call.id,observation_id:observation.id,settlement_id:settlement.id,subject_ref:observation.subject_ref,status:settlement.status});
+  }return verified;
+ }
+ async function waitPhase(phase){
+  if(phase.finished)return;const started=Date.now(),audit={kind:'phase',phase_id:phase.id,member:phase.member,token:phase.token,started_at:new Date(started).toISOString(),budget_ms:budgetMs,status:'waiting'};waits.push(audit);
+  try{while(Date.now()-started<budgetMs){const current=await log(phase.member),boundary=current&&phaseBoundary(phase,current.events);if(boundary){const durable=await log(phase.member,true),confirmed=phaseBoundary(phase,durable.events);assert.ok(confirmed,'Flushed session must retain the exact phase boundary');audit.calls=confirmed.outputs.map(x=>({id:x.call.id,name:x.call.name,call_seq:x.invocation.seq,result_seq:x.result.seq}));audit.turn_end={seq:confirmed.end.seq,time:confirmed.end.time,turn:confirmed.end.data.turn};audit.publications=await publications(confirmed,String(durable.member.id));audit.persistence=durable.source;audit.other_members=h.ctx.agentTeams.listMembers(lead).filter(m=>m.name!==phase.member);audit.status=confirmed.interrupted?'interrupted_not_authorized':'observed';phase.finished=true;phase.steps=[];return audit;}await new Promise(r=>setTimeout(r,100));}throw Error('Actual phase '+phase.id+' for '+phase.member+' did not complete within '+budgetMs+'ms');}
+  catch(error){audit.status='failed';audit.error=String(error);throw error;}finally{audit.finished_at=new Date().toISOString();audit.elapsed_ms=Date.now()-started;}
+ }
+ async function send(agent,text){assert.equal(String(agent.session.id),String(lead.session.id),'Only the real Lead receives direct fixture input');const phase=pending('lead');assert.ok(phase,'Lead actions require an explicitly queued phase');agent.followup(createUserMessage({content:[{type:'text',text:activate('lead',text)}],source:{kind:'user'}}));await waitPhase(phase);}
+ async function settle(){for(const phase of phases.filter(p=>!p.finished))await waitPhase(phase);}
+ const runMember=async(name,message)=>{if(!pending(name))queue(name);queue('lead',step('send_message',{target:name,message}));await send(lead,'Resume the named member through the official Team inbox.');await settle();};
+ async function sendPeer(sender,target,message){
+  const previous=await log(target),watermark=previous?.events.at(-1)?.seq??-1,requestWatermark=h.model.requests.length;queue(sender,step('send_message',{target,message}));const senderPhase=pending(sender);if(sender==='lead')await send(lead,'Send the bounded Team evidence exchange.');else await runMember(sender,'Send the prepared peer evidence exchange.');
+  const sentCall=senderPhase.calls.find(c=>c.name==='send_message'),senderLog=await log(sender,true),sentResult=senderLog.events.find(e=>e.type==='tool/result'&&String(e.data.message.toolCallId)===sentCall?.id);assert.ok(sentResult);assert.equal(sentResult.data.message.isError,false);assert.equal(JSON.parse(textOf(sentResult.data.message)).sent,true,'The actual sender call must succeed; a received historical message alone is insufficient');
+  const senderRow=row(sender),started=Date.now(),audit={kind:'peer_input',sender,target,sender_phase:senderPhase.id,sender_call_id:sentCall.id,sender_result_seq:sentResult.seq,after_seq:watermark,request_watermark:requestWatermark,started_at:new Date(started).toISOString(),budget_ms:budgetMs,status:'waiting'};waits.push(audit);
+  try{while(Date.now()-started<budgetMs){const current=await log(target),boundary=current&&peerProcessingBoundary(current.events,h.model,{watermark,requestWatermark,senderSessionId:String(senderRow.id),target,message});if(boundary){const{received,response,end}=boundary,durable=await log(target,true);assert.ok(durable.events.some(e=>e.seq===received.seq&&e.data.id===received.data.id));assert.ok(durable.events.some(e=>e.seq===end.seq&&e.type==='turn/end'));Object.assign(audit,{status:'processed_and_flushed',session_id:String(current.member.id),message_id:received.data.id,message_seq:received.seq,model_response_seq:response.seq,turn_end_seq:end.seq,persistence:durable.source});return audit;}await new Promise(r=>setTimeout(r,100));}throw Error('Peer input from '+sender+' to '+target+' was not processed within '+budgetMs+'ms');}catch(error){audit.status='failed';audit.error=String(error);throw error;}finally{audit.finished_at=new Date().toISOString();audit.elapsed_ms=Date.now()-started;}
+ }
+ return{queue,step,send,settle,runMember,sendPeer,waits,phases,waitPhase};
+}
+
+export function peerProcessingBoundary(events,model,{watermark,requestWatermark,senderSessionId,target,message}){
+ const received=events.find(e=>e.seq>watermark&&e.type==='user/message'&&e.data.source.kind==='agent-message'&&String(e.data.source.senderSessionId)===senderSessionId&&e.data.content.some(c=>c.type==='text'&&c.text.includes(message)));if(!received)return;
+ const response=events.find(e=>e.seq>received.seq&&e.type==='assistant/message'&&e.data.message.source?.kind==='model'),end=response&&events.find(e=>e.type==='turn/end'&&e.seq>response.seq&&e.data.turn===response.data.turn),requested=model.requests.slice(requestWatermark).some(r=>model.route(r)===target&&requestText(r).includes(message));
+ if(!end||!requested)return;assert.equal(end.data.reason.kind,'completed','Peer input processing requires its actual completed turn');return{received,response,end};
 }
 const observed=(value)=>{assert.equal(value.isError,false,JSON.stringify(value));if(value.value?.invocation)assert.equal(value.value.invocation,'completed',JSON.stringify(value));return value.value?.data??value.value;};
 export async function teamAcceptance(project,plugin,{evidencePath,mount,negativeChecks}={}){
  const model=new TeamModel(),policy={perspectives:[{id:'oracle',proposition_ids:['P1'],necessity:'Check the source-defined exact result and the disputed zero boundary.',source_refs:['SRC1']},{id:'coverage',proposition_ids:['P1'],necessity:'Check that required positive, zero and negative branches exercise the declared Oracle.',source_refs:['SRC1']}],context:'fresh_required',max_rounds:6,cross_check_required:true};
  const task=await initializeProject(project,{teamPolicy:policy}),persistence=join(project,'sessions'),timeoutRelay=negativeChecks?await createTimeoutRelay(project):undefined,h=await host({model,persistence,team:mount?'infrastructure':true});
- let lead;const observations=[],waitObservations=[],records=new Map();let scopeState,scopeRef,sequence=0;
+ let lead,waitObservations=[];const observations=[],records=new Map();let scopeState,scopeRef;
  h.ctx.on('tools/result',(exec,result)=>{observations.push({agent:String(exec.agent?.session.id),tool:exec.name,call:String(exec.callId),result});if(result.isError||result.value?.invocation!=='completed')return;const data=result.value.data;if(exec.name==='bugate_scope')scopeState=data;if(exec.name==='bugate_record_scope')scopeRef={id:data.id,revision:data.revision,digest:data.digest};if(exec.name==='bugate_publish_artifact')records.set(data.id,data);});
  h.ctx.tools.register({name:'inspect_contract',description:'Read the generated Profile-declared source and exact current review artifacts through the configured filesystem provider.',parameters:{type:'object',properties:{},additionalProperties:false},output:{schema:{type:'object'},render:(_a,v)=>[{type:'text',text:JSON.stringify(v)}]},execute:async()=>{const source=new TextDecoder().decode(await h.ctx.fs.readBytes(await h.ctx.fs.resolve(join(project,'requirements.md'))));const artifacts={};for(const name of ['brief','testability','inventory']){try{artifacts[name]=JSON.parse(new TextDecoder().decode(await h.ctx.fs.readBytes(await h.ctx.fs.resolve(join(task,'artifacts',name+'.json')))));}catch{}}const implementations={};for(const c of artifacts.inventory?.content?.cases??[]){const path=c.implementation?.path;if(!path||implementations[path])continue;try{const bytes=await h.ctx.fs.readBytes(await h.ctx.fs.resolve(join(task,path)));implementations[path]={content:new TextDecoder('utf-8',{fatal:true}).decode(bytes),digest:'sha256:'+createHash('sha256').update(bytes).digest('hex')};}catch(error){if(!['ENOENT','FS_NOT_FOUND'].includes(error?.code))throw error;}}return{source,artifacts,implementations};}});
  h.ctx.tools.register({name:'write',description:'Write a generated draft through configured filesystem provider.',parameters:{type:'object',properties:{file_path:{type:'string'},content:{type:'string'}},required:['file_path','content'],additionalProperties:false},output:{schema:{type:'boolean'},render:()=>[]},execute:async args=>{await h.ctx.fs.writeText(await h.ctx.fs.resolve(args.file_path),args.content);return true;}});
@@ -56,24 +122,8 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
  const runtimeConfig={executionCommands,maxContextBytes:16000,...(timeoutRelay?{coreEntrypoint:timeoutRelay.entry}:{})};
  if(mount)await mount(h,{project,task,...runtimeConfig});else await h.ctx.plugin(plugin,{projectRoot:project,nodeExecutable:process.execPath,...runtimeConfig});
  lead=await h.ctx.agentLoop.create(SessionId('team-lead'),{provider:'fixture',model:'deterministic-team-fixture'},{cwd:task});
- const step=(name,args)=>()=>toolResponse(name,typeof args==='function'?args():args,'team-call-'+(++sequence));
- const queue=(member,...steps)=>model.enqueue(member,...steps,()=>textResponse('The bounded fixture step is complete; quality remains subject to BUGate assessment.'));
- const flush=async()=>{await h.ctx.sessions.flush(lead.session);};
- async function settle(){
-  const started=Date.now(),budget=300000,deadline=started+budget;
-  const audit={id:waitObservations.length+1,started_at:new Date(started).toISOString(),budget_ms:budget,status:'waiting',initial_members:structuredClone(h.ctx.agentTeams.listMembers(lead)),unfinished_members:[]};waitObservations.push(audit);
-  try{
-   while(Date.now()<deadline){const members=h.ctx.agentTeams.listMembers(lead),running=members.filter(m=>m.status==='running'||m.status==='provisioning');audit.unfinished_members=running;
-    if(!running.length){audit.members_idle_at=new Date().toISOString();await flush();audit.status='settled';audit.final_members=members;return;}
-    await new Promise(r=>setTimeout(r,Math.min(25,Math.max(1,deadline-Date.now()))));
-   }
-   audit.status='timeout';throw Error('Actual Team failed to settle within the 300000ms fixture deadline');
-  }catch(error){if(audit.status==='waiting')audit.status='error';audit.error=String(error);throw error;}
-  finally{audit.finished_at=new Date().toISOString();audit.elapsed_ms=Date.now()-started;}
- }
+ const driver=createTeamPhaseDriver(h,lead,{task}),{step,queue,send,settle,runMember,sendPeer}=driver;waitObservations=driver.waits;
  const memberAgent=name=>{const row=h.ctx.agentTeams.listMembers(lead).find(m=>m.name===name);return row?h.ctx.agents.get(row.id):undefined;};
- const runMember=async(name,message)=>{queue('lead',step('send_message',{target:name,message}));await send(lead,'Resume the named member through the official Team inbox.');await settle();};
- const sendPeer=async(sender,target,message)=>{queue(sender,step('send_message',{target,message}));if(sender==='lead'){await send(lead,'Send the bounded Team evidence exchange.');await settle();}else await runMember(sender,'Send the prepared peer evidence exchange.');};
  function review(id,perspective,{open=false,cross=[],resolved=false}={}){const value=templates(scopeRef)[3];value.id=id;value.revision=String(Number(records.get(id)?.revision??0)+1);value.content.reviewer='A label is never identity';value.content.perspective_id=perspective;value.content.artifact_digests=Object.fromEntries(['brief','testability','inventory'].map(id=>[id,records.get(id).digest]));value.content.findings=perspective==='oracle'?[{id:'zero-boundary',proposition_id:'P1',statement:'SRC1 states zero and negative inputs produce zero; the required zero branch must have an explicit exact assertion; cross-check its presence in the inventory.',blocking:true,status:open?'open':'resolved',evidence_refs:['SRC1','O1'],counterevidence:resolved?['inventory']:[]}]:[];value.content.conclusion=open?'uncertain':'accepted';value.content.cross_checks=cross;return value;}
  function publish(value,update=false){return step('bugate_publish_artifact',()=>({artifact:typeof value==='function'?value():value,...(update?{expected_digest:records.get((typeof value==='function'?value():value).id).digest}:{})}));}
  function received(member,reviewId){const agent=memberAgent(member),ref=records.get(reviewId);assert.ok(agent);const event=agent.session.snapshotEvents().findLast(e=>e.type==='user/message'&&e.data.source.kind==='agent-message'&&JSON.stringify(e.data.content).includes(ref.digest));assert.ok(event,'The official Team message must have entered the actual target session');return event.data.id;}
@@ -135,7 +185,7 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
   assert.ok(receipts.some(r=>r.messages.length>0));assert.ok(receipts.some(r=>r.subject_ref.digest===firstOpinion.digest),'Original dissent observation retained');
   assert.deepEqual(JSON.parse(await readFile(join(task,'artifacts/review-oracle.json'),'utf8')),records.get('review-oracle'),'Completed tool output has already been published');
   const report={status:'PASS',fixture_runtime_config:{maxContextBytes:16000,memberSettleDeadlineMs:300000,timeoutRelay},mode:'deterministic-model-real-runtime',live_model:'NOT_RUN',task,policy,versions:{node:process.version,dsh:'0.2.2-alpha.2',team:'0.2.2-alpha.2',cordis:'4.0.6-alpha.1'},members:h.ctx.agentTeams.listMembers(lead),tasks:h.ctx.agentTeams.listTasks(lead),original_opinion:firstOpinion,current_opinions:[records.get('review-oracle'),records.get('review-coverage')],assessment:assessment.data,implemented_design:implementedDesign,execution:execution.data,requirement_verification:verified,receipts,model_requests:model.requests.length,observations,waits:waitObservations};
-  if(negativeChecks)report.negative_controls=await negativeChecks({h,lead,task,project,records,observations,queue,step,publish,review,runMember,sendPeer,received,settle,policy,timeoutRelay});
+  if(negativeChecks)report.negative_controls=await negativeChecks({h,lead,task,project,records,observations,queue,step,publish,review,send,runMember,sendPeer,received,settle,policy,timeoutRelay});
   // Restart the entire Cordis host, not only a Team member. Historical signed
   // outputs are recomputed from persisted session results under a new host key.
   const beforeRestart=cli('status','--task',task);assert.equal(beforeRestart.invocation,'completed');
@@ -145,11 +195,11 @@ export async function teamAcceptance(project,plugin,{evidencePath,mount,negative
    if(mount)await mount(recovered,{project,task,...runtimeConfig});else await recovered.ctx.plugin(plugin,{projectRoot:project,nodeExecutable:process.execPath,...runtimeConfig});
    recovered.ctx.on('tools/result',(exec,result)=>recoveredResults.push({tool:exec.name,result}));
    const resumed=(await recovered.ctx.agents.resume({resumeSessionId:SessionId('team-lead'),agentOptions:{provider:'fixture',model:'deterministic-team-fixture'}})).agent;
-   recoveredModel.enqueue('lead',()=>toolResponse('bugate_prepare',{},'cold-host-prepare'),()=>toolResponse('bugate_status',{},'cold-host-status'),()=>textResponse('Recomputed persisted facts without replacing historical provenance.'));
-   await send(resumed,'Recover the existing task and read the persisted exact facts after host restart.');await recovered.ctx.sessions.flush(resumed.session);
+   const recoveredDriver=createTeamPhaseDriver(recovered,resumed,{task});recoveredDriver.queue('lead',recoveredDriver.step('bugate_prepare',{}),recoveredDriver.step('bugate_status',{}));
+   await recoveredDriver.send(resumed,'Recover the existing task and read the persisted exact facts after host restart.');await recovered.ctx.sessions.flush(resumed.session);
    for(const entry of recoveredResults){assert.equal(entry.result.isError,false,JSON.stringify(entry));assert.equal(entry.result.value.invocation,'completed',JSON.stringify(entry));}
    const afterRestart=cli('status','--task',task);assert.equal(afterRestart.invocation,'completed',JSON.stringify(afterRestart));assert.equal(afterRestart.data.workspace_snapshot,beforeRestart.data.workspace_snapshot,'A new runtime authority must not replace old immutable settlements or change the authorization snapshot');
-   report.host_restart={before_snapshot:beforeRestart.data.workspace_snapshot,after_snapshot:afterRestart.data.workspace_snapshot,observations:recoveredResults,members:recovered.ctx.agentTeams.listMembers(resumed)};
+   report.host_restart={before_snapshot:beforeRestart.data.workspace_snapshot,after_snapshot:afterRestart.data.workspace_snapshot,observations:recoveredResults,members:recovered.ctx.agentTeams.listMembers(resumed),waits:recoveredDriver.waits};
   }finally{await recovered.ctx.fiber.dispose();}
   if(evidencePath)await writeFile(evidencePath,JSON.stringify(report,null,2)+'\n');return{report,task,persistence,records,cli,project};
  }catch(error){await writeFile(join(project,'team-failure.json'),JSON.stringify({message:String(error),observations,waits:waitObservations,requests:model.requests.map(r=>({sessionId:r.sessionId,route:model.route(r)})),members:lead?h.ctx.agentTeams.listMembers(lead):[]},null,2));console.error('TEAM_FAILURE_ARTIFACT',join(project,'team-failure.json'));throw error;}finally{await h.ctx.fiber.dispose();}

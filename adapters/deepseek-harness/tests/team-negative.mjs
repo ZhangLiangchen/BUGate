@@ -2,13 +2,12 @@ import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {readFile,readdir,writeFile,mkdir,cp} from 'node:fs/promises';
 import {join} from 'node:path';
-import {send} from './host.mjs';
 import {cli,initializeProject,cliEntrypoint} from './workflow-node.mjs';
 
 /** Counterexamples use real official Team executions; invalid imported material
  * and deliberate mutations remain in their temporary task as negative evidence. */
 export async function negativeTeamChecks(api){
- const {h,lead,task,project,records,observations,queue,step,publish,review,runMember,sendPeer,received,settle,policy,timeoutRelay}=api,checks=[];
+ const {h,lead,task,project,records,observations,queue,step,publish,review,send,runMember,sendPeer,received,settle,policy,timeoutRelay}=api,checks=[];
  const codes=()=>{const value=cli('status','--task',task);assert.equal(value.invocation,'completed',JSON.stringify(value));return value.data.findings.map(x=>x.code);};
  const checkpoint=(name,expected)=>{const actual=codes();for(const code of expected)assert.ok(actual.includes(code),JSON.stringify({name,expected,actual}));checks.push({name,expected,observed_codes:[...new Set(actual)]});};
  // A failed publish with no durable output must not poison subsequent
@@ -80,7 +79,7 @@ export async function negativeTeamChecks(api){
   }
   return decision;
  });
- queue('cancel-reviewer',step('inspect_contract',{}),publish(()=>review('review-cancel-after-publish','coverage')));
+ queue('cancel-reviewer',step('inspect_contract',{}),publish(()=>review('review-cancel-after-publish','coverage'))).allowInterrupted=true;
  queue('lead',step('spawn_teammate',{name:'cancel-reviewer',description:'Final-outcome cancellation negative control',prompt:'Publish one current coverage opinion. The fixture interrupts the actual Team turn after durable output publication.',context:'fresh'}));
  await send(lead,'Create the real Team cancellation control.');await settle();stop();assert.ok(cancellation,'Actual Team interrupt must run at the observed post-execute barrier');
  await runMember('cancel-reviewer','Resume through the official Team inbox and recompute the final publication outcome; do not emit a replacement review.');
